@@ -100,6 +100,9 @@ export function mapProduct(
     imageUrl: p.image_url ?? '',
     calories: p.calories ?? 0,
     isActive: p.is_active,
+    // Defaults TRUE, matching the column default: a project that has not run
+    // 20260908120000 shows every item as earning, which is what it does.
+    earnsLoyaltyPoints: p.earns_loyalty_points ?? true,
     sortOrder: p.sort_order ?? 0,
     modifierGroupIds: links.filter(l => l.product_id === p.id).map(l => l.group_id),
     variants: variants
@@ -388,6 +391,12 @@ export function productToDbUpdate(p: Product): Partial<DbProduct> {
     // reconstructed `isActive` value would let an ordinary text/price edit
     // silently reactivate a disabled menu item. A future activation control must
     // use an explicit, auditable path instead of piggybacking on generic edits.
+    //
+    // `earnsLoyaltyPoints` is excluded for exactly the same reason, and it is
+    // the same class of setting: an administrator's decision that an item earns
+    // nothing must not be undone by somebody correcting its price. Its control
+    // writes through `setProductEarnsPoints` instead, which sends that one
+    // column and nothing else. `mappers.test.ts` pins this omission.
   };
 }
 

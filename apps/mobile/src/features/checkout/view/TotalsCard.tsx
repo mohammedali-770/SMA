@@ -38,6 +38,7 @@ export function TotalsCard({
   totals,
   isDelivery,
   labels,
+  pointsEarned,
   serverNote,
 }: {
   totals: PreviewTotals;
@@ -45,8 +46,15 @@ export function TotalsCard({
   labels: {
     subtotal: string; deliveryFee: string; discount: string;
     loyaltyDiscount: string; compDiscount: string; compNote: string;
-    vat: string; total: string;
+    vat: string; total: string; pointsEarned: string;
   };
+  /**
+   * Points this order will earn, as the SERVER computed it — null when it could
+   * not be fetched, which renders nothing rather than a guess. A TOTAL only: the
+   * owner asked for the figure without a per-item breakdown, and a breakdown
+   * would also be the first step towards re-deriving the rule on the client.
+   */
+  pointsEarned: number | null;
   serverNote: string;
 }) {
   const styles = useStyles();
@@ -76,6 +84,16 @@ export function TotalsCard({
       <MoneyRow label={labels.total} amount={totals.total} big />
       {totals.compDiscount > 0 ? (
         <Text variant="caption" tone="tertiary" style={{ marginTop: space.s1 }}>{labels.compNote}</Text>
+      ) : null}
+      {/* Below the total, because it is what the order GIVES rather than part of
+          what it costs — putting it among the money rows would read as a
+          reduction. Hidden at 0 and when unknown: "You'll earn 0 points" is a
+          worse experience than saying nothing, and an item may legitimately earn
+          nothing (`products.earns_loyalty_points`). */}
+      {pointsEarned !== null && pointsEarned > 0 ? (
+        <Text variant="caption" tone="secondary" style={{ marginTop: space.s1 }}>
+          {labels.pointsEarned.replace('{points}', String(pointsEarned))}
+        </Text>
       ) : null}
       <Text variant="caption" tone="tertiary" style={{ marginTop: space.s1 }}>{serverNote}</Text>
     </View>

@@ -41,7 +41,7 @@ import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
-import { catalog as catalogApi, checkout, compMembership, coupons, orders, payments } from '../../services/api';
+import { catalog as catalogApi, checkout, compMembership, coupons, loyaltyPreview, orders, payments } from '../../services/api';
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
@@ -376,6 +376,9 @@ export function CheckoutScreen() {
   // The submission-time re-read of `app_settings.loyalty_pickup_only`; null
   // until one has been taken. See the derivation below.
   const [pickupOnlyOverride, setPickupOnlyOverride] = useState<boolean | null>(null);
+  // What this order will EARN, as the server computes it. `null` renders
+  // nothing — see the effect below for why it is fetched rather than derived.
+  const [pointsEarned, setPointsEarned] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
     compMembership.isComped().then((v) => { if (alive) setComped(v); });
@@ -417,6 +420,35 @@ export function CheckoutScreen() {
     loyaltyPickupOnly: loyalty?.pickupOnly ?? true,
     comped,
   }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, comped]);
+
+  // WHAT THIS ORDER WILL EARN — fetched, never computed here.
+  //
+  // The earning rule already lives in two SQL functions that must agree
+  // (`place_order` and `compute_order_snapshot`); a third copy in this file
+  // would be a figure that drifts from the points actually granted, and it
+  // would have to absorb every later loyalty change too. `preview_loyalty_points`
+  // is a narrow SECURITY DEFINER wrapper returning only the loyalty figures, so
+  // the number shown is produced by the code that grants it.
+  //
+  // Deliberately NOT part of `canSubmitOrder`: this is a nicety on top of state
+  // the customer already has, and a slow or failed read must never stop a valid
+  // order. `alive` drops a late response so a stale figure cannot overwrite a
+  // newer one after a quick edit.
+  useEffect(() => {
+    if (!selectedBranch || !orderType || cart.items.length === 0) { setPointsEarned(null); return; }
+    let alive = true;
+    void loyaltyPreview.points({
+      branchId: selectedBranch.id,
+      orderType,
+      items: cart.toOrderItems(),
+      addressId: orderType === 'delivery' ? addressId : null,
+      couponCode: couponResult?.ok ? couponCode.trim() : null,
+      loyaltyPoints: redeemingPoints,
+    }).then((r) => { if (alive) setPointsEarned(r ? r.earned : null); });
+    return () => { alive = false; };
+    // `comped` is in the list because a comped order earns nothing and the
+    // figure must disappear when the re-check flips it.
+  }, [selectedBranch, orderType, cart.items, addressId, couponResult, couponCode, redeemingPoints, comped]);
 
   // The confirmed location, and the landmark that travels WITH it.
   //
@@ -1012,6 +1044,7 @@ export function CheckoutScreen() {
           <TotalsCard
             totals={totals}
             isDelivery={isDelivery}
+            pointsEarned={pointsEarned}
             labels={{
               subtotal: t('subtotal'),
               deliveryFee: t('deliveryFee'),
@@ -1019,6 +1052,7 @@ export function CheckoutScreen() {
               loyaltyDiscount: t('loyaltyDiscount'),
               compDiscount: t('compDiscount'),
               compNote: t('compNote'),
+              pointsEarned: t('pointsEarnedNote'),
               // Single substitution at the point of use. The i18n layer has no
               // interpolation and this PR does not add one for a single string.
               vat: t('vat').replace('{rate}', String(brand?.vatPercentage ?? 15)),

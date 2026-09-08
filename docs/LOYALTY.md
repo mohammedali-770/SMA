@@ -41,9 +41,11 @@ in `orders.loyalty_points_earned` / `_redeemed` / `loyalty_discount_amount` /
 **10% rebate**. The QSR norm is 1–5%. That is a pricing decision, not an
 engineering one, and it is one settings change whenever the owner wants it.
 
-**Points are earned on the payable total**, which includes the delivery fee and
-is VAT-inclusive. Earning on the merchandise subtotal alone is the more usual
-design; it has been raised with the owner and is not implemented.
+**Points are earned on an ELIGIBLE BASE, not on the payable total** — changed by
+`20260908120000`, see §3. The base is the sum of order lines whose product still
+earns, reduced by the pro-rata share of any coupon and redemption, clamped to
+what is payable. It is VAT-inclusive, because prices here are; it excludes the
+**delivery fee**, which is not merchandise.
 
 ---
 
@@ -128,14 +130,83 @@ the rule is about points, not about discounts. The redemption floor
 
 ---
 
-## 3. Testing
+## 3. Per-item exclusion (`products.earns_loyalty_points`, default TRUE)
+
+**The rule.** With the flag off, **ordering that item earns nothing**. Points may
+still be **spent** on an order containing it — the owner's wording, and what
+makes this earn-side only.
+
+**Where an administrator sets it.** Admin console → Menu → the star control on
+each product row. It writes **one column** through `setProductEarnsPoints` and is
+deliberately **not** part of the product edit modal: `productToDbUpdate` omits the
+flag, exactly as it omits `is_active`, so that correcting a price cannot silently
+restore earning on an item somebody zeroed. `productEditMapper.test.ts` pins the
+omission with a fixture that carries `earnsLoyaltyPoints: false`.
+
+**A Lazywait re-import cannot undo it.** `import_lazywait_catalog` updates and
+inserts products with explicit column lists that do not name this column. That is
+true by construction rather than by intent, so
+`loyalty_item_exclusion_test.sql` §8 asserts it.
+
+### The formula, because a future reader will get it wrong
+
+```
+eligible   = Σ line_total  where products.earns_loyalty_points
+earn_base  = eligible − round((coupon + loyalty_discount) × eligible / subtotal, 2)
+earn_base  = greatest(0, least(earn_base, total))
+points     = floor(earn_base × points_per_riyal)
+```
+
+The **pro-rata** term is the part worth understanding: coupons and redemptions
+are order-level, so the eligible lines carry their share. Without it, an excluded
+item would absorb the whole discount and shield the eligible ones.
+
+### Two consequences, stated rather than discovered later
+
+**The comp no longer protects itself.** A comped order used to earn nothing *for
+free*: points were `floor(v_total × rate)` and `v_total` is zeroed for a comp. An
+eligible base is built from line prices, which a comp does not touch — so without
+a guard a free order would start earning. Both a `not v_is_comp` condition **and**
+the `least(…, v_total)` clamp are present, and the suite pins each separately.
+
+**The delivery fee stops earning**, accepted by the owner on 2026-09-07. The fee
+is not a line, so it is never in `eligible`; it stays in `total` and can only
+lower the clamp. While §2's pickup-only rule is on this is a **no-op** — an
+earning order is a pickup order, whose fee is 0 — so it is observable only if
+that setting is turned off.
+
+## 3a. Telling the customer what they will earn
+
+Checkout shows one line, **"You'll earn N points with this order"**, below the
+total. No per-item breakdown, per the owner's instruction.
+
+**The figure is fetched, not computed.** `preview_loyalty_points` is a narrow
+`SECURITY DEFINER` RPC that takes the customer from `auth.uid()` — never a
+caller-supplied id — and returns only `loyalty_points_earned`,
+`loyalty_points_redeemed`, `loyalty_discount_amount` and `total`.
+
+Why an RPC rather than client arithmetic: the earning rule already lives in two
+SQL functions that must agree, and a third copy in the client would be a number
+that drifts from the points actually granted — while also having to absorb §5's
+expiry and multipliers. And why a wrapper rather than exposing the snapshot:
+`compute_order_snapshot` is `service_role`-only because it trusts a
+caller-supplied `p_customer` with no check, so opening it would let anyone read
+another customer's name, phone and address snapshot. That boundary is asserted by
+both the migration and the suite.
+
+It **never blocks an order**: any failure renders nothing, the same rule
+`refreshAvailability` follows. The line is hidden at 0 points, because an item may
+legitimately earn nothing.
+
+## 4. Testing
 
 | Suite | Covers |
 | --- | --- |
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
-| `src/lib/mappers.test.ts` | The admin mapper reads and defaults the column |
+| `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
+| `src/lib/mappers.test.ts` · `productEditMapper.test.ts` | The admin mappers read and default both columns, and the generic edit contract carries neither |
 | `supabase/tests/loyalty_reason_history_safe_test.sql` · `loyalty_reason_no_order_number_test.sql` | Ledger-reason semantics (pre-existing) |
 
 Two guards are worth knowing about because they caught real mistakes while this
@@ -158,7 +229,7 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 4. Regulatory shape (KSA)
+## 5. Regulatory shape (KSA)
 
 Not legal advice; it is why the design looks the way it does.
 
@@ -176,14 +247,14 @@ Not legal advice; it is why the design looks the way it does.
 
 ---
 
-## 5. Planned, not built
+## 6. Planned, not built
 
 Recorded here so nobody re-derives them. Each is a separate pull request with its
 own migration and its own owner approval.
 
 | | Change | Note |
 | --- | --- | --- |
-| 2 | `products.earns_loyalty_points` — force an item to earn nothing | **Earn-exclusion only**: points may still be *spent* on such an item. Changes how the earning base is computed, from the payable total to an eligible base |
+| ~~2~~ | ~~`products.earns_loyalty_points`~~ | **DONE — see §3.** Kept in this table so the sequence still reads in order |
 | 3 | Expiry — a fixed calendar reset, period set in the admin portal | Needs `loyalty_transactions_type_check` widened to admit `expire`, a `pg_cron` driver, a customer-facing expiry date, and the T&C acceptance moment in §4 |
 | 4 | `loyalty_multipliers` — x2 points, or +x% for a period | Deliberately a **separate table** from `campaigns`, which is discount-shaped and blocked on eight open business questions (`docs/DISCOUNTS_CAMPAIGNS.md`) |
 | 5 | Customer-facing copy, T&C mechanics, admin polish | |
@@ -194,7 +265,7 @@ per-order redemption cap.
 
 ---
 
-## 6. Related
+## 7. Related
 
 - [Discounts, campaigns and comped customers](DISCOUNTS_CAMPAIGNS.md) — the comp
   rule that composes with this one, and the blocked campaigns table

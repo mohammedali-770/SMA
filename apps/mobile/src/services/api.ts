@@ -400,6 +400,50 @@ export const payments = {
 // ---------------------------------------------------------------------------
 // Coupons (validation RPC only — codes are never client-readable)
 // ---------------------------------------------------------------------------
+/**
+ * What this order will EARN, answered by the server.
+ *
+ * The customer asked to be told the figure at checkout. It is fetched rather
+ * than computed here on purpose: the earning rule already lives in two SQL
+ * functions that must agree (`place_order` and `compute_order_snapshot`), and a
+ * third copy in the client would be a number that drifts from the points
+ * actually granted — the exact failure `previewTotals.ts` is careful NOT to
+ * introduce. `preview_loyalty_points` is a narrow SECURITY DEFINER wrapper that
+ * takes the customer from `auth.uid()` and returns only these four figures.
+ *
+ * Returns `null` on ANY failure, including the deliberate raises for an invalid
+ * cart. A preview must never block an order, so the caller shows nothing.
+ */
+export const loyaltyPreview = {
+  async points(input: {
+    branchId: string;
+    orderType: 'delivery' | 'pickup';
+    items: unknown;
+    addressId?: string | null;
+    couponCode?: string | null;
+    loyaltyPoints?: number;
+  }): Promise<{ earned: number; redeemed: number } | null> {
+    try {
+      const { data, error } = await supabase.rpc('preview_loyalty_points', {
+        p_branch_id: input.branchId,
+        p_order_type: input.orderType,
+        p_items: input.items,
+        p_address_id: input.addressId ?? null,
+        p_coupon_code: input.couponCode ?? null,
+        p_loyalty_points: input.loyaltyPoints ?? 0,
+      });
+      if (error || !data) return null;
+      const row = data as { loyalty_points_earned?: number; loyalty_points_redeemed?: number };
+      return {
+        earned: Number(row.loyalty_points_earned ?? 0),
+        redeemed: Number(row.loyalty_points_redeemed ?? 0),
+      };
+    } catch {
+      return null;
+    }
+  },
+};
+
 export const coupons = {
   async validate(code: string, subtotal: number) {
     const rows = ok<{ valid: boolean; code: string; discount_amount: number; message: string }[]>(

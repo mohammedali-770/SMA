@@ -99,6 +99,12 @@ export interface Product {
   calories: number;
   isActive: boolean;
   /**
+   * Ordering this item earns loyalty points. Earn-side ONLY — points may still
+   * be spent on an order containing it. Server-authoritative: `place_order` and
+   * `compute_order_snapshot` read the column themselves.
+   */
+  earnsLoyaltyPoints: boolean;
+  /**
    * Display rank WITHIN its category, set by an administrator through
    * `reorder_products`. Compared only against products in the SAME category.
    *

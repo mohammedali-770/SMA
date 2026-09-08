@@ -113,6 +113,8 @@
       "sources": [
         "apps/mobile/src/features/checkout/previewTotals.ts",
         "apps/mobile/src/features/checkout/view/Loyalty*.tsx",
+        "apps/mobile/src/features/checkout/view/TotalsCard.tsx",
+        "src/components/admin/MenuManagementPanel.tsx",
         "src/components/admin/SettingsPanel.tsx",
         "src/lib/mappers.ts",
         "apps/mobile/src/lib/mappers.ts"

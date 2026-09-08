@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Download, Edit, FileSpreadsheet, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Edit, FileSpreadsheet, Loader2, Plus, Star, StarOff, Trash2 } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
 import { menuOrder as menuOrderApi, productImages as productImageApi } from '../../lib/api';
@@ -57,7 +57,7 @@ export const MenuManagementPanel: React.FC = () => {
   const {
     categories, products,
     addCategory, updateCategory, deleteCategory,
-    addProduct, updateProduct, deleteProduct,
+    addProduct, updateProduct, deleteProduct, setProductEarnsPoints,
     bulkUploadMenu, currentUser, adminLang, reload,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
@@ -160,6 +160,13 @@ export const MenuManagementPanel: React.FC = () => {
       // a confidently wrong photo is not.
       imageUrl: prodImg.trim(),
       isActive: true,
+      // Carried through from the product being edited rather than hardcoded, so
+      // this object describes reality. It is not how the flag is SAVED —
+      // `productToDbUpdate` omits it deliberately, and the row control writes it
+      // through `setProductEarnsPoints` — but an object that quietly claimed
+      // every edited item earns points would be a lie waiting to be believed by
+      // the next person who wires it up.
+      earnsLoyaltyPoints: editingProduct?.earnsLoyaltyPoints ?? true,
       modifierGroupIds: ['mg-heat-level'],
       // A hand-authored product has no Lazywait price tiers. Tiers arrive
       // only through the catalog import, which is where the menu is owned.
@@ -512,6 +519,31 @@ export const MenuManagementPanel: React.FC = () => {
                           </td>
                           <td className={TD}>
                             <div className="flex gap-1.5">
+                              {/* LOYALTY EXCLUSION. Its own control and its own
+                                  write — `setProductEarnsPoints` sends this one
+                                  column. Deliberately NOT part of the edit modal:
+                                  `productToDbUpdate` omits the flag so that
+                                  correcting a price cannot silently restore
+                                  earning on an item somebody zeroed, which is the
+                                  same rule `is_active` already follows.
+                                  Earn-side only — points remain spendable on it. */}
+                              <button
+                                type="button"
+                                onClick={() => setProductEarnsPoints(p.id, !p.earnsLoyaltyPoints)}
+                                disabled={isAccountant}
+                                aria-pressed={p.earnsLoyaltyPoints}
+                                title={p.earnsLoyaltyPoints
+                                  ? (isRTL ? 'يمنح نقاط ولاء — اضغط للإيقاف' : 'Earns loyalty points — click to set 0')
+                                  : (isRTL ? 'لا يمنح نقاط — اضغط للتفعيل' : 'Earns no points — click to restore')}
+                                aria-label={p.earnsLoyaltyPoints
+                                  ? (isRTL ? 'إيقاف نقاط الولاء لهذا الصنف' : 'Stop this item earning loyalty points')
+                                  : (isRTL ? 'تفعيل نقاط الولاء لهذا الصنف' : 'Let this item earn loyalty points')}
+                                className={ICON_BTN}
+                              >
+                                {p.earnsLoyaltyPoints
+                                  ? <Star className="size-3.5 text-con-text-2" aria-hidden="true" />
+                                  : <StarOff className="size-3.5 text-danger-ds" aria-hidden="true" />}
+                              </button>
                               <button type="button" onClick={() => handleOpenEditProduct(p)} disabled={isAccountant}
                                 aria-label={isRTL ? 'تعديل المنتج' : 'Edit product'} className={ICON_BTN}>
                                 <Edit className="size-3.5 text-con-text-2" aria-hidden="true" />
