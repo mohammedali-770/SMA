@@ -24,6 +24,36 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-07 (later still) — THREE unapplied repository files, and
+> the two new ones have a DEPENDENCY ORDER that is not optional.**
+> `20260908120000_loyalty_item_exclusion.sql` joins the list: per-item loyalty
+> exclusion, written and awaiting owner approval. **122 repository files / 125
+> live history rows.**
+>
+> **Apply `20260907120000` first, then `20260908120000`, each on its own
+> approval, each named by version.** The second derives both money-path function
+> bodies from the first, so applying it alone would install functions without the
+> pickup-only channel gate. It refuses to let that happen: its self-verification
+> asserts `v_loyalty_channel_ok` appears four times in each function before it
+> will land, so the order is enforced by the file rather than by whoever is
+> reading this.
+>
+> It redefines `place_order` and `compute_order_snapshot` **a second time**, so
+> the money-path hashes change twice across the pair. Record both, rather than
+> comparing the end state against the pre-`20260907120000` pair and reporting a
+> surprise.
+>
+> Applying it **excludes nothing on its own**: `products.earns_loyalty_points`
+> defaults `true`, so every product keeps earning until an administrator turns
+> one off. What does change on apply is the earning *base* — from the payable
+> total to the eligible lines, with coupon and redemption shared pro-rata. That
+> is a real behaviour change on a live money path even with no product excluded:
+> the delivery fee stops earning. With pickup-only on it is a no-op, since an
+> earning order has no fee. Detail and the comp trap it closes:
+> [`LOYALTY.md`](LOYALTY.md) §3.
+>
+> **Superseded, kept because the reasoning is the point:**
+>
 > **Updated 2026-09-07 (later the same day) — there are TWO unapplied
 > repository files again, and the new one is NOT frozen.** It is
 > `20260907120000_loyalty_pickup_only.sql`: loyalty becomes pickup-only, written

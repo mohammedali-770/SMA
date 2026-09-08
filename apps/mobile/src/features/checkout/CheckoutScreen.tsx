@@ -434,9 +434,18 @@ export function CheckoutScreen() {
   // the customer already has, and a slow or failed read must never stop a valid
   // order. `alive` drops a late response so a stale figure cannot overwrite a
   // newer one after a quick edit.
+  //
+  // The figure is cleared BEFORE the request goes out, not held while it flies.
+  // Every dependency below changes the answer, so a value computed from the
+  // previous inputs is not "the last good value" — it is a promise about an
+  // order the customer is no longer placing, and holding it to avoid a flicker
+  // would keep that promise on screen until the reply lands, or forever if it
+  // never does. A number that briefly disappears is a smaller harm than one
+  // that is quietly wrong, and this is the customer's own reward balance.
   useEffect(() => {
     if (!selectedBranch || !orderType || cart.items.length === 0) { setPointsEarned(null); return; }
     let alive = true;
+    setPointsEarned(null);
     void loyaltyPreview.points({
       branchId: selectedBranch.id,
       orderType,
