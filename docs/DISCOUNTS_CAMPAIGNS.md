@@ -208,14 +208,24 @@ and not its twin is a bug:
    burned on an order that was free anyway, and a mistyped code raises at a
    customer who owes nothing;
 2. **loyalty redemption is skipped** — no burning points against free food.
-   `loyalty_points_earned` needs no special case: `floor(0 × rate)` is 0. Since
-   `20260907120000_loyalty_pickup_only` there is a **second, independent** reason
-   a delivery order redeems nothing (see [`LOYALTY.md`](LOYALTY.md) §2); the two
-   compose rather than fight, and `loyalty_pickup_only_test.sql` section 6 pins
-   that a comped order earns and redeems nothing on **either** channel;
-3. the total is **zeroed before VAT is derived from it**, so VAT falls out at
+   Since `20260907120000_loyalty_pickup_only` there is a **second, independent**
+   reason a delivery order redeems nothing (see [`LOYALTY.md`](LOYALTY.md) §2);
+   the two compose rather than fight, and `loyalty_pickup_only_test.sql` section
+   6 pins that a comped order earns and redeems nothing on **either** channel;
+3. **loyalty earning is skipped, and since `20260908120000` that needs saying
+   out loud.** It used to be free: points came off `floor(v_total × rate)` and
+   rule 4 below zeroes `v_total` first, so a comped order earned nothing without
+   anybody writing a rule for it. `20260908120000_loyalty_item_exclusion` moved
+   earning onto the **eligible lines** (LOYALTY.md §3), and a line base has no
+   such property — the goods still have a value even when the customer pays
+   nothing. Two guards replace the accident: an explicit `not v_is_comp`, and a
+   `least(v_earn_base, v_total)` clamp that would hold the number at zero even if
+   the explicit guard were removed. `loyalty_item_exclusion_test.sql` case 7
+   pins both, and the mutation check for this migration is *delete the guard and
+   the clamp together and watch a free order start earning*;
+4. the total is **zeroed before VAT is derived from it**, so VAT falls out at
    0.00 with no second rule to keep in step;
-4. `orders.is_comped` and `orders.comp_discount_amount` are stamped, and
+5. `orders.is_comped` and `orders.comp_discount_amount` are stamped, and
    `payment_status` is written **`paid`** with `paid_at` set.
 
 **What does NOT change:** the branch delivery minimum still applies (it protects
@@ -448,6 +458,13 @@ is **pickup only**, so a delivery order is shown no redemption
 ([`LOYALTY.md`](LOYALTY.md) §2). A comped order reports
 `loyaltyBlockedByChannel: false` even on delivery — it already says why it costs
 nothing, and two explanations for one absent discount is worse than one.
+
+The **earning** estimate added by `20260908120000` is not computed in the client
+at all — `preview_loyalty_points` asks the server, which runs the same
+`compute_order_snapshot` that will grant the points, so a comped customer is
+shown nothing to earn because the server says so rather than because the app
+remembered to ask. That is deliberate: it is the only arrangement where the
+comp guard cannot be forgotten in one of the two places.
 
 **The membership is re-read immediately before the order is submitted.** An
 administrator can revoke a comp while checkout sits open; the mount-time read
