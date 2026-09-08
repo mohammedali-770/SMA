@@ -226,9 +226,21 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-08, after the OTP retention sweep was APPLIED: 125
-repository files / 126 live history rows / FIVE unapplied — Moyasar (frozen on
-purpose) and the four loyalty files.** Latest live version `20260908123116`
+**Current position 2026-09-08, after the data-portability migration was written:
+126 repository files / 126 live history rows / SIX unapplied — Moyasar (frozen on
+purpose), the four loyalty files, and `20260912120000_export_my_data` (written,
+awaiting approval).** `export_my_data()` is the PDPL access/portability answer
+for `docs/GO_LIVE_READINESS.md` A6, which had no implementation at all. It
+redefines no existing function, touches no money path and reads only the caller's
+own rows — its whole security model is that it takes **no argument**, so there is
+no id to forge. No deploy implied.
+
+**Superseded, kept because the count is the point: 125 files / FIVE unapplied**
+after the OTP retention sweep was applied.
+
+**The apply that produced the 126th live row: 125 repository files / 126 live
+history rows / FIVE unapplied — Moyasar (frozen on purpose) and the four loyalty
+files.** Latest live version `20260908123116`
 (`20260911120000_otp_retention_sweep`, applied 12:31:16 UTC on explicit owner
 approval naming the target by version; ledger row 81).
 
