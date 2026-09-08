@@ -71,8 +71,9 @@ describe('scopeLabel', () => {
   });
 
   it('lists several narrowings most-specific first', () => {
-    expect(scopeLabel({ product_id: 'p1', category_id: 'c1', branch_id: 'b1' }, ctx))
-      .toBe('Classic · Burgers · Olaya');
+    expect(scopeLabel({ product_id: 'p1', category_id: 'c1', branch_id: 'b1' }, ctx)).toBe(
+      'Classic · Burgers · Olaya',
+    );
   });
 
   it('never renders a bare id, and never reads as "everything", when a target is gone', () => {

@@ -65,10 +65,7 @@ export function scopeLabel(
     isRTL: boolean;
   },
 ): string {
-  const pick = (
-    list: { id: string; nameEn: string; nameAr: string }[],
-    id: string | null,
-  ): string | null => {
+  const pick = (list: { id: string; nameEn: string; nameAr: string }[], id: string | null): string | null => {
     if (!id) return null;
     const hit = list.find((x) => x.id === id);
     if (!hit) return ctx.isRTL ? '(محذوف)' : '(deleted)';
@@ -296,7 +293,9 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
             >
               <option value="">{isRTL ? 'كل الفروع' : 'All branches'}</option>
               {branches.map((b) => (
-                <option key={b.id} value={b.id}>{isRTL ? b.nameAr : b.nameEn}</option>
+                <option key={b.id} value={b.id}>
+                  {isRTL ? b.nameAr : b.nameEn}
+                </option>
               ))}
             </select>
           </div>
@@ -313,7 +312,9 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
             >
               <option value="">{isRTL ? 'كل التصنيفات' : 'All categories'}</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{isRTL ? c.nameAr : c.nameEn}</option>
+                <option key={c.id} value={c.id}>
+                  {isRTL ? c.nameAr : c.nameEn}
+                </option>
               ))}
             </select>
           </div>
@@ -330,7 +331,9 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
             >
               <option value="">{isRTL ? 'كل الأصناف' : 'All products'}</option>
               {products.map((pr) => (
-                <option key={pr.id} value={pr.id}>{isRTL ? pr.nameAr : pr.nameEn}</option>
+                <option key={pr.id} value={pr.id}>
+                  {isRTL ? pr.nameAr : pr.nameEn}
+                </option>
               ))}
             </select>
           </div>
