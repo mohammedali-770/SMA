@@ -178,10 +178,26 @@ as $$
     1);
 $$;
 
+-- NOT granted to `authenticated`, and that is the point rather than an oversight.
+--
+-- The table's select policy is `is_staff()`, so a customer cannot read the
+-- campaign list. Granting this resolver to `authenticated` would have handed the
+-- same information back through the front door: it takes `p_at`, so a customer
+-- could ask "what is the multiplier on this product NEXT MONTH" and enumerate
+-- targeted and not-yet-started campaigns one probe at a time. A protection the
+-- policy provides and a helper undoes is not a protection. Review caught it on
+-- #338.
+--
+-- Nothing legitimate loses access. `place_order`, `compute_order_snapshot` and
+-- `preview_loyalty_points` are all `security definer` owned by the same role
+-- that owns this function, so they call it as the owner and never through the
+-- caller's grants -- which is why the customer still sees a correct
+-- campaign-aware "you'll earn N points" figure. No client code calls it
+-- directly, and case 11 asserts a customer session cannot.
 revoke all on function public.loyalty_multiplier_for(uuid, uuid, uuid, timestamptz)
-  from public, anon;
+  from public, anon, authenticated;
 grant execute on function public.loyalty_multiplier_for(uuid, uuid, uuid, timestamptz)
-  to authenticated, service_role;
+  to service_role;
 
 -- ---- 3. The two money-path functions, changed identically -------------------
 create or replace function public.place_order(

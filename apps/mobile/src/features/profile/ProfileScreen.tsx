@@ -1,5 +1,5 @@
 /** Profile hub: personal info, loyalty, preferences, social links and support. */
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
 import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { AwardIcon, SignOutIcon } from '../../components/Icons';
@@ -10,6 +10,7 @@ import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
+import { catalog as catalogApi } from '../../services/api';
 import { useAddressBook, useAuth, useCatalog } from '../../store';
 import { expiryNotice } from './loyaltyExpiry';
 import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
@@ -43,11 +44,39 @@ export function ProfileScreen() {
   const { profile, status, signOut } = useAuth();
   const addressBook = useAddressBook();
   const { loyalty } = useCatalog();
+  // THE MOUNT-TIME SNAPSHOT IS NOT GOOD ENOUGH FOR THIS ONE.
+  //
+  // `CatalogProvider` loads settings once and its foreground refresh covers
+  // availability and branches only, so a session left open across an
+  // administrator enabling expiry keeps reporting `expiryEnabled: false`
+  // forever. The customer then loses points having been shown no warning —
+  // which is precisely the notice this screen exists to give. Review found it
+  // on #337; it is the same staleness class as the pickup-only re-read added
+  // to checkout on #334, and it is fixed the same narrow way.
+  //
+  // Re-read on focus rather than subscribing: this is a screen the customer
+  // opens occasionally, the answer changes about once a year, and a realtime
+  // subscription for a date is far more machinery than the problem deserves.
+  // A failed read keeps whatever is already on screen — never invent a date,
+  // and never erase one because the network blinked.
+  const [expiryOverride, setExpiryOverride] =
+    React.useState<{ enabled: boolean; nextRunOn: string | null } | null>(null);
+  useFocusEffect(
+    React.useCallback(() => {
+      let alive = true;
+      void catalogApi.readLoyaltyExpiry().then((fresh) => {
+        if (alive && fresh) setExpiryOverride(fresh);
+      });
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
   // Null unless expiry is on, a reset is scheduled AND this customer has points
   // to lose — see loyaltyExpiry.ts for why each of those stays silent.
   const expiresOn = expiryNotice({
-    enabled: loyalty?.expiryEnabled ?? false,
-    nextRunOn: loyalty?.expiryNextRunOn ?? null,
+    enabled: expiryOverride?.enabled ?? loyalty?.expiryEnabled ?? false,
+    nextRunOn: expiryOverride ? expiryOverride.nextRunOn : loyalty?.expiryNextRunOn ?? null,
     points: profile?.loyaltyPoints ?? 0,
     lang,
   });

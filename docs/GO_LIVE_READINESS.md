@@ -166,8 +166,10 @@ difference between a task and a decision.
 
 ### New hard blockers this document did not carry
 
-X7 was added after the first pass, when the audit's final round landed; it is the
-most time-sensitive item on this page.
+X7 was added after the first pass, when the audit's final round landed. It was the
+most time-sensitive item on this page **until 2026-09-07, when the credential was
+read directly from Meta and found to be permanent** — see its row. What survives of
+it is a test that has not been run, not a clock that is running out.
 
 | # | Item | Evidence | Action |
 | --- | --- | --- | --- |
@@ -177,7 +179,7 @@ most time-sensitive item on this page.
 | **X4** | ~~In-app account deletion is buried three levels deep.~~ **FIXED IN SOURCE 2026-09-03.** A `MenuRow` on `ProfileScreen` links straight to `/account/delete`, gated on `status === 'signed_in'` — and **so is the Addresses row beside it, as of 2026-09-03** — one rule for both rows on the screen. That row guarded on `profile`, which was never a data dependency: `addressCount` comes from `useAddressBook()`, and `AddressProvider.tsx:58` loads the book from `status` and `userId` alone, never `profile`. It therefore hid **address management** from a signed-in customer whose profile row is null — the same defect as the deletion one, surfaced by review on #323 and fixed rather than left standing. Both destinations are `AuthGate`-wrapped and `AuthGate` gates on `status`, so guard and route now agree. **CORRECTED 2026-09-03: this cell said "guarded on `profile` to match the Addresses row" until now. That was the pre-review design and it is the opposite of what shipped** — review caught it on #321, because gating on `profile` would hide deletion from a signed-in user, the exact failure this row exists to fix. `signed_in` with `profile === null` is reachable three ways in `AuthProvider.tsx` (an authoritative null from `fetch_success`, the synchronous `signed_in` in `onChange` before the deferred fetch resolves, and retry exhaustion), and `/account/delete` is valid for that auth account in all three. Signed-out visitors never reach the tab at all: `apps/mobile/src/app/(tabs)/_layout.tsx:39` redirects them to login. Reuses the existing `delAccount` string, already present in both languages, so `strings.ts` is untouched. | source-verified | **Rides the X2 build** — inert until then. No test asserts it: all 62 mobile test files are `.test.ts`, there are no RN render tests, and `vitest.config.ts` forbids mobile tests importing React Native or Expo. Stated rather than papered over. |
 | **X5** | **The order lifecycle past `received` has never executed in Production, and every transition pushes a live customer notification.** All 68 orders are `received` (62) or `cancelled` (6). Zero `direction='webhook'` rows from the POS: the status callback has **never fired**. A real customer today gets `pos_confirmed` and then hears nothing, ever. | live-verified | Investigate before coding: confirm with Lazywait whether the callback is registered at all. If it is not, the admin console's manual status path *is* the launch mechanism and must be rehearsed end to end on one order. |
 | **X6** | ~~The `ready` push tells delivery customers to come and collect.~~ **FIXED AND LIVE 2026-09-03.** `order_type` now rides the order row `push-dispatch` already reads, and `ready` — the only status whose meaning differs by fulfilment — branches on it. Pickup copy is byte-identical; delivery gets *"ready and will be on its way shortly"*, which promises no time and does not pre-empt `out_for_delivery`. Pinned by `pushReadyCopyWiring.test.ts`, mutation-tested against four regressions. | **live-verified** | **DONE — deployed 2026-09-03 as `push-dispatch` v6**, `verify_jwt` preserved at `false`. All five bundle files were read back and hashed against the merged branch: byte-identical. The function boots and the JWT gate is still off (`GET` → 405 from the handler, not a platform 401), proven without sending a push. Sequenced **before** X5 deliberately, so the rehearsal now sends the corrected copy. Residual: the delivery **Arabic is engineering-drafted and has not had a native read** — live on an engineer's draft, ten minutes to close (`OWNER_ACTIONS.md` §26). |
-| **X7** | **The only customer login channel is unexercised, fallback-free and may expire inside launch week.** WhatsApp OTP is the sole route in: `otp_channel_default='whatsapp'`, `sms_otp_fallback_enabled=false`, and the SMS provider row is `sandbox`/disabled — **there is no fallback of any kind**. Live 2026-09-03: the last `auth_login` OTP was sent **2026-08-21** (**0 in the last 7 days**), the last customer sign-in was the same day, and `otp_send_reservations` is empty — so **no real login has ever run through `auth-send-sms-whatsapp` v2**, deployed 2026-09-02. The WhatsApp `integration_settings` row was last updated **2026-07-10, 54 days ago**. | live-verified; **the expiry is an inference, not a reading** — key *names* only were read, never a value, and a Meta **System User** token does not expire while a standard one lapses at 60 days (which would fall ~2026-09-08) | Confirm in Meta Business Manager which token type is in use and when it expires, and that templates `spicymeal_otp_en`/`_ar` are still approved. Then **run one real end-to-end login before launch.** If the token has lapsed, 100% of signups fail at the front door — and with §25 (no delivery callbacks) and X3 (no external alerting) the first signal is a customer complaint. Owner; minutes to check. |
+| **X7** | ~~The only customer login channel is unexercised, fallback-free and may expire inside launch week.~~ **THE EXPIRY FEAR IS REFUTED, MEASURED 2026-09-07 (UTC). The credential does not expire.** Meta's own `debug_token` reports `type: SYSTEM_USER`, `is_valid: true`, `expires_at: 0` and `data_access_expires_at: 0` — a System User token, permanent by construction — on app `SpicyMealWA`, carrying `whatsapp_business_messaging` and `whatsapp_business_management`. Both login templates are live: `spicymeal_otp_en` and `spicymeal_otp_ar`, **APPROVED**, category `AUTHENTICATION` (2 templates on the account, **0 not approved**). The sending number — `1165712249955347`, which **is** the configured `phone_number_id` rather than a sibling — is `status: CONNECTED`, `account_mode: LIVE`, `quality_rating: GREEN`, `name_status: APPROVED`, PIN enabled. **`code_verification_status: EXPIRED` is benign and was checked rather than assumed**: it describes the onboarding verification code, not live registration, and `CONNECTED`/`LIVE` is the field that governs whether a send succeeds. **What remains is the smaller half, and it is still true:** the channel is **unexercised** — the last `auth_login` OTP was **2026-08-21**, `otp_send_reservations` is empty, so **no real login has ever run through `auth-send-sms-whatsapp` v2** (deployed 2026-09-02) — and **fallback-free**: `otp_channel_default='whatsapp'`, `sms_otp_fallback_enabled=false`, SMS provider row `sandbox`/disabled. | **live-verified against Meta, no longer an inference.** The previous cell said so explicitly: *"the expiry is an inference, not a reading"*. It has now been read. **Method matters here** — the token was interpolated into the request **inside Postgres** via `pg_net`, so it never entered a tool call, a shell command, a transcript or the repository; `debug_token` is read-only, sends no message and consumes no messaging quota. Afterwards, `net._http_response` and the pg_net queue were searched **by predicate** for the token: **0 rows retain it.** | **The Business Manager check is DONE and needs nothing from the owner.** What is left is **one real end-to-end login before launch** — sign in on a real handset with a real Saudi number and confirm the code arrives, which also becomes the first exercise of `auth-send-sms-whatsapp` v2 and its rate limiter. This is now a *test*, not an *investigation*: the infrastructure behind it is proven healthy. Consider it alongside X1's Auth test-OTP entry, which deliberately bypasses this path and so does **not** substitute for it. |
 
 ### Corrections to claims already in this document
 
@@ -262,7 +264,10 @@ are `payment_status='pending'` and the only two `paid` are comped zero-total. A 
 launch is coherent now. A card launch is a provider decision plus merchant onboarding
 measured in weeks, and is not compatible with a one-week go-live.
 
-**Hard blockers for a CASH launch (nine):**
+**Hard blockers for a CASH launch (nine — but see X7).** Still nine items, and the
+count is deliberately not reduced: X7's *credential* risk was refuted on 2026-09-07,
+but the end-to-end login it also asks for has still never been run, so the item stays
+on the list with a much smaller shape. Nothing here has been quietly retired.
 
 1. **A1 — PDPL cross-border transfer.** Saudi personal data in `eu-central-1` with no
    recorded lawful basis. Counsel, possibly a region move. Longest lead time on the
@@ -293,10 +298,14 @@ measured in weeks, and is not compatible with a one-week go-live.
    collect — is fixed AND deployed** (`push-dispatch` v6, 2026-09-03, §26), so the
    rehearsal no longer sends the wrong message to a real person. The rehearsal
    itself is still owed. *(2026-09-03)*
-9. **X7 — the only login channel is unexercised, fallback-free, and its credential
-   may lapse inside launch week.** No customer has signed in since 2026-08-21 and the
-   WhatsApp settings row is 54 days old. Cheapest item on this list to check and the
-   most total in its failure: nobody can sign up at all. *(2026-09-03)*
+9. **X7 — the only login channel is unexercised and fallback-free.** **The credential
+   fear is gone, measured 2026-09-07:** Meta reports a `SYSTEM_USER` token that
+   **never expires**, both OTP templates `APPROVED`, and the sending number
+   `CONNECTED`/`LIVE`/`GREEN`. What remains is that **no real login has run since
+   2026-08-21** and there is no fallback of any kind, so this is now *one test to
+   run* rather than *a thing that may already be broken*. **Reclassify it when you
+   plan the week: it is the cheapest item left on this list.** *(2026-09-03, credential
+   verified 2026-09-07)*
 
 **Additionally, and only if taking card payment:** G1/G2 (no provider, weeks of
 onboarding), the 8-week-old payment bundles that cannot be redeployed safely one at a

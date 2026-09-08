@@ -157,6 +157,28 @@ end $$;
 -- Without this, disabling expiry and re-enabling it a year later would leave a
 -- date in the PAST and the very next tick would wipe every balance. The whole
 -- retroactivity guarantee rests on this trigger.
+--
+-- `loyalty_expiry_next_run_on` is SYSTEM-OWNED. It is an ordinary column on a
+-- table administrators may update, so nothing at the grant level stops one
+-- writing to it directly -- by hand, by SQL, or by a request that names the
+-- column. The trigger is therefore the only thing that can own it, and it does
+-- so by recomputing whenever the caller's value differs from the stored one:
+-- whatever was supplied is discarded and the date is re-derived from the anchor
+-- settings, which ARE the administrator's knobs.
+--
+-- Review found this on #337. The first version recomputed on the false->true
+-- transition and on anchor changes, which left the steady state open: while
+-- expiry was ALREADY enabled, `update app_settings set
+-- loyalty_expiry_next_run_on = <a past date>` made every condition false, the
+-- value survived, and the next nightly tick zeroed every positive balance.
+-- Reproduced before it was fixed, and case 3d pins it.
+--
+-- Note what is deliberately NOT done here: the recompute is conditional on the
+-- value having CHANGED, not unconditional on every update. An unconditional
+-- recompute would push the reset a whole cycle into the future if an
+-- administrator happened to save an unrelated setting on the due date itself,
+-- because `loyalty_next_expiry_on` always returns a date strictly after the one
+-- it is given. That silently skips a reset instead of running it.
 create or replace function public.set_loyalty_expiry_next_run()
 returns trigger
 language plpgsql
@@ -173,6 +195,12 @@ begin
      or old.loyalty_expiry_anchor_month  is distinct from new.loyalty_expiry_anchor_month
      or old.loyalty_expiry_anchor_day    is distinct from new.loyalty_expiry_anchor_day
      or old.loyalty_expiry_period_months is distinct from new.loyalty_expiry_period_months
+     -- The caller tried to set the date itself. Discard it and re-derive.
+     -- `run_loyalty_expiry()` advances this column too, and converges rather
+     -- than fights: it advances with the SAME `loyalty_next_expiry_on(
+     -- current_date, ...)` expression this branch recomputes with, so the
+     -- trigger lands on the identical value.
+     or new.loyalty_expiry_next_run_on   is distinct from old.loyalty_expiry_next_run_on
      or new.loyalty_expiry_next_run_on   is null then
     new.loyalty_expiry_next_run_on := public.loyalty_next_expiry_on(
       current_date,

@@ -582,6 +582,48 @@ the shape of the phone already on the profile.
 
 ---
 
+## 10a. Credential and channel health — read from Meta, 2026-09-07 (UTC)
+
+`GO_LIVE_READINESS.md` carried X7 for weeks partly on an **inference**: the
+`integration_settings` row was 59 days old and a standard Meta token lapses at 60,
+so the credential *might* have been hours from expiry. It is not. This is what Meta
+itself reports.
+
+| Question | Answer |
+| --- | --- |
+| Token type | **`SYSTEM_USER`** — permanent by construction |
+| `expires_at` / `data_access_expires_at` | **`0` / `0`** — never |
+| `is_valid` | **true**, on app `SpicyMealWA` |
+| Scopes | `whatsapp_business_messaging`, `whatsapp_business_management` (+ management extras) |
+| `spicymeal_otp_en` / `_ar` | **APPROVED**, category `AUTHENTICATION` — 2 templates on the account, **0 not approved** |
+| Sending number | `1165712249955347` — **is** the configured `phone_number_id`, not a sibling |
+| Number status | **`CONNECTED`**, `account_mode: LIVE`, `quality_rating: GREEN`, `name_status: APPROVED`, PIN enabled |
+
+**`code_verification_status: EXPIRED` is benign, and was checked rather than waved
+through.** It describes the onboarding verification code, not live registration;
+`status: CONNECTED` with `account_mode: LIVE` is the field that decides whether a
+send succeeds. Do not re-raise it as a defect without new evidence.
+
+**How this was read, because the method is the reusable part.** The access token was
+interpolated into the request **inside Postgres** — `net.http_get` with the URL built
+from `integration_settings` in the same statement — so the secret never entered a tool
+call, a shell command, a transcript or this repository (CLAUDE.md §9). `debug_token`
+is read-only: it sends no message and consumes no messaging quota. Afterwards the
+pg_net tables were searched **by predicate** for the token rather than by eye:
+**0 rows retain it.** The same technique generated the alert-dispatch Vault secret
+(`OWNER_ACTIONS.md` §28); prefer it over any flow that puts a live credential on a
+command line.
+
+**What this does NOT establish.** No message was sent, so the end-to-end path is
+still unexercised: the last real `auth_login` OTP was **2026-08-21** and
+`otp_send_reservations` is empty, meaning `auth-send-sms-whatsapp` **v2** (deployed
+2026-09-02) has never carried a real login, and neither has its rate limiter. One
+real sign-in on a real handset remains owed before launch. X1's Auth test-OTP entry
+deliberately **bypasses** this path and does not substitute for it.
+
+Re-read this table if the WhatsApp row is ever edited, if the number is moved between
+WABAs, or if the System User is rotated — all three invalidate it.
+
 ## 11. Remaining risks / notes
 
 - **No legacy accounts to migrate.** Confirmed by the owner: there are no
@@ -590,7 +632,10 @@ the shape of the phone already on the profile.
   Nothing is auto-merged and nothing is deleted by this change.
 - **No fallback:** if WhatsApp login is off or misconfigured, customers cannot
   log in at all. The Send SMS Hook fails closed by design, so verify the whole
-  chain (§12) before flipping the flag.
+  chain (§12) before flipping the flag. **Still true as of 2026-09-07** —
+  `sms_otp_fallback_enabled=false` and the SMS provider row is `sandbox`/disabled —
+  and it is what makes §10a's health check worth repeating rather than assuming:
+  there is no second door.
 - **Saudi mobiles only, by design.** There is no country picker; a non-Saudi
   number cannot be used to sign up or log in.
 - Meta template approval can take time — do not flip `whatsapp_login_enabled`
