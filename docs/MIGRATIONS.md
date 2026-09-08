@@ -24,6 +24,31 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-07 (last of the series) — FIVE unapplied repository files,
+> and the apply ORDER now matters for three of them.**
+> `20260910120000_loyalty_multipliers.sql` joins the list: points-earning
+> campaigns, written and awaiting owner approval. **124 repository files / 125
+> live history rows.**
+>
+> **`20260907120000` → `20260908120000` → `20260910120000`, in that order, each
+> on its own approval, each named by version.** Each derives both money-path
+> function bodies from the one before it, and each asserts the previous step's
+> marker is present before it will land — so a wrong order fails loudly instead
+> of quietly installing functions that are missing a rule. `20260909120000`
+> (expiry) redefines neither function and can go at any point in the sequence.
+>
+> **Three of the four redefine `place_order` and `compute_order_snapshot`**, so
+> the money-path hashes change three times across the series. Record them at each
+> apply rather than reading a change as an anomaly. Only expiry leaves them alone.
+>
+> **Applying the multiplier file changes nothing**: the table is created EMPTY,
+> and an empty table resolves to a multiplier of 1 for every line — which its own
+> verification asserts. Nothing earns differently until an administrator creates
+> a campaign. Behaviour and the clamp-ordering trap it avoids:
+> [`LOYALTY.md`](LOYALTY.md) §5.
+>
+> **Superseded, kept because the count is the point:**
+>
 > **Updated 2026-09-07 (later again) — FOUR unapplied repository files, and the
 > newest one is the first in this series that can DESTROY customer value.**
 > `20260909120000_loyalty_expiry.sql` joins the list: points expiry on a fixed
