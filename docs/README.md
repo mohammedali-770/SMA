@@ -87,7 +87,8 @@ npm run docs:check      # what CI runs: drift + ownership
 | [Decision records](decisions/README.md) | Why a choice was made, what was rejected, and what it costs |
 | [Payment postponement](PAYMENT_POSTPONEMENT.md) | Why payments are frozen and what the freeze covers |
 | [Discounts and campaigns](DISCOUNTS_CAMPAIGNS.md) | The schema, and the business questions still open |
-| [Loyalty](LOYALTY.md) | How points are earned and spent, why they are pickup-only, and what is planned |
+| [Loyalty](LOYALTY.md) | How points are earned and spent, the four rules that shape it, and where the live customer terms are wrong |
+| [Offers & loyalty terms draft](legal/OFFERS_LOYALTY_TERMS_DRAFT.md) | The factual description counsel needs, and the switches that must not be flipped before it is published |
 | [Security review](SECURITY_REVIEW.md) | Security posture and findings |
 | [Security policy](../SECURITY.md) | How to report a vulnerability |
 

@@ -9,6 +9,7 @@ import { mapConfig } from '../../lib/map';
 import { admin, catalog } from '../../lib/api';
 import { isPlaceholderValue, mailtoLink, telLink, whatsappLink } from '../../lib/supportContact';
 import { LoyaltyCampaignsPanel } from './LoyaltyCampaignsPanel';
+import { loyaltyRulesSummary } from '../../lib/loyaltyRulesSummary';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -640,6 +641,31 @@ export const SettingsPanel: React.FC = () => {
                             <option value="false">{isRTL ? 'لا (إيقاف الحملة)' : 'No (Disable Program)'}</option>
                           </select>
                         </div>
+                      </div>
+
+                      {/* WHAT THE PROGRAMME IS ACTUALLY DOING.
+                          The controls that decide it are spread across two tabs
+                          and a per-item flag on every product; an operator can
+                          read all of them and still not be able to say what a
+                          customer will get. This restates the saved settings in
+                          sentences — it computes nothing, so it cannot drift
+                          into being a second copy of the earning rule. */}
+                      <div className="p-4 bg-con-surface-2 border border-con-line rounded-2xl space-y-2">
+                        <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">
+                          {isRTL ? 'القواعد المطبَّقة حالياً' : 'Rules In Force Right Now'}
+                        </span>
+                        <ul className="space-y-1">
+                          {loyaltyRulesSummary(loyaltySettings).map((r) => (
+                            <li
+                              key={r.id}
+                              className={`text-[9.5px] leading-relaxed font-bold ${
+                                r.tone === 'warn' ? 'text-ember' : 'text-con-text-2'
+                              }`}
+                            >
+                              {isRTL ? r.ar : r.en}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
 
                       <LoyaltyCampaignsPanel isRTL={isRTL} readOnly={isAccountant} />

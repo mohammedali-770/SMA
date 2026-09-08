@@ -320,6 +320,7 @@ Customers never read `loyalty_multipliers`: the select policy requires
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
+| `src/lib/loyaltyRulesSummary.test.ts` | The admin "rules in force" summary: silent when the programme is off, flags only the rules that REMOVE value, never prints a bare `null` |
 | `supabase/tests/loyalty_multipliers_test.sql` · `loyaltyCampaignState.test.ts` | Campaigns: neutral when empty, **identical to §3 with none live**, clamp-safe (points may exceed the total), specificity, windows, branch scope, composition with the channel gate and the comp, preview parity, and the bounds |
 | `supabase/tests/loyalty_expiry_test.sql` · `loyaltyExpiry.test.ts` | Expiry: off by default, never retroactive (including a hand-written past due date), once per reset, a missed day caught up, one auditable row each, and when the customer is told nothing |
 | `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
@@ -346,7 +347,58 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 7. Regulatory shape (KSA)
+## 7. The customer-facing terms, and where they are wrong today
+
+The binding document is `public.legal_documents`, row `offers_loyalty_terms` —
+**version 2.0, effective 18 August 2026, active and visible to customers now**.
+The engineering draft that should replace it, with the reasoning behind every
+clause, is [`legal/OFFERS_LOYALTY_TERMS_DRAFT.md`](legal/OFFERS_LOYALTY_TERMS_DRAFT.md).
+
+**Two things in the live text are already false, independently of anything in
+§§2-5**, and both were found by reading it against the code rather than by
+assuming it was fine:
+
+1. **"Points are added when the order is completed."** They are added when the
+   order is **created** — `place_order` writes the ledger row in the same
+   transaction as the order, and the online path does the same immediately after
+   payment. The whole cancellation-reversal mechanism (`20260810100000`) exists
+   *because* points are granted early; a reader of the current terms would not
+   expect a reversal to be needed at all.
+2. **"points … cancelled or refunded are reversed"** is approximately true for
+   cancellation and unverified for refunds. Cancellation reverses earning
+   **bounded by the balance that still exists** (a shortfall is recorded rather
+   than the balance going negative) and restores redemption **in full**. No
+   refund path touches loyalty at all — refund processing is disabled under the
+   payment freeze, so the terms promise behaviour that has never run.
+
+Correcting those needs no feature switch and should not wait for one.
+
+### Before flipping each switch
+
+Terms first, switch second. Publishing after the fact means a period where the
+app does something the customer was never told.
+
+| Switch | Terms work needed first |
+| --- | --- |
+| `loyalty_pickup_only` (defaults ON) | Publish the pickup-only lines — due when `20260907120000` is applied, since the rule is on by default |
+| `products.earns_loyalty_points` → false | Publish the "some items earn no points" line before excluding the first item |
+| A campaign multiplier | Publish the promotion line. Least urgent: multipliers only ever *increase* earning |
+| `loyalty_expiry_enabled` | **Publish the expiry section AND resolve the acceptance question below.** Do not enable before both |
+
+### The acceptance moment is not built
+
+`legal_documents` already carries `version`, `effective_date` and a
+`requires_acceptance` flag, so the *shape* exists — but **nothing records that a
+given customer accepted a given version**, and nothing gates ordering on it.
+Building that is a schema change plus a checkout-flow change, and it is
+deliberately absent from the loyalty series, which added no such migration.
+
+Practically: publishing updated terms is plausibly enough for the changes that
+only *narrow* future earning. It is probably **not** enough for expiry, which
+forfeits value a customer already holds. That is counsel's call, and it is why
+expiry ships switched off.
+
+## 8. Regulatory shape (KSA)
 
 Not legal advice; it is why the design looks the way it does.
 
@@ -364,7 +416,7 @@ Not legal advice; it is why the design looks the way it does.
 
 ---
 
-## 8. Planned, not built
+## 9. Planned, not built
 
 Recorded here so nobody re-derives them. Each is a separate pull request with its
 own migration and its own owner approval.
@@ -374,7 +426,7 @@ own migration and its own owner approval.
 | ~~2~~ | ~~`products.earns_loyalty_points`~~ | **DONE — see §3.** Kept in this table so the sequence still reads in order |
 | ~~3~~ | ~~Expiry~~ | **BUILT — see §4.** Still needs the T&C acceptance moment in §6 before it can be ENABLED, and the "expiring soon" push is a separate owner decision |
 | ~~4~~ | ~~`loyalty_multipliers`~~ | **BUILT — see §5.** |
-| 5 | Customer-facing copy, T&C mechanics, admin polish | |
+| ~~5~~ | ~~Copy, T&C mechanics, admin polish~~ | **DONE — see §7.** What remains is not engineering: counsel's wording, and the acceptance-moment decision |
 
 Ideas raised and not adopted: tiers as *status* rather than currency, a welcome
 bonus on a first pickup order, a birthday bonus, an "expiring soon" nudge, and a
@@ -382,7 +434,7 @@ per-order redemption cap.
 
 ---
 
-## 9. Related
+## 10. Related
 
 - [Discounts, campaigns and comped customers](DISCOUNTS_CAMPAIGNS.md) — the comp
   rule that composes with this one, and the blocked campaigns table

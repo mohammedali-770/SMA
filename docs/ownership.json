@@ -117,6 +117,7 @@
         "apps/mobile/src/features/profile/loyaltyExpiry*.ts",
         "src/components/admin/LoyaltyCampaignsPanel.tsx",
         "src/lib/loyaltyCampaignsApi.ts",
+        "src/lib/loyaltyRulesSummary.ts",
         "src/components/admin/MenuManagementPanel.tsx",
         "src/components/admin/SettingsPanel.tsx",
         "src/lib/mappers.ts",
