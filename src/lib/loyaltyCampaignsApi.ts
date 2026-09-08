@@ -55,7 +55,9 @@ export const loyaltyCampaigns = {
     return unwrap<LoyaltyCampaign[]>(
       await supabase
         .from('loyalty_multipliers')
-        .select('id, name_en, name_ar, multiplier, starts_at, ends_at, branch_id, product_id, category_id, is_active, created_at')
+        .select(
+          'id, name_en, name_ar, multiplier, starts_at, ends_at, branch_id, product_id, category_id, is_active, created_at',
+        )
         .order('created_at', { ascending: false }),
     );
   },
@@ -83,10 +85,7 @@ export const loyaltyCampaigns = {
    * deleting: the row stays readable next to the orders it affected.
    */
   async setActive(id: string, isActive: boolean): Promise<void> {
-    const { error } = await supabase
-      .from('loyalty_multipliers')
-      .update({ is_active: isActive })
-      .eq('id', id);
+    const { error } = await supabase.from('loyalty_multipliers').update({ is_active: isActive }).eq('id', id);
     if (error) throw new Error(error.message);
   },
 

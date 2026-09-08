@@ -64,7 +64,9 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
     }
   }, []);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const create = async () => {
     const m = Number(multiplier);
@@ -82,10 +84,17 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
     setBusy(true);
     try {
       await loyaltyCampaigns.create({
-        name_en: nameEn, name_ar: nameAr, multiplier: m,
-        starts_at: startsAt || null, ends_at: endsAt || null,
+        name_en: nameEn,
+        name_ar: nameAr,
+        multiplier: m,
+        starts_at: startsAt || null,
+        ends_at: endsAt || null,
       });
-      setNameEn(''); setNameAr(''); setMultiplier('2'); setStartsAt(''); setEndsAt('');
+      setNameEn('');
+      setNameAr('');
+      setMultiplier('2');
+      setStartsAt('');
+      setEndsAt('');
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -96,9 +105,14 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
 
   const act = async (fn: () => Promise<void>) => {
     setBusy(true);
-    try { await fn(); await refresh(); }
-    catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
+    try {
+      await fn();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   const now = new Date();
@@ -126,35 +140,80 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
       </p>
 
       {error ? (
-        <Notice tone="blocking" title={isRTL ? 'تعذّر الحفظ' : 'Could not save'}>{error}</Notice>
+        <Notice tone="blocking" title={isRTL ? 'تعذّر الحفظ' : 'Could not save'}>
+          {error}
+        </Notice>
       ) : null}
 
       {!readOnly ? (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div>
-            <label className={LABEL} htmlFor="lc-en">{isRTL ? 'الاسم (EN)' : 'Name (EN)'}</label>
-            <input id="lc-en" className={INPUT} value={nameEn} onChange={(e) => setNameEn(e.target.value)}
-              placeholder="Double points weekend" disabled={busy} />
+            <label className={LABEL} htmlFor="lc-en">
+              {isRTL ? 'الاسم (EN)' : 'Name (EN)'}
+            </label>
+            <input
+              id="lc-en"
+              className={INPUT}
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              placeholder="Double points weekend"
+              disabled={busy}
+            />
           </div>
           <div>
-            <label className={LABEL} htmlFor="lc-ar">{isRTL ? 'الاسم (AR)' : 'Name (AR)'}</label>
-            <input id="lc-ar" className={INPUT} value={nameAr} onChange={(e) => setNameAr(e.target.value)}
-              placeholder="نقاط مضاعفة" disabled={busy} />
+            <label className={LABEL} htmlFor="lc-ar">
+              {isRTL ? 'الاسم (AR)' : 'Name (AR)'}
+            </label>
+            <input
+              id="lc-ar"
+              className={INPUT}
+              value={nameAr}
+              onChange={(e) => setNameAr(e.target.value)}
+              placeholder="نقاط مضاعفة"
+              disabled={busy}
+            />
           </div>
           <div>
-            <label className={LABEL} htmlFor="lc-m">{isRTL ? 'المضاعف (١-١٠)' : 'Multiplier (1-10)'}</label>
-            <input id="lc-m" className={`${INPUT} font-ds-num`} type="number" step="0.25" min={1} max={10}
-              value={multiplier} onChange={(e) => setMultiplier(e.target.value)} disabled={busy} />
+            <label className={LABEL} htmlFor="lc-m">
+              {isRTL ? 'المضاعف (١-١٠)' : 'Multiplier (1-10)'}
+            </label>
+            <input
+              id="lc-m"
+              className={`${INPUT} font-ds-num`}
+              type="number"
+              step="0.25"
+              min={1}
+              max={10}
+              value={multiplier}
+              onChange={(e) => setMultiplier(e.target.value)}
+              disabled={busy}
+            />
           </div>
           <div>
-            <label className={LABEL} htmlFor="lc-s">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
-            <input id="lc-s" className={INPUT} type="datetime-local"
-              value={startsAt} onChange={(e) => setStartsAt(e.target.value)} disabled={busy} />
+            <label className={LABEL} htmlFor="lc-s">
+              {isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}
+            </label>
+            <input
+              id="lc-s"
+              className={INPUT}
+              type="datetime-local"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+              disabled={busy}
+            />
           </div>
           <div>
-            <label className={LABEL} htmlFor="lc-e">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
-            <input id="lc-e" className={INPUT} type="datetime-local"
-              value={endsAt} onChange={(e) => setEndsAt(e.target.value)} disabled={busy} />
+            <label className={LABEL} htmlFor="lc-e">
+              {isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}
+            </label>
+            <input
+              id="lc-e"
+              className={INPUT}
+              type="datetime-local"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+              disabled={busy}
+            />
           </div>
           <div className="md:col-span-5">
             <Button
@@ -168,7 +227,9 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
 
       {rows.length === 0 ? (
         <Text variant="caption" tone="tertiary" as="p">
-          {isRTL ? 'لا توجد حملات. النقاط تُحتسب بالمعدل العادي.' : 'No campaigns. Points accrue at the normal rate.'}
+          {isRTL
+            ? 'لا توجد حملات. النقاط تُحتسب بالمعدل العادي.'
+            : 'No campaigns. Points accrue at the normal rate.'}
         </Text>
       ) : (
         <div className="overflow-x-auto">
@@ -179,10 +240,14 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
                 return (
                   <tr key={c.id} className="border-t border-con-line">
                     <td className={TD}>
-                      <Text variant="body" as="span">{isRTL ? c.name_ar : c.name_en}</Text>
+                      <Text variant="body" as="span">
+                        {isRTL ? c.name_ar : c.name_en}
+                      </Text>
                     </td>
                     <td className={TD}>
-                      <Text variant="body" numeric as="span">×{c.multiplier}</Text>
+                      <Text variant="body" numeric as="span">
+                        ×{c.multiplier}
+                      </Text>
                     </td>
                     <td className={TD}>
                       <Text variant="caption" tone="secondary" as="span">
@@ -191,10 +256,23 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
                     </td>
                     <td className={TD}>
                       <StatusPill
-                        label={state === 'live' ? (isRTL ? 'فعّالة' : 'Live')
-                          : state === 'scheduled' ? (isRTL ? 'مجدولة' : 'Scheduled')
-                          : state === 'ended' ? (isRTL ? 'منتهية' : 'Ended')
-                          : (isRTL ? 'موقوفة' : 'Off')}
+                        label={
+                          state === 'live'
+                            ? isRTL
+                              ? 'فعّالة'
+                              : 'Live'
+                            : state === 'scheduled'
+                              ? isRTL
+                                ? 'مجدولة'
+                                : 'Scheduled'
+                              : state === 'ended'
+                                ? isRTL
+                                  ? 'منتهية'
+                                  : 'Ended'
+                                : isRTL
+                                  ? 'موقوفة'
+                                  : 'Off'
+                        }
                         tone={state === 'live' ? 'success' : state === 'off' ? 'neutral' : 'warning'}
                       />
                     </td>
@@ -204,7 +282,7 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
                           <Button
                             variant="ghost"
                             disabled={busy}
-                            label={c.is_active ? (isRTL ? 'إيقاف' : 'Stop') : (isRTL ? 'تفعيل' : 'Start')}
+                            label={c.is_active ? (isRTL ? 'إيقاف' : 'Stop') : isRTL ? 'تفعيل' : 'Start'}
                             onClick={() => void act(() => loyaltyCampaigns.setActive(c.id, !c.is_active))}
                           />
                           {/* A visible word rather than a bare icon: this row is

@@ -18,19 +18,24 @@ describe('campaignState', () => {
   it('is off whenever deactivated, whatever the window says', () => {
     // Checked first on purpose: a stopped campaign that still reads "Live"
     // because its dates look right is the most misleading state of the four.
-    expect(campaignState(
-      { is_active: false, starts_at: '2026-09-01T00:00:00Z', ends_at: '2026-09-30T00:00:00Z' }, NOW,
-    )).toBe('off');
+    expect(
+      campaignState(
+        { is_active: false, starts_at: '2026-09-01T00:00:00Z', ends_at: '2026-09-30T00:00:00Z' },
+        NOW,
+      ),
+    ).toBe('off');
   });
 
   it('is scheduled before it starts', () => {
-    expect(campaignState({ is_active: true, starts_at: '2026-10-01T00:00:00Z', ends_at: null }, NOW))
-      .toBe('scheduled');
+    expect(campaignState({ is_active: true, starts_at: '2026-10-01T00:00:00Z', ends_at: null }, NOW)).toBe(
+      'scheduled',
+    );
   });
 
   it('is ended after it finishes', () => {
-    expect(campaignState({ is_active: true, starts_at: null, ends_at: '2026-09-01T00:00:00Z' }, NOW))
-      .toBe('ended');
+    expect(campaignState({ is_active: true, starts_at: null, ends_at: '2026-09-01T00:00:00Z' }, NOW)).toBe(
+      'ended',
+    );
   });
 
   it('is live on the boundaries, matching the SQL resolver', () => {
