@@ -47,9 +47,21 @@ direction for a retention commitment.
 `supabase/migrations/20260911120000_otp_retention_sweep.sql` is the fix.
 
 **APPLIED 2026-09-08 12:31:16 UTC** (live version `20260908123116`, ledger row
-81), so the sentence is now true: `otp-retention-sweep` runs daily at 00:40 UTC.
-Applying it deleted nothing — it schedules the job, and the July rows go on the
-first run. **There is no remaining inaccuracy in the set.**
+81). The mechanism is installed and the schedule is live.
+
+**The sentence is not true yet, and that distinction is the point.** Applying the
+migration deleted nothing — it schedules the job — so the July rows are still
+there, and the function has never actually executed. Installing a cron job is
+not evidence that it runs; this repository has a worked example of exactly that
+gap (`OWNER_ACTIONS.md` §28, where a dispatcher shipped with no caller). The
+promise becomes true at the first tick, 00:40 UTC.
+
+**This item therefore stays open until the first run is recorded**, per §30's own
+completion criteria. Review caught it being closed early on #342 — the criteria
+had been written two commits before and then not met, which is the same
+declare-done-on-partial-evidence error this whole audit exists to correct.
+
+Everything else in the set is accurate. **This is the one open item.**
 
 A second, quieter gap in the same area: `otp_send_reservations` already deletes
 rows older than two days inside `otp_reserve_send` — but only **for the phone

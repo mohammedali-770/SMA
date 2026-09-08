@@ -2139,19 +2139,31 @@ other engineering-drafted string on a live customer path.
 
 ---
 
-## 30. ~~Apply the OTP retention sweep~~ — DONE 2026-09-08 (closed)
+## 30. OTP retention sweep — APPLIED 2026-09-08, NOT YET CLOSED
 
-**CLOSED. Applied 2026-09-08 12:31:16 UTC**, live version `20260908123116`, on
-explicit owner approval naming the target by version. Ledger row 81. The Privacy
-Policy's retention sentence is now true: `otp-retention-sweep` runs daily at
-00:40 UTC.
+**Applied 2026-09-08 12:31:16 UTC**, live version `20260908123116`, on explicit
+owner approval naming the target by version. Ledger row 81.
 
 Verified after the apply: exactly one cron job with the canonical schedule and
 command; the function callable by `service_role` only, not by `anon` or
-`authenticated`; the money-path hashes identical; Moyasar still absent. Applying
-deleted nothing — it schedules the sweep, and `otp_challenges` still held its
-three rows immediately afterwards. **The rows from 10 July go on the first
-run.**
+`authenticated`; the money-path hashes identical; Moyasar still absent.
+
+**STILL OPEN, because applying is not running.** The sweep deleted nothing —
+`otp_challenges` still held its three rows immediately afterwards, including the
+ones from 10 July — and the function has never executed. A cron job that exists
+is not a cron job that works, which §28 of this file already learned the hard
+way when a dispatcher shipped with no caller.
+
+**It was briefly marked closed here on the strength of the apply alone**, and
+review caught that on #342: the completion criteria below had been written two
+commits earlier and were not met. Recording the mistake rather than quietly
+fixing it, because it is the same shape as the errors the legal-document audit
+was created to find.
+
+**Two ways to finish it.** Either wait for the 00:40 UTC tick and record the
+run, or call `select public.purge_expired_otp_records();` once — a live delete of
+personal data, so a separate §5 action either way. The scheduled route needs no
+approval and costs only time.
 
 The section below is kept as the record of why it was needed.
 

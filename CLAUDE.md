@@ -232,13 +232,17 @@ purpose) and the four loyalty files.** Latest live version `20260908123116`
 (`20260911120000_otp_retention_sweep`, applied 12:31:16 UTC on explicit owner
 approval naming the target by version; ledger row 81).
 
-**It closed the one gap where a live customer document was false because of
-missing code rather than wrong wording.** `privacy_policy` v2.1 says verification
+**It installs the fix for the one gap where a live customer document was false
+because of missing code rather than wrong wording — but does not itself close
+it.** `privacy_policy` v2.1 says verification
 codes are deleted after a short period; until this applied, nothing did —
 `otp_challenges` held rows from 10 July carrying `phone_e164` and `ip_hash`. The
-sweep now runs daily at 00:40 UTC. **Applying it deleted nothing**: it schedules
-the job, and the first run is the next tick, which was verified rather than
-assumed (`otp_challenges` still held its 3 rows immediately afterwards).
+sweep is scheduled daily at 00:40 UTC. **Applying it deleted nothing**: it
+schedules the job, and the first run is the next tick — verified rather than
+assumed, since `otp_challenges` still held its 3 rows immediately afterwards.
+**So the policy sentence becomes true at that first run, not at the apply**, and
+`docs/OWNER_ACTIONS.md` §30 stays open until the run is recorded. Review caught
+that item being closed on the apply alone (#342).
 
 **The money path was untouched, and a hashing trap is worth remembering from
 this apply.** The pre-apply read used `md5(prosrc)` and produced values that look
