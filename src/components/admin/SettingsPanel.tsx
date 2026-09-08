@@ -641,6 +641,36 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* CHANNEL RULE.
+                          Server-enforced in place_order and
+                          compute_order_snapshot, so this select changes real
+                          behaviour rather than a display preference. It reads
+                          ON for a project that has not run 20260907120000 yet,
+                          because that is what the server will do once it has. */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">
+                            {isRTL ? 'قصر النقاط على طلبات الاستلام' : 'Restrict Points to Pickup Orders'}
+                          </label>
+                          <select
+                            value={loyaltySettings.pickupOnly ? 'true' : 'false'}
+                            onChange={(e) => updateLoyaltySettings({ pickupOnly: e.target.value === 'true' })}
+                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+                            disabled={isAccountant}
+                          >
+                            <option value="true">{isRTL ? 'نعم (الاستلام فقط)' : 'Yes (pickup only)'}</option>
+                            <option value="false">{isRTL ? 'لا (الاستلام والتوصيل)' : 'No (pickup and delivery)'}</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end">
+                          <p className="text-[9.5px] leading-relaxed text-con-text-3 font-bold">
+                            {isRTL
+                              ? 'عند التفعيل، لا تُمنح نقاط على طلبات التوصيل ولا يمكن استبدالها فيها. يطبّق الخادم هذه القاعدة على السعر المعروض وعلى الطلب الفعلي معاً.'
+                              : 'While on, a delivery order neither earns points nor may redeem them. The server applies this to the price the customer is shown and to the order itself, so the two cannot disagree.'}
+                          </p>
+                        </div>
+                      </div>
+
                       {/* LOYALTY SUMMARY STATISTICS */}
                       <div className="p-4 bg-con-surface-2 border border-con-line rounded-2xl space-y-3">
                         <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">{isRTL ? 'مؤشرات أداء العملاء ونقاط الولاء (Loyalty Statistics)' : 'Corporate Customer Loyalty Metrics (Real-time Live Audit)'}</span>

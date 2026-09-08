@@ -33,12 +33,15 @@ import {
   orderNoteMessage,
   orderNoteRemainingMessage,
 } from '../order/orderNote';
-import { appliedCouponSurvives, decideCompChange, decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import {
+  appliedCouponSurvives, decideCompChange, decideLoyaltyChannelChange, decideQuantityChange,
+  resolveBlockReason, type BlockReason,
+} from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
-import { checkout, compMembership, coupons, orders, payments } from '../../services/api';
+import { catalog as catalogApi, checkout, compMembership, coupons, orders, payments } from '../../services/api';
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
@@ -59,6 +62,7 @@ import { CheckoutLines } from './view/CheckoutLines';
 import { CouponRow } from './view/CouponRow';
 import { DeliveryLocationSection } from './view/DeliveryLocationSection';
 import { ConfirmDialog } from './view/Dialog';
+import { LoyaltyChannelNote } from './view/LoyaltyChannelNote';
 import { LoyaltyToggle } from './view/LoyaltyToggle';
 import { OrderTypeRow } from './view/OrderTypeRow';
 import { PaymentMethodPicker } from './view/PaymentMethodPicker';
@@ -369,6 +373,9 @@ export function CheckoutScreen() {
   // It never gates submission: a stale `false` simply shows the ordinary price
   // and the server still charges nothing, which is the safe direction to fail.
   const [comped, setComped] = useState(false);
+  // The submission-time re-read of `app_settings.loyalty_pickup_only`; null
+  // until one has been taken. See the derivation below.
+  const [pickupOnlyOverride, setPickupOnlyOverride] = useState<boolean | null>(null);
   useEffect(() => {
     let alive = true;
     compMembership.isComped().then((v) => { if (alive) setComped(v); });
@@ -377,6 +384,26 @@ export function CheckoutScreen() {
 
   const availablePoints = profile?.loyaltyPoints ?? 0;
   const loyaltyEnabled = Boolean(loyalty?.isEnabled) && availablePoints >= (loyalty?.minPointsToRedeem ?? Infinity);
+  // Loyalty is a PICKUP incentive. `place_order` and `compute_order_snapshot`
+  // both refuse to redeem on a delivery order while
+  // `app_settings.loyalty_pickup_only` is on (20260907120000), so the toggle is
+  // replaced by an explanation rather than left to offer a discount the server
+  // will not grant. `pickupOnly` defaults TRUE in `mapLoyaltySettings`, so an
+  // unloaded settings row withholds the offer rather than making a false one.
+  //
+  // `pickupOnlyOverride` is the fresher answer read at submission, when there is
+  // one. CatalogProvider maps the settings row once at launch and its foreground
+  // refresh does not re-read it, so without this an administrator toggling the
+  // rule mid-checkout would leave the screen offering a redemption the server
+  // refuses. Local state, exactly like `comped` above, for the same reason: the
+  // catalog value is a launch-time snapshot and this screen is the only place
+  // that needs the fresher one. `null` means "nothing fresher has been read".
+  const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;
+  const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';
+  // Read at BOTH use sites below, so switching from pickup to delivery with the
+  // toggle already on cannot leave a stale redemption in the preview or, worse,
+  // in what is submitted.
+  const redeemingPoints = redeemPoints && loyaltyChannelOk ? availablePoints : 0;
   const couponDiscount = couponResult?.ok ? couponResult.discount : 0;
 
   const totals = useMemo(() => computePreviewTotals({
@@ -385,10 +412,11 @@ export function CheckoutScreen() {
     deliveryFee: selectedBranch?.deliveryFee ?? 0,
     minDeliveryOrder: selectedBranch?.minDeliveryOrder ?? 0,
     couponDiscount,
-    loyaltyPoints: redeemPoints ? availablePoints : 0,
+    loyaltyPoints: redeemingPoints,
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
+    loyaltyPickupOnly: loyalty?.pickupOnly ?? true,
     comped,
-  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty, comped]);
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, comped]);
 
   // The confirmed location, and the landmark that travels WITH it.
   //
@@ -600,6 +628,33 @@ export function CheckoutScreen() {
         }
       }
 
+      // The same question for the loyalty CHANNEL rule, and the same answer
+      // shape. An administrator can turn `loyalty_pickup_only` on while this
+      // screen sits open on a delivery order; the settings row is read once at
+      // launch and never refreshed, so the screen would keep showing a
+      // reduction `place_order` refuses -- the customer charged MORE than they
+      // were shown. Raised in review on PR #334.
+      //
+      // Only blocks when points were actually being spent: for a customer who
+      // was not redeeming, nothing was promised and nothing is taken away.
+      // Placed BEFORE the online/cash branch below so it covers both paths.
+      const freshPickupOnly = await catalogApi.readLoyaltyPickupOnly();
+      const channelChange = decideLoyaltyChannelChange({
+        redeeming: redeemingPoints > 0,
+        displayedChannelOk: loyaltyChannelOk,
+        // The rule is about the CHANNEL, so it has to be resolved against this
+        // order's type before the guard sees it: pickup is always allowed.
+        freshChannelOk:
+          freshPickupOnly === null ? null : !freshPickupOnly || orderType === 'pickup',
+      });
+      if (channelChange.action !== 'none') {
+        setPickupOnlyOverride(freshPickupOnly);
+        if (channelChange.action === 'block') {
+          setError(t('loyaltyChannelChanged'));
+          return;
+        }
+      }
+
       // Resolve any interrupted online payment FIRST — before creating ANY new
       // order, cash included. Otherwise a customer with an unresolved online charge
       // could switch to cash and place a second order while that charge may still
@@ -644,7 +699,7 @@ export function CheckoutScreen() {
         addressId: deliveryAddressId,
         couponCode: couponResult?.ok ? couponCode.trim() : null,
         notes: normalizeOrderNote(notes),
-        loyaltyPoints: redeemPoints ? availablePoints : 0,
+        loyaltyPoints: redeemingPoints,
         idempotencyKey: cart.idempotencyKey,
         paymentMethod,
       };
@@ -897,12 +952,22 @@ export function CheckoutScreen() {
 
           {loyaltyEnabled ? (
             <Section>
-              <LoyaltyToggle
-                on={redeemPoints}
-                onToggle={() => setRedeemPoints((v) => !v)}
-                label={t('useLoyalty')}
-                pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
-              />
+              {loyaltyChannelOk ? (
+                <LoyaltyToggle
+                  on={redeemPoints}
+                  onToggle={() => setRedeemPoints((v) => !v)}
+                  label={t('useLoyalty')}
+                  pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
+                />
+              ) : (
+                // A customer holding a redeemable balance who is shown nothing
+                // reads it as the app having lost their points. Say why, and say
+                // the points are still there.
+                <LoyaltyChannelNote
+                  title={t('loyaltyPickupOnly')}
+                  balanceLine={`${availablePoints} ${t('pointsAvailable')} — ${t('loyaltyPickupOnlyBalance')}`}
+                />
+              )}
             </Section>
           ) : null}
 

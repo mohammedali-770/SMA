@@ -208,7 +208,11 @@ and not its twin is a bug:
    burned on an order that was free anyway, and a mistyped code raises at a
    customer who owes nothing;
 2. **loyalty redemption is skipped** — no burning points against free food.
-   `loyalty_points_earned` needs no special case: `floor(0 × rate)` is 0;
+   `loyalty_points_earned` needs no special case: `floor(0 × rate)` is 0. Since
+   `20260907120000_loyalty_pickup_only` there is a **second, independent** reason
+   a delivery order redeems nothing (see [`LOYALTY.md`](LOYALTY.md) §2); the two
+   compose rather than fight, and `loyalty_pickup_only_test.sql` section 6 pins
+   that a comped order earns and redeems nothing on **either** channel;
 3. the total is **zeroed before VAT is derived from it**, so VAT falls out at
    0.00 with no second rule to keep in step;
 4. `orders.is_comped` and `orders.comp_discount_amount` are stamped, and
@@ -438,6 +442,12 @@ about what is charged. The preview **skips the coupon and loyalty rows entirely
 for a comped customer**, because the server skips both — showing them would
 display two reductions that never happen and report a comp smaller than the
 `comp_discount_amount` the order actually records.
+
+`computePreviewTotals` carries a second server rule for the same reason: loyalty
+is **pickup only**, so a delivery order is shown no redemption
+([`LOYALTY.md`](LOYALTY.md) §2). A comped order reports
+`loyaltyBlockedByChannel: false` even on delivery — it already says why it costs
+nothing, and two explanations for one absent discount is worse than one.
 
 **The membership is re-read immediately before the order is submitted.** An
 administrator can revoke a comp while checkout sits open; the mount-time read

@@ -291,5 +291,11 @@ export interface LoyaltySettings {
   pointsPerRiyal: number;
   minPointsToRedeem: number;
   discountPerPoint: number; // e.g. 100 points = 10 SAR, so 0.10 SAR per point
+  /**
+   * Points are earned and redeemed on PICKUP orders only. Enforced in
+   * `place_order` and `compute_order_snapshot`; this is the admin control over
+   * `app_settings.loyalty_pickup_only`.
+   */
+  pickupOnly: boolean;
 }
 

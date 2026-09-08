@@ -1328,6 +1328,29 @@ alter table public.loyalty_transactions
   validate constraint loyalty_transactions_reason_no_order_number;
 ```
 
+## 10a-bis. Loyalty is pickup only — the checkout must say so
+
+Since `20260907120000_loyalty_pickup_only`, a **delivery** order neither earns
+loyalty points nor may redeem them while `app_settings.loyalty_pickup_only` is
+on (it defaults on). The order itself is unaffected: it is placed, priced,
+confirmed and sent to the POS exactly as before. Only the points are withheld.
+
+It belongs in this document because it is a **checkout preview** rule as much as
+a pricing rule. `compute_order_snapshot` is what the customer is shown before
+committing and `place_order` is what happens; the gate lives in both, and
+`apps/mobile/src/features/checkout/previewTotals.ts` mirrors it so the screen
+cannot display a reduction the server will refuse. That is the same mirror-drift
+class as section 4's *"the SQL authority had the same bug, and nothing was
+comparing the two"*, and it is pinned by
+`supabase/tests/loyalty_pickup_only_test.sql` section 4, which asserts preview
+and actual agree for the same cart on **both** channels.
+
+A delivery customer holding a redeemable balance is shown an explanation rather
+than a silent zero: the redeem toggle is replaced by *"Points are earned and
+redeemed on pickup orders only"* alongside their balance. Full detail, including
+the measured justification and how an administrator turns the rule off:
+[`LOYALTY.md`](LOYALTY.md) §2.
+
 ## 10b. Tap `description` (closed)
 
 Tap documents `description` only as *"an arbitrary string which you can attach to

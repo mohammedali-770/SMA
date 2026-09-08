@@ -34,6 +34,16 @@ export interface PreviewInput {
   /** Currency value of one loyalty point. */
   discountPerPoint: number;
   /**
+   * `app_settings.loyalty_pickup_only`. While on, points are earned and
+   * redeemed on PICKUP orders only, so a delivery checkout must not offer a
+   * redemption the server will refuse.
+   *
+   * Defaults TRUE when omitted — the same direction as the column default and
+   * as `mapLoyaltySettings`. An unknown value withholds the discount rather
+   * than promising one, so the preview can only ever under-promise.
+   */
+  loyaltyPickupOnly?: boolean;
+  /**
    * The customer is a comped member (`public.comp_members`, active). The server
    * decides this; the flag is here only so the screen shows 0.00 instead of a
    * full price the customer will not be charged.
@@ -52,6 +62,16 @@ export interface PreviewTotals {
    * `couponDiscount` because a comp is not a coupon.
    */
   compDiscount: number;
+  /**
+   * The channel rule -- not the comp, not an empty cart, not a zero balance --
+   * is why no loyalty discount is applied. The screen uses it to EXPLAIN the
+   * refusal; showing a silent 0.00 was the alternative, and a customer with a
+   * balance would read that as the app losing their points.
+   *
+   * False whenever the customer would not have redeemed anyway (comped, or no
+   * points selected), so it never fires on a screen with nothing to explain.
+   */
+  loyaltyBlockedByChannel: boolean;
   total: number;
   /** True when delivery is selected and the subtotal is under the minimum. */
   belowMinimum: boolean;
@@ -98,12 +118,26 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
   // so the code is not consumed and the points are not burned. Subtracting them
   // here would show two reductions that will not happen, and would report a
   // comp SMALLER than the `comp_discount_amount` the order actually records.
+  //
+  // The CHANNEL rule is the second refusal, and it is the server's rule rather
+  // than a display choice: `place_order` and `compute_order_snapshot` both
+  // derive `v_loyalty_channel_ok` and skip the redemption AND the earning for a
+  // delivery order while `loyalty_pickup_only` is on
+  // (20260907120000_loyalty_pickup_only). Mirroring it here is what stops the
+  // checkout showing a 10.00 reduction the server will not grant.
   const comped = Boolean(input.comped);
+  const pickupOnly = input.loyaltyPickupOnly ?? true;
+  const channelOk = !pickupOnly || input.orderType === 'pickup';
   const couponDiscount = comped ? 0 : money(Math.min(input.couponDiscount, subtotal));
   const loyaltyCap = Math.max(0, subtotal - couponDiscount);
-  const loyaltyDiscount = comped
-    ? 0
-    : money(Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap));
+  const loyaltyDiscount =
+    comped || !channelOk
+      ? 0
+      : money(Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap));
+  // Only worth explaining when the customer was actually trying to spend
+  // something: a comped order already says why it costs nothing, and a customer
+  // who redeemed nothing has nothing withheld.
+  const loyaltyBlockedByChannel = !comped && !channelOk && input.loyaltyPoints > 0;
 
   // A comped customer owes nothing at all. The comp is worth exactly what was
   // about to be charged — delivery fee included, which is what the owner asked
@@ -126,6 +160,7 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
     couponDiscount,
     loyaltyDiscount,
     compDiscount,
+    loyaltyBlockedByChannel,
     total,
     belowMinimum,
     missingForMinimum,

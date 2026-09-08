@@ -179,6 +179,33 @@ if (dense.length > 0) {
   console.error('SQUASH-merges, so a blame-ignore entry takes two pull requests, not one.');
 }
 
+// ---- The trap this check sets for you, said out loud ------------------------
+//
+// Both rules read `git diff <merge-base>...HEAD`, which sees COMMITTED state
+// only. A file you have written but not yet `git add`ed is invisible here, so
+// running this before committing reports a clean tree and CI then fails on the
+// same commit — which is exactly what happened on PR #334, where a new component
+// was Prettier-dirty and this said "Clean." twice before the push.
+//
+// A warning rather than a failure: an untracked scratch file is not an error,
+// and failing on one would make the check unusable mid-work.
+if (!ALL) {
+  const untracked = git('ls-files', '--others', '--exclude-standard')
+    .split('\n')
+    .filter(Boolean)
+    .filter((f) => CODE_EXTENSIONS.some((ext) => f.endsWith(ext)))
+    .filter((f) => !isGenerated(f));
+  if (untracked.length > 0) {
+    console.warn('');
+    console.warn('NOT CHECKED — these files are untracked, so they are invisible to this check:');
+    for (const f of untracked) console.warn(`  ${f}`);
+    console.warn('');
+    console.warn('Both rules diff against the base branch, which sees committed state only.');
+    console.warn('Commit them and re-run, or CI will hold them to Prettier when you push.');
+    console.warn('');
+  }
+}
+
 if (!failed) {
   console.log(
     `Formatting: ${newFiles.length} new file(s) Prettier-checked, ` +

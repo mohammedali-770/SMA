@@ -40,6 +40,7 @@ export const INITIAL_LOYALTY_SETTINGS: LoyaltySettings = {
   isEnabled: true,
   pointsPerRiyal: 1,
   minPointsToRedeem: 100,
-  discountPerPoint: 0.10 // 100 points = 10 SAR
+  discountPerPoint: 0.10, // 100 points = 10 SAR
+  pickupOnly: true // matches the app_settings column default
 };
 

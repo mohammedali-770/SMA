@@ -86,6 +86,10 @@ export interface DbAppSettings {
   primary_color: string; secondary_color: string; currency: string;
   vat_percentage: number; loyalty_enabled: boolean;
   points_per_riyal: number; discount_per_point: number; min_points_to_redeem: number;
+  // Loyalty is a PICKUP incentive while this is on: a delivery order neither
+  // earns nor may redeem. Optional so a pre-migration project still parses;
+  // every reader defaults it TRUE, the same direction as the column default.
+  loyalty_pickup_only?: boolean;
   // Payment-method availability (non-secret; admin-editable, public-readable).
   online_payment_enabled?: boolean; cash_payment_enabled?: boolean;
   default_payment_method?: 'online' | 'cash' | null; payment_outage_mode_enabled?: boolean;

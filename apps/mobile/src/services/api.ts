@@ -137,6 +137,35 @@ export const catalog = {
       await supabase.from('branch_modifier_availability').select('*')),
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
+  /**
+   * Is loyalty pickup-only right now? `boolean | null`, `null` when the answer
+   * could not be read.
+   *
+   * A narrow re-read of ONE column, deliberately, for the moment just before an
+   * order is submitted. `CatalogProvider` maps the whole settings row once at
+   * launch and its foreground refresh does not re-read it, so an administrator
+   * toggling this rule mid-checkout would otherwise leave the screen offering a
+   * redemption `place_order` refuses -- the customer charged more than they
+   * were shown. `decideLoyaltyChannelChange` (checkoutGuards.ts) decides what to
+   * do with the answer; this only fetches it.
+   *
+   * `null` rather than a thrown error, and rather than a safe default, because
+   * the guard must be able to tell "could not read" from "the rule changed":
+   * an unknown answer never blocks an order. Same contract, and same reasoning,
+   * as `compMembership.readComped()` below.
+   *
+   * Defaults TRUE when the column is absent, matching every other reader --
+   * an unmigrated project withholds the offer rather than making a false one.
+   */
+  async readLoyaltyPickupOnly(): Promise<boolean | null> {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('loyalty_pickup_only')
+      .eq('id', true)
+      .maybeSingle();
+    if (error || !data) return null;
+    return (data as { loyalty_pickup_only?: boolean | null }).loyalty_pickup_only ?? true;
+  },
   /** Active delivery zones (safe columns only — never `updated_by`). */
   deliveryZones: async () =>
     ok<DbBranchDeliveryZone[]>(await supabase

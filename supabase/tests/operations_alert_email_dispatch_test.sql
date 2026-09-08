@@ -335,6 +335,7 @@ declare
                            'YYYY-MM-DD"T"HH24:MI:SS"Z"');
   v_sig    text;
   v_sigold text;
+  v_near   text;
 begin
   -- No Vault entry yet: nothing authenticates, whatever is presented.
   if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, 'deadbeef') then
@@ -364,7 +365,23 @@ begin
   -- A near miss, and a signature that is valid for OTHER material. The second
   -- is the one that matters: it proves the nonce and timestamp are actually
   -- covered by the MAC rather than merely travelling alongside it.
-  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, left(v_sig, 63) || 'f') then
+  --
+  -- THE NEAR MISS MUST BE PROVEN TO BE A MISS. This read `left(v_sig, 63) ||
+  -- 'f'`, which is the signature itself whenever the digest already ends in
+  -- 'f' -- one run in sixteen, and measured at 6.4% over 4 096 digests. The
+  -- verifier then correctly ACCEPTED it and this assertion fired, so a
+  -- deliberately flaky test failed CI on an unrelated pull request (#334) while
+  -- reporting a security defect that did not exist. `v_stamp` is `now()` to the
+  -- second, so which runs fail is unpredictable.
+  --
+  -- Flipping to a character the last one is not makes the miss unconditional,
+  -- and the equality check below stops the same class returning silently: a
+  -- fixture that is supposed to differ should say so, not be assumed to.
+  v_near := left(v_sig, 63) || case when right(v_sig, 1) = 'f' then '0' else 'f' end;
+  if v_near = v_sig then
+    raise exception 'FIXTURE BROKEN: the near miss is the signature itself';
+  end if;
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, v_near) then
     raise exception 'signature check must reject a near miss';
   end if;
   if public.verify_operations_alert_dispatch_signature('0000000000000000', v_stamp, v_sig) then

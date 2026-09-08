@@ -141,3 +141,47 @@ export function decideCompChange(input: {
   }
   return { action: input.fresh ? 'update' : 'block', comped: input.fresh };
 }
+
+/**
+ * The same question for the loyalty CHANNEL rule, and the same answer shape.
+ *
+ * `app_settings.loyalty_pickup_only` decides whether a delivery order may
+ * redeem points (20260907120000). `CatalogProvider` reads the settings row once,
+ * on its initial catalog load; its foreground refresh reloads availability,
+ * modifier availability and branches, and NOT settings. So an administrator who
+ * turns the rule on while a delivery checkout sits open leaves this screen
+ * offering a redemption that `place_order` will refuse -- the customer charged
+ * MORE than they were shown, which is the same unacceptable direction
+ * `decideCompChange` above exists to prevent. Raised in review on PR #334.
+ *
+ * `redeeming` is what makes this different from the comp case. Losing the
+ * ability to redeem matters only to a customer who was actually spending points;
+ * for everyone else nothing was promised, so the screen is corrected and the
+ * order goes through untouched. Blocking there would refuse a perfectly good
+ * order to protect a discount nobody asked for.
+ *
+ *   'block'   the channel rule closed AND points were being spent. Correct the
+ *             screen and refuse this submission.
+ *   'update'  it closed while nothing was being spent, or it OPENED. Correct
+ *             the screen and continue -- charging less than displayed, or the
+ *             same, breaks nothing.
+ *   'none'    unchanged, or the read could not answer (`null`). An unknown
+ *             answer must never block, for the reason given above.
+ */
+export function decideLoyaltyChannelChange(input: {
+  /** Whether this order is currently spending points. */
+  redeeming: boolean;
+  /** Whether the screen was painted as able to redeem. */
+  displayedChannelOk: boolean;
+  /** The fresh answer for THIS order type; `null` when it could not be read. */
+  freshChannelOk: boolean | null;
+}): { action: 'none' | 'update' | 'block'; channelOk: boolean } {
+  if (input.freshChannelOk === null || input.freshChannelOk === input.displayedChannelOk) {
+    return { action: 'none', channelOk: input.displayedChannelOk };
+  }
+  const lost = !input.freshChannelOk;
+  return {
+    action: lost && input.redeeming ? 'block' : 'update',
+    channelOk: input.freshChannelOk,
+  };
+}

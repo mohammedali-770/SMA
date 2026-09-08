@@ -254,4 +254,11 @@ export interface LoyaltySettings {
   pointsPerRiyal: number;
   minPointsToRedeem: number;
   discountPerPoint: number;
+  /**
+   * Points are earned and redeemed on PICKUP orders only. Server-authoritative
+   * (`app_settings.loyalty_pickup_only`, read by `place_order` and
+   * `compute_order_snapshot`); this copy only decides what the checkout screen
+   * shows and explains.
+   */
+  pickupOnly: boolean;
 }

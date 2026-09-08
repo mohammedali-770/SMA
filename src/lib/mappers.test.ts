@@ -195,7 +195,18 @@ describe('settings mappers', () => {
     expect(b.vatPercentage).toBe(15);
   });
   it('maps loyalty config from app_settings', () => {
-    expect(mapLoyaltySettings(s)).toEqual({ isEnabled: true, pointsPerRiyal: 1, minPointsToRedeem: 100, discountPerPoint: 0.1 });
+    expect(mapLoyaltySettings(s)).toEqual({
+      isEnabled: true, pointsPerRiyal: 1, minPointsToRedeem: 100, discountPerPoint: 0.1,
+      // Absent from the row above -- a project that has not run 20260907120000
+      // yet must read the rule as ON, which is what the server will do the
+      // moment it does.
+      pickupOnly: true,
+    });
+  });
+
+  it('reads loyalty_pickup_only when the column is present', () => {
+    expect(mapLoyaltySettings({ ...s, loyalty_pickup_only: false }).pickupOnly).toBe(false);
+    expect(mapLoyaltySettings({ ...s, loyalty_pickup_only: true }).pickupOnly).toBe(true);
   });
 });
 

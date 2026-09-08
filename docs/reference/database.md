@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **120**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260903130000_operations_alert_dispatch_scheduler.sql`.
+Migration files in the repository: **121**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260907120000_loyalty_pickup_only.sql`.
 
 ## Tables
 
@@ -23,7 +23,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `account_deletion_requests` | `20260715120000_account_deletion.sql` | 0 | 2 |
 | `account_deletion_resolution_audit` | `20260810120000_account_deletion_manual_review_resolution.sql` | 0 | 1 |
 | `addresses` | `20260707120300_addresses.sql` | 0 | 2 |
-| `app_settings` | `20260707120600_app_settings.sql` | 2 | 2 |
+| `app_settings` | `20260707120600_app_settings.sql` | 3 | 2 |
 | `branch_availability_events` | `20260820110000_branch_availability_snooze.sql` | 0 | 1 |
 | `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 3 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
@@ -128,7 +128,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_modifier_snooze` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `clear_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
 | `compute_campaign_discount` | 1 | `20260728120000_discounts_campaigns.sql` |
-| `compute_order_snapshot` | 5 | `20260826100000_comp_order_totals.sql` |
+| `compute_order_snapshot` | 6 | `20260907120000_loyalty_pickup_only.sql` |
 | `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
@@ -234,7 +234,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
-| `place_order` | 13 | `20260826100000_comp_order_totals.sql` |
+| `place_order` | 14 | `20260907120000_loyalty_pickup_only.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |

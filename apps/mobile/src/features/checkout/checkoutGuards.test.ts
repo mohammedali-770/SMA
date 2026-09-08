@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { appliedCouponSurvives, decideCompChange, decideQuantityChange, resolveBlockReason } from './checkoutGuards';
+import {
+  appliedCouponSurvives, decideCompChange, decideLoyaltyChannelChange, decideQuantityChange,
+  resolveBlockReason,
+} from './checkoutGuards';
 
 /**
  * Replays a sequence of stepper taps the way CheckoutScreen does: a synchronous
@@ -199,5 +202,57 @@ describe('decideCompChange', () => {
       .toEqual({ action: 'none', comped: true });
     expect(decideCompChange({ displayed: false, fresh: null }))
       .toEqual({ action: 'none', comped: false });
+  });
+});
+
+describe('decideLoyaltyChannelChange', () => {
+  // An administrator turned `loyalty_pickup_only` on while a DELIVERY checkout
+  // sat open. CatalogProvider reads the settings row once and its foreground
+  // refresh does not re-read it, so the screen would keep offering a redemption
+  // that place_order refuses -- the customer charged more than they were shown.
+  it('blocks when the channel closed on an order that is spending points', () => {
+    expect(decideLoyaltyChannelChange({
+      redeeming: true, displayedChannelOk: true, freshChannelOk: false,
+    })).toEqual({ action: 'block', channelOk: false });
+  });
+
+  // The distinction from decideCompChange: nothing was promised, so nothing is
+  // taken away. Blocking here would refuse a good order to protect a discount
+  // the customer never asked for.
+  it('only corrects the screen when the channel closed but nothing was being spent', () => {
+    expect(decideLoyaltyChannelChange({
+      redeeming: false, displayedChannelOk: true, freshChannelOk: false,
+    })).toEqual({ action: 'update', channelOk: false });
+  });
+
+  it('lets an order through when the channel OPENED — charging less breaks nothing', () => {
+    expect(decideLoyaltyChannelChange({
+      redeeming: true, displayedChannelOk: false, freshChannelOk: true,
+    })).toEqual({ action: 'update', channelOk: true });
+    expect(decideLoyaltyChannelChange({
+      redeeming: false, displayedChannelOk: false, freshChannelOk: true,
+    })).toEqual({ action: 'update', channelOk: true });
+  });
+
+  it('does nothing when the answer has not changed', () => {
+    expect(decideLoyaltyChannelChange({
+      redeeming: true, displayedChannelOk: true, freshChannelOk: true,
+    })).toEqual({ action: 'none', channelOk: true });
+    expect(decideLoyaltyChannelChange({
+      redeeming: true, displayedChannelOk: false, freshChannelOk: false,
+    })).toEqual({ action: 'none', channelOk: false });
+  });
+
+  it('never blocks on an unknown answer — the server stays the authority', () => {
+    // Same trade-off decideCompChange documents: a flaky network must not
+    // refuse a valid order. It is the weaker side of the deal here, because a
+    // stale `true` is the overcharge case -- but the window is a settings
+    // toggle mid-checkout, and refusing orders on every failed read is worse.
+    expect(decideLoyaltyChannelChange({
+      redeeming: true, displayedChannelOk: true, freshChannelOk: null,
+    })).toEqual({ action: 'none', channelOk: true });
+    expect(decideLoyaltyChannelChange({
+      redeeming: false, displayedChannelOk: false, freshChannelOk: null,
+    })).toEqual({ action: 'none', channelOk: false });
   });
 });

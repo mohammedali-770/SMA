@@ -318,6 +318,10 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     pointsPerRiyal: Number(s.points_per_riyal),
     minPointsToRedeem: s.min_points_to_redeem,
     discountPerPoint: Number(s.discount_per_point),
+    // Defaults TRUE, matching the column default, so a project that has not run
+    // 20260907120000 yet shows the rule as ON -- which is what the server will
+    // do the moment the migration lands.
+    pickupOnly: s.loyalty_pickup_only ?? true,
   };
 }
 
@@ -347,6 +351,7 @@ export function loyaltyPatchToDb(patch: Partial<LoyaltySettings>): Partial<DbApp
   if (patch.pointsPerRiyal !== undefined) out.points_per_riyal = patch.pointsPerRiyal;
   if (patch.discountPerPoint !== undefined) out.discount_per_point = patch.discountPerPoint;
   if (patch.minPointsToRedeem !== undefined) out.min_points_to_redeem = patch.minPointsToRedeem;
+  if (patch.pickupOnly !== undefined) out.loyalty_pickup_only = patch.pickupOnly;
   return out;
 }
 
