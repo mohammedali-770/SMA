@@ -1380,11 +1380,21 @@ Three properties of that RPC are load-bearing rather than incidental:
 - it is **executable by `authenticated` only**, and the migration's own
   verification block asserts `anon` cannot call it.
 
-Operationally it behaves like `refreshAvailability`: it is refetched on cart,
-order-type, coupon and redeem-toggle changes through the same debounce, the last
-good value is held while a refetch is in flight so the line does not flicker,
-and **any failure means no estimate rather than a blocked submission**. A number
-the customer cannot see is a smaller harm than an order they cannot place.
+Operationally it behaves like `refreshAvailability`: it is refetched whenever
+the cart, order type, address, coupon, redemption or comp state changes, and
+**any failure means no estimate rather than a blocked submission**. A number the
+customer cannot see is a smaller harm than an order they cannot place.
+
+**The figure is cleared before each refetch rather than held across it**, and
+that is the opposite of what the first draft did. Holding the previous value to
+avoid a flicker sounds like a kindness, but every input the effect watches
+*changes the answer* — so the held number is not a stale-but-close estimate, it
+is a promise about an order the customer is no longer placing, and it would
+stay on screen until the reply landed or forever if it never did. A customer
+could submit a changed cart while reading points computed for the old one.
+Review caught it on #336. The general shape is worth remembering: **"keep the
+last value while refreshing" is only safe when the refresh was triggered by
+time, not by the input changing.**
 
 ## 10b. Tap `description` (closed)
 
