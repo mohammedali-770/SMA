@@ -113,16 +113,16 @@ describe('loyaltyRulesSummary — campaigns', () => {
       ...over,
     }) as LoyaltyCampaign;
 
-  const ids = (c?: LoyaltyCampaign[]) =>
-    loyaltyRulesSummary(base, c, NOW).map((l) => l.id);
+  const ids = (c?: LoyaltyCampaign[]) => loyaltyRulesSummary(base, c, NOW).map((l) => l.id);
 
   it('says nothing about campaigns when the list has not loaded', () => {
     expect(ids(undefined)).not.toContain('campaigns');
   });
 
   it('states plainly that none is running when the list is empty', () => {
-    expect(loyaltyRulesSummary(base, [], NOW).find((l) => l.id === 'campaigns')?.en)
-      .toContain('No points campaign is running');
+    expect(loyaltyRulesSummary(base, [], NOW).find((l) => l.id === 'campaigns')?.en).toContain(
+      'No points campaign is running',
+    );
   });
 
   it('names a live campaign and its multiplier', () => {
@@ -137,8 +137,9 @@ describe('loyaltyRulesSummary — campaigns', () => {
     const over = campaign({ ends_at: '2026-09-01T00:00:00Z' });
     const off = campaign({ is_active: false });
     for (const c of [notYet, over, off]) {
-      expect(loyaltyRulesSummary(base, [c], NOW).find((l) => l.id === 'campaigns')?.en)
-        .toContain('No points campaign is running');
+      expect(loyaltyRulesSummary(base, [c], NOW).find((l) => l.id === 'campaigns')?.en).toContain(
+        'No points campaign is running',
+      );
     }
   });
 });
