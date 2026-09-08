@@ -483,6 +483,11 @@ stating something false, but the wording is a follow-up
 
 Correcting these needed no feature switch, and did not wait for one.
 
+**The same treatment was then given to the other eight legal documents**, because
+the third error above was found only by reading a whole document rather than the
+passages this work had touched. That sweep corrected three more and confirmed
+five were already accurate: [`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md).
+
 ### Before flipping each switch
 
 Terms first, switch second. Publishing after the fact means a period where the
