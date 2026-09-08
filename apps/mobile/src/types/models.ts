@@ -261,4 +261,11 @@ export interface LoyaltySettings {
    * shows and explains.
    */
   pickupOnly: boolean;
+  /**
+   * Points expire on a fixed calendar reset the administrator sets. When
+   * disabled, `expiryNextRunOn` is null and nothing is shown to the customer.
+   */
+  expiryEnabled: boolean;
+  /** ISO date of the next reset, or null when expiry is off. */
+  expiryNextRunOn: string | null;
 }

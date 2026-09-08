@@ -203,6 +203,8 @@ export const FIXTURE_LOYALTY = fixture<LoyaltySettings>({
   discountPerPoint: 0.1,
   minPointsToRedeem: 100,
   pickupOnly: true,
+  expiryEnabled: false,
+  expiryNextRunOn: null,
 });
 
 /** Both methods on, so the selector renders in full. */

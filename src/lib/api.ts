@@ -97,6 +97,13 @@ export interface DbAppSettings {
   // earns nor may redeem. Optional so a pre-migration project still parses;
   // every reader defaults it TRUE, the same direction as the column default.
   loyalty_pickup_only?: boolean;
+  // Points expiry (20260909120000). `loyalty_expiry_next_run_on` is written by
+  // a trigger and the driver, never by the admin form.
+  loyalty_expiry_enabled?: boolean;
+  loyalty_expiry_anchor_month?: number;
+  loyalty_expiry_anchor_day?: number;
+  loyalty_expiry_period_months?: number;
+  loyalty_expiry_next_run_on?: string | null;
   // Payment-method availability (non-secret; admin-editable, public-readable).
   online_payment_enabled?: boolean; cash_payment_enabled?: boolean;
   default_payment_method?: 'online' | 'cash' | null; payment_outage_mode_enabled?: boolean;

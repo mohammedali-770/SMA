@@ -10,7 +10,8 @@ import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
-import { useAddressBook, useAuth } from '../../store';
+import { useAddressBook, useAuth, useCatalog } from '../../store';
+import { expiryNotice } from './loyaltyExpiry';
 import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
 import { makeStyles } from '../../theme/makeStyles';
 import { EditableName } from './EditableName';
@@ -41,6 +42,15 @@ export function ProfileScreen() {
   const s = useStyles();
   const { profile, status, signOut } = useAuth();
   const addressBook = useAddressBook();
+  const { loyalty } = useCatalog();
+  // Null unless expiry is on, a reset is scheduled AND this customer has points
+  // to lose — see loyaltyExpiry.ts for why each of those stays silent.
+  const expiresOn = expiryNotice({
+    enabled: loyalty?.expiryEnabled ?? false,
+    nextRunOn: loyalty?.expiryNextRunOn ?? null,
+    points: profile?.loyaltyPoints ?? 0,
+    lang,
+  });
   const onSignOut = async () => {
     await signOut();
     router.replace('/(auth)/login');
@@ -68,6 +78,14 @@ export function ProfileScreen() {
               {profile?.loyaltyPoints ?? 0}
             </Text>
           </View>
+          {/* The balance is not allowed to vanish unannounced. Shown only when
+              there is genuinely something to lose on a genuinely scheduled
+              date. */}
+          {expiresOn ? (
+            <Text variant="caption" tone="secondary" style={s.expiry}>
+              {t('pointsExpireOn').replace('{date}', expiresOn)}
+            </Text>
+          ) : null}
           {/*
             Gated on AUTH, not on profile data — the same rule as the delete row
             below, and for the same reason. This read `{profile ? … : null}` until
@@ -232,6 +250,9 @@ function SocialButton({
   );
 }
 const useStyles = makeStyles((c) => ({
+  // Tucked under the balance card rather than inside it: it qualifies the number
+  // above, and putting it in the card would compete with the figure itself.
+  expiry: { marginTop: -space.s2, paddingHorizontal: space.s1 },
   scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' as const },
   column: { gap: space.s3 },
   card: {

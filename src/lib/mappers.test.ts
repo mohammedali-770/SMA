@@ -201,12 +201,45 @@ describe('settings mappers', () => {
       // yet must read the rule as ON, which is what the server will do the
       // moment it does.
       pickupOnly: true,
+      // And expiry defaults the OTHER way, deliberately. Reading "on" from an
+      // absent column would tell a customer their points expire on a date
+      // nothing is scheduled for; the safe direction for a rule that destroys
+      // value is off.
+      expiryEnabled: false,
+      expiryNextRunOn: null,
+      expiryAnchorMonth: 1,
+      expiryAnchorDay: 1,
+      expiryPeriodMonths: 12,
     });
   });
 
   it('reads loyalty_pickup_only when the column is present', () => {
     expect(mapLoyaltySettings({ ...s, loyalty_pickup_only: false }).pickupOnly).toBe(false);
     expect(mapLoyaltySettings({ ...s, loyalty_pickup_only: true }).pickupOnly).toBe(true);
+  });
+
+  it('reads the expiry schedule when the columns are present', () => {
+    const withExpiry = mapLoyaltySettings({
+      ...s, loyalty_expiry_enabled: true, loyalty_expiry_next_run_on: '2027-01-01',
+      loyalty_expiry_anchor_month: 3, loyalty_expiry_anchor_day: 15,
+      loyalty_expiry_period_months: 6,
+    });
+    expect(withExpiry.expiryEnabled).toBe(true);
+    expect(withExpiry.expiryNextRunOn).toBe('2027-01-01');
+    expect(withExpiry.expiryAnchorMonth).toBe(3);
+    expect(withExpiry.expiryAnchorDay).toBe(15);
+    expect(withExpiry.expiryPeriodMonths).toBe(6);
+  });
+
+  it('never sends the next-reset date back to the database', () => {
+    // It is the date a nightly job acts on. The database owns it — a trigger
+    // recomputes it and the driver advances it — so a stale or hand-edited form
+    // value must not be able to schedule a wipe.
+    const patch = loyaltyPatchToDb({
+      expiryEnabled: true, expiryAnchorMonth: 3, expiryNextRunOn: '2020-01-01',
+    });
+    expect(patch).not.toHaveProperty('loyalty_expiry_next_run_on');
+    expect(patch).toMatchObject({ loyalty_expiry_enabled: true, loyalty_expiry_anchor_month: 3 });
   });
 });
 

@@ -343,6 +343,11 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     // migrated yet therefore shows the pickup-only rule rather than offering a
     // redemption the server would refuse.
     pickupOnly: s.loyalty_pickup_only ?? true,
+    // Defaults OFF, unlike pickupOnly. Expiry destroys customer value, so an
+    // unmigrated project or a failed read must show NO expiry date rather than
+    // invent one — the safe direction here is silence.
+    expiryEnabled: s.loyalty_expiry_enabled ?? false,
+    expiryNextRunOn: s.loyalty_expiry_next_run_on ?? null,
   };
 }
 

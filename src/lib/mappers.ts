@@ -325,6 +325,13 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     // 20260907120000 yet shows the rule as ON -- which is what the server will
     // do the moment the migration lands.
     pickupOnly: s.loyalty_pickup_only ?? true,
+    // Expiry defaults OFF: it destroys customer value, so an unmigrated project
+    // must read as "not expiring", never as "expiring on some default date".
+    expiryEnabled: s.loyalty_expiry_enabled ?? false,
+    expiryAnchorMonth: s.loyalty_expiry_anchor_month ?? 1,
+    expiryAnchorDay: s.loyalty_expiry_anchor_day ?? 1,
+    expiryPeriodMonths: s.loyalty_expiry_period_months ?? 12,
+    expiryNextRunOn: s.loyalty_expiry_next_run_on ?? null,
   };
 }
 
@@ -355,6 +362,14 @@ export function loyaltyPatchToDb(patch: Partial<LoyaltySettings>): Partial<DbApp
   if (patch.discountPerPoint !== undefined) out.discount_per_point = patch.discountPerPoint;
   if (patch.minPointsToRedeem !== undefined) out.min_points_to_redeem = patch.minPointsToRedeem;
   if (patch.pickupOnly !== undefined) out.loyalty_pickup_only = patch.pickupOnly;
+  if (patch.expiryEnabled !== undefined) out.loyalty_expiry_enabled = patch.expiryEnabled;
+  if (patch.expiryAnchorMonth !== undefined) out.loyalty_expiry_anchor_month = patch.expiryAnchorMonth;
+  if (patch.expiryAnchorDay !== undefined) out.loyalty_expiry_anchor_day = patch.expiryAnchorDay;
+  if (patch.expiryPeriodMonths !== undefined) out.loyalty_expiry_period_months = patch.expiryPeriodMonths;
+  // `expiryNextRunOn` is DELIBERATELY absent. It is the date a nightly job acts
+  // on, so letting the settings form send it would let a stale or hand-edited
+  // value schedule a wipe. The database owns it: a trigger recomputes it when
+  // the schedule changes, and the driver advances it after each reset.
   return out;
 }
 
