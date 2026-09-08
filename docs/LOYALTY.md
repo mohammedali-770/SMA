@@ -187,8 +187,8 @@ caller-supplied id — and returns only `loyalty_points_earned`,
 
 Why an RPC rather than client arithmetic: the earning rule already lives in two
 SQL functions that must agree, and a third copy in the client would be a number
-that drifts from the points actually granted — while also having to absorb §5's
-expiry and multipliers. And why a wrapper rather than exposing the snapshot:
+that drifts from the points actually granted — while also having to absorb §4's
+expiry and §5's multipliers. And why a wrapper rather than exposing the snapshot:
 `compute_order_snapshot` is `service_role`-only because it trusts a
 caller-supplied `p_customer` with no check, so opening it would let anyone read
 another customer's name, phone and address snapshot. That boundary is asserted by
@@ -244,7 +244,7 @@ expire on…" would make the warning worthless for the customers it is for.
 - **No expiry of the existing balances.** The current points ride to the first
   configured reset. Dropping them would be a live data write needing approval and
   buys nothing.
-- **It does not make expiry lawful to enable.** See §5 — expiry needs updated
+- **It does not make expiry lawful to enable.** See §7 — expiry needs updated
   T&Cs and an acceptance moment first. The mechanism existing is not permission
   to switch it on.
 
@@ -311,13 +311,107 @@ snapshot taken before it existed.
   computed. That date is when every balance goes to zero; showing a stale one is
   worse than showing none.
 
-## 5. Testing
+## 5. Campaign multipliers (`loyalty_multipliers`)
+
+**The rule.** A campaign multiplies what an order **earns**. It never changes
+what an order **costs**, and it can never reduce earning — the CHECK is
+`between 1 and 10`.
+
+Set from **Admin → Settings → Loyalty Program → Points Campaigns**.
+
+### Why a separate table from `campaigns`
+
+`campaigns` is discount-shaped: its `type` CHECK admits only
+`percentage`/`fixed`/`free_delivery`, `campaigns_percentage_range` caps a value
+at 100, and `max_discount_amount` describes money off. A points multiplier is
+none of those — and that feature is blocked on eight unanswered business
+questions with no UI at all. Borrowing its *shape* is free; inheriting its
+blockage would have meant this step could not ship either.
+
+### The bounds are the safety feature
+
+- **Below 1 is refused.** It would be a second, silent way to reduce earning, and
+  §3 already owns that question. Two mechanisms for one outcome is how an item
+  ends up mysteriously earning nothing.
+- **Above 10 is refused.** 2 and 1.5 are the real cases. The ceiling turns a
+  slipped decimal point into a rejected insert rather than a very expensive
+  weekend.
+
+### How it composes — the ordering is the whole risk
+
+Earning already survived three rules: the channel gate, the per-item exclusion,
+and the clamp to the payable total. **A 2x campaign legitimately exceeds the
+order total**, so multiplying *before* `least(v_earn_base, v_total)` would let
+the clamp silently cancel the campaign. The multiplier is therefore applied
+**after** the clamp, as a ratio:
+
+```
+eligible  = Σ line_total                       over earning lines
+weighted  = Σ line_total × multiplier_for_line over the same lines
+earn_base = clamp(0, min(eligible − pro-rata discounts, total))     [§3]
+points    = floor(earn_base × (weighted / eligible) × points_per_riyal)
+```
+
+Every §3 guarantee survives: a comped order still has `earn_base` 0 and earns 0
+whatever is live; the delivery fee is still absent from `eligible`; and **a cart
+with no campaign has `weighted = eligible`, a ratio of exactly 1, and therefore
+points arithmetically identical to §3.** That last property is the most important
+thing in the feature and the suite asserts it against §3's own figures.
+
+### Which campaign wins
+
+Overlap is **allowed** — a house-wide 1.5x plus a 2x on one product is a
+reasonable thing to run — so instead of forbidding it, resolution is
+deterministic: most specific scope first (product → category → branch →
+house-wide), then the larger multiplier, then the older row. Exactly one applies
+to any line.
+
+### Checkout needed no change, and that is §3a paying off
+
+The "You'll earn N points" line comes from `preview_loyalty_points`, which calls
+`compute_order_snapshot` — so it shows the campaign figure automatically. Had the
+client been given its own copy of the earning rule, this step would have needed a
+fourth mirror of it.
+
+Customers never read `loyalty_multipliers`: the select policy requires
+`is_staff()`. They see the result, not the campaign list.
+
+**And they cannot reach the same information through the resolver either**,
+which is where the first version leaked it. `loyalty_multiplier_for` was granted
+to `authenticated`, and it takes `p_at` — so a customer could ask what the
+multiplier on a given product will be *next month* and enumerate targeted,
+not-yet-started campaigns a probe at a time, recovering exactly what the select
+policy withholds. It is now granted to `service_role` only. Nothing legitimate
+lost access: `place_order`, `compute_order_snapshot` and `preview_loyalty_points`
+are all `security definer` owned by the same role that owns the resolver, so
+they call it as the owner rather than through the caller's grants. Case 11b
+asserts a customer session is refused. Review caught it on #338, and the
+generalisable form is worth keeping: **a protection one object provides and a
+helper undoes is not a protection** — check the grants on every function that
+reads a policy-protected table, not just the table.
+
+### Scope is set from the panel, not only from the resolver
+
+The resolver has always supported branch, category and product narrowing, and
+the headline use case for this feature — *"double points on burgers this week"*
+— depends on it. The first version of the admin form omitted the controls, so
+every campaign it could create was house-wide and the per-line behaviour was
+unreachable without direct database calls. The form now carries three optional
+selects, and the list carries a **Scope** column: a table showing two rows both
+called "Double points" with no way to tell which is the burgers-only one is
+worse than no table. `scopeLabel` renders names rather than ids, and a narrowing
+whose target has been deleted shows `(deleted)` rather than an empty cell —
+because an empty cell reads as *everything*, which is the opposite of what a
+narrowed campaign does.
+
+## 6. Testing
 
 | Suite | Covers |
 | --- | --- |
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
+| `supabase/tests/loyalty_multipliers_test.sql` · `loyaltyCampaignState.test.ts` | Campaigns: neutral when empty, **identical to §3 with none live**, clamp-safe (points may exceed the total), specificity, windows, branch scope, composition with the channel gate and the comp, preview parity, and the bounds |
 | `supabase/tests/loyalty_expiry_test.sql` · `loyaltyExpiry.test.ts` | Expiry: off by default, never retroactive (a hand-written past due date on enable, **and** a direct write while already enabled), the trigger and driver converging on one date, once per reset, a missed day caught up, one auditable row each, and when the customer is told nothing |
 | `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
 | `src/lib/mappers.test.ts` · `productEditMapper.test.ts` | The admin mappers read and default both columns, and the generic edit contract carries neither |
@@ -343,7 +437,7 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 6. Regulatory shape (KSA)
+## 7. Regulatory shape (KSA)
 
 Not legal advice; it is why the design looks the way it does.
 
@@ -361,7 +455,7 @@ Not legal advice; it is why the design looks the way it does.
 
 ---
 
-## 7. Planned, not built
+## 8. Planned, not built
 
 Recorded here so nobody re-derives them. Each is a separate pull request with its
 own migration and its own owner approval.
@@ -369,8 +463,8 @@ own migration and its own owner approval.
 | | Change | Note |
 | --- | --- | --- |
 | ~~2~~ | ~~`products.earns_loyalty_points`~~ | **DONE — see §3.** Kept in this table so the sequence still reads in order |
-| ~~3~~ | ~~Expiry~~ | **BUILT — see §4.** Still needs the T&C acceptance moment in §6 before it can be ENABLED, and the "expiring soon" push is a separate owner decision |
-| 4 | `loyalty_multipliers` — x2 points, or +x% for a period | Deliberately a **separate table** from `campaigns`, which is discount-shaped and blocked on eight open business questions (`docs/DISCOUNTS_CAMPAIGNS.md`) |
+| ~~3~~ | ~~Expiry~~ | **BUILT — see §4.** Still needs the T&C acceptance moment in §7 before it can be ENABLED, and the "expiring soon" push is a separate owner decision |
+| ~~4~~ | ~~`loyalty_multipliers`~~ | **BUILT — see §5.** |
 | 5 | Customer-facing copy, T&C mechanics, admin polish | |
 
 Ideas raised and not adopted: tiers as *status* rather than currency, a welcome
@@ -379,7 +473,7 @@ per-order redemption cap.
 
 ---
 
-## 8. Related
+## 9. Related
 
 - [Discounts, campaigns and comped customers](DISCOUNTS_CAMPAIGNS.md) — the comp
   rule that composes with this one, and the blocked campaigns table
