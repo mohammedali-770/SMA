@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**165 TypeScript test files declaring 2539 test blocks, plus 65 SQL suites.**
+**166 TypeScript test files declaring 2546 test blocks, plus 66 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -61,6 +61,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/lazywait_variant_import_test.sql`
 - `supabase/tests/loyalty_expiry_test.sql`
 - `supabase/tests/loyalty_item_exclusion_test.sql`
+- `supabase/tests/loyalty_multipliers_test.sql`
 - `supabase/tests/loyalty_pickup_only_test.sql`
 - `supabase/tests/loyalty_reason_history_safe_test.sql`
 - `supabase/tests/loyalty_reason_no_order_number_test.sql`
@@ -178,7 +179,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-81 files, 1072 declared test blocks.
+82 files, 1079 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -188,6 +189,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/CompMembersPanel.test.tsx` | 12 | CompMembersPanel |
 | `src/components/admin/IntegrationCard.test.ts` | 4 | Lazywait base_url placeholder |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
+| `src/components/admin/loyaltyCampaignState.test.ts` | 5 | campaignState |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
@@ -242,7 +244,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/mappers.test.ts` | 29 | catalog mappers |
+| `src/lib/mappers.test.ts` | 31 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/mirrorParity.test.ts` | 4 | cross-app lib mirrors stay identical |

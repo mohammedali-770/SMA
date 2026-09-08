@@ -8,6 +8,7 @@ import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 import { admin, catalog } from '../../lib/api';
 import { isPlaceholderValue, mailtoLink, telLink, whatsappLink } from '../../lib/supportContact';
+import { LoyaltyCampaignsPanel } from './LoyaltyCampaignsPanel';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -640,6 +641,8 @@ export const SettingsPanel: React.FC = () => {
                           </select>
                         </div>
                       </div>
+
+                      <LoyaltyCampaignsPanel isRTL={isRTL} readOnly={isAccountant} />
 
                       {/* POINTS EXPIRY.
                           The only control on this page that DESTROYS customer

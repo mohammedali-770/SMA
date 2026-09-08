@@ -75,6 +75,7 @@ The admin console is panel-based rather than routed: one component per operation
 | LazywaitPanel | Admin-only Lazywait POS visibility + controls (secure: talks to Supabase via RLS-guarded api calls; no Lazywait secret ever reaches the browser): |
 | LegalDocumentsPanel | Admin-only Legal Documents editor. Admins edit the AR/EN title + content, version, effective date, active flag, and requires_acceptance for each… |
 | LiveOrdersPanel | Live Orders — the console's busiest surface |
+| LoyaltyCampaignsPanel | Points-earning campaigns — "double points this weekend", "+50% on burgers" |
 | MenuManagementPanel | — |
 | MoyasarPaymentPanel | Admin Moyasar readiness + connection test. Reads config-presence booleans from the `payment-test-config` Edge Function (never any secret key) and… |
 | OperationsAlertsPanel | The three filter selects. Native <select> is deliberate — it gives the OS picker on a phone and keyboard type-ahead on a desktop, neither of which a… |
