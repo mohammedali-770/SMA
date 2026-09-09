@@ -2246,7 +2246,40 @@ download exists.
 
 ---
 
-## 32. Loyalty terms are BEHIND the code — delivery redemption is now misleading
+## 32. CLOSED 2026-09-09 — loyalty terms corrected to v2.2
+
+**Closed by publishing `offers_loyalty_terms` v2.2 at 07:56:15 UTC**, on explicit
+owner approval ("update the loyalty terms to v2.2"), effective 9 September 2026,
+active, both languages. All three items below are answered:
+
+1. **EARNING — "eligible" is now defined:** *"Points are earned on PICKUP orders
+   only. A delivery order does not earn points."*
+2. **REDEEMING — the missing caveat is in:** *"Points can be spent on PICKUP
+   orders only. They cannot be used on a delivery order."* This was the
+   misleading half, not merely the incomplete one.
+3. **The advance-notice promise — answered honestly rather than papered over.**
+   Notice was **not** given in advance, because the rule went live at the instant
+   the migration applied and there was no window in which to give it. The
+   customer document does not claim otherwise. Real exposure was nil and
+   measured: 5 accounts hold points (5 409 total), all owner test accounts, and
+   delivery has been redeemed against **zero** times, ever. If you want
+   belt-and-braces, `app_settings.loyalty_pickup_only` turns the rule off with no
+   migration, notice can be given, and it can be re-enabled after — say the word.
+
+v2.2 went further than this item asked and also covered per-item exclusion and
+campaign multipliers, so those two switches are terms-ready before first use
+rather than after. **Expiry is only partly covered — see §33.**
+
+Verification, wording decisions and the byte-exact revert path:
+`docs/LOYALTY.md` §7. Method note: `docs/LEGAL_DOCUMENTS_AUDIT.md`.
+
+**The sequencing lesson, kept because it will recur.** `docs/LOYALTY.md` §7 says
+*terms first, switch second*. Pickup-only defaults ON, so applying the migration
+WAS the change — there was no later toggle to wait for, and the terms therefore
+had to be published **before** the apply. They were published after. It cost
+nothing here only because there are no real customers yet.
+
+### The original item, kept for its reasoning
 
 **Raised 2026-09-09, the moment `20260907120000_loyalty_pickup_only` was applied.**
 Loyalty is pickup-only in Production: a delivery order neither earns points nor
@@ -2307,6 +2340,51 @@ off and restores the previous behaviour exactly, with no migration, if you would
 rather correct the terms first and re-enable after.
 
 ---
+
+## 33. Loyalty terms v2.2 — two follow-ups, one of them blocking expiry
+
+**Opened 2026-09-09, when v2.2 was published.** §32 is closed; these are what it
+did *not* settle.
+
+### 33a. The Arabic in v2.2 has not had a native read — NOT blocking
+
+Same caveat as v2.1 and the rest of this series (§26, §29), but **v2.2 carries
+more new Arabic than v2.1 did**: an entire new expiry section, a restructured
+earning section and five new sentences, all engineering-drafted. It was published
+rather than held so that neither language was left stating something misleading
+on delivery — the English and Arabic say the same thing, and the risk is phrasing
+rather than meaning.
+
+What a reviewer should check, rather than reading it cold:
+
+- **انتهاء صلاحية النقاط** — the new section. It must read as *"points do not
+  currently expire, and if we introduce a date we will tell you in advance"*, not
+  as an announcement that expiry is coming.
+- **طلبات الاستلام فقط** in both the earning and redemption sections — the
+  pickup-only rule is the whole point of the version.
+- **وقد لا تمنح بعض الأصناف نقاطاً** — "may not", not "do not". Nothing is
+  excluded yet and the stronger form would be false.
+
+### 33b. Expiry is still NOT lawful to enable — BLOCKING
+
+v2.2 removed one of three blockers. Publishing the expiry section means the terms
+are no longer silent on the mechanism, and it starts the advance-notice clock.
+**Two remain, and both are yours:**
+
+1. **Give the advance notice.** The document promises *"we will announce it in
+   the app in advance and give you a reasonable period to use them."* Publishing
+   the promise is not performing it. A specific date must be announced, with a
+   usable window, before the first reset.
+2. **The acceptance question — counsel's call.** KSA guidance expects forfeiture
+   terms to be accepted through a click-wrap mechanism. `legal_documents` carries
+   a `requires_acceptance` flag, but **nothing records that a given customer
+   accepted a given version** and nothing gates ordering on it. Building that is
+   a schema change plus a checkout-flow change; it is not built, and
+   `requires_acceptance` is still `false` on the live row.
+
+Until both are done, leave `loyalty_expiry_enabled` off. The mechanism is applied
+and proven inert (`docs/MIGRATIONS.md` ledger row 84); nothing degrades by
+waiting.
 
 ## Owner-action closeout rule
 

@@ -60,10 +60,11 @@ what is payable. It is VAT-inclusive, because prices here are; it excludes the
 > gives a 50.00 discount. The delivery half is covered by the local suite rather
 > than a Production order, for the reason given in §6.
 >
-> **The customer-facing terms have NOT caught up.** `offers_loyalty_terms` v2.1
-> mentions neither channel, and its redemption sentence — *"You choose whether to
-> use your points on an order"* — is now misleading on delivery. Correcting a
-> live legal document is an owner action: `OWNER_ACTIONS.md` §32.
+> **The customer-facing terms HAVE now caught up — `offers_loyalty_terms` v2.2,
+> effective 9 September 2026, published live the same day.** Both halves state
+> the rule: *"Points are earned on PICKUP orders only"* and *"Points can be spent
+> on PICKUP orders only."* The bare redemption sentence that was misleading on
+> delivery is gone. Record and verification: §7.
 
 **The rule.** While this setting is on, a **delivery** order neither earns points
 nor may redeem them. A **pickup** order does both, exactly as before.
@@ -247,12 +248,22 @@ legitimately earn nothing.
 > 1-January annual anchor resolves to 2027-01-01, a monthly one to 2026-10-01 —
 > both strictly future. Turning expiry on does not wipe anybody on the spot.
 >
-> **⚠️ ENABLING IT IS NOT LAWFUL YET.** The terms have not caught up. The live
-> `offers_loyalty_terms` promises advance notice before a change that reduces the
-> value of points already held, and is already behind on the pickup-only rule.
-> Expiry is the **second** item queued behind that one correction
-> (`OWNER_ACTIONS.md` §32). Applying the migration made the mechanism exist; it
-> did not make it lawful to switch on.
+> **⚠️ STILL NOT LAWFUL TO ENABLE — but the blocker has changed, and the change
+> matters.** `offers_loyalty_terms` **v2.2** (2026-09-09) now covers expiry: it
+> states truthfully that points do not currently expire, and pre-announces the
+> mechanism and the promise of advance notice. **That closes the "the terms are
+> silent" objection and starts the notice clock. It does not close the other
+> two.** Before enabling, both of these still have to happen:
+>
+> 1. **Actual advance notice**, with a reasonable period to spend — the document
+>    promises it, and publishing the *promise* is not performing it.
+> 2. **The acceptance question**, which is counsel's call and is unresolved: KSA
+>    guidance expects forfeiture terms to be accepted through a click-wrap
+>    mechanism, and **nothing records that a customer accepted a version**
+>    (§7). `requires_acceptance` is still `false` on the live row.
+>
+> Applying the migration made the mechanism exist; v2.2 made it describable;
+> neither makes it lawful to switch on. Tracked at `OWNER_ACTIONS.md` §33.
 
 **The rule.** Everybody's points expire together, on a date the administrator
 sets, rather than each batch ageing out on its own anniversary. That is the
@@ -515,18 +526,74 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 7. The customer-facing terms — corrected 2026-09-08, and behind again since 2026-09-09
+## 7. The customer-facing terms — v2.2, published 2026-09-09
 
-> **v2.1 is now BEHIND the code.** Pickup-only went live on 2026-09-09 and the
-> document describes neither channel. Earning survives on a hedge — it promises
-> points on "eligible orders" and never defines eligible — but redemption does
-> not: *"You choose whether to use your points on an order"* carries no channel
-> caveat. A v2.2 correcting both halves is an owner action, with the exact
-> wording to change listed in `OWNER_ACTIONS.md` §32. The section below records
-> the 2.0 → 2.1 corrections and remains accurate about those.
+> **v2.2 IS LIVE and the code and the document now agree.** Published
+> 2026-09-09 07:56:15 UTC on explicit owner approval ("update the loyalty terms
+> to v2.2"), effective 9 September 2026, active, `requires_acceptance` still
+> **false**. It closes `OWNER_ACTIONS.md` §32 and covers all four loyalty
+> switches in advance of three of them being used.
+>
+> **What changed, and why each line is there:**
+>
+> | Change | Why |
+> | --- | --- |
+> | *"Points are earned on PICKUP orders only. A delivery order does not earn points."* | §32 item 1 — defines the "eligible" the old text never defined |
+> | *"Points can be spent on PICKUP orders only. They cannot be used on a delivery order."* | §32 item 2 — the missing caveat. This was the **misleading** half, not merely incomplete |
+> | *"The delivery fee never earns points."* | The merchandise-only base from step 2. Accurate under either setting of `loyalty_pickup_only`, so it survives a later change of mind |
+> | *"Some items **may** not earn points; where an item does not earn, you can still spend points on it."* | Step 2's per-item exclusion. **"May" is deliberate:** 0 of 61 products are excluded today, so "some items do not earn" would be false. It also does **not** say where the exclusion is shown, because the app has no per-item marker — the draft flagged that trap and it is honoured |
+> | *"During a promotion we may multiply the points an order earns."* | Step 4's campaigns. "May" again: the table is empty |
+> | *"Your points do not currently expire."* + the advance-notice paragraph | See below — this is the judgement call in v2.2 |
+> | *"They have no cash value."* | From the engineering draft; strengthens an existing clause |
+> | Cancellation broken out into its own section | Substance unchanged from v2.1, just findable |
+>
+> **THE EXPIRY SECTION DESCRIBES A PROMISE, NOT A RULE IN FORCE, and that is the
+> one real decision in this version.** The engineering draft offered a section
+> beginning *"All points expire on [DATE]"* to be included *"only if points
+> expiry is switched on"*. Publishing that today would have been **false** —
+> `loyalty_expiry_enabled` is false, `loyalty_expiry_next_run_on` is null and
+> there are 0 ledger rows of type `expire`. Omitting the subject entirely would
+> have left the terms silent on the one mechanism that destroys customer value.
+> So v2.2 states the truth and pre-announces the mechanism: points do not
+> currently expire; if a date is introduced, all points expire together on it,
+> the balance returns to zero, it is recorded in points history, and **it will be
+> announced in the app in advance** with the profile showing the date.
+>
+> **This does NOT make enabling expiry lawful.** Publishing the mechanism starts
+> the advance-notice clock; it does not answer the acceptance question, which is
+> counsel's call and is recorded below and in `OWNER_ACTIONS.md` §33. Enabling
+> `loyalty_expiry_enabled` still requires that answer **and** actual advance
+> notice with a usable period.
+>
+> **Advance notice for pickup-only was NOT given, and the record says so rather
+> than implying otherwise.** The rule went live at the moment the migration
+> applied, so there was no window in which to announce it. Real exposure is nil
+> and measured: 5 accounts hold points (5 409 total), all owner test accounts,
+> and delivery has been redeemed against **zero** times, ever. If belt-and-braces
+> is wanted, `app_settings.loyalty_pickup_only` turns the rule off with no
+> migration — notice could be given and the rule re-enabled after.
+>
+> **The Arabic is engineering-drafted and has NOT had a native read** — the same
+> caveat as v2.1 and the rest of this series. It was published rather than held
+> so that neither language stated something misleading, and the native review is
+> queued at `OWNER_ACTIONS.md` §33.
+>
+> **How it was written, and how that was proven.** The v2.1 text was captured
+> locally first and both languages hashed against live (`b39dfd12…` EN,
+> `2be12552…` AR, matching exactly), so a byte-exact revert is available. The
+> new text was drafted to files, hashed, then written; the returned live hashes
+> match the local drafts byte-for-byte (`b6a3048b…` / 3 050 bytes EN,
+> `ccc19e25…` / 4 541 bytes AR), so the inline write transcribed nothing wrong —
+> the same discipline the inline migration applies use. Verified afterwards by
+> **21 predicates** rather than by eye: the misleading clause absent, both pickup
+> lines present in both languages, the expiry wording truthful and no
+> "All points expire on" claim anywhere, every quoted figure still matching live
+> `app_settings` (1 point per 1 SAR, 0.10 SAR, 100 minimum), the advance-notice
+> and contact clauses intact, and all nine sections present in both languages.
 
 The binding document is `public.legal_documents`, row `offers_loyalty_terms` —
-now **version 2.1, effective 8 September 2026, active**. The engineering draft
+now **version 2.2, effective 9 September 2026, active**. The 2.0 → 2.1 history
+below remains accurate about those corrections. The engineering draft
 that should eventually replace it wholesale, with the reasoning behind every
 clause, is [`legal/OFFERS_LOYALTY_TERMS_DRAFT.md`](legal/OFFERS_LOYALTY_TERMS_DRAFT.md).
 
@@ -564,7 +631,8 @@ other sections and the quoted figures intact, in both languages.
 **The Arabic replacements are engineering-drafted and have not had a native
 read.** They were published rather than held so that neither language was left
 stating something false, but the wording is a follow-up
-(`docs/OWNER_ACTIONS.md` shape: a native review of loyalty terms v2.1).
+(`docs/OWNER_ACTIONS.md` §33 — now covering v2.2, which carries more new Arabic
+than v2.1 did).
 
 Correcting these needed no feature switch, and did not wait for one.
 
@@ -580,10 +648,10 @@ app does something the customer was never told.
 
 | Switch | Terms work needed first |
 | --- | --- |
-| `loyalty_pickup_only` (defaults ON) | Publish the pickup-only lines — due when `20260907120000` is applied, since the rule is on by default |
-| `products.earns_loyalty_points` → false | Publish the "some items earn no points" line before excluding the first item |
-| A campaign multiplier | Publish the promotion line. Least urgent: multipliers only ever *increase* earning |
-| `loyalty_expiry_enabled` | **Publish the expiry section AND resolve the acceptance question below.** Do not enable before both |
+| `loyalty_pickup_only` (defaults ON) | ✅ **DONE in v2.2.** Both halves state pickup-only. Published 2026-09-09, the day the rule went live — *after* the apply rather than before it, which is the one thing this table asked for and did not get; see §7 on why exposure was nil |
+| `products.earns_loyalty_points` → false | ✅ **DONE in v2.2** — *"Some items may not earn points."* Worded with "may" because nothing is excluded yet, and deliberately silent on **where** that shows, because the app has no per-item marker. **If a per-item label is ever built, the line can be strengthened; do not promise one first** |
+| A campaign multiplier | ✅ **DONE in v2.2** — *"During a promotion we may multiply the points an order earns."* |
+| `loyalty_expiry_enabled` | ⚠️ **PARTLY.** v2.2 publishes the expiry section and the advance-notice promise, which was one of the three blockers. **Still outstanding: actually giving the advance notice, and the acceptance question below.** Do not enable before both |
 
 ### The acceptance moment is not built
 

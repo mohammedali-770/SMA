@@ -13,6 +13,22 @@ than the passages the loyalty work had touched. That generalised immediately:
 the errors you find are bounded by the passages you actually check. So every
 other document got the same treatment.
 
+> **Updated 2026-09-09 — `offers_loyalty_terms` is now version 2.2.** The other
+> eight rows are unchanged at 2.1. v2.2 was not a further correction of a false
+> statement: it brought the document level with four loyalty features that
+> shipped on 2026-09-09, of which **pickup-only was live and had made the
+> redemption clause misleading**. Detail, the wording decisions and the
+> verification: [`LOYALTY.md`](LOYALTY.md) §7.
+>
+> **The method differed from the sweep below, on purpose.** The 2026-09-08
+> corrections used SQL `replace()` on individual clauses, so untouched text was
+> byte-identical by construction. v2.2 restructures the document — a new section,
+> a reordered earning section — so `replace()` could not express it and the
+> content was written wholesale. The equivalent guarantee was obtained a
+> different way: the v2.1 text was captured locally and hashed against live
+> first, giving a byte-exact revert; the new text was hashed before and after the
+> write; and 21 predicates were then asserted against the live row.
+
 ## Corrected, live, 2026-09-08 (all now version 2.1)
 
 | Document | What it said | What is true |

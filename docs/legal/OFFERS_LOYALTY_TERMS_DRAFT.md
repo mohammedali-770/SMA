@@ -1,5 +1,134 @@
 # Offers & Loyalty Terms — engineering draft
 
+> # ⚠️ SUPERSEDED IN PART — v2.2 IS PUBLISHED AND LIVE
+>
+> **`offers_loyalty_terms` v2.2 went live 2026-09-09 07:56:15 UTC**, effective
+> 9 September 2026, on explicit owner approval. The sections below are the draft
+> that fed it and are kept for their reasoning — but **§3 and §4 are no longer
+> the current text.** The published text is reproduced verbatim immediately
+> below, so this repository holds a byte-accurate copy of what a customer sees.
+>
+> **Three open brackets in §3 were resolved, and how matters more than what:**
+>
+> - **`[DATE]` → 9 September 2026.** The bracketed figures were re-read from live
+>   `app_settings` at publication rather than copied from this file, as §3
+>   instructs: 1 point per 1 SAR, 0.10 SAR per point, 100 minimum. All three
+>   matched what was already published, so no figure changed.
+> - **The per-item bracket** — *"[The app does not currently mark these items
+>   individually … wording that does not promise a per-item label until one
+>   exists.]"* — was honoured. Published wording is *"Some items **may** not earn
+>   points; where an item does not earn, you can still spend points on it."*
+>   **"May"** because 0 of 61 products are excluded today, and **no statement
+>   about where it shows**, because there is no per-item marker. Note the
+>   checkout "You'll earn N points" line is *also* not a valid answer yet — it is
+>   merged but ships with the X2 build.
+> - **`[Include this section only if points expiry is switched on.]`** was **not**
+>   followed, deliberately, and this is the one real departure from the draft.
+>   Expiry is switched **off**, so the draft's *"All points expire on [DATE]"*
+>   would have been false; but omitting the section entirely would leave the
+>   terms silent on the only mechanism that destroys customer value. The
+>   published section instead states the truth — *"Your points do not currently
+>   expire"* — and pre-announces the mechanism and the advance-notice promise.
+>   That starts the notice clock without asserting a rule that is not in force.
+>   **It does not make enabling expiry lawful** (`OWNER_ACTIONS.md` §33b).
+>
+> §5's acceptance analysis is **unchanged and still correct**: nothing records
+> that a customer accepted a version, and `requires_acceptance` is still `false`.
+
+## 0. The PUBLISHED text — version 2.2, effective 9 September 2026
+
+Reproduced byte-for-byte from `public.legal_documents`. English md5
+`b6a3048b2166b47dd943a5ed300fdb5b` (3 050 bytes); Arabic md5
+`ccc19e250110863e15a560fd37998b0a` (4 541 bytes). **The Arabic has not had a
+native read** — `OWNER_ACTIONS.md` §33a lists the three passages to check first.
+
+### English
+
+```
+Effective date: 9 September 2026
+
+WHO CAN JOIN
+The loyalty programme is open to every Spicy Meal account. There is nothing to sign up for — points are added automatically on eligible orders.
+
+EARNING POINTS
+Points are earned on PICKUP orders only. A delivery order does not earn points.
+You earn points on the value of the eligible items in a pickup order placed through the app. At the time of writing you earn 1 point for each 1 SAR of that value. The current rate always applies, and the app shows your live balance in your profile.
+The delivery fee never earns points. Some items may not earn points; where an item does not earn, you can still spend points on it.
+If you use a coupon or spend points on an order, the points you earn are calculated on what you actually pay for the eligible items.
+Points are added when you place the order, and your balance updates immediately.
+During a promotion we may multiply the points an order earns. Where a promotion applies, the multiplied amount is the amount added.
+
+REDEEMING POINTS
+Points can be spent on PICKUP orders only. They cannot be used on a delivery order.
+Points are redeemed as a discount at checkout. At the time of writing each point is worth 0.10 SAR, and you need at least 100 points before you can redeem.
+You choose whether to use your points on an order. When you do, your whole available balance is applied, up to the value of the order. The discount is applied to the order total by our system, and the amounts confirmed at checkout are final.
+Points cannot be exchanged for cash, transferred to another account, or combined across accounts. They have no cash value.
+
+IF YOUR ORDER IS CANCELLED
+A cancelled order earns no points: the points it earned are taken back, up to the balance you hold at that moment, and any points you spent on it are returned to you in full.
+
+WHEN POINTS EXPIRE
+Your points do not currently expire.
+If we introduce an expiry date, all points will expire together on that date, whatever date they were earned on, the balance will return to zero, and the expiry will be recorded in your points history. We will announce any such date in the app in advance and give you a reasonable period to use your points, and your profile will show the next expiry date while you hold a balance.
+
+OFFERS AND COUPONS
+An offer or a coupon may have its own conditions — a minimum order, selected branches, selected items, a limited period, or one use per customer. The conditions shown with the offer are the ones that apply.
+Unless an offer says otherwise, offers cannot be combined with each other.
+
+CHANGES TO THE PROGRAMME
+Earning rates, point values, minimums and eligibility can change, and we may pause or end the programme. Where a change reduces the value of points you already hold, we will announce it in the app in advance and give you a reasonable period to use them.
+
+MISUSE
+We may cancel points, withdraw an offer, or close an account where points or offers were obtained by error, duplication, or misuse.
+
+CONTACT
+info@spicymeal.com.sa — 9200 31495
+```
+
+### Arabic
+
+```
+تاريخ السريان: ٩ سبتمبر ٢٠٢٦
+
+من يستفيد
+برنامج الولاء متاح لكل حساب في سبايسي ميل. ولا يتطلب تسجيلاً، إذ تُضاف النقاط تلقائياً على الطلبات المؤهلة.
+
+اكتساب النقاط
+تُكتسب النقاط على طلبات الاستلام فقط، ولا تمنح طلبات التوصيل أي نقاط.
+تكتسب نقاطاً على قيمة الأصناف المؤهلة في طلب الاستلام المقدَّم عبر التطبيق. وفي تاريخ كتابة هذه الشروط تكتسب نقطة واحدة عن كل ١ ريال من تلك القيمة. والمعدّل الساري هو المعتمد دائماً، ويعرض التطبيق رصيدك الحالي في ملفك الشخصي.
+ولا تمنح رسوم التوصيل أي نقاط. وقد لا تمنح بعض الأصناف نقاطاً، ويظل بإمكانك استخدام نقاطك عليها.
+وإذا استخدمت كوبوناً أو استبدلت نقاطاً في الطلب، تُحتسب النقاط المكتسبة على ما تدفعه فعلياً مقابل الأصناف المؤهلة.
+وتُضاف النقاط عند تقديم الطلب، ويُحدَّث رصيدك فوراً.
+وخلال العروض قد نضاعف النقاط الممنوحة على الطلب، وتُضاف القيمة بعد المضاعفة.
+
+استبدال النقاط
+يمكن استخدام النقاط في طلبات الاستلام فقط، ولا يمكن استخدامها في طلبات التوصيل.
+تُستبدل النقاط كخصم عند إتمام الطلب. وفي تاريخ كتابة هذه الشروط تساوي كل نقطة ٠٫١٠ ريال، ويلزم امتلاك ١٠٠ نقطة على الأقل قبل الاستبدال.
+وأنت تختار ما إذا كنت ستستخدم نقاطك في الطلب. وعند اختيار ذلك يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب. ويطبّق نظامنا الخصم على إجمالي الطلب، والمبالغ المؤكدة عند إتمام الطلب نهائية.
+ولا يمكن استبدال النقاط بمبالغ نقدية ولا تحويلها إلى حساب آخر ولا جمعها بين حسابات متعددة، وليست لها قيمة نقدية.
+
+عند إلغاء الطلب
+لا يكتسب الطلب الملغى أي نقاط: فإذا أُلغي الطلب استُرجعت النقاط التي اكتسبها في حدود رصيدك وقت الإلغاء، وأُعيدت إليك بالكامل أي نقاط استخدمتها فيه.
+
+انتهاء صلاحية النقاط
+لا تنتهي صلاحية نقاطك حالياً.
+وإذا اعتمدنا تاريخاً لانتهاء الصلاحية، فستنتهي صلاحية جميع النقاط معاً في ذلك التاريخ بغض النظر عن تاريخ اكتسابها، ويعود الرصيد إلى الصفر، ويُسجَّل ذلك في سجل نقاطك. وسنعلن عن أي تاريخ من هذا القبيل في التطبيق مسبقاً ونمنحك مدة معقولة لاستخدام نقاطك، وسيعرض ملفك الشخصي تاريخ الانتهاء القادم ما دام لديك رصيد.
+
+العروض والكوبونات
+قد يكون للعرض أو الكوبون شروطه الخاصة، مثل حد أدنى للطلب أو فروع محددة أو أصناف محددة أو مدة محدودة أو استخدام واحد لكل عميل. والشروط المعروضة مع العرض هي الشروط المطبّقة.
+وما لم ينص العرض على خلاف ذلك، لا يمكن الجمع بين العروض.
+
+تعديل البرنامج
+قد تتغيّر معدلات الاكتساب وقيمة النقطة والحدود الدنيا وشروط الأهلية، وقد نوقف البرنامج أو ننهيه. وإذا كان التعديل يقلّل قيمة نقاط تملكها بالفعل، فسنعلن عنه في التطبيق مسبقاً ونمنحك مدة معقولة لاستخدامها.
+
+سوء الاستخدام
+يجوز لنا إلغاء النقاط أو سحب العرض أو إغلاق الحساب إذا تم الحصول على النقاط أو العروض نتيجة خطأ أو تكرار أو سوء استخدام.
+
+التواصل
+info@spicymeal.com.sa — 9200 31495
+```
+
+
 **This is not legal advice and it is not binding wording.** It is a factual
 description of what the code actually does, written so counsel can turn it into
 terms and so the owner can see exactly which promises the current live text makes

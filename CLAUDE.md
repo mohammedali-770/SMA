@@ -389,13 +389,29 @@ new values are `place_order` `fab9f299507e68d0f368cc6acc35c198` and
 (`20260908120000`) and 4 (`20260910120000`) each move them again — record the new
 pair at each apply rather than treating a change as a fault.
 
-**A live customer document is now BEHIND the code.**
-`legal_documents.offers_loyalty_terms` v2.1 mentions neither pickup nor delivery.
-Earning survives on a hedge — it promises points on "eligible orders" and never
-defines eligible — but redemption does not: *"You choose whether to use your
-points on an order"* has no channel caveat and is now misleading on delivery.
-Correcting a live legal document is a §5 write and an owner action:
-`docs/OWNER_ACTIONS.md` §32.
+**A live customer document was BEHIND the code — CLOSED the same day by
+`offers_loyalty_terms` v2.2.** The defect, kept because the shape recurs: v2.1
+mentioned neither pickup nor delivery. Earning survived on a hedge — it promised
+points on "eligible orders" and never defined eligible — but redemption did not:
+*"You choose whether to use your points on an order"* had no channel caveat and
+was misleading on delivery from the moment the migration applied.
+
+**Corrected live 2026-09-09 07:56:15 UTC on explicit owner approval** ("update
+the loyalty terms to v2.2"), effective 9 September 2026, both languages, both
+halves now stating pickup-only. v2.2 also covers per-item exclusion, campaign
+multipliers and expiry, so three of the four loyalty switches are now
+terms-ready in advance of use. **Expiry is NOT** — publishing the mechanism
+started the advance-notice clock but did not give the notice, and the acceptance
+question is still counsel's (`docs/OWNER_ACTIONS.md` §33).
+
+**The general lesson is about sequencing, and this instance failed it.**
+`docs/LOYALTY.md` §7 says *terms first, switch second* — and pickup-only defaults
+ON, so applying the migration WAS the change, with no later toggle to wait for.
+The terms therefore had to be published **before** the apply and were published
+after. Cost here was nil and measured (5 owner test accounts hold points, zero
+delivery redemptions ever), which is why it is a correction rather than an
+incident — but the next feature of this shape will not be so forgiving. Editing a
+live legal document is a §5 write and needs its own approval every time.
 
 **Superseded, kept because the count is the point: 126 repository files / 126
 live history rows / SIX unapplied — Moyasar (frozen on
