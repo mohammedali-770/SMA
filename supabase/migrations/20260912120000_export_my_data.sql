@@ -36,9 +36,17 @@
 --   * anything belonging to anybody else. Every subquery is keyed on the caller.
 --
 -- WHAT IS INCLUDED ON PURPOSE: the identity fields, saved addresses, the full
--- order history with line items, and the complete loyalty ledger -- the last
--- because after `20260909120000` a balance can be reduced by an `expire` row,
--- and a customer who cannot see that row cannot check the arithmetic.
+-- order history with line items AND their selected add-ons, and the complete
+-- loyalty ledger -- the last because after `20260909120000` a balance can be
+-- reduced by an `expire` row, and a customer who cannot see that row cannot
+-- check the arithmetic.
+--
+-- The add-ons follow the same principle and were missed on the first pass:
+-- `order_item_modifiers` rows carry their own `price` and are already inside
+-- `line_total`, so omitting them left the customer holding a figure they could
+-- not reconcile. Every number in this export should be accountable from the
+-- export itself; that is the test to apply when deciding whether a field
+-- belongs.
 -- ============================================================================
 
 create or replace function public.export_my_data()
@@ -128,7 +136,19 @@ begin
             'unit_price', i.unit_price,
             'quantity', i.quantity,
             'line_total', i.line_total,
-            'your_note', i.note
+            'your_note', i.note,
+            -- Add-ons carry their OWN price and are part of `line_total`.
+            -- Without them the export shows a line total the customer cannot
+            -- reconcile against the item price -- the same defect as omitting
+            -- the comp flag: an amount stated with no way to account for it.
+            -- Review caught this on #343.
+            'add_ons', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                'name', m.name_en,
+                'price', m.price
+              ) order by m.created_at)
+              from public.order_item_modifiers m where m.order_item_id = i.id
+            ), '[]'::jsonb)
           ) order by i.created_at)
           from public.order_items i where i.order_id = o.id
         ), '[]'::jsonb)

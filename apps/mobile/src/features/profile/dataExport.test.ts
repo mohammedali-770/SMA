@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   exportErrorMessage,
   exportTitle,
+  isTooLargeToShare,
+  SHARE_TEXT_LIMIT_BYTES,
   shouldStartExport,
   summarizeExport,
   summaryLine,
+  tooLargeMessage,
 } from './dataExport';
 
 describe('shouldStartExport', () => {
@@ -87,5 +90,38 @@ describe('exportErrorMessage', () => {
     for (const lang of ['en', 'ar'] as const) {
       expect(exportErrorMessage(leaky, lang)).not.toContain('export_my_data');
     }
+  });
+});
+
+/**
+ * The Android Binder ceiling. A share that silently does nothing is worse than
+ * a refusal that explains itself, and it would fail for exactly the customers
+ * with the most data.
+ */
+describe('isTooLargeToShare', () => {
+  it('passes a realistic export', () => {
+    const realistic = JSON.stringify({ orders: Array.from({ length: 120 }, (_, i) => ({ n: i })) });
+    expect(isTooLargeToShare(realistic)).toBe(false);
+  });
+
+  it('refuses one past the limit', () => {
+    expect(isTooLargeToShare('x'.repeat(SHARE_TEXT_LIMIT_BYTES + 1))).toBe(true);
+    expect(isTooLargeToShare('x'.repeat(SHARE_TEXT_LIMIT_BYTES))).toBe(false);
+  });
+
+  it('measures BYTES, not characters', () => {
+    // Arabic is 2 bytes per character in UTF-8, so a string well under the limit
+    // by `.length` can be over it in bytes — which is what Binder counts.
+    const arabic = 'ب'.repeat(SHARE_TEXT_LIMIT_BYTES - 10);
+    expect(arabic.length).toBeLessThan(SHARE_TEXT_LIMIT_BYTES);
+    expect(isTooLargeToShare(arabic)).toBe(true);
+  });
+
+  it('tells the customer what to do instead, in both languages', () => {
+    for (const lang of ['en', 'ar'] as const) {
+      expect(tooLargeMessage(lang).length).toBeGreaterThan(0);
+    }
+    expect(tooLargeMessage('en')).toMatch(/contact us/i);
+    expect(tooLargeMessage('ar')).not.toBe(tooLargeMessage('en'));
   });
 });

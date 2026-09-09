@@ -2213,6 +2213,39 @@ remaining `otp_challenges` row is inside the window.
 
 ---
 
+## 31. Ship the data export as a FILE, not share text (next native build)
+
+**Not blocking, and the current behaviour is honest rather than broken.**
+
+`export_my_data()` and its Profile screen (A6, PR #343) hand the customer their
+data through React Native's core `Share` as message text. That was chosen so the
+feature would not be trapped behind a native build: `expo-file-system` and
+`expo-sharing` are not installed, and adding either is a new native module.
+
+**The limit is real and review found it.** On Android the share text travels in
+an Intent extra across Binder, whose transaction buffer is roughly 1 MB and is
+shared with everything else the process is doing. A large export can therefore
+fail — sometimes silently — and it fails for exactly the customers with the most
+order history, who are the ones most likely to be exercising a data request.
+
+The code refuses above **256 KB** and tells the customer to contact support,
+which converts a silent platform failure into an explicit one with a route out.
+A realistic export today is tens of kilobytes, so this should bite rarely — but
+"rarely" is not "never".
+
+What is wanted, when a native build is being cut anyway (the same build that
+ships A6 and B1):
+
+- add `expo-file-system` and `expo-sharing`;
+- write the JSON to a cache file named from `exportTitle()` and share the file
+  URI instead of the message body;
+- delete the 256 KB guard and its tests, or keep them as a fallback for web.
+
+Until then the guard stays, and the readiness row says so rather than implying a
+download exists.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

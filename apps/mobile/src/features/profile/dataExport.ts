@@ -16,7 +16,54 @@
  * information, and it can be pasted anywhere.
  */
 
-export type ExportState = 'idle' | 'working' | 'shared' | 'error';
+export type ExportState = 'idle' | 'working' | 'shared' | 'error' | 'too_large';
+
+/**
+ * The ceiling on what may go through `Share` as message text.
+ *
+ * On Android the share text travels in an Intent extra, which crosses Binder;
+ * the per-process transaction buffer is about 1 MB and is SHARED, so a large
+ * payload fails — sometimes by throwing, sometimes silently — and it fails
+ * precisely for the customers with the most order history, who are the ones
+ * most likely to be exercising a data request in the first place. Review raised
+ * this on #343.
+ *
+ * 256 KB is deliberately well under the platform limit rather than close to it,
+ * because the buffer is shared with whatever else the process is doing and a
+ * bound that is only just safe is not safe. A realistic export is a few tens of
+ * kilobytes, so this bites rarely — but "rarely" is not "never", and the
+ * failure it prevents is silent.
+ *
+ * THIS IS A GUARD, NOT THE FIX. The real answer is a file attachment via
+ * `expo-file-system` + `expo-sharing`, which is a new native module and so waits
+ * for the next build. Until then an oversized export refuses loudly and points
+ * the customer at support, which is a worse experience than a download and a far
+ * better one than a share that does nothing.
+ */
+export const SHARE_TEXT_LIMIT_BYTES = 256 * 1024;
+
+/** Byte length, not string length — Arabic and emoji are multi-byte in UTF-8. */
+export function exportByteLength(json: string): number {
+  if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(json).length;
+  // Older JS runtimes: count UTF-8 bytes without allocating an encoder.
+  let bytes = 0;
+  for (const ch of json) {
+    const cp = ch.codePointAt(0) ?? 0;
+    bytes += cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+  }
+  return bytes;
+}
+
+export function isTooLargeToShare(json: string): boolean {
+  return exportByteLength(json) > SHARE_TEXT_LIMIT_BYTES;
+}
+
+/** What the customer is told when their own history is too big for a share sheet. */
+export function tooLargeMessage(lang: 'en' | 'ar'): string {
+  return lang === 'ar'
+    ? 'سجلك أكبر من أن يُرسل عبر المشاركة. تواصل معنا وسنرسل لك نسختك.'
+    : 'Your history is too large to share this way. Contact us and we will send you your copy.';
+}
 
 /**
  * A second tap while a request is in flight must do nothing. Not cosmetic: each

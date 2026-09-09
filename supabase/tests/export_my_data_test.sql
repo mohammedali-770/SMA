@@ -55,13 +55,39 @@ values
   (:alice, null, 'adjustment',  250, 250, 'Alice goodwill'),
   (:bob,   null, 'adjustment',  999, 999, 'Bob goodwill');
 
+-- An order with a PRICED add-on. The add-on's price is already inside
+-- `line_total`, which is what makes its absence from the export a figure the
+-- customer cannot reconcile rather than a missing nicety.
+do $$
+declare v_order uuid; v_item uuid;
+begin
+  insert into public.orders
+    (customer_id, order_number, customer_name, customer_phone, branch_id,
+     branch_name_en, branch_name_ar, status, order_type,
+     subtotal, delivery_fee, vat_amount, total, payment_method, payment_status)
+  select '0e100000-0000-0000-0000-0000000000a1', 'SM-TEST-EXPORT-1', 'Alice Test',
+         '+966500000901', b.id, b.name_en, b.name_ar, 'delivered', 'pickup',
+         30.00, 0, 4.50, 30.00, 'cash', 'paid'
+    from public.branches b limit 1
+  returning id into v_order;
+
+  insert into public.order_items
+    (order_id, product_id, name_en, name_ar, unit_price, quantity, line_total)
+  select v_order, p.id, 'Test Burger', 'برجر', 22.00, 1, 30.00
+    from public.products p limit 1
+  returning id into v_item;
+
+  insert into public.order_item_modifiers (order_item_id, modifier_id, name_en, name_ar, price)
+  values (v_item, null, 'Extra cheese', 'جبن إضافي', 8.00);
+end $$;
+
 -- ============================================================================
 -- 1-2, 4-6. The caller gets their own data, and only their own
 -- ============================================================================
 set local role authenticated;
 set local request.jwt.claim.sub = '0e100000-0000-0000-0000-0000000000a1';
 do $$
-declare v jsonb; v_txt text;
+declare v jsonb; v_txt text; v_key text;
 begin
   v := public.export_my_data();
   v_txt := v::text;
@@ -79,6 +105,30 @@ begin
   if jsonb_array_length(v -> 'loyalty_history') <> 1 then
     raise exception 'FAIL 1: expected 1 loyalty row, got %', jsonb_array_length(v -> 'loyalty_history');
   end if;
+
+  -- 1b. ADD-ONS. `line_total` (30.00) is the item (22.00) plus the add-on
+  -- (8.00), so an export without the add-on states a number the customer
+  -- cannot account for. Assert the amount reconciles, not merely that a key
+  -- exists.
+  declare
+    v_item jsonb;
+    v_addons jsonb;
+  begin
+    v_item := v #> '{orders,0,items,0}';
+    v_addons := v_item -> 'add_ons';
+    if v_addons is null or jsonb_array_length(v_addons) <> 1 then
+      raise exception 'FAIL 1b: expected 1 add-on in the exported line item, got %',
+        coalesce(jsonb_array_length(v_addons)::text, 'null');
+    end if;
+    if (v_addons #>> '{0,name}') <> 'Extra cheese' then
+      raise exception 'FAIL 1b: add-on name is %', v_addons #>> '{0,name}';
+    end if;
+    if (v_item ->> 'unit_price')::numeric + (v_addons #>> '{0,price}')::numeric
+       <> (v_item ->> 'line_total')::numeric then
+      raise exception 'FAIL 1b: % + % does not reconcile to line_total %',
+        v_item ->> 'unit_price', v_addons #>> '{0,price}', v_item ->> 'line_total';
+    end if;
+  end;
 
   -- 2. NOTHING of Bob's, checked by content rather than by count
   if v_txt ilike '%Bob%' or v_txt like '%966500000902%' or v_txt ilike '%bob@example.test%' then
@@ -112,10 +162,15 @@ begin
     raise exception 'FAIL 5: internal operational state leaked into the export';
   end if;
 
-  -- 6. empty collections are [] not null, so a client can iterate blind
-  if jsonb_typeof(v -> 'orders') <> 'array' then
-    raise exception 'FAIL 6: orders is %, expected an array even when empty', jsonb_typeof(v -> 'orders');
-  end if;
+  -- 6. every collection is an array, so a client can iterate blind. Alice now
+  -- has an order, so the empty-case check moves to a collection she has none
+  -- of — a null here would crash a `.map()` on the client.
+  for v_key in select unnest(array['orders','saved_addresses','loyalty_history','notification_devices'])
+  loop
+    if jsonb_typeof(v -> v_key) <> 'array' then
+      raise exception 'FAIL 6: % is %, expected an array', v_key, jsonb_typeof(v -> v_key);
+    end if;
+  end loop;
 
   raise notice 'cases 1,2,4,5,6 ok -- own data returned, neighbour excluded, token withheld';
 end $$;
