@@ -55,7 +55,19 @@ anticipated the migration that would lift it. That is what
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
-### Recovery email pairing (`20260913120000`)
+### Recovery email pairing (`20260913120000`) — APPLIED
+
+> **LIVE IN PRODUCTION since 2026-09-09 10:29:49 UTC** (live version
+> `20260909102949`, `docs/MIGRATIONS.md` ledger row 87), applied on explicit
+> owner approval naming the target by version.
+>
+> **Applying it sent nothing and changed nothing** — the outbox still holds its
+> same 156 rows with zero on the `email` channel, and `external_dispatch_enabled`
+> is still false, which the migration's own final assertion requires.
+>
+> **The rule is now in force for the moment dispatch is switched on.** Before it,
+> enabling dispatch would have mailed roughly 12 messages a week of which four
+> were recoveries with no mailed opening; with it, those four are suppressed.
 
 **A recovery is mailed only if the same episode already mailed.** Without this a
 responder receives the END of an incident whose START this channel never
