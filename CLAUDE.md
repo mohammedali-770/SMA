@@ -227,10 +227,39 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
 **Current position 2026-09-09, after `20260914120000_platform_rollup_suppression`
-was WRITTEN: 128 repository files / 132 live history rows / TWO unapplied —
-Moyasar (frozen on purpose) and `20260914120000` (written, awaiting approval).**
-Latest live version is still `20260909102949` (ledger row 87); nothing has been
-applied since.
+was APPLIED: 128 repository files / 133 live history rows / exactly ONE unapplied —
+Moyasar, unapplied on purpose.** Latest live version `20260909121702`, applied
+12:17:02 UTC on explicit owner approval naming the target by version; ledger
+row 88.
+
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE.** One file left means "apply the
+outstanding migrations" reads like a no-op and is the one instruction that would
+break the §6 freeze. **Name the target by version.**
+
+**Nothing moved, measured:** outbox still 156 rows with 0 on `email`, dispatch
+still false, money-path pair unchanged, `operations_alerts_derive_pre_stranded`
+**byte-identical** before and after (this migration deliberately does not touch
+it), and **0 open alerts** at apply time so no alert identity could churn.
+
+**ITS BEHAVIOUR IS PROVABLE IN PRODUCTION, WHICH ROW 87'S WAS NOT.**
+`operations_alerts_derive` is `stable` and pure over its arguments, so four
+synthetic snapshots were passed to it live and read-only — the ordinary
+duplicate, both #354 review cases, and the two-driver mute — and all four behaved
+as designed. **When a function's behaviour is a function of its arguments alone,
+prove it against the live definition**; that is strictly better evidence than a
+local chain.
+
+**A HASHING TRAP, THE SECOND OF ITS KIND.** Both pre-computed body hashes came
+out exactly ONE BYTE short — which reads exactly like the transcription error an
+inline apply is checked for. It was not: `prosrc` includes the newline **before**
+the closing `$$`, and the extraction span had cut at `'\n$$;'` rather than
+`'$$;'`. Row 81 recorded the `md5(prosrc)` vs `md5(pg_get_functiondef)` basis
+trap; this is the same lesson at the boundary. **Check the span before reporting
+a mismatch.**
+
+**Superseded, kept because the count is the point: 128 repository files / 132
+live history rows / TWO unapplied — Moyasar (frozen on purpose) and
+`20260914120000` (written, awaiting approval).**
 
 **The new file stops the platform rollup duplicating the subsystem that caused
 it.** `platform:health` fires on `overall_state`, which is derived from five
