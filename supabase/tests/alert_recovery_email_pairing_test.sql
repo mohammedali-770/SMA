@@ -220,6 +220,104 @@ begin
     raise exception 'case 9: re-running the producer duplicated an email row (got %)', pg_temp.email_rows(v_rec_crit);
   end if;
 
+  -- ---- 10. A ROW IS NOT A DELIVERY (review #352). The opening must be
+  -- DELIVERABLE, not delivered -- and the two halves of that are asymmetric on
+  -- purpose, so both directions are pinned.
+  declare
+    v_o uuid; v_r uuid; v_row uuid; v_term text; v_status text;
+  begin
+    -- 10a. TERMINAL: an opening that can never arrive must not pair. 'cancelled'
+    -- and 'blocked' have no claim path at all.
+    foreach v_term in array array['cancelled', 'blocked'] loop
+      insert into _ep values ('t_' || v_term, gen_random_uuid(), 'platform:failing_' || v_term);
+      v_o := pg_temp.mk_event('t_' || v_term, 'o_' || v_term, 'opened', 'critical');
+      perform public.operations_alerts_outbox_for_event(
+        v_o, 'opened', 'platform', 'failing_' || v_term, 'critical');
+      -- Force the opening's email row into the terminal status AFTER it is
+      -- written -- forcing it first would leave nothing to update.
+      -- `operations_alert_outbox_blocked_reason` requires a reason on 'blocked'
+      -- and the v2 dispatch constraint admits both statuses for email.
+      update public.operations_alert_outbox
+         set status = v_term,
+             blocked_reason = case when v_term = 'blocked' then 'test_terminal' end
+       where alert_event_id = v_o and channel = 'email';
+      v_r := pg_temp.mk_event('t_' || v_term, 'r_' || v_term, 'recovered', 'info');
+      perform public.operations_alerts_outbox_for_event(
+        v_r, 'recovered', 'platform', 'failing_' || v_term, 'info');
+      if pg_temp.email_rows(v_r) <> 0 then
+        raise exception 'case 10a: a recovery paired with an opening in terminal status %', v_term;
+      end if;
+    end loop;
+
+    -- 10b. FAILED AT THE CAP is terminal too: claim_operations_alert_emails only
+    -- takes rows with attempt_count < 5, so a row at 5 is unreachable forever.
+    insert into _ep values ('t_cap', gen_random_uuid(), 'platform:failing_cap');
+    v_o := pg_temp.mk_event('t_cap', 'o_cap', 'opened', 'critical');
+    perform public.operations_alerts_outbox_for_event(
+      v_o, 'opened', 'platform', 'failing_cap', 'critical');
+    update public.operations_alert_outbox set status = 'failed', attempt_count = 5
+     where alert_event_id = v_o and channel = 'email';
+    v_r := pg_temp.mk_event('t_cap', 'r_cap', 'recovered', 'info');
+    perform public.operations_alerts_outbox_for_event(
+      v_r, 'recovered', 'platform', 'failing_cap', 'info');
+    if pg_temp.email_rows(v_r) <> 0 then
+      raise exception 'case 10b: a recovery paired with an opening that exhausted its retry budget';
+    end if;
+
+    -- 10c. THE OPPOSITE DIRECTION, and the one that matters more. 'failed' with
+    -- budget REMAINING is still deliverable, so the recovery must pair -- or a
+    -- single transient SMTP error silently costs the recovery of an incident the
+    -- responder does eventually hear about.
+    insert into _ep values ('t_retry', gen_random_uuid(), 'platform:failing_retry');
+    v_o := pg_temp.mk_event('t_retry', 'o_retry', 'opened', 'critical');
+    perform public.operations_alerts_outbox_for_event(
+      v_o, 'opened', 'platform', 'failing_retry', 'critical');
+    update public.operations_alert_outbox set status = 'failed', attempt_count = 1
+     where alert_event_id = v_o and channel = 'email';
+    v_r := pg_temp.mk_event('t_retry', 'r_retry', 'recovered', 'info');
+    perform public.operations_alerts_outbox_for_event(
+      v_r, 'recovered', 'platform', 'failing_retry', 'info');
+    if pg_temp.email_rows(v_r) <> 1 then
+      raise exception 'case 10c: a recovery was DROPPED for an opening still inside its retry budget -- the responder is left believing the incident is open';
+    end if;
+
+    -- 10d. THE ORDINARY CASE. The evaluator and dispatcher share a 5-minute
+    -- cadence and sync_degraded recovers inside one interval, so a recovery
+    -- produced while its opening is still `pending` is normal, not an edge case.
+    -- Requiring status='sent' would break exactly this.
+    insert into _ep values ('t_pending', gen_random_uuid(), 'platform:failing_pending');
+    v_o := pg_temp.mk_event('t_pending', 'o_pend', 'opened', 'critical');
+    perform public.operations_alerts_outbox_for_event(
+      v_o, 'opened', 'platform', 'failing_pending', 'critical');
+    select status into v_status from public.operations_alert_outbox
+     where alert_event_id = v_o and channel = 'email';
+    if v_status <> 'pending' then
+      raise exception 'case 10d precondition: a fresh email row is % not pending, so this case proves nothing', v_status;
+    end if;
+    v_r := pg_temp.mk_event('t_pending', 'r_pend', 'recovered', 'info');
+    perform public.operations_alerts_outbox_for_event(
+      v_r, 'recovered', 'platform', 'failing_pending', 'info');
+    if pg_temp.email_rows(v_r) <> 1 then
+      raise exception 'case 10d: a recovery was dropped because its opening had not been dispatched yet -- the ordinary case, not an edge one';
+    end if;
+
+    -- 10e. And a delivered opening obviously pairs.
+    update public.operations_alert_outbox set status = 'sent'
+     where alert_event_id = v_o and channel = 'email';
+    insert into _ep values ('t_sent', gen_random_uuid(), 'platform:failing_sent');
+    v_row := pg_temp.mk_event('t_sent', 'o_sent', 'opened', 'critical');
+    perform public.operations_alerts_outbox_for_event(
+      v_row, 'opened', 'platform', 'failing_sent', 'critical');
+    update public.operations_alert_outbox set status = 'sent'
+     where alert_event_id = v_row and channel = 'email';
+    v_r := pg_temp.mk_event('t_sent', 'r_sent', 'recovered', 'info');
+    perform public.operations_alerts_outbox_for_event(
+      v_r, 'recovered', 'platform', 'failing_sent', 'info');
+    if pg_temp.email_rows(v_r) <> 1 then
+      raise exception 'case 10e: a recovery did not pair with a SENT opening';
+    end if;
+  end;
+
   raise notice 'alert_recovery_email_pairing: all cases passed';
 end $$;
 

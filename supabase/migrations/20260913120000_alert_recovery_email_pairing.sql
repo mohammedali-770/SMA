@@ -55,6 +55,12 @@
 --     than an opening. If you were told anything about this episode you are told
 --     it ended -- which is why the check is "any earlier email row for this
 --     alert_id" and not "the opened row".
+--   * It does NOT require the opening to have been DELIVERED, only to be
+--     deliverable. Rows that can never arrive ('cancelled', 'blocked', and
+--     'failed' at the retry cap) do not pair; 'pending' and 'processing' do,
+--     because the evaluator and the dispatcher share a 5-minute cadence and a
+--     recovery produced before its opening is dispatched is the ORDINARY case,
+--     not an edge one. See the predicate for why the stricter rule is wrong.
 --   * It changes NO money path, no customer-facing behaviour, and sends nothing:
 --     `external_dispatch_enabled` is false, so the branch it guards is
 --     unreachable until somebody turns dispatch on.
@@ -113,6 +119,39 @@ begin
          and e.alert_id = (
            select e2.alert_id from public.operations_alert_events e2
             where e2.id = p_event_id
+         )
+         -- A ROW IS NOT A DELIVERY, and the exclusion is deliberately narrow.
+         -- Review raised this on #352: an opening whose email row exists but was
+         -- never sent would still pair a recovery, recreating the orphan this
+         -- migration exists to remove.
+         --
+         -- The obvious repair -- require `status = 'sent'` -- is WRONG HERE, and
+         -- the measured data says so. The evaluator and the dispatcher both run
+         -- every 5 minutes, and `lazywait:sync_degraded` has opened and
+         -- self-recovered INSIDE one evaluator interval on every occasion it
+         -- fired. So the ordinary case is a recovery produced while its opening
+         -- is still `pending`, un-dispatched and perfectly deliverable. Pairing
+         -- on 'sent' would drop that recovery permanently, and the two errors are
+         -- not equal: an orphaned recovery is confusing, while a MISSING recovery
+         -- leaves a responder believing an outage is still open. Case 2b in the
+         -- suite is that failure, and it is the one worth being asymmetric about.
+         --
+         -- So the rule is "pair unless the opening can PROVABLY never arrive":
+         --   * 'cancelled' / 'blocked' -- terminal, no claim path exists;
+         --   * 'failed' at the attempt cap -- `claim_operations_alert_emails`
+         --     only takes rows with `attempt_count < p_max_attempts`, so a row
+         --     at the cap is unreachable forever.
+         -- 'sent', 'pending', 'processing', and 'failed' with budget remaining
+         -- all still pair, because each of them can still be delivered.
+         --
+         -- The literal 5 mirrors that function's DEFAULT, which the dispatcher
+         -- relies on by not passing the argument. A mirrored constant is exactly
+         -- this repository's most-repeated hazard, so it is not merely commented:
+         -- the self-verification block below asserts the default is still 5 and
+         -- refuses to apply if somebody changes one side.
+         and not (
+           o.status in ('cancelled', 'blocked')
+           or (o.status = 'failed' and o.attempt_count >= 5)
          )
     ) into v_episode_mailed;
   end if;
@@ -218,6 +257,23 @@ begin
   -- would look similar and silently re-admit a LATER episode's recovery.
   if v_src not like '%e.alert_id%' then
     raise exception 'recovery pairing verification failed: the episode check is not scoped by alert_id';
+  end if;
+
+  -- THE MIRRORED CONSTANT. The producer's `attempt_count >= 5` is only correct
+  -- while `claim_operations_alert_emails` still defaults `p_max_attempts` to 5 --
+  -- the dispatcher does not pass the argument, so the default is the live value.
+  -- Raise it there without raising it here and this function would stop pairing
+  -- recoveries for openings the dispatcher is still retrying, which drops a
+  -- recovery for an incident that does get announced. Assert rather than hope.
+  if (select pg_get_function_arguments(p.oid)
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = 'claim_operations_alert_emails')
+     not like '%p_max_attempts integer DEFAULT 5%' then
+    raise exception 'recovery pairing verification failed: claim_operations_alert_emails no longer defaults p_max_attempts to 5, so the attempt cap mirrored in the producer has drifted';
+  end if;
+
+  if v_src not like '%cancelled%' or v_src not like '%blocked%' then
+    raise exception 'recovery pairing verification failed: the undeliverable-status exclusion is missing';
   end if;
 
   -- What must NOT have changed: the severity floor and the in_app pair.

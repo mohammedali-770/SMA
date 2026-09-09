@@ -51,8 +51,8 @@ to Production.**
 > **Applying it would send nothing and change no money path.**
 > `external_dispatch_enabled` is false, so the branch it guards is unreachable,
 > and the file's own verification refuses to land if that flag is true. No deploy
-> implied. sha256 `572315a3e62006712b37bc24c55209e98362dbe97c31abf93ea95f2f5b441570`,
-> 243 lines / 11 896 bytes — re-hash the MERGED copy before applying, per §15.
+> implied. sha256 `495c8ccbe46ebb7476195b8d1faa2f88846ac62a435e5c44cd44e48f2b146bd5`,
+> 299 lines / 15 647 bytes — re-hash the MERGED copy before applying, per §15.
 > Validated cold at 127 migrations / 69 suites / 67 passed / 2 quarantined / 0 new
 > failures, and mutation-tested five ways: four killed, **one survivor documented
 > rather than hidden** (the self-exclusion is insurance against a caller that does
