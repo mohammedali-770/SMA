@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **127**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260913120000_alert_recovery_email_pairing.sql`.
+Migration files in the repository: **128**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260914120000_platform_rollup_suppression.sql`.
 
 ## Tables
 
@@ -202,7 +202,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_alert_settings_update` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alert_timeline` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_admin_summary` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
-| `operations_alerts_derive` | 4 | `20260810113500_stranded_order_alert_and_index.sql` |
+| `operations_alerts_apply_rollup_correlation` | 1 | `20260914120000_platform_rollup_suppression.sql` |
+| `operations_alerts_derive` | 5 | `20260914120000_platform_rollup_suppression.sql` |
 | `operations_alerts_derive_pre_stranded` | 1 | `20260820160000_branch_availability_health_card.sql` |
 | `operations_alerts_dispatch_recipients` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alerts_evaluate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |

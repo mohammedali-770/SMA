@@ -55,6 +55,90 @@ anticipated the migration that would lift it. That is what
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
+### Platform rollup suppression (`20260914120000`) — WRITTEN, not applied
+
+**The rollup no longer duplicates the subsystem that caused it.**
+`platform:health` fires on `overall_state`, which is DERIVED from five
+subsystems (lazywait, order_integrity, account_deletion, database_jobs,
+order_flow — `operations_health_overall_state`, the 5-arg overload). So one
+failing subsystem opened **two** critical alerts on the same tick.
+
+**Measured live 2026-09-09 over the previous seven days:** two incidents, four
+critical opens, and in both cases `platform:health` and `order_flow:health`
+opened *and* recovered at exactly the same second. The rollup was the less useful
+of the pair — its entire evidence was `{"overall_state": "failing"}`, while the
+subsystem alert beside it carried `orders_in_window`, `baseline_orders`,
+`open_branches` and the window. It did not even name which subsystem was at
+fault.
+
+| | |
+| --- | --- |
+| Suppressed when | **every** subsystem *driving* `overall_state` already reports it at **critical** |
+| Drivers are | rollup members whose state **equals** `overall_state` — not any rollup member |
+| Not suppressed by | a `warning`; by `branch_availability` / `payment` (neither feeds `overall_state`); or by a critical about a **different** state |
+| Never suppressed when | any driver is **muted**, or no system row matches `overall_state` |
+| When it does fire | it carries `driver_subsystems`, naming the drivers |
+| Applied in | `operations_alerts_derive` — the **wrapper**, after every condition exists |
+
+**Two review findings on #354 shaped the final design, and both were real.**
+
+**P1 — correlate with the DRIVER, not any rollup member.** `overall_state` ranks
+`configuration_error` above `failing`. So a **muted** `lazywait=configuration_error`
+alongside an unmuted `order_flow=failing` reports the platform as
+*configuration_error* — driven by lazywait — while order_flow's critical is about
+a different state entirely. The first version suppressed on "any rollup critical",
+so the lazywait configuration error was reported by **nothing**: not its own
+condition (muted), not the safety net (suppressed). The predicate is now stated in
+terms of drivers, and requires **every** driver explained — two drivers with one
+muted must still raise the rollup.
+
+**P2 — judge after the wrapper's append, not before.** `operations_alerts_derive`
+appends `order_integrity:stranded_orders` at **critical** *after*
+`_pre_stranded` returns. And the `order_integrity` arm is an if/**elsif**: with
+`open_warning_count > 0` it emits only a **warning** and never reaches its
+critical branch. Deciding inside `_pre_stranded` therefore saw a warning, emitted
+the rollup, and had the critical appended immediately after — restoring the exact
+duplication. The correlation now runs in the wrapper, on **all five** return
+paths, and `_pre_stranded` is left untouched.
+
+**THE MUTE CASE IS WHY THE PREDICATE READS EMITTED CONDITIONS, NOT RAW STATES.**
+A muted subsystem emits no condition while still feeding `overall_state`.
+Suppressing on raw state would mean muting one card *also* silences the platform
+alert for it — two alerts lost to one mute, and a failing subsystem reported
+nowhere. Reading the emitted conditions keeps the rollup as the safety net a mute
+is supposed to leave standing. Case 2a pins it, and the raw-state mutant dies
+there.
+
+**A sanitizer contract worth knowing before adding evidence anywhere.**
+`operations_alerts_sanitize_evidence` keeps only strings, numbers and booleans —
+objects and arrays are dropped **by design**, so nothing structured can carry
+unreviewed content into an alert body. The first version of this migration
+attached `driver_subsystems` as a jsonb array and it vanished silently; its own
+verification block caught that. `driver_subsystems` is therefore a
+comma-separated string. Conform to the sanitizer rather than widening it.
+
+**An existing test had to be revisited, and that is recorded rather than quietly
+edited.** `order_flow_alert_condition_test.sql` CASE 10 expected
+`platform:health` alongside the subsystem conditions. Its stated purpose is that
+the order_flow arm "did not disturb the branches around it" — the rollup was in
+its expected list only **incidentally**. It now asserts the rollup's *absence*
+explicitly, turning an incidental expectation into a deliberate one. This is
+#332's lesson in reverse: a test that incidentally pins behaviour must be
+revisited when that behaviour is deliberately changed, or it becomes an argument
+against the change.
+
+Coverage: `platform_rollup_suppression_test.sql`, **14 cases**, calling
+`operations_alerts_derive` (the public entry point) rather than the internal
+builder — testing the builder would have passed while the function the evaluator
+calls still emitted the duplicate. Mutation-tested five ways, **all killed**,
+including both #354 regressions reintroduced deliberately: any-critical instead
+of drivers (case 10a), any-driver instead of every-driver (10d), correlating
+before the wrapper's append (11b), dropping the non-empty-drivers guard (3), and
+any-severity (11c).
+
+**Not applied.** It changes what is ALERTED, not what is measured — the
+Operations Health Center still shows the platform red.
+
 ### Recovery email pairing (`20260913120000`) — APPLIED
 
 > **LIVE IN PRODUCTION since 2026-09-09 10:29:49 UTC** (live version
