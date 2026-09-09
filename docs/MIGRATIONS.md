@@ -24,6 +24,40 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-09 (later) — TWO unapplied again, and the new one is an
+> ALERTING correctness fix rather than a feature.**
+> `20260913120000_alert_recovery_email_pairing.sql` joins the list: **127
+> repository files / 131 live history rows.** Written and awaiting approval; not
+> frozen, not urgent, and it is not Moyasar.
+>
+> **The count going 1 → 2 restores the appearance of an innocent referent
+> without making a bulk apply safer.** `20260824100000` still sorts ahead of
+> everything, so "apply the outstanding migrations" would sweep the frozen
+> payment file in first. **Name the target by version.**
+>
+> **What it fixes, measured before it was written.** Checking what enabling
+> `external_dispatch_enabled` would actually send showed that of the 12 emails
+> the previous seven days would have produced, **four were
+> `lazywait:sync_degraded` recoveries whose openings were never mailed** — the
+> severity floor suppresses the `warning` opening while the `recovered` switch
+> admits its `info` recovery, so a responder is told an incident cleared that
+> they were never told had started. A `recovered` event now emits an email only
+> if the same episode (`alert_id`) already emitted one.
+>
+> It is the missing half of a guard already in the evaluator, which suppresses
+> recoveries on `last_notified_at` — a channel-agnostic field the in-app inbox
+> sets, so a warning that never mailed still satisfies it.
+>
+> **Applying it would send nothing and change no money path.**
+> `external_dispatch_enabled` is false, so the branch it guards is unreachable,
+> and the file's own verification refuses to land if that flag is true. No deploy
+> implied. sha256 `572315a3e62006712b37bc24c55209e98362dbe97c31abf93ea95f2f5b441570`,
+> 243 lines / 11 896 bytes — re-hash the MERGED copy before applying, per §15.
+> Validated cold at 127 migrations / 69 suites / 67 passed / 2 quarantined / 0 new
+> failures, and mutation-tested five ways: four killed, **one survivor documented
+> rather than hidden** (the self-exclusion is insurance against a caller that does
+> not exist). Detail: `docs/OPERATIONS_ALERTS_DIGEST.md`.
+
 > **Updated 2026-09-09 — FIVE migrations applied in one morning, and exactly
 > ONE repository file is now unapplied: Moyasar.**
 > **126 repository files / 131 live history rows**, latest live version
