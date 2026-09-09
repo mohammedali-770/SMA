@@ -228,6 +228,32 @@ legitimately earn nothing.
 
 ## 4. Expiry — a fixed calendar reset (`loyalty_expiry_enabled`, default OFF)
 
+> **THE MECHANISM IS LIVE IN PRODUCTION since 2026-09-09 06:53:34 UTC. EXPIRY IS
+> NOT.** `20260909120000_loyalty_expiry` was applied on explicit owner approval
+> (live version `20260909065334`, `docs/MIGRATIONS.md` ledger row 84).
+>
+> **Applying it expired nothing, and that was measured rather than assumed:**
+> 5 409 points across 5 customers unchanged, 111 ledger rows, **0** rows of type
+> `expire`. `loyalty_expiry_enabled` is false and `loyalty_expiry_next_run_on` is
+> null.
+>
+> **The nightly job exists and does nothing.** `loyalty-expiry` runs at
+> `20 0 * * *` (03:20 Riyadh). It was proven inert rather than trusted — the
+> driver was invoked directly and returned `{"ran": false, "reason": "disabled"}`,
+> with nothing moved afterwards. It is callable by neither `anon` nor
+> `authenticated`.
+>
+> **The retroactivity guarantee holds on today's calendar:** from 2026-09-09 a
+> 1-January annual anchor resolves to 2027-01-01, a monthly one to 2026-10-01 —
+> both strictly future. Turning expiry on does not wipe anybody on the spot.
+>
+> **⚠️ ENABLING IT IS NOT LAWFUL YET.** The terms have not caught up. The live
+> `offers_loyalty_terms` promises advance notice before a change that reduces the
+> value of points already held, and is already behind on the pickup-only rule.
+> Expiry is the **second** item queued behind that one correction
+> (`OWNER_ACTIONS.md` §32). Applying the migration made the mechanism exist; it
+> did not make it lawful to switch on.
+
 **The rule.** Everybody's points expire together, on a date the administrator
 sets, rather than each batch ageing out on its own anniversary. That is the
 owner's choice: *"let me decide the validity period from portal, but fixed
