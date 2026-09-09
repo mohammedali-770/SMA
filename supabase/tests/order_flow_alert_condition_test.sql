@@ -296,10 +296,24 @@ begin
   select array_agg(c ->> 'fingerprint' order by c ->> 'fingerprint') into v_fps
     from jsonb_array_elements(public.operations_alerts_derive(v_snap, '{}'::jsonb)) c;
 
-  if not (v_fps @> array['lazywait:sync_health','order_flow:health','platform:health']) then
-    raise exception 'FAIL(10): expected lazywait, order_flow and platform conditions, got %', v_fps;
+  -- UPDATED by 20260914120000. This case tests that the order_flow arm did not
+  -- disturb its NEIGHBOURS, which is what its heading says; `platform:health`
+  -- was in the expected list only INCIDENTALLY, because that is what the
+  -- function happened to emit when the case was written.
+  --
+  -- The platform rollup is now suppressed when a rollup subsystem is already
+  -- alerting at critical -- and this snapshot has TWO of them failing, so its
+  -- absence here is the new rule working rather than a neighbour being
+  -- disturbed. Asserting it explicitly, rather than deleting the expectation,
+  -- keeps the case honest: it now pins the intended behaviour instead of
+  -- whatever fell out.
+  if not (v_fps @> array['lazywait:sync_health','order_flow:health']) then
+    raise exception 'FAIL(10): expected lazywait and order_flow conditions, got %', v_fps;
   end if;
-  raise notice 'CASE 10 ok: neighbouring branches still derive (%)', v_fps;
+  if v_fps @> array['platform:health'] then
+    raise exception 'FAIL(10): the platform rollup fired alongside two failing rollup subsystems that already explain it, got %', v_fps;
+  end if;
+  raise notice 'CASE 10 ok: neighbouring branches still derive, rollup correctly suppressed (%)', v_fps;
 end $$;
 
 -- ---- CASE 11: the subsystem has a HUMAN NAME in both languages -------------

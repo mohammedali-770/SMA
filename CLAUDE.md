@@ -226,9 +226,43 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-09, after `20260913120000_alert_recovery_email_pairing`
-was APPLIED: 127 repository files / 132 live history rows / exactly ONE unapplied —
-Moyasar, unapplied on purpose.** Latest live version `20260909102949`, applied
+**Current position 2026-09-09, after `20260914120000_platform_rollup_suppression`
+was WRITTEN: 128 repository files / 132 live history rows / TWO unapplied —
+Moyasar (frozen on purpose) and `20260914120000` (written, awaiting approval).**
+Latest live version is still `20260909102949` (ledger row 87); nothing has been
+applied since.
+
+**The new file stops the platform rollup duplicating the subsystem that caused
+it.** `platform:health` fires on `overall_state`, which is derived from five
+subsystems including `order_flow`, so one failing subsystem opened TWO critical
+alerts on the same tick — measured live: two incidents, four critical opens, both
+fingerprints opening and recovering at the same second, the rollup carrying
+`{"overall_state": "failing"}` and nothing else.
+
+**THE MUTE CASE IS THE REASON THE PREDICATE IS SHAPED AS IT IS.** A muted
+subsystem emits no condition while still feeding `overall_state`, so suppressing
+on raw state would let one mute silence BOTH alerts and leave a failing subsystem
+reported nowhere. The check therefore reads the emitted conditions, and only a
+**critical** condition from a **rollup** subsystem suppresses the rollup —
+`branch_availability` and `payment` can emit critical and feed nothing, so
+neither may.
+
+**A sanitizer contract worth carrying:** `operations_alerts_sanitize_evidence`
+keeps only strings, numbers and booleans and drops objects and arrays **by
+design**. The first version attached the new attribution as a jsonb array and it
+vanished silently — caught by the migration's own verification. Conform to the
+sanitizer rather than widening it.
+
+**An existing test had to be revisited, and it is recorded rather than quietly
+edited.** `order_flow_alert_condition_test.sql` CASE 10 listed `platform:health`
+only incidentally — its stated purpose is that the order_flow arm did not disturb
+its neighbours. It now asserts the rollup's absence deliberately. That is #332's
+lesson in reverse: a test that incidentally pins behaviour must be revisited when
+that behaviour is deliberately changed, or it becomes an argument against the
+change.
+
+**Superseded, kept because the count is the point: 127 repository files / 132
+live history rows / exactly ONE unapplied — Moyasar, unapplied on purpose.** Latest live version `20260909102949`, applied
 10:29:49 UTC on explicit owner approval naming the target by version; ledger
 row 87.
 

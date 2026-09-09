@@ -55,6 +55,63 @@ anticipated the migration that would lift it. That is what
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
+### Platform rollup suppression (`20260914120000`) — WRITTEN, not applied
+
+**The rollup no longer duplicates the subsystem that caused it.**
+`platform:health` fires on `overall_state`, which is DERIVED from five
+subsystems (lazywait, order_integrity, account_deletion, database_jobs,
+order_flow — `operations_health_overall_state`, the 5-arg overload). So one
+failing subsystem opened **two** critical alerts on the same tick.
+
+**Measured live 2026-09-09 over the previous seven days:** two incidents, four
+critical opens, and in both cases `platform:health` and `order_flow:health`
+opened *and* recovered at exactly the same second. The rollup was the less useful
+of the pair — its entire evidence was `{"overall_state": "failing"}`, while the
+subsystem alert beside it carried `orders_in_window`, `baseline_orders`,
+`open_branches` and the window. It did not even name which subsystem was at
+fault.
+
+| | |
+| --- | --- |
+| Suppressed when | a **rollup subsystem** is already alerting at **critical** |
+| Not suppressed by | a `warning` (it does not explain a critical platform state), or by `branch_availability` / `payment` — both can emit critical and neither feeds `overall_state` |
+| Never suppressed when | the failing subsystem is **muted** — see below |
+| When it does fire | it now carries `driver_subsystems`, naming the rollup members actually in that state |
+
+**THE MUTE CASE IS WHY THE PREDICATE READS EMITTED CONDITIONS, NOT RAW STATES.**
+A muted subsystem emits no condition while still feeding `overall_state`.
+Suppressing on raw state would mean muting one card *also* silences the platform
+alert for it — two alerts lost to one mute, and a failing subsystem reported
+nowhere. Reading the emitted conditions keeps the rollup as the safety net a mute
+is supposed to leave standing. Case 2a pins it, and the raw-state mutant dies
+there.
+
+**A sanitizer contract worth knowing before adding evidence anywhere.**
+`operations_alerts_sanitize_evidence` keeps only strings, numbers and booleans —
+objects and arrays are dropped **by design**, so nothing structured can carry
+unreviewed content into an alert body. The first version of this migration
+attached `driver_subsystems` as a jsonb array and it vanished silently; its own
+verification block caught that. `driver_subsystems` is therefore a
+comma-separated string. Conform to the sanitizer rather than widening it.
+
+**An existing test had to be revisited, and that is recorded rather than quietly
+edited.** `order_flow_alert_condition_test.sql` CASE 10 expected
+`platform:health` alongside the subsystem conditions. Its stated purpose is that
+the order_flow arm "did not disturb the branches around it" — the rollup was in
+its expected list only **incidentally**. It now asserts the rollup's *absence*
+explicitly, turning an incidental expectation into a deliberate one. This is
+#332's lesson in reverse: a test that incidentally pins behaviour must be
+revisited when that behaviour is deliberately changed, or it becomes an argument
+against the change.
+
+Coverage: `platform_rollup_suppression_test.sql`, 9 cases. Mutation-tested five
+ways, all killed — raw-state suppression (case 2a), any-severity (case 3),
+admitting a non-rollup subsystem (case 4b), computing the flag without applying
+it (case 1a), and appending instead of prepending (case 9).
+
+**Not applied.** It changes what is ALERTED, not what is measured — the
+Operations Health Center still shows the platform red.
+
 ### Recovery email pairing (`20260913120000`) — APPLIED
 
 > **LIVE IN PRODUCTION since 2026-09-09 10:29:49 UTC** (live version

@@ -24,6 +24,32 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-09 (last) — TWO unapplied again:
+> `20260914120000_platform_rollup_suppression` is written and awaiting approval.**
+> **128 repository files / 132 live history rows.** Not frozen, not urgent, and
+> not Moyasar — but `20260824100000` still sorts ahead of everything, so
+> **name the target by version**.
+>
+> **What it fixes, measured before it was written.** `platform:health` fires on
+> `overall_state`, which is derived from five subsystems including `order_flow`
+> — so one failing subsystem opened TWO critical alerts on the same tick. Live
+> over the previous seven days: two incidents, four critical opens, both
+> fingerprints opening and recovering at exactly the same second, with the rollup
+> carrying `{"overall_state": "failing"}` and nothing else.
+>
+> The rollup is now withheld only when a rollup subsystem is already alerting at
+> **critical**, and carries `driver_subsystems` attribution when it does fire.
+> **A muted subsystem emits nothing, so the rollup still fires for it** — the
+> predicate reads emitted conditions rather than raw states precisely so that
+> muting one card cannot silence both.
+>
+> **No money path, nothing sent, no deploy implied.** It changes what is alerted,
+> not what is measured. sha256 `5d7a3ccbfa5d29a95cc278faaa745ca1406e6ce1b677f3210c20717b69318ffb`,
+> 610 lines / 32 206 bytes — re-hash the MERGED copy before applying, per §15.
+> Validated cold at 128 migrations / 70 suites / 68 passed / 2 quarantined / 0 new
+> failures, and mutation-tested five ways, all killed. Detail:
+> `docs/OPERATIONS_ALERTS_DIGEST.md`.
+
 > **Updated 2026-09-09 (later still) — `20260913120000` is APPLIED, and the count
 > is back to ONE: Moyasar, frozen on purpose.**
 > **127 repository files / 132 live history rows**, latest live version
