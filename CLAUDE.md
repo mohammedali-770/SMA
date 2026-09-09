@@ -226,8 +226,69 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-09, after `20260910120000_loyalty_multipliers` was
-APPLIED: 126 repository files / 130 live history rows / TWO unapplied — Moyasar
+**Current position 2026-09-09, after `20260912120000_export_my_data` was
+APPLIED: 126 repository files / 131 live history rows / exactly ONE unapplied —
+Moyasar, unapplied on purpose.** Latest live version `20260909073209`, applied
+07:32:09 UTC on explicit owner approval naming the target by version; ledger
+row 86.
+
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
+rather than the bottom.** With a single file left, "apply the outstanding
+migrations" reads like a no-op and is in fact the one instruction that would
+break the §6 payment freeze — there is no other file it could plausibly mean.
+The guard that catches a bulk apply when two files are outstanding, Moyasar
+sorting ahead of everything, has run out of second files again. **Name the
+target by version.** That is what makes the count irrelevant in either shape.
+
+**The money-path pair is UNCHANGED here** — `place_order`
+`e54caa332404755b733590a673d12c27`, `compute_order_snapshot`
+`ca276a84424e403a98d34860817f815c`. Row 85 said the next row to move this pair
+would be doing something new; this row does not move it, which is the correct
+outcome for a read-only portability endpoint.
+
+**A SUCCESSFUL APPLY PROVED NOTHING ABOUT WHETHER IT RUNS, and that generalises
+to every `plpgsql` migration.** A `plpgsql` body is **not name-resolved at
+creation** — a wrong column reference applies cleanly and raises at the first
+call. `export_my_data()` reads **65 distinct columns across SEVEN tables**
+(`profiles`, `addresses`, `orders`, `order_items`, `order_item_modifiers`,
+`loyalty_transactions`, `push_devices`), so one renamed column would have shipped
+a data-rights endpoint that fails for every customer who presses the button, with
+apply output indistinguishable from a good one. All 65 are present in live
+`information_schema` — measured, 0 missing — and the function was **called**
+afterwards, which resolves every name at execution and is stronger evidence than
+any existence check. A `language sql` body is the contrast: PostgreSQL validates
+it at creation and the same mistake aborts loudly.
+
+**This paragraph first said "38 columns across six tables", and the correction is
+worth keeping rather than quietly overwriting.** Review caught it on #350. Both
+figures were wrong: seven tables, 65 columns. The property the number was cited
+for still holds and is now measured at its true breadth, but that is luck rather
+than diligence — **a count quoted as evidence has to be recomputed from the
+artifact, not carried forward from a working note.** It is §9-B.7's stale
+fingerprint wearing different clothes: a recorded number that had stopped
+describing the file, in a record whose whole purpose is to describe the file.
+
+**Calling it proved scoping, not merely success: 1 order returned out of 71 in
+the table**, that one owned by the caller; likewise its own loyalty rows. "It
+returned some orders" would pass against a function with no filter at all — the
+row 82 trap in a new costume. **The anonymous path raises `42501` rather than
+returning an empty document**, which is the failure mode a `SECURITY DEFINER`
+function invites: with no `auth.uid()` it would otherwise run as owner with a
+null filter and look successful.
+
+**Zero arguments IS the security model**, so the file asserts it: exactly one
+overload, `pronargs = 0`, `anon` cannot execute. That is the strongest
+self-verification in this run — contrast `20260910120000`, whose block checks
+only the `anon` half of a defect that involved `authenticated`. Definer functions
+reachable by `authenticated` moved 72 → 73, exactly the one intended, and
+`compute_order_snapshot` remains reachable by **neither** role.
+
+**APPLIED IS NOT DELIVERED.** The client half is merged and wired, but *Get a
+copy of my data* reaches customers only in the next EAS build (X2), so
+`docs/GO_LIVE_READINESS.md` A6 is **not** closed by this apply.
+
+**Superseded, kept because the count is the point: 126 repository files / 130
+live history rows / TWO unapplied — Moyasar
 (frozen on purpose) and `20260912120000_export_my_data`.** Latest live version
 `20260909071429`, applied 07:14:29 UTC on explicit owner approval naming the
 target by version; ledger row 85.
@@ -524,6 +585,7 @@ by version.**
 | `20260908120000_loyalty_item_exclusion.sql` | **APPLIED 2026-09-09 06:20:00 UTC**, live version `20260909062000`, on explicit owner approval ("apply 20260908120000" — named by version), one call. Ledger row 83. Step 1's gate was confirmed present in both live bodies BEFORE sending, not merely trusted to the file's own check. All three bodies verified byte-identical against the merged file. Applying excluded nothing (0 of 61 products). `compute_order_snapshot` verified still closed to both `anon` and `authenticated` after the new wrapper landed. Historical description follows. Per-item loyalty exclusion: `products.earns_loyalty_points` (defaults TRUE, so applying it excludes nothing), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points` — a narrow `SECURITY DEFINER` RPC so checkout can show the figure without a third copy of the rule or opening `compute_order_snapshot` to clients. sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions again**, so their hashes change a second time. Its self-verification refuses to land unless the pickup-only gate from `20260907120000` is already present in both functions, which is what enforces the order. Validated on the local chain harness (122 migrations, 64 suites, 0 new failures) and mutation-tested three ways. No deploy implied. |
 | `20260909120000_loyalty_expiry.sql` | **APPLIED 2026-09-09 06:53:34 UTC**, live version `20260909065334`, on explicit owner approval ("apply 20260909120000" — named by version), one call. Ledger row 84. sha256 `7606d27a05e77ac887c47dc833bf0fd03a373664ac300cd989fe59f49c1fbedd`, 384 lines / 18 546 bytes — recorded at apply time, since no fingerprint existed for this file beforehand. **Applying it expired nothing** (5 409 points, 111 ledger rows, 0 `expire` rows, all unchanged); the cron job is live and was proven inert by invoking the driver, which returned `disabled`. Money-path hashes **unchanged** — the one loyalty step that redefines neither. All 111 existing ledger rows were counted through the widened type CHECK before sending (0 violations), per row 79's lesson. Historical description follows. Points expiry on a fixed calendar reset: four settings columns plus a system-owned `loyalty_expiry_next_run_on`, the ledger type CHECK widened to admit `expire`, `run_loyalty_expiry()` and a daily `pg_cron` job. **Independent of the other two loyalty files — it redefines neither money-path function, so their hashes are unchanged by it.** Applying it changes nothing: expiry defaults OFF and its self-verification asserts the live row is disabled and unscheduled. **Enabling it is a separate decision and needs updated T&Cs first.** No deploy implied. |
 | `20260910120000_loyalty_multipliers.sql` | **APPLIED 2026-09-09 07:14:29 UTC**, live version `20260909071429`, on explicit owner approval ("apply 20260910120000" — named by version), one call. Ledger row 85, and the LAST of the loyalty series. The recorded sha256 below matched — **because #345 had corrected it hours earlier**; the stale value would have mismatched here, on a money-path file. All three bodies verified byte-identical (the largest inline apply yet, `place_order` at 24 212 chars). Applying changed nothing: table EMPTY, resolver returns 1, same cart gives figures identical to step 2. `loyalty_multiplier_for` verified unreachable by BOTH `anon` and `authenticated` — the file's own check tests only `anon`. Historical description follows. Points-earning campaigns (x2, +50%) in a new `loyalty_multipliers` table, deliberately separate from the blocked discount-shaped `campaigns`. Multiplier CHECK `between 1 and 10` — below 1 would duplicate step 2's exclusion, above 10 is a slipped decimal point. sha256 `90bbc364bac3ed5824561d8ad7fe66defd400074555c7be75121036338649487`, 1 115 lines / 54 587 bytes — re-hash the MERGED copy before applying, per §15. **That fingerprint was itself wrong on this branch until 2026-09-09, and the reason generalises.** It was recorded from the pre-review draft (`4a5a174d…`, 1 099 lines); review then caught a campaign-enumeration oracle in `loyalty_multiplier_for` — the resolver was granted to `authenticated`, so a customer could probe `p_at` and enumerate targeted and not-yet-started campaigns that the table's `is_staff()` policy hides — and the 16-line fix changed the file without the record being recomputed. A squash merge lands both in one commit, so nothing looked inconsistent. The cost is precise: at apply time a re-hash would mismatch, and a stale record is indistinguishable from a tampered file, which is the one thing the fingerprint exists to tell apart. `npm run docs:check` now fails on any recorded sha256 that matches no file in the tree. **It redefines both money-path functions a third time.** Applying it changes nothing: the table is created EMPTY and an empty table resolves to a multiplier of 1 for every line, which its self-verification asserts. Its parity block also refuses to land unless step 1's channel gate and step 2's eligible base are still present in both functions. Validated on the local chain harness (124 migrations, 66 suites, 0 new failures) and mutation-tested four ways. No deploy implied. |
+| `20260912120000_export_my_data.sql` | **APPLIED 2026-09-09 07:32:09 UTC**, live version `20260909073209`, on explicit owner approval ("apply 20260912120000" — named by version), one call. Ledger row 86, and the row that returns the outstanding count to ONE. sha256 `a5214226bc6d6dbef022d8fe55fc3d1f6876e1281bc42f54d498468ab342bf3d`, 221 lines / 9 939 bytes — recorded at apply time, since no fingerprint existed for this file beforehand. **Money-path hashes UNCHANGED.** The single body verified byte-identical against the merged file. **Applying it proved nothing about whether it runs** — a `plpgsql` body is not name-resolved at creation, so the function was **called** afterwards: it returns the 7 intended keys and **1 order out of 71**, that one the caller's own. It reads **65 distinct columns across SEVEN tables**, all present live (0 missing); an earlier revision of this row said "38 columns across six tables" and review corrected it on #350. The anonymous path raises `42501` rather than returning an empty document. Historical description follows. `export_my_data()` is the PDPL access/portability answer for `docs/GO_LIVE_READINESS.md` A6, which had no implementation at all. It redefines no existing function, touches no money path and reads only the caller's own rows — its whole security model is that it takes **no argument**, so there is no id to forge. Its self-verification asserts one overload, `pronargs = 0`, and that `anon` cannot execute — the exact property the design rests on. **No deploy implied**, but **applied is not delivered**: the *Get a copy of my data* screen ships with the next EAS build (X2), so A6 stays ⚠️. |
 | `20260903130000_operations_alert_dispatch_scheduler.sql` | **APPLIED 2026-09-07 08:23:17 UTC**, live version `20260907082317`, on explicit owner approval, one call, target named explicitly. Ledger row 80. The pg_cron invocation path for the dispatcher — the piece whose absence review caught on #328, when the dispatcher shipped with no caller and the docs claimed enabling sent mail. Its two Vault secrets were created first, at 08:21:35 and 08:21:44; the trigger secret was generated **inside Postgres** and never crossed the wire, so nobody has seen it. Inert while dispatch is disabled, and that was watched rather than assumed: cron run **218621** at 08:25:00 `succeeded` in **11 ms** and made no outbound request. **Only enabling the flag remains.** |
 | `20260903120000_operations_alert_email_dispatch.sql` | **APPLIED 2026-09-07 06:46:38 UTC**, live version `20260907064638`, on explicit owner approval ("apply 20260903120000" — named by version), one call, target named explicitly. Ledger row 79. Operations alerts v2 — the email dispatch path for X3. Removed three deliberate v1 interlocks (the outbox dormancy CHECK, the producers' hard-coded `in_app`, and the settings RPC's refusal) for the **email channel only**; `whatsapp` and `push` stay structurally blocked. It changed NO behaviour, verified after the fact: the flag is still false, the outbox still holds 136 rows with zero on the `email` channel, and the money-path hashes are unchanged. **Deploying `operations-alert-dispatch`, applying `20260903130000` with its Vault secrets, and enabling the flag remain three separate §5 actions.** |
 | `20260902120000_orders_index_cleanup.sql` | **APPLIED 2026-09-02 12:37:37 UTC**, live version `20260902123737`, on explicit owner approval ("apply 20260902120000" — named by version), one call, target named explicitly. Ledger row 78. Dropped `orders_lazywait_deadline_queue_idx` (an exact duplicate) and `orders_sync_queue_idx` (dead); `orders` index count 18 → 16, the survivor still serves the queue predicate by index scan, and the money-path hashes are unchanged. No deploy implied. |
