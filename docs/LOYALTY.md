@@ -51,6 +51,20 @@ what is payable. It is VAT-inclusive, because prices here are; it excludes the
 
 ## 2. Pickup only (`loyalty_pickup_only`, default TRUE)
 
+> **LIVE IN PRODUCTION since 2026-09-09 05:50:16 UTC.**
+> `20260907120000_loyalty_pickup_only` was applied on explicit owner approval
+> (live version `20260909055016`, `docs/MIGRATIONS.md` ledger row 82). Because
+> the setting defaults TRUE, **applying it WAS the behaviour change** — delivery
+> stopped earning and stopped being redeemable at that moment, with no further
+> step. Verified live: a 74.00 pickup cart previews 74 points, and redeeming 500
+> gives a 50.00 discount. The delivery half is covered by the local suite rather
+> than a Production order, for the reason given in §6.
+>
+> **The customer-facing terms have NOT caught up.** `offers_loyalty_terms` v2.1
+> mentions neither channel, and its redemption sentence — *"You choose whether to
+> use your points on an order"* — is now misleading on delivery. Correcting a
+> live legal document is an owner action: `OWNER_ACTIONS.md` §32.
+
 **The rule.** While this setting is on, a **delivery** order neither earns points
 nor may redeem them. A **pickup** order does both, exactly as before.
 
@@ -438,7 +452,15 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 7. The customer-facing terms — corrected 2026-09-08
+## 7. The customer-facing terms — corrected 2026-09-08, and behind again since 2026-09-09
+
+> **v2.1 is now BEHIND the code.** Pickup-only went live on 2026-09-09 and the
+> document describes neither channel. Earning survives on a hedge — it promises
+> points on "eligible orders" and never defines eligible — but redemption does
+> not: *"You choose whether to use your points on an order"* carries no channel
+> caveat. A v2.2 correcting both halves is an owner action, with the exact
+> wording to change listed in `OWNER_ACTIONS.md` §32. The section below records
+> the 2.0 → 2.1 corrections and remains accurate about those.
 
 The binding document is `public.legal_documents`, row `offers_loyalty_terms` —
 now **version 2.1, effective 8 September 2026, active**. The engineering draft

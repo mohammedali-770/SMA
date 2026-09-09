@@ -226,8 +226,35 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-08, after the data-portability migration was written:
-126 repository files / 126 live history rows / SIX unapplied — Moyasar (frozen on
+**Current position 2026-09-09, after `20260907120000_loyalty_pickup_only` was
+APPLIED: 126 repository files / 127 live history rows / FIVE unapplied — Moyasar
+(frozen on purpose), the three later loyalty files and
+`20260912120000_export_my_data`.** Latest live version `20260909055016`, applied
+05:50:16 UTC on explicit owner approval naming the target by version; ledger row
+82.
+
+**LOYALTY IS NOW PICKUP-ONLY IN PRODUCTION. Applying it WAS the behaviour
+change** — `loyalty_pickup_only` defaults TRUE, so a delivery order stopped
+earning and stopped being redeemable against at the moment of apply. Nothing
+existing moved: 71 orders untouched, 0 new ledger rows, 5 409 points across 5
+customers unchanged.
+
+**The money-path hash pair carried unchanged since 2026-08-27 is RETIRED.** The
+new values are `place_order` `fab9f299507e68d0f368cc6acc35c198` and
+`compute_order_snapshot` `a134547c938734538bbb4420fd63378f`. Steps 2
+(`20260908120000`) and 4 (`20260910120000`) each move them again — record the new
+pair at each apply rather than treating a change as a fault.
+
+**A live customer document is now BEHIND the code.**
+`legal_documents.offers_loyalty_terms` v2.1 mentions neither pickup nor delivery.
+Earning survives on a hedge — it promises points on "eligible orders" and never
+defines eligible — but redemption does not: *"You choose whether to use your
+points on an order"* has no channel caveat and is now misleading on delivery.
+Correcting a live legal document is a §5 write and an owner action:
+`docs/OWNER_ACTIONS.md` §32.
+
+**Superseded, kept because the count is the point: 126 repository files / 126
+live history rows / SIX unapplied — Moyasar (frozen on
 purpose), the four loyalty files, and `20260912120000_export_my_data` (written,
 awaiting approval).** `export_my_data()` is the PDPL access/portability answer
 for `docs/GO_LIVE_READINESS.md` A6, which had no implementation at all. It
@@ -410,7 +437,7 @@ by version.**
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260907120000_loyalty_pickup_only.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval.** Not frozen, and not Moyasar. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
+| `20260907120000_loyalty_pickup_only.sql` | **APPLIED 2026-09-09 05:50:16 UTC**, live version `20260909055016`, on explicit owner approval ("apply 20260907120000" — named by version), one call, target named explicitly. Ledger row 82. Body fidelity proven byte-for-byte against the merged file (`prosrc` md5 `8351e2641b1cb45ab5dcbc52d8c8194f` / `3d042e691ad933b121552dde146ce06d`), which matters because the MCP tool takes SQL inline and a transcription slip would have been silent. Both functions remain `service_role`-only. Delivery behaviour was proven on the LOCAL harness, not in Production, because asserting it needs a real `place_order` and that means a real kitchen ticket. Historical description follows. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
 | `20260908120000_loyalty_item_exclusion.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval. APPLY AFTER `20260907120000`, never before.** Per-item loyalty exclusion: `products.earns_loyalty_points` (defaults TRUE, so applying it excludes nothing), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points` — a narrow `SECURITY DEFINER` RPC so checkout can show the figure without a third copy of the rule or opening `compute_order_snapshot` to clients. sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions again**, so their hashes change a second time. Its self-verification refuses to land unless the pickup-only gate from `20260907120000` is already present in both functions, which is what enforces the order. Validated on the local chain harness (122 migrations, 64 suites, 0 new failures) and mutation-tested three ways. No deploy implied. |
 | `20260909120000_loyalty_expiry.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval.** Points expiry on a fixed calendar reset: four settings columns plus a system-owned `loyalty_expiry_next_run_on`, the ledger type CHECK widened to admit `expire`, `run_loyalty_expiry()` and a daily `pg_cron` job. **Independent of the other two loyalty files — it redefines neither money-path function, so their hashes are unchanged by it.** Applying it changes nothing: expiry defaults OFF and its self-verification asserts the live row is disabled and unscheduled. **Enabling it is a separate decision and needs updated T&Cs first.** No deploy implied. |
 | `20260910120000_loyalty_multipliers.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval. APPLY AFTER `20260908120000`.** Points-earning campaigns (x2, +50%) in a new `loyalty_multipliers` table, deliberately separate from the blocked discount-shaped `campaigns`. Multiplier CHECK `between 1 and 10` — below 1 would duplicate step 2's exclusion, above 10 is a slipped decimal point. sha256 `90bbc364bac3ed5824561d8ad7fe66defd400074555c7be75121036338649487`, 1 115 lines / 54 587 bytes — re-hash the MERGED copy before applying, per §15. **That fingerprint was itself wrong on this branch until 2026-09-09, and the reason generalises.** It was recorded from the pre-review draft (`4a5a174d…`, 1 099 lines); review then caught a campaign-enumeration oracle in `loyalty_multiplier_for` — the resolver was granted to `authenticated`, so a customer could probe `p_at` and enumerate targeted and not-yet-started campaigns that the table's `is_staff()` policy hides — and the 16-line fix changed the file without the record being recomputed. A squash merge lands both in one commit, so nothing looked inconsistent. The cost is precise: at apply time a re-hash would mismatch, and a stale record is indistinguishable from a tampered file, which is the one thing the fingerprint exists to tell apart. `npm run docs:check` now fails on any recorded sha256 that matches no file in the tree. **It redefines both money-path functions a third time.** Applying it changes nothing: the table is created EMPTY and an empty table resolves to a multiplier of 1 for every line, which its self-verification asserts. Its parity block also refuses to land unless step 1's channel gate and step 2's eligible base are still present in both functions. Validated on the local chain harness (124 migrations, 66 suites, 0 new failures) and mutation-tested four ways. No deploy implied. |
