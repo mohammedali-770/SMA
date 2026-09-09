@@ -804,9 +804,29 @@ retires a signal every row between had recorded as unchanged: `place_order`
 again. Record the new pair at each apply rather than treating a change as a
 fault.
 
+It is also the first row whose fidelity check had to defend against a risk this
+ledger has not carried before: **the MCP tool takes SQL inline**, so the reviewed
+file could not be streamed and a transcription slip would have been silent — no
+error, no failed assertion, just a subtly different function in Production. The
+answer is cheap and should be repeated for any large inline apply: extract each
+function body from the repository file by `$$` span, hash it, and compare against
+live `prosrc`. Both matched byte-for-byte. A successful apply proves the SQL was
+valid, not that it was the SQL you reviewed.
+
+And it is the first row to leave a **live customer document behind the code**.
+`offers_loyalty_terms` v2.1 describes neither channel, and its redemption
+sentence is now misleading on delivery. That is recorded as an owner action
+(`OWNER_ACTIONS.md` §32) rather than fixed in passing, because editing
+`legal_documents` is a §5 live write and the wording is a commercial choice. The
+generalisable question: when a migration changes what a customer is entitled to,
+ask which live document already told them otherwise.
+
 Row **83** is `loyalty_item_exclusion`, applied 2026-09-09 06:20:00 UTC, step 2 of
 the same series and the second of the three hash movements row 82 predicted
-(`ed2ced01…` / `6c667b4b…`). Class B, so the totals move to **83/84** above.
+(`ed2ced01…` / `6c667b4b…`). Class B, so the totals move to **83/84** above. The
+inline-apply fidelity method row 82 established was re-run here on **three**
+bodies rather than two — the two money-path functions plus the new preview RPC —
+and all three matched byte-for-byte.
 
 It is the first row here to **add a customer-reachable `SECURITY DEFINER`
 function**, and that is the part that needed checking rather than the money path.
@@ -833,23 +853,6 @@ Row 83 is also the clean example of **applied is not delivered**, the lesson row
 one is not: the client half is merged and wired, but the "You'll earn N points"
 line reaches customers only in the next EAS build. The RPC is live and nothing in
 a customer's hands calls it yet.
-
-It is also the first row whose fidelity check had to defend against a risk this
-ledger has not carried before: **the MCP tool takes SQL inline**, so the reviewed
-file could not be streamed and a transcription slip would have been silent — no
-error, no failed assertion, just a subtly different function in Production. The
-answer is cheap and should be repeated for any large inline apply: extract each
-function body from the repository file by `$$` span, hash it, and compare against
-live `prosrc`. Both matched byte-for-byte. A successful apply proves the SQL was
-valid, not that it was the SQL you reviewed.
-
-And it is the first row to leave a **live customer document behind the code**.
-`offers_loyalty_terms` v2.1 describes neither channel, and its redemption
-sentence is now misleading on delivery. That is recorded as an owner action
-(`OWNER_ACTIONS.md` §32) rather than fixed in passing, because editing
-`legal_documents` is a §5 live write and the wording is a commercial choice. The
-generalisable question: when a migration changes what a customer is entitled to,
-ask which live document already told them otherwise.
 
 Rows **73–75** were all written on 2026-08-28, and only one of them was written
 by the session that performed the application. **73 and 74 began as GAP ROWS and
