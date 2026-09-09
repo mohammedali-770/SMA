@@ -367,6 +367,29 @@ snapshot taken before it existed.
 
 ## 5. Campaign multipliers (`loyalty_multipliers`)
 
+> **LIVE IN PRODUCTION since 2026-09-09 07:14:29 UTC — and this completes the
+> loyalty series.** `20260910120000_loyalty_multipliers` was applied on explicit
+> owner approval (live version `20260909071429`, `docs/MIGRATIONS.md` ledger row
+> 85).
+>
+> **Applying it changed nothing, and that was proven arithmetically rather than
+> by the row count.** The table is created EMPTY, `loyalty_multiplier_for`
+> returns exactly **1**, and the same pickup cart returns figures **identical to
+> §3** — 74.00 earning 74, redeeming 500 giving 24.00 earning 24. With no
+> campaign the weighted sum equals the eligible sum, so the ratio cancels. **An
+> administrator creating a campaign is the behaviour change.**
+>
+> **Customers cannot read the campaign list, and cannot ask about it either.**
+> The table's select policy is `is_staff()`, and `loyalty_multiplier_for` is
+> revoked from `anon` **and** `authenticated` — verified live for both. That
+> second half matters: the resolver takes `p_at`, so a grant to `authenticated`
+> would let a customer probe next month's multiplier and enumerate hidden
+> campaigns one call at a time.
+>
+> **No client change was needed**, which is §3 paying off: the checkout figure
+> comes from `preview_loyalty_points` through `compute_order_snapshot`, so it
+> follows a campaign automatically.
+
 **The rule.** A campaign multiplies what an order **earns**. It never changes
 what an order **costs**, and it can never reduce earning — the CHECK is
 `between 1 and 10`.
