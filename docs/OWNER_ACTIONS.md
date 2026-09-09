@@ -2293,6 +2293,15 @@ needs honouring — not an engineering one.
    only.
 3. Decide whether the advance-notice promise applies, and if so how it is met.
 
+**Updated 2026-09-09 — a SECOND item is now queued behind this same correction.**
+`20260909120000_loyalty_expiry` is applied, so points expiry exists as a
+mechanism. It is **off**, nothing is scheduled, and applying it expired nothing —
+but the terms say nothing about expiry at all, and the same CHANGES TO THE
+PROGRAMME clause promising advance notice applies with far more force to a reset
+that zeroes a balance than to a channel restriction. **Expiry cannot be switched
+on until the terms cover it**, which means v2.2 should settle both questions at
+once rather than being revised twice. `docs/LOYALTY.md` §4.
+
 The engineering side is ready: `app_settings.loyalty_pickup_only` turns the rule
 off and restores the previous behaviour exactly, with no migration, if you would
 rather correct the terms first and re-enable after.
