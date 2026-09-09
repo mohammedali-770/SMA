@@ -902,6 +902,37 @@ Risks:
 5. Verify the migration has not already been applied **semantically** (object
    state, not just history rows).
 6. Record before-state fingerprints for everything the migration touches.
+7. **Re-hash the MERGED file, and check the recorded value against it.** The
+   fingerprint written when a migration was drafted is not evidence about the
+   file that will be applied; only the merged copy is.
+
+**B-note — a recorded fingerprint can go stale silently, and once did.**
+`20260910120000_loyalty_multipliers.sql` had its sha256 recorded in CLAUDE.md
+from the pre-review draft (`4a5a174d…`, 1 099 lines). Review then found a
+campaign-enumeration oracle — `loyalty_multiplier_for` was granted to
+`authenticated`, and because it takes `p_at` a customer could probe it to
+enumerate targeted and not-yet-started campaigns that the table's `is_staff()`
+select policy hides. The 16-line fix landed; the recorded hash did not move. A
+**squash merge puts the file change and the now-stale record in the same
+commit**, so no diff looks inconsistent and no reviewer sees a mismatch. It
+survived from 2026-09-08 to 2026-09-09.
+
+The file was always correct — it carried the fix. What was damaged was the
+control: at apply time the re-hash would mismatch, and a stale record cannot be
+told apart from a tampered file, which is the single distinction the fingerprint
+exists to make. An alarm that cannot be explained is worse than no alarm,
+because the tempting response is to "correct" the record.
+
+`scripts/check-recorded-hashes.mjs` now fails CI on any sha256 recorded in
+`CLAUDE.md` or `docs/**.md` that matches no file in the tree, and runs in the
+`Documentation (generated + ownership)` job. It is deliberately format-agnostic
+— the prose records hashes as table cells, inline spans and parenthesised byte
+counts, and a parser binding each hash to a filename would be brittle exactly
+where it matters — so it asserts only that every recorded hash matches *some*
+file. That is weaker than a per-file binding and sufficient, because a stale
+hash matches nothing. It checks the whole tree rather than the diff, since a
+hash goes stale when the **file** moves away from it, a change the record's own
+diff never shows.
 
 **C. Apply**
 1. Apply **exactly the reviewed migration content** using MCP

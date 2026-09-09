@@ -626,7 +626,7 @@ function generateIndex() {
       '',
       '```sh',
       'npm run docs:generate   # rewrite these files',
-      'npm run docs:check      # fail if they drifted, and check documentation ownership',
+      'npm run docs:check      # drift, ownership, and recorded-hash freshness',
       '```',
       '',
       '`docs:check` runs in CI. A change that alters the shape of the system — a new route, a new Edge Function, a new table, a new environment variable — will turn CI red until the reference is regenerated and committed. That is the intended behaviour: it is how the inventory stays true without anybody having to remember.',
