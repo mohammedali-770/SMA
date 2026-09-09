@@ -684,11 +684,11 @@ production.
 | 81 | 20260911120000 | otp_retention_sweep | n/a | 20260908123116 | otp_retention_sweep | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-08 12:31:16 UTC** on explicit owner approval ("apply 20260911120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. **The merge was verified BEFORE the apply, because the instruction arrived while PR #341 was still open and CI still running.** That is §15's worked example repeating itself: nothing was sent until #341 merged as squash `81f4a72`, and the file was then hashed **from the merged default branch** (sha256 `fad9b47c0f7eec94a8f644b1c5d4b76ee09027a0576624fdb0bb3ec5f47a66cd`, 138 lines / 6 561 bytes) and confirmed byte-identical to the reviewed branch copy. **Why it exists:** the live Privacy Policy said "Verification codes: a short period, then deleted" and nothing performed it. `otp_challenges` retained every row it had written — oldest **2026-07-10** — carrying `phone_e164` and `ip_hash`; the only deleter was `anonymize_account_data`, on account deletion. Found by reading the whole live document against the code (`docs/LEGAL_DOCUMENTS_AUDIT.md`). **The wording was deliberately not softened to match the code**, because lowering a retention promise to fit the implementation is the wrong direction. **What it adds:** `purge_expired_otp_records()` and a `pg_cron` job `otp-retention-sweep` on `40 0 * * *` (03:40 Riyadh, after the loyalty expiry job at 00:20). **The two bounds are the safety-critical part**, since an over-eager sweep breaks login two ways: challenges go 24 h past their own expiry (every reader selects by id or `expires_at > now()`, so an expired row can never become a successful verification), and reservations at two days — **identical to the rule `otp_reserve_send` already applies per phone**, which is what makes it impossible to change the rate limiter's behaviour. Both are asserted by the file's own closing `DO` block and were mutation-tested locally, each mutant dying on the count assertion for its own table. It also closes a quieter gap: the existing reservation purge only ever ran **for the phone currently asking**, so a number that requested a code once and never returned kept its row forever. **Preconditions checked live before sending:** 0 existing `otp-retention-sweep` jobs and 0 `purge_expired_otp_records` functions, so both were fresh creates rather than replacements. **Verified after applying:** exactly one cron job, `otp-retention-sweep | 40 0 * * * | select public.purge_expired_otp_records();`; ACL `postgres=X | service_role=X`, so **`anon` and `authenticated` cannot call it**; `otp_challenges` still **3** rows, because applying schedules the sweep and does not run it. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the pair carried since 2026-08-27. **A hashing trap worth recording:** the first pre-apply read used `md5(prosrc)` and produced `b3d00f38…` / `e98d309a…`, which look like a money-path change and are not — this ledger records `md5(pg_get_functiondef(oid))`. Same functions, different basis. Check the basis before reporting an anomaly. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **125 → 126**. Covered by `supabase/tests/otp_retention_sweep_test.sql` (7 cases, weighted toward what the sweep must NOT delete), run cold at 125 migrations / 67 suites / 65 passed / 0 new failures. **No deploy implied** — nothing outside the database calls it. **Five repository files remain unapplied:** Moyasar (frozen) and the four loyalty files. **Version NOT aligned** — live carries the apply-time stamp `20260908123116` (§9-D). **Current latest live version** |
 | 82 | 20260907120000 | loyalty_pickup_only | n/a | 20260909055016 | loyalty_pickup_only | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 05:50:16 UTC** on explicit owner approval ("apply 20260907120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Loyalty v2 step 1: while `app_settings.loyalty_pickup_only` is on, a delivery order neither earns nor may redeem. **§9-B.7 was exercised for the first time** — the merged file was re-hashed from the default branch at `07a444c` (sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`, 833 lines / 39 052 bytes) and matched the recorded value; `scripts/check-recorded-hashes.mjs` agreed the whole record set was current. **THE MONEY-PATH HASHES CHANGED, AND THAT IS THE INTENDED EFFECT, NOT AN ANOMALY.** The pair carried unchanged in every row since 2026-08-27 is retired here: `place_order` `8bd7183832108abb25bcca6942dccd70` → **`fab9f299507e68d0f368cc6acc35c198`**, `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` → **`a134547c938734538bbb4420fd63378f`** (`md5(pg_get_functiondef)`). Steps 2 and 4 will each move them again. **Body fidelity was PROVEN rather than assumed, and here that mattered more than usual**: the MCP tool takes the SQL inline, so the file could not be streamed and a transcription error would have been silent. Both bodies were extracted from the repository file by `$$` span and hashed against live `prosrc`: `place_order` `8351e2641b1cb45ab5dcbc52d8c8194f` (20 625 chars) and `compute_order_snapshot` `3d042e691ad933b121552dde146ce06d` (11 811 chars), **byte-identical on both sides**. **Preconditions checked live before sending:** the column absent, the gate absent from both functions, exactly one overload of each. The file's own closing `DO` block then asserted the column exists, defaults **true**, that `v_loyalty_channel_ok` appears exactly **4 times in each** body — the mirror-parity guard, so it cannot land in only one — and that neither function forked into a second overload. **Grants survived the redefinition, verified not assumed:** `place_order` and `compute_order_snapshot` are both still `postgres=X | service_role=X` — **`compute_order_snapshot` is NOT exposed to `authenticated`**, which is what keeps another customer's name, phone and address snapshot unreadable — and `place_customer_order` keeps its `authenticated` grant. Security advisors after the apply carry **no new finding**, and neither money-path function appears in the authenticated-executable list. **Behaviour verified live on the PICKUP half only, deliberately.** A 74.00 pickup cart previews 74 points earned; requesting 500 redeems 500 for a 50.00 discount, total 24.00, earning 24 on the reduced total. The DELIVERY half was proven on the local harness instead — `loyalty_pickup_only_test.sql` case 3 **places a real delivery order** and asserts 0 earned, 0 redeemed, 0 discount, no `loyalty_awarded_at` stamp, the balance unmoved and no ledger row — because doing that in Production would mean a real kitchen ticket. Cold run: 126 migrations, 68 suites, 66 passed, 2 quarantined, 0 new failures. **A TEST TRAP WORTH MORE THAN THE RESULT.** The first live both-channel check returned 0 points on *both* channels and looked like proof the gate worked. It was worthless: the customer picked was **comped**, and a comp zeroes `v_total` before the earning line, so `floor(0 × rate)` is 0 whatever the gate does. A passing assertion that would pass with the feature removed is not evidence. Re-run against a non-comped customer. **Nothing existing moved, measured after:** 71 orders with **0** touched in the hour, 111 loyalty ledger rows with **0** new, 5 409 points across 5 customers identical to the pre-apply read, and `loyalty_enabled`, `points_per_riyal`, `discount_per_point` and `min_points_to_redeem` all unchanged. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **126 → 127**. **No deploy implied** — the clients read the setting through `app_settings`, which they already select in full. **Version NOT aligned** — live carries the apply-time stamp `20260909055016` (§9-D, separate approval). **A LIVE CUSTOMER DOCUMENT IS NOW BEHIND THE CODE, and it is an owner action rather than an oversight to fix quietly.** `legal_documents.offers_loyalty_terms` v2.1 mentions neither pickup nor delivery. Earning survives on a hedge — it promises points on "eligible orders" and never defines eligible — but **redemption does not**: "You choose whether to use your points on an order" carries no channel caveat and is now misleading on delivery. See `docs/OWNER_ACTIONS.md` §32. **Five repository files remain unapplied:** Moyasar (frozen), the three later loyalty files (`20260908120000`, `20260909120000`, `20260910120000`) and `20260912120000_export_my_data` |
 
-Reconciliation check: the rows above detail **80 repository / 81 live** rows.
+Reconciliation check: the rows above detail **82 repository / 83 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–80
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–82
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they were the most recent applications at the time (2026-08-25 and
 2026-08-26, §32 and §33), 62–63 because they are the applications of
@@ -775,6 +775,50 @@ outlive the act.
 It is also the first row to leave **exactly one** unapplied file behind, and that
 file is the frozen payment migration. Read the §1 warning about what "apply the
 outstanding migrations" now means before acting on any unnamed instruction.
+
+Row **81** is `otp_retention_sweep`, applied 2026-09-08 12:31:16 UTC, and it is
+the first row here whose apply **did not by itself make the thing it exists for
+true**. The Privacy Policy promised verification codes are deleted after a short
+period; applying the migration *schedules* the sweep, and the first run is the
+next tick — `otp_challenges` still held its three July rows immediately
+afterwards. The policy sentence became true when the sweep was executed once on
+separate approval the same day. Review caught the item being closed on the apply
+alone (#342), which is why the distinction is spelled out. Class B, so the totals
+move to **81/82** above.
+
+Row **82** is `loyalty_pickup_only`, applied 2026-09-09 05:50:16 UTC, and it
+inverts row 81's lesson: here **applying it WAS the behaviour change**, with no
+second step at all. `app_settings.loyalty_pickup_only` defaults TRUE, so delivery
+orders stopped earning points and stopped being redeemable against at the moment
+the migration landed. A row that needs a follow-up action and a row that needs
+none look identical in this table; the difference is the default on the setting
+it ships, and it is worth reading before approving rather than after. Class B, so
+the totals move to **82/83** above.
+
+It is the first row since 2026-08-27 to **change the money-path hashes**, which
+retires a signal every row between had recorded as unchanged: `place_order`
+`8bd7183832108abb25bcca6942dccd70` → `fab9f299507e68d0f368cc6acc35c198` and
+`compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` →
+`a134547c938734538bbb4420fd63378f`. Steps 2 and 4 of the loyalty series move them
+again. Record the new pair at each apply rather than treating a change as a
+fault.
+
+It is also the first row whose fidelity check had to defend against a risk this
+ledger has not carried before: **the MCP tool takes SQL inline**, so the reviewed
+file could not be streamed and a transcription slip would have been silent — no
+error, no failed assertion, just a subtly different function in Production. The
+answer is cheap and should be repeated for any large inline apply: extract each
+function body from the repository file by `$$` span, hash it, and compare against
+live `prosrc`. Both matched byte-for-byte. A successful apply proves the SQL was
+valid, not that it was the SQL you reviewed.
+
+And it is the first row to leave a **live customer document behind the code**.
+`offers_loyalty_terms` v2.1 describes neither channel, and its redemption
+sentence is now misleading on delivery. That is recorded as an owner action
+(`OWNER_ACTIONS.md` §32) rather than fixed in passing, because editing
+`legal_documents` is a §5 live write and the wording is a commercial choice. The
+generalisable question: when a migration changes what a customer is entitled to,
+ask which live document already told them otherwise.
 
 Rows **73–75** were all written on 2026-08-28, and only one of them was written
 by the session that performed the application. **73 and 74 began as GAP ROWS and
