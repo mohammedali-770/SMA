@@ -234,6 +234,15 @@ does not touch); `subtotal` still records the real value of the goods; and
 `discount_amount` still means *coupon*, so the admin coupon-usage report is not
 silently corrupted.
 
+**A comped customer's own data export names the comp.** `export_my_data()`
+(`20260912120000`, [`GO_LIVE_READINESS.md`](GO_LIVE_READINESS.md) A6) returns
+each order with `comped` and `comp_discount` alongside the totals. Without them
+a comped order appears in the customer's own record as a 0.00 total with nothing
+to explain it — and a subject-access response that leaves the reader unable to
+account for their own figures has not answered the request. It is the same
+reasoning as the POS marker: a comp is invisible in the money and therefore has
+to be stated wherever the money is read.
+
 **A comped customer is not exempt from points EXPIRY, and the combination is
 worth seeing.** `run_loyalty_expiry` selects on `profiles.loyalty_points > 0`
 with no comp filter ([`LOYALTY.md`](LOYALTY.md) §4), so a comped customer's

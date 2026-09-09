@@ -661,6 +661,20 @@ export interface DeletionRequestState { id: string; status: string }
 export interface DeletionSubmitResult {
   status?: string; requestId?: string | null; verified?: boolean; existing?: boolean; code?: string;
 }
+/**
+ * PDPL access / portability. The RPC takes NO argument — the subject is always
+ * `auth.uid()` server-side, which is what stops it being an enumeration oracle
+ * for other customers (`20260912120000_export_my_data.sql`). Nothing is passed
+ * from here, deliberately, and there is nothing a caller could pass.
+ */
+export const dataExport = {
+  mine: async (): Promise<unknown> => {
+    const { data, error } = await supabase.rpc('export_my_data');
+    if (error) throw new Error(error.message);
+    return data;
+  },
+};
+
 export const accountDeletion = {
   /** My current in-flight deletion request, if any (RLS returns only my row). */
   current: async (): Promise<DeletionRequestState | null> => {

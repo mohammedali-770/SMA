@@ -24,6 +24,23 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-08 (later) — SIX unapplied again, and the newest one closes a
+> LAUNCH-GATE gap rather than a documentation one.**
+> `20260912120000_export_my_data.sql` joins the list: PDPL access and
+> portability. **126 repository files / 126 live history rows.**
+>
+> `docs/GO_LIVE_READINESS.md` A6 recorded that deletion and correction exist
+> while **access and portability have no implementation** — confirmed live before
+> writing it (zero `public` functions matching `%export%`, `%portab%` or
+> `%my_data%`). The function takes **no argument** and reads `auth.uid()`; that is
+> the security model rather than a convenience, because a portability endpoint
+> accepting a customer id is an enumeration oracle for every customer's name,
+> phone, addresses and order history. It redefines nothing, touches no money
+> path, and is `authenticated`-only. No deploy implied; the mobile screen that
+> calls it ships with the next build.
+>
+> **Superseded, kept because the count is the point:**
+>
 > **Updated 2026-09-08 — SIX unapplied, and the newest one is the only file
 > whose ABSENCE makes a live customer document false.**
 > `20260911120000_otp_retention_sweep.sql` joins the list: a daily job that
