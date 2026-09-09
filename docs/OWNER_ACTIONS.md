@@ -2246,6 +2246,59 @@ download exists.
 
 ---
 
+## 32. Loyalty terms are BEHIND the code — delivery redemption is now misleading
+
+**Raised 2026-09-09, the moment `20260907120000_loyalty_pickup_only` was applied.**
+Loyalty is pickup-only in Production: a delivery order neither earns points nor
+may redeem them. `legal_documents.offers_loyalty_terms` v2.1 (effective
+2026-09-08, active) **mentions neither pickup nor delivery.**
+
+The two halves are not equally exposed, and the distinction is the point.
+
+**Earning is covered, narrowly, by a hedge.** The document says *"You earn points
+on the value of **eligible orders**"* and *"points are added automatically on
+eligible orders"* — and never defines "eligible". That is the hook a channel rule
+hangs on, so the sentence is incomplete rather than false.
+
+**Redemption has no such hedge, and is now misleading.** The document says:
+
+> You choose whether to use your points on an order. When you do, your whole
+> available balance is applied, up to the value of the order.
+
+No channel caveat. A customer with a balance who reaches checkout on a delivery
+order will find they cannot redeem, and the terms told them they could.
+
+**A second clause is worth reading before deciding how to fix it.** Under CHANGES
+TO THE PROGRAMME the document promises: *"Where a change reduces the value of
+points you already hold, we will announce it in the app in advance and give you a
+reasonable period to use them."* Restricting where a balance may be spent is
+arguably such a change. It was not announced in advance, because the apply is
+what made it true.
+
+**Real exposure is currently nil, and that is why this is a correction rather
+than an incident.** Five accounts hold points (5 409 total, largest 1 945), across
+71 orders — the owner's own testing. Delivery has been redeemed against **zero**
+times, ever. Fixing the wording before real customers arrive costs nothing;
+discovering it afterwards would.
+
+**Why it is yours and not mine.** Editing `legal_documents` is a live Production
+write under §5, and the wording is a commercial and legal choice — whether to
+state the rule plainly, define "eligible", and whether the advance-notice clause
+needs honouring — not an engineering one.
+
+**What needs to change, both languages, as v2.2:**
+
+1. EARNING — define eligible: points are earned on **pickup** orders only.
+2. REDEEMING — the missing caveat: points may be redeemed on **pickup** orders
+   only.
+3. Decide whether the advance-notice promise applies, and if so how it is met.
+
+The engineering side is ready: `app_settings.loyalty_pickup_only` turns the rule
+off and restores the previous behaviour exactly, with no migration, if you would
+rather correct the terms first and re-enable after.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:
