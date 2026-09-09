@@ -63,12 +63,22 @@ jobs:
           # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
           node-version-file: .nvmrc
 
-      # No `npm ci`. Both scripts import only node: builtins, on purpose — a
-      # documentation gate that needs a dependency tree is a documentation gate
-      # people will start skipping.
+      # No `npm ci`. All three scripts import only node: builtins, on purpose —
+      # a documentation gate that needs a dependency tree is a documentation
+      # gate people will start skipping.
 
       - name: Generated reference is up to date
         run: node scripts/docs-generate.mjs --check
+
+      # Recorded file fingerprints must still describe files in the tree. This
+      # is not a style check: CLAUDE.md and docs/MIGRATIONS.md record sha256
+      # values so a migration can be re-hashed before it is applied to
+      # Production (§9-B.6), and a stale record is indistinguishable from a
+      # tampered file at exactly the moment that distinction matters. Runs on
+      # the whole tree, not the diff — a hash goes stale when the FILE moves
+      # away from it, which is a change the record's own diff never shows.
+      - name: Recorded hashes still describe real files
+        run: node scripts/check-recorded-hashes.mjs
 
       # `github.base_ref` is set on pull_request events and empty on push. On a
       # push to the default branch the merge base is HEAD, so the check finds no
