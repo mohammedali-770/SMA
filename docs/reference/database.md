@@ -202,8 +202,9 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_alert_settings_update` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alert_timeline` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_admin_summary` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
-| `operations_alerts_derive` | 4 | `20260810113500_stranded_order_alert_and_index.sql` |
-| `operations_alerts_derive_pre_stranded` | 2 | `20260914120000_platform_rollup_suppression.sql` |
+| `operations_alerts_apply_rollup_correlation` | 1 | `20260914120000_platform_rollup_suppression.sql` |
+| `operations_alerts_derive` | 5 | `20260914120000_platform_rollup_suppression.sql` |
+| `operations_alerts_derive_pre_stranded` | 1 | `20260820160000_branch_availability_health_card.sql` |
 | `operations_alerts_dispatch_recipients` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alerts_evaluate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |

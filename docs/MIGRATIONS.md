@@ -44,8 +44,8 @@ to Production.**
 > muting one card cannot silence both.
 >
 > **No money path, nothing sent, no deploy implied.** It changes what is alerted,
-> not what is measured. sha256 `5d7a3ccbfa5d29a95cc278faaa745ca1406e6ce1b677f3210c20717b69318ffb`,
-> 610 lines / 32 206 bytes — re-hash the MERGED copy before applying, per §15.
+> not what is measured. sha256 `3959dcec3257ca2207b5fa217b10ba326d12c523031aaf30275c5ba2bbc7c793`,
+> 388 lines / 19 197 bytes — re-hash the MERGED copy before applying, per §15.
 > Validated cold at 128 migrations / 70 suites / 68 passed / 2 quarantined / 0 new
 > failures, and mutation-tested five ways, all killed. Detail:
 > `docs/OPERATIONS_ALERTS_DIGEST.md`.

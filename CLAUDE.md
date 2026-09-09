@@ -242,10 +242,24 @@ fingerprints opening and recovering at the same second, the rollup carrying
 **THE MUTE CASE IS THE REASON THE PREDICATE IS SHAPED AS IT IS.** A muted
 subsystem emits no condition while still feeding `overall_state`, so suppressing
 on raw state would let one mute silence BOTH alerts and leave a failing subsystem
-reported nowhere. The check therefore reads the emitted conditions, and only a
-**critical** condition from a **rollup** subsystem suppresses the rollup —
-`branch_availability` and `payment` can emit critical and feed nothing, so
-neither may.
+reported nowhere. The check therefore reads the emitted conditions — and, after
+review on #354, correlates them with the subsystems actually **driving**
+`overall_state` rather than accepting any rollup critical.
+
+**Review found two real defects in the first version, and both generalise.**
+**(P1)** `overall_state` ranks `configuration_error` above `failing`, so a MUTED
+`lazywait=configuration_error` beside an unmuted `order_flow=failing` was
+suppressed by a critical about a *different state* — leaving the configuration
+error reported by nothing at all. The rule is now "**every** subsystem whose
+state equals `overall_state` must already report it at critical". **(P2)** the
+decision ran in `_pre_stranded`, but the wrapper appends a critical condition
+*after* that returns, and the `order_integrity` arm is an if/elsif that emits
+only a warning when incidents exist — so the duplicate came straight back. The
+correlation now runs in `operations_alerts_derive`, on all five return paths,
+with `_pre_stranded` untouched.
+
+**The generalisable pair: correlate an aggregate with the specific thing that
+drove it, and judge a set only once the set is complete.**
 
 **A sanitizer contract worth carrying:** `operations_alerts_sanitize_evidence`
 keeps only strings, numbers and booleans and drops objects and arrays **by

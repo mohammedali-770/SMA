@@ -73,10 +73,33 @@ fault.
 
 | | |
 | --- | --- |
-| Suppressed when | a **rollup subsystem** is already alerting at **critical** |
-| Not suppressed by | a `warning` (it does not explain a critical platform state), or by `branch_availability` / `payment` — both can emit critical and neither feeds `overall_state` |
-| Never suppressed when | the failing subsystem is **muted** — see below |
-| When it does fire | it now carries `driver_subsystems`, naming the rollup members actually in that state |
+| Suppressed when | **every** subsystem *driving* `overall_state` already reports it at **critical** |
+| Drivers are | rollup members whose state **equals** `overall_state` — not any rollup member |
+| Not suppressed by | a `warning`; by `branch_availability` / `payment` (neither feeds `overall_state`); or by a critical about a **different** state |
+| Never suppressed when | any driver is **muted**, or no system row matches `overall_state` |
+| When it does fire | it carries `driver_subsystems`, naming the drivers |
+| Applied in | `operations_alerts_derive` — the **wrapper**, after every condition exists |
+
+**Two review findings on #354 shaped the final design, and both were real.**
+
+**P1 — correlate with the DRIVER, not any rollup member.** `overall_state` ranks
+`configuration_error` above `failing`. So a **muted** `lazywait=configuration_error`
+alongside an unmuted `order_flow=failing` reports the platform as
+*configuration_error* — driven by lazywait — while order_flow's critical is about
+a different state entirely. The first version suppressed on "any rollup critical",
+so the lazywait configuration error was reported by **nothing**: not its own
+condition (muted), not the safety net (suppressed). The predicate is now stated in
+terms of drivers, and requires **every** driver explained — two drivers with one
+muted must still raise the rollup.
+
+**P2 — judge after the wrapper's append, not before.** `operations_alerts_derive`
+appends `order_integrity:stranded_orders` at **critical** *after*
+`_pre_stranded` returns. And the `order_integrity` arm is an if/**elsif**: with
+`open_warning_count > 0` it emits only a **warning** and never reaches its
+critical branch. Deciding inside `_pre_stranded` therefore saw a warning, emitted
+the rollup, and had the critical appended immediately after — restoring the exact
+duplication. The correlation now runs in the wrapper, on **all five** return
+paths, and `_pre_stranded` is left untouched.
 
 **THE MUTE CASE IS WHY THE PREDICATE READS EMITTED CONDITIONS, NOT RAW STATES.**
 A muted subsystem emits no condition while still feeding `overall_state`.
@@ -104,10 +127,14 @@ explicitly, turning an incidental expectation into a deliberate one. This is
 revisited when that behaviour is deliberately changed, or it becomes an argument
 against the change.
 
-Coverage: `platform_rollup_suppression_test.sql`, 9 cases. Mutation-tested five
-ways, all killed — raw-state suppression (case 2a), any-severity (case 3),
-admitting a non-rollup subsystem (case 4b), computing the flag without applying
-it (case 1a), and appending instead of prepending (case 9).
+Coverage: `platform_rollup_suppression_test.sql`, **14 cases**, calling
+`operations_alerts_derive` (the public entry point) rather than the internal
+builder — testing the builder would have passed while the function the evaluator
+calls still emitted the duplicate. Mutation-tested five ways, **all killed**,
+including both #354 regressions reintroduced deliberately: any-critical instead
+of drivers (case 10a), any-driver instead of every-driver (10d), correlating
+before the wrapper's append (11b), dropping the non-empty-drivers guard (3), and
+any-severity (11c).
 
 **Not applied.** It changes what is ALERTED, not what is measured — the
 Operations Health Center still shows the platform red.
