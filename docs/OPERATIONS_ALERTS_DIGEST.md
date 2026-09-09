@@ -55,7 +55,20 @@ anticipated the migration that would lift it. That is what
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
-### Platform rollup suppression (`20260914120000`) — WRITTEN, not applied
+### Platform rollup suppression (`20260914120000`) — APPLIED
+
+> **LIVE IN PRODUCTION since 2026-09-09 12:17:02 UTC** (live version
+> `20260909121702`, `docs/MIGRATIONS.md` ledger row 88), applied on explicit
+> owner approval naming the target by version.
+>
+> **Nothing moved on apply** — outbox still 156 rows with 0 on `email`, dispatch
+> still false, and `_pre_stranded` byte-identical.
+>
+> **All four behaviours were verified LIVE, read-only**, because the wrapper is
+> pure over its arguments: the ordinary duplicate is suppressed; the muted
+> `configuration_error` driver keeps its rollup and is named in
+> `driver_subsystems`; the wrapper-added stranded critical suppresses correctly;
+> and two failing drivers with one muted keep the rollup, naming both.
 
 **The rollup no longer duplicates the subsystem that caused it.**
 `platform:health` fires on `overall_state`, which is DERIVED from five
@@ -136,7 +149,7 @@ of drivers (case 10a), any-driver instead of every-driver (10d), correlating
 before the wrapper's append (11b), dropping the non-empty-drivers guard (3), and
 any-severity (11c).
 
-**Not applied.** It changes what is ALERTED, not what is measured — the
+**Applied.** It changes what is ALERTED, not what is measured — the
 Operations Health Center still shows the platform red.
 
 ### Recovery email pairing (`20260913120000`) — APPLIED
