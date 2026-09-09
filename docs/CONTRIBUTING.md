@@ -108,7 +108,7 @@ See [`decisions/README.md`](decisions/README.md). Copy [`decisions/0000-template
 
 ## What the automation does
 
-Two checks run as `npm run docs:check`, and both run in CI.
+Three checks run as `npm run docs:check`, and all three run in CI.
 
 ### 1. Generated reference must not drift
 
@@ -130,6 +130,42 @@ Never hand-edit a file in `docs/reference/`. Your edit will be silently reverted
 The map is narrow on purpose — ten rules covering payments, push, WhatsApp sign-in, the POS integration, account deletion, the order lifecycle, order integrity, maps, OTP entry and deployment. These are the areas where stale documentation has actually cost something. A rule that fires on every change gets routed around on every change.
 
 **Adding a rule is the correct response to finding a stale document.** Removing one needs a reason in the pull request.
+
+### 3. A recorded file hash must still describe a real file
+
+`scripts/check-recorded-hashes.mjs` takes every sha256 written in `CLAUDE.md` or
+any `docs/**.md` and requires it to match some file under `supabase/`, `scripts/`
+or `.github/`. A hash that matches nothing fails the check and names the document
+and line.
+
+These are not decorative. `CLAUDE.md` records a fingerprint for each unapplied
+migration so it can be re-hashed before being applied to Production
+([`MIGRATIONS.md` §9-B](MIGRATIONS.md)), and that comparison is only worth
+running while the recorded value is current.
+
+One went stale and the mechanism is worth knowing, because it is invisible in
+review. `20260910120000_loyalty_multipliers.sql` had its hash recorded from the
+pre-review draft; review then found a real defect, the fix changed the file, and
+the record was not recomputed. **A squash merge lands the file change and the
+now-stale record in the same commit**, so no diff looks inconsistent. The cost is
+specific: at apply time the re-hash mismatches, and a stale record is
+indistinguishable from a tampered file — the one distinction the fingerprint
+exists to make.
+
+Two things about this check differ from the other two, both deliberate:
+
+- **It reads the whole tree, not your diff.** A hash goes stale when the *file*
+  moves away from it, which is a change the record's own diff never shows.
+- **It does not bind a hash to a filename.** The prose records hashes as table
+  cells, inline spans and parenthesised byte counts; a parser tying each to a
+  filename would be brittle exactly where it matters. Matching *some* file is
+  weaker and sufficient, because a stale hash matches nothing.
+
+If you hit it: recompute the value (`sha256sum <file>`) and update the document
+that records it. If a hash is deliberately historical — a "before the change it
+was X" note — add it to `HISTORICAL` in the script with a reason. Only 64-hex is
+considered, so the money-path `md5(pg_get_functiondef(oid))` fingerprints, which
+are live-database values with no file to compare against, are correctly ignored.
 
 #### The exemption, and when to use it
 

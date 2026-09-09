@@ -18,7 +18,7 @@ The practical consequence: **adding a route, an Edge Function, a table or an env
 
 ```sh
 npm run docs:generate   # rewrite the generated reference
-npm run docs:check      # what CI runs: drift + ownership
+npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshness
 ```
 
 > **A standing warning about live state.** Nothing in this repository can prove what production currently holds. Source describes source. Dashboard settings, deployed function versions, Supabase configuration and store console state all change independently of Git. Where a document states a live fact it carries the date it was verified and how. Treat an undated live claim as unverified, and check it read-only rather than assuming — or writing.
