@@ -55,6 +55,61 @@ anticipated the migration that would lift it. That is what
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
+### Recovery email pairing (`20260913120000`)
+
+**A recovery is mailed only if the same episode already mailed.** Without this a
+responder receives the END of an incident whose START this channel never
+mentioned — the severity floor suppresses a `warning` opening, and the `recovered`
+event is admitted by `recovery_notifications_enabled` through its own switch,
+bypassing the floor entirely.
+
+**Measured before it was written, on live data (2026-09-09).** Of the 12 emails
+the previous seven days would have produced had dispatch been on, **four were
+`lazywait:sync_degraded` recoveries with no mailed opening** — a third of the
+volume, and the least actionable third.
+
+**It is the missing half of a guard that already existed**, not a new rule. The
+evaluator's recovery pass already refuses to notify about a recovery that was
+never announced; it just measures `last_notified_at`, which the in-app inbox
+sets. Email now asks the question about itself.
+
+| | |
+| --- | --- |
+| Scope | `alert_id` — **episode**, not fingerprint. The open pass inserts a NEW state row per episode (`generation + 1`), so every event of one episode shares an id and the next episode has a different one. A fingerprint match would let a later episode inherit an earlier one's email |
+| Admits | any earlier email for the episode, not specifically the opening — an episode that mailed an **escalation** has been announced, so its recovery is mailed |
+| Untouched | `in_app` (a history needs its closings), the severity floor, the language rule, and `recovery_notifications_enabled` — which still suppresses recoveries independently |
+| Deliverable, not delivered | The opening must be **capable of arriving**, not already sent. `cancelled`, `blocked` and `failed` **at the retry cap** do not pair — no claim path exists for them. `sent`, `pending`, `processing` and `failed` **inside** the budget all do |
+
+**Why not simply require `status = 'sent'`?** Because the evaluator and the
+dispatcher share a 5-minute cadence, and `lazywait:sync_degraded` has opened and
+self-recovered *inside one interval* on every occasion it fired. A recovery
+produced while its opening is still `pending` is therefore the **ordinary** case,
+and pairing on `sent` would drop it permanently. The two errors are not equal: an
+orphaned recovery is confusing, a **missing** recovery leaves a responder
+believing an outage is still open. Review proposed the stricter rule on #352; the
+suite's case 2b kills it, and cases 10c/10d pin the reason.
+
+**The retry cap is a mirrored constant, and it is asserted rather than trusted.**
+`attempt_count >= 5` is only correct while `claim_operations_alert_emails`
+defaults `p_max_attempts` to 5 — which the dispatcher relies on by not passing the
+argument. The migration's self-verification reads that default out of
+`pg_get_function_arguments` and refuses to apply if it has moved.
+
+**Mutation-tested, and one survivor is recorded rather than hidden.** Killed: the
+guard computed-but-unapplied, the guard inverted, fingerprint scoping instead of
+`alert_id`, and dropping the recovery switch. **Survived:** removing the
+`alert_event_id <> p_event_id` self-exclusion — every current caller inserts the
+event before calling the producer, so the current event cannot already own an
+email row and the exclusion never changes an answer. It is kept as insurance
+against a caller that pre-inserts, and documented as untested rather than covered
+by a test that manufactures an unreachable state.
+
+**The suite's own ordering was the bug mutation testing found.** The
+episode-leak case originally ran before any email existed on that fingerprint, so
+fingerprint scoping and `alert_id` scoping returned the same answer and the
+assertion could not fail. It now runs after the escalation case and asserts its
+own precondition. An assertion that cannot fail is not a test.
+
 ### Why the floor defaults to critical
 
 Measured, not assumed. `lazywait:sync_degraded` has opened and self-recovered
@@ -206,7 +261,11 @@ identities.
   conditions that were actually notified and are still active.
 - **Recovery** — exactly once per generation: the open row flips to
   `recovered`, one `recovered` event is emitted (suppressed if the alert was
-  never notified or recovery notifications are off).
+  never notified or recovery notifications are off). **That suppression is
+  measured on `last_notified_at`, which is channel-agnostic** — it is set on open
+  and on escalation regardless of severity, so a `warning` that only ever
+  appeared in the in-app inbox satisfies it. Email answers the same question for
+  itself; see *Recovery email pairing* below.
 - **Reopen** — a recurrence after recovery starts a **new generation**
   (fresh row, generation + 1), preserving the full history of the previous
   generation.
