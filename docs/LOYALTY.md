@@ -146,6 +146,20 @@ the rule is about points, not about discounts. The redemption floor
 
 ## 3. Per-item exclusion (`products.earns_loyalty_points`, default TRUE)
 
+> **LIVE IN PRODUCTION since 2026-09-09 06:20:00 UTC.**
+> `20260908120000_loyalty_item_exclusion` was applied on explicit owner approval
+> (live version `20260909062000`, `docs/MIGRATIONS.md` ledger row 83).
+>
+> **Applying it excluded nothing, and that is the design** — the column defaults
+> TRUE and 0 of 61 products carry FALSE. Unlike §2, nothing changed for any
+> customer at the moment of apply. **An administrator excluding an item is the
+> behaviour change**, and it takes effect immediately for orders placed after it.
+>
+> **The checkout figure is NOT visible yet.** `preview_loyalty_points` is live,
+> and the client half is merged and wired — `services/api.ts`, `CheckoutScreen`,
+> `TotalsCard` — but the "You'll earn N points" line reaches customers only in
+> the next EAS build (X2). Applied is not delivered.
+
 **The rule.** With the flag off, **ordering that item earns nothing**. Points may
 still be **spent** on an order containing it — the owner's wording, and what
 makes this earn-side only.
