@@ -21,8 +21,8 @@ import {
   parseTabFromHash, tabToHash,
 } from './adminNav';
 
-const ALL_VISIBLE: GatedVisibility = { health: true, alerts: true, integrity: true };
-const NONE_VISIBLE: GatedVisibility = { health: false, alerts: false, integrity: false };
+const ALL_VISIBLE: GatedVisibility = { health: true, alerts: true, integrity: true, coupons: true };
+const NONE_VISIBLE: GatedVisibility = { health: false, alerts: false, integrity: false, coupons: false };
 
 const tabsOf = (id: AdminNavGroupId, visibility = ALL_VISIBLE): AdminTab[] =>
   resolveNavGroups(visibility).find((g) => g.id === id)?.items.map((i) => i.tab) ?? [];
@@ -68,7 +68,17 @@ describe('the agreed structure', () => {
     expect(tabsOf('operations')).toEqual(['orders', 'health', 'alerts', 'integrity']);
     expect(tabsOf('catalog')).toEqual(['menu', 'banners']);
     expect(tabsOf('branches')).toEqual(['branches']);
-    expect(tabsOf('finance')).toEqual(['reports', 'comps']);
+    // `coupons` joined Finance on 2026-09-10 rather than System, on the same
+    // reasoning as `comps`: a promo code is money off a bill, so it belongs
+    // beside the reports that show what it cost. Updated deliberately —
+    // this assertion is the agreed structure, so a tab appearing here
+    // without a decision is exactly what it exists to catch.
+    expect(tabsOf('finance')).toEqual(['reports', 'comps', 'coupons']);
+    // Hidden for an accountant, because `coupons_admin_all` is gated on
+    // is_admin() and RLS would hand them an empty list that the panel would
+    // report as "no promo code is live" — the false all-clear the screen
+    // exists to prevent. Review, #358.
+    expect(tabsOf('finance', NONE_VISIBLE)).toEqual(['reports', 'comps']);
     expect(tabsOf('system')).toEqual(['integrations', 'settings', 'legal']);
   });
 
@@ -102,12 +112,16 @@ describe('permission and capability gating', () => {
   });
 
   it('gates each capability independently', () => {
-    expect(tabsOf('operations', { health: true, alerts: false, integrity: false }))
-      .toEqual(['orders', 'health']);
-    expect(tabsOf('operations', { health: false, alerts: true, integrity: false }))
-      .toEqual(['orders', 'alerts']);
-    expect(tabsOf('operations', { health: false, alerts: false, integrity: true }))
-      .toEqual(['orders', 'integrity']);
+    const only = (k: keyof GatedVisibility): GatedVisibility => ({
+      ...NONE_VISIBLE,
+      [k]: true,
+    });
+    expect(tabsOf('operations', only('health'))).toEqual(['orders', 'health']);
+    expect(tabsOf('operations', only('alerts'))).toEqual(['orders', 'alerts']);
+    expect(tabsOf('operations', only('integrity'))).toEqual(['orders', 'integrity']);
+    // Spelled through the same helper so a new gate cannot be added to the
+    // type without this case having to acknowledge it.
+    expect(tabsOf('finance', only('coupons'))).toEqual(['reports', 'comps', 'coupons']);
   });
 
   it('never gates an ungated tab', () => {

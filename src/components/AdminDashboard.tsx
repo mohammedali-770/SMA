@@ -26,6 +26,7 @@ import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { CompMembersPanel } from './admin/CompMembersPanel';
+import { CouponsPanel } from './admin/CouponsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
 import { IntegrationsPanel } from './admin/IntegrationsPanel';
 import { BannerManagementPanel } from './admin/BannerManagementPanel';
@@ -256,7 +257,7 @@ export const AdminDashboard: React.FC = () => {
         <AdminSidebar
           active={activeTab}
           onSelect={setActiveTab}
-          visibility={{ health: healthVisible, alerts: alertsVisible, integrity: watchdogVisible }}
+          visibility={{ health: healthVisible, alerts: alertsVisible, integrity: watchdogVisible, coupons: !isAccountant }}
           lang={adminLang}
           liveOrderCount={activeOrdersCount}
           healthAlert={healthAlert}
@@ -290,6 +291,18 @@ export const AdminDashboard: React.FC = () => {
               Ungated: the RPCs it calls refuse a non-admin themselves, and a
               capability probe would only hide the reason for the refusal. */}
           {activeTab === 'comps' && <CompMembersPanel lang={adminLang} />}
+
+          {/* TAB: PROMO CODES — what a customer can take off a bill.
+              ADMIN ONLY, and not for tidiness. `coupons_admin_all` is the
+              table's only policy and is gated on is_admin(), which accepts the
+              `admin` role alone. An accountant would get an empty result from
+              RLS and read "No promo code is live" — the exact false all-clear
+              this screen exists to prevent. Showing it to them truthfully
+              needs a staff SELECT policy, which is a migration; until then the
+              honest answer is not to show it. Review, #358. */}
+          {activeTab === 'coupons' && !isAccountant && (
+            <CouponsPanel lang={adminLang} />
+          )}
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}
