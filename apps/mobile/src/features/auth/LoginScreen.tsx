@@ -89,5 +89,8 @@ const useStyles = makeStyles((color) => ({
     fontSize: typeScale.caption.size,
     lineHeight: typeScale.body.lineHeight,
   },
-  policyLink: { color: color.ember, fontWeight: '700' as const },
+  // `emberText`, not `ember`: this is caption-size text, so WCAG AA wants
+  // 4.5:1 and `ember` gives 4.08 light / 3.15 dark. It stays red — red is the
+  // interactive colour — just at an ink that clears the threshold.
+  policyLink: { color: color.emberText, fontWeight: '700' as const },
 }));

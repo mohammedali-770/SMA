@@ -11,8 +11,16 @@
 > adds seven blockers this document did not carry, corrects **D3** (it was green and
 > wrong), and revises the go/no-go summary.
 >
-> **Everything not named in the addendum or dated 2026-09-03 is still a 2026-09-02
-> reading and has not been re-checked.**
+> **Re-verified in full on 2026-09-10** — seven dimensions against live
+> Production, the deployed artifacts and the source, each then attacked by an
+> adversarial reviewer. See **Second layer — 2026-09-10 re-verification** below.
+> That pass corrected **A3, A5, A7, C1, C2, F3, F5 and G3 in place**, added
+> **A9** and **B8**, refreshed every count, and found one structural fact this
+> document had never carried: **there are two customer channels, and the web one
+> is current** — so several rows marked "needs the X2 build" are in fact
+> delivered on web today.
+>
+> **Everything not named in a dated layer is still a 2026-09-02 reading.**
 
 ## What this is, and what it is not
 
@@ -55,11 +63,11 @@ numbers, delivery addresses, map coordinates, and order history.
 | --- | --- | --- | --- |
 | A1 | **Cross-border transfer has a lawful basis** | ❌ | The Supabase project is **`eu-central-1` — Frankfurt** (`get_project`, 2026-09-02). PDPL generally requires personal data collected in the Kingdom to stay there absent an adequacy finding or approved safeguards. This is the largest open item in this document and it is a legal question, not an engineering one. Resolving it may mean a transfer mechanism, or moving the project to a Kingdom region — which is a migration, not a setting. |
 | A2 | Controller registered with SDAIA | ⬜ | Registration on SDAIA's platform is mandatory for controllers. Not determinable from the repository. |
-| A3 | Lawful basis for each processing purpose | ⬜ | Consent is the PDPL default. Ordering, delivery, loyalty, marketing push and Sentry telemetry are distinct purposes and may not share one basis. |
+| A3 | Lawful basis for each processing purpose | ⬜ legal · **one half now measured** | **Measured live 2026-09-10, and it is worse than "unknown": there is no consent record of any kind.** Every column in the `public` schema was searched for `%consent%`, `%accept%`, `%terms%`, `%agreed%`, `%opt_in%`, `%marketing%` — exactly **one** column matches in the entire database, `legal_documents.requires_acceptance`, and it is **false on all 9 rows**. No acceptance or consent table exists. Nothing records that any customer accepted any version of any policy. Marketing state lives only in `push_devices.promos_enabled`, a mutable boolean whose sole timestamp is `updated_at` — a preference, not a demonstrable consent tied to a document version. The legal call remains a human's. Consent is the PDPL default. Ordering, delivery, loyalty, marketing push and Sentry telemetry are distinct purposes and may not share one basis. |
 | A4 | **Marketing consent** | ⚠️ | Push marketing is **opt-out**: `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so granting the OS notification prompt enrols the device in offers (CLAUDE.md §7, owner decision 2026-08-20). "Marketing communications without consent" is an enumerated PDPL violation. The same design is also the Apple 4.5.4 exposure in B2 — one decision, two regulators. |
-| A5 | 72-hour breach notification path to SDAIA | ⬜ | [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md) covers technical incident handling; it does not name a regulator, a deadline or who notifies. |
+| A5 | 72-hour breach notification path to SDAIA | ❌ **re-marked 2026-09-10** | Was ⬜ "needs a human to check". It was checked, and the control is **absent** rather than unverified: a case-insensitive grep of [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md) for `sdaia`, `regulator`, `72[- ]hour` and `notif.*authority` returns **zero matches**, and repository-wide the only `docs/` file containing "SDAIA" is this one. No regulator named, no deadline stated, nobody designated to notify. **The cheapest legal item on this page** — a page of writing plus a named person, not code. Note the interaction with **X3**: with nothing paging a human, a breach would have to be noticed by the launch-week watcher poll before any 72-hour clock could start. |
 | A6 | Data-subject rights: access, correction, deletion, **portability** | ⚠️ APPLIED 2026-09-09, needs only the X2 build | Deletion and correction existed; **access and portability had no implementation at all** — confirmed live before building (zero `public` functions matching `%export%`, `%portab%`, `%my_data%`). `20260912120000_export_my_data.sql` adds `export_my_data()`: **zero arguments by design**, subject is always `auth.uid()`, so it cannot be pointed at another customer. Returns account, addresses, orders with line items **and their selected add-ons**, the full loyalty ledger, the comp flag, and notification preferences; withholds the push **token** and all internal operational state. The test applied to every field: *every number in the export must be accountable from the export itself* — which is why add-ons and the comp flag are in, since both sit inside figures the customer would otherwise be unable to reconcile. Surfaced at Profile → Account & privacy → *Get a copy of my data*, shared through React Native's core `Share` so it needs no new native module. **KNOWN LIMIT:** the share text crosses Android's Binder buffer (~1 MB, shared), so an export above 256 KB refuses with a support message rather than failing silently — a guard, not a cure. The real fix is a file attachment via `expo-file-system` + `expo-sharing`, which is a native dependency and therefore rides the next build. **APPLIED to Production 2026-09-09 07:32:09 UTC** (live version `20260909073209`, ledger row 86) on explicit owner approval naming the target by version. Verified live rather than inferred from a clean apply — which matters here, because a `plpgsql` body is not name-resolved at creation and this one reads **65 distinct columns across seven tables**: all 65 are present in live `information_schema` (0 missing), and the function was then called as a real customer inside a read-only transaction — which resolves every name at execution and is the stronger check. (This entry first said "38 columns across six tables"; review corrected it on #350.) It returns the 7 intended keys and **1 order out of the 71 in the table**, that one the caller's own; the anonymous path raises `42501` rather than returning an empty document that would look like a successful export of nothing; `anon` cannot execute it and `compute_order_snapshot` is still reachable by neither role. **Only the X2 build now stands between this and ✅** — the screen is merged and wired, the RPC is live, and nothing in a customer's hands calls it yet. **Applied is not delivered.** |
-| A7 | Privacy notice in Arabic and English, matching actual behaviour | ⬜ | Legal documents are served from `legal_documents` (`src/lib/legal.ts`). Whether the text is current, bilingual and accurate is a content review. |
+| A7 | Privacy notice in Arabic and English, matching actual behaviour | ⚠️ **re-marked 2026-09-10** — the review happened; two residuals | Legal documents are served from `legal_documents` (`src/lib/legal.ts`). Whether the text is current, bilingual and accurate is a content review. **That content review HAS been done and this row did not know it:** [`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md) records all nine rows read end to end on 2026-09-08 — four corrected to v2.1, five verified accurate — and `offers_loyalty_terms` went to v2.2 on 2026-09-09. All nine carry non-empty `content_ar`. **Two residuals keep it off ✅:** the binding Arabic has never had a native read (`OWNER_ACTIONS.md` §29, §33a, §35), and **A9 below** — one live statement that the software does not match. |
 | A8 | Processor agreements with sub-processors | ⬜ | Supabase, Meta (WhatsApp), Sentry, Vercel, Expo/EAS, Google Maps and Lazywait all receive or hold personal data. |
 
 ---
@@ -82,8 +90,8 @@ numbers, delivery addresses, map coordinates, and order history.
 
 | # | Item | Status | Evidence / note |
 | --- | --- | --- | --- |
-| C1 | **Target API level** | ⬜ | New apps and updates must target **API 36 (Android 16)** in 2026; existing apps needed API 35 by 31 August 2026, with extensions available to 1 November 2026. `app.json` sets **no explicit target**, so it inherits the Expo SDK default — Expo SDK `~57.0.14` / RN `0.86.2` should satisfy this, but **verify on the built artifact, not from config**. |
-| C2 | **`ACCESS_FINE_LOCATION` justified** | ⚠️ decided 2026-09-08 — keep FINE | **This row's premise was wrong and is corrected here.** It reasoned from the iOS purpose string alone and concluded the app only needs COARSE. The code disagrees: `LocationPickerMap.tsx:226` requests `Location.Accuracy.High` — deliberately, with a cached-fix fast path and a timeout guard — in the delivery-pin picker, the one screen that decides where the food is taken. `Accuracy.High` requires FINE on Android. The other two call sites (`OrderTypeSelectScreen`, `CheckoutScreen`) use `Balanced` and would be fine on COARSE. So FINE is **used**, and the defect was the justification, not the permission: the purpose string said location was used *"only to center the delivery map"*, which undersells it to a reviewer. Rewritten to state precise delivery placement, while-in-use only, never background. **Play's data-safety form needs the same sentence** — that part is an owner action. |
+| C1 | **Target API level** | ⬜ | New apps and updates must target **API 36 (Android 16)** in 2026; existing apps needed API 35 by 31 August 2026, with extensions available to 1 November 2026. `app.json` sets **no explicit target**, so it inherits the Expo SDK default. **Updated 2026-09-10:** the toolchain is now Expo `57.0.21` / RN `0.86.3` (patch drift resolved, see the 2026-09-10 layer). A build-artifact read during the re-verification reported **`targetSdkVersion 36`**, which would satisfy the 2026 requirement — but that reading is **not reproducible from the checkout**, because this is a managed workflow and the Gradle config is generated at EAS build time. Treat it as encouraging, not settled: **confirm on the first production AAB**, which is owed anyway under X2. |
+| C2 | **`ACCESS_FINE_LOCATION` justified** | ⚠️ decided 2026-09-08 — keep FINE | **This row's premise was wrong and is corrected here.** It reasoned from the iOS purpose string alone and concluded the app only needs COARSE. The code disagrees: `LocationPickerMap.tsx:226` requests `Location.Accuracy.High` — deliberately, with a cached-fix fast path and a timeout guard — in the delivery-pin picker, the one screen that decides where the food is taken. `Accuracy.High` requires FINE on Android. The other two call sites (`OrderTypeSelectScreen`, `CheckoutScreen`) use `Balanced` and would be fine on COARSE. So FINE is **used**, and the defect was the justification, not the permission: the purpose string said location was used *"only to center the delivery map"*, which undersells it to a reviewer. Rewritten to state precise delivery placement, while-in-use only, never background. **Play's data-safety form needs the same sentence** — that part is an owner action. **CORRECTED AGAIN 2026-09-10, because the first correction only landed in one place out of two.** The 2026-09-09 rewrite went into `app.json`'s base `Info.plist`. The app also ships `en` and `ar` locale files, which `@expo/config-plugins` turns into per-language `InfoPlist.strings` — **and iOS prefers those over the base plist**. Both still read *"only to center the delivery map on you"*, last touched 2026-08-13. So the corrected sentence was dead text for every customer, in both languages, and would have been read by App Review in its old form. `apps/mobile/locales/en.json` and `ar.json` now carry the precise-delivery-placement wording; the Arabic is engineering-drafted (`OWNER_ACTIONS.md` §35). **The generalisable lesson: a localised app has more than one copy of every purpose string, and the base plist is the one the customer never sees.** |
 | C3 | No background location | ✅ | Neither `ACCESS_BACKGROUND_LOCATION` nor a location foreground service is declared. |
 | C4 | `POST_NOTIFICATIONS` handled | ✅ | Declared; the runtime prompt is the consent moment (see A4/B2). |
 | C5 | Data safety form matches reality | ⬜ | Must agree with B3 and with what the SDKs actually collect. Third-party SDKs collect data you did not write code for. |
@@ -129,9 +137,9 @@ has, so it is a verification list rather than an aspiration.
 | --- | --- | --- | --- |
 | F1 | Arabic and English, including RTL | ⬜ | Both ship; `RELEASE_CHECKLIST.md` §7 already requires RTL device validation. |
 | F2 | Dynamic type / large text | ⬜ | Verify layouts survive the largest system font. |
-| F3 | Contrast and dark mode | ⚠️ | `design-system:check` enforces token hygiene, not perceived contrast. §7 of the release checklist calls out "unreadable frozen-light colors" as a real past failure. |
+| F3 | Contrast and dark mode | ⚠️ **measured and partly fixed 2026-09-10** | **Dark mode had no contrast floor at all, and one real failure was found.** `contrastContract.test.ts` pinned only the LIGHT inks; the dark palette is hand-authored in `apps/mobile/src/theme/palette.ts` and nothing asserted it. Measuring all 75 dark pairings found `color.ember` failing WCAG AA as normal-size text — **and it fails in light too**: 4.08:1 at worst light, 3.15:1 dark, against the grounds text actually lands on. The one body-size site was `LoginScreen.policyLink`, the link to the terms and privacy documents. **Fixed** by adding an `emberText` ink (light `#AE0F20` 6.51:1, dark `#ED7480` 5.31:1) and pointing that link at it; `ember` stays as a fill and as large text, where it is legitimate. **The durable half is `apps/mobile/src/theme/darkContrastContract.test.ts`** — 28 assertions, mutation-tested, which give dark mode the floor it never had. Two things were checked and deliberately NOT changed: `heatOff` on `appSurface3` (2.02:1) is a placeholder icon where an image is missing — decorative, not a contrast obligation — and `disabledFg` (4.44:1) is exempt under WCAG 1.4.3. `design-system:check` still enforces token hygiene, not perceived contrast. §7 of the release checklist calls out "unreadable frozen-light colors" as a real past failure. |
 | F4 | Screen-reader labels on primary flows | ⬜ | Menu → cart → checkout → confirmation, in both languages. |
-| F5 | Tap-target sizes | ⬜ | Both platforms publish minimums. |
+| F5 | Tap-target sizes | ⚠️ **swept and partly fixed 2026-09-10** | Both platforms publish minimums (Apple 44pt, Android 48dp) and `tokens.hitTarget = 44` already encodes it. A sweep of every declared `minHeight`/`minWidth` in `apps/mobile/src` found four interactive controls below it on the primary flow. **Three are fixed** — `CartScreen` remove (34 → `hitTarget`), `SuggestionStrip` add (34 → `hitTarget`), `OrderTypeRow` (36 → `hitTarget`). **One was deliberately left**: `app/payment/checkout.tsx` close (36), because that file is inside the §6 payment freeze and a tap-target height is not worth touching a frozen path for — the screen is unreachable while online payment is off. Fix it with the first payment change that is approved. |
 
 ---
 
@@ -141,7 +149,7 @@ has, so it is a verification list rather than an aspiration.
 | --- | --- | --- | --- |
 | G1 | **Payment provider** | ❌ for card payment · ✅ for a cash launch | No provider is selected and payment work is **frozen** (CLAUDE.md §6). Tap is provisional, Moyasar is complete but inert — its migration is deliberately unapplied. Live data agrees: of 65 orders, 63 are `payment_status = 'pending'` and the only 2 `paid` are comped zero-total. **A cash-only launch is coherent today; an online-payment launch is not.** |
 | G2 | Refunds | ❌ if taking payment | Automated refund processing is intentionally disabled under the freeze. |
-| G3 | Menu content ready | ⬜ | 55 active products; **1** now carries an image. Decide whether launching with mostly image-less products is acceptable. |
+| G3 | Menu content ready | ⚠️ **re-measured 2026-09-10** | 55 active products; **1** carries an image — unchanged, and re-measured rather than carried forward. **The row understated it: 40 of the 55 have no description in EITHER language**, not just no English. So three quarters of the menu is a name and a price. Decide whether that is the launch you want; it is days-to-weeks of photography and bilingual copy, and it is the single largest determinant of how the app LOOKS on day one. |
 | G4 | Store listing assets | ⬜ | Screenshots, description, category, support contact — in both languages. |
 | G5 | Terms, refund and delivery policy match behaviour | ✅ for a cash launch | Verified 2026-09-03 against the **live** `legal_documents` rows (all 9 active, effective 2026-08-18). The copy was already written for a cash-only launch and says so plainly: `payment_policy` — *"paid in cash … Online card payment is not currently available in the app"* and *"We have not yet selected an online payment provider"*; `cancellation_refund_policy` — *"Where a refund is due, it is settled in cash at the branch that prepared the order."* Nothing promises card payment or an online refund. The cancellation window (*"while your order is still Received"*) is also accurate: `received` remains the live status on 62 of 68 orders and the app still renders it as **Received** — only its *push* was retired on 2026-08-27. **Re-check this the moment a payment provider is chosen**, since both documents promise to be updated *before* the option appears. |
 | G6 | **Campaigns / promo codes are not a launch feature** | ⚠️ known gap | The schema (`campaigns`, `campaign_redemptions`, `compute_campaign_discount`) is applied to Production, but **there is no UI in either app** — no admin tab, no customer entry point — and `place_order` has no campaign awareness, so `global_limit`/`per_user_limit` are unenforced and no redemption row is ever written. Established by the 2026-09-02 dead-code audit. **Do not advertise promo codes at launch.** Detail: `docs/DISCOUNTS_CAMPAIGNS.md` Part 1. |
@@ -251,6 +259,108 @@ These are recorded so the cash decision is made with its alternative priced hone
 
 ---
 
+## Second layer — 2026-09-10 re-verification
+
+**What this is.** Every row above was re-checked against live Production, the
+deployed artifacts and the source tree on 2026-09-10, seven dimensions at a
+time, each then attacked by an adversarial reviewer told to refute it. Rows the
+check found wrong were corrected **in place** above and say so. This layer
+carries what is genuinely new, and the counts, which had all moved.
+
+### The structural finding: there are TWO customer channels, not one
+
+**This document has never carried it, and it changes what "undelivered" means.**
+`docs/DEPLOY.md` designates `/app/` as the customer web application, and that
+Vercel deployment is **newer than the iOS binary and fully current**. Verified
+2026-09-10: `https://app.spicymeal.com.sa/app` returns 200 and serves the
+customer app — an Expo web export, entry bundle 4 429 268 bytes — which contains
+`export_my_data`, `preview_loyalty_points`, the *Get a copy of my data* label and
+the `/account/delete` route.
+
+So every feature this page describes as "merged but needing the X2 build" **is
+reachable today on web**. That does not retire X2 — the native app is what a
+store reviewer opens and what most customers will use — but it does mean:
+
+- **A6 is delivered on web** and undelivered on native. The PDPL access and
+  portability right has a working customer route today.
+- **B1's deletion row** likewise: `/account/delete` is live on web.
+- "Applied is not delivered" was the right instinct and the wrong conclusion.
+  **Ask which channel**, every time.
+
+Nothing else on this page reasons about the web channel either. It has no store
+review, no binary, and no release gate of its own — which is convenient now and
+is itself an unexamined surface.
+
+### New rows
+
+| # | Item | Status | Evidence |
+| --- | --- | --- | --- |
+| **A9** | **The privacy policy names the wrong map sub-processor** | ❌ | `privacy_policy` v2.1 says `Mapbox — the map you use to choose a delivery location` in **both languages**. The shipped web bundle carries a Google Maps key (`AIza` present) and **no Mapbox token** (`pk.` absent, 0 occurrences), and `googleMaps.ts` uses Google **Places** for address search. A named processor receives nothing while an unnamed one receives the customer's **delivery coordinates** — wrong in both directions, in the document destined for both store listings. Replacement text, evidence and its limits: [`legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`](legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md); owner action `OWNER_ACTIONS.md` §34. **Read `EXPO_PUBLIC_MAP_PROVIDER` in the EAS production environment before publishing** — the evidence proves the web channel only, and both providers are compiled into both artifacts. |
+| **B8** | **The iOS binary declared three purpose strings for capabilities the app never uses** — ✅ fixed 2026-09-10 | `expo-location`'s config plugin is auto-applied and injected `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationAlwaysUsageDescription` and `NSMotionUsageDescription`, all generic `Allow $(PRODUCT_NAME) to…` placeholders. An Always-location and a Motion declaration invite an App Review question with no good answer, since neither capability is used. Fixed by declaring the plugin explicitly with `false` for those three, which makes `applyPermissions` delete them. **Verified from the resolved config, not from source**: `expo config --type introspect` now yields exactly **one** usage description — the corrected when-in-use string — and no `UIBackgroundModes`. |
+
+### The adversarial pass found one more cash blocker, and it is the sharpest thing on this page
+
+| # | Item | Status | Evidence |
+| --- | --- | --- | --- |
+| **G8** | **Two live, uncapped, never-expiring promo codes are redeemable from checkout today — and there is no admin screen to switch them off** | ❌ | Verified live 2026-09-10 against `public.coupons`: **2 rows, both `is_active`**. Both have `starts_at` **null** and `ends_at` **null** (never expire), `usage_limit` **null** (no ceiling), `min_order_amount` **0** (no minimum spend) and `max_discount_amount` **null** (no cap). One is **percentage 15%**, one is **fixed 10 SAR**. `usage_count` is **0**, so nothing has been redeemed yet — the exposure is entirely forward-looking. The customer-facing surface is **unconditional**: `CheckoutScreen.tsx` renders `<Section title={t('couponTitle')}><CouponRow …>` with no gate, so a "Promo code" field is on every checkout, on both channels, today. **And `coupons` has no admin UI** — the only admin file mentioning it is `ReportsPanel.tsx`, so switching them off is a direct database write, which is a §5 action. **This is the one launch-day finding that costs money per order rather than costing a review cycle.** Decide before launch: deactivate them, or cap and date them deliberately. |
+
+**Why this was missed until the adversarial pass.** G6 asked whether campaigns
+were reachable and answered *no* — correctly, about the `campaigns` table. It
+then found `loyalty_multipliers` and answered *no* about that too. Neither is the
+table wired into the money path. **`coupons` is a third table**, it is live, and
+`validate_coupon` is called from checkout. The lesson generalises: *checking two
+tables and finding both inert is not evidence about a third.*
+
+### Four smaller findings from the same pass, recorded rather than actioned
+
+| # | Item | Note |
+| --- | --- | --- |
+| **D8** | ~~An ACTIVE Production Edge Function has no source in this repository.~~ **WITHDRAWN 2026-09-10 — this was already answered, and the answer was a deliberate decision.** The facts are right (`latency-probe` v2, `ACTIVE`, `verify_jwt: true`, no `supabase/functions/latency-probe/`), but the conclusion was wrong. **`OWNER_ACTIONS.md` §23 is a CLOSED owner decision to KEEP it**, taken 2026-09-03 on live evidence: the deployed body is a single `Deno.serve` returning **HTTP 410 with a fixed JSON string — no database call, no secret, no outbound request**; **0 invocations** across three consecutive 24-hour windows; no cron job or `pg_proc` body names it. The original delete argument rested on a security surface that the 410 stub removed and on legibility, which writing §23 answered. Re-confirmed today: **0 cron jobs and 0 database functions reference it**, and the only repository mentions are §23 and this page. The 23-deployed-vs-22-in-repo drift is documented there as expected, not as a fault. **Nothing is outstanding.** |
+| **D10** | **The live admin console already offers Moyasar as a selectable payment provider, with a full credential form.** Read from the deployed bundle: the lazily-loaded `AdminDashboard` chunk ships `providerOptions:["tap","moyasar"]`. Selecting it would be inert today — the Moyasar migration is unapplied and no Moyasar function is deployed — but §6 says choosing the provider is a deliberate owner action, and the console currently presents it as a dropdown. A guard belongs here, not a redesign. |
+| **X3c / X3e** | Two facts that change what enabling alert dispatch will actually do. **There is exactly one recipient**: `operations_alerts_dispatch_recipients()` selects `profiles.email where role = 'admin'`, live count **1**, and `operations_alert_settings` has no recipients column at all — so **E2 and X3 are the same single point of failure**, and the one admin who must enable alerting is also the only one who would receive it. And **enabling the flag does not backfill**: all 160-odd queued rows are `channel='in_app'`, and producers only write email rows while the flag is already true, so the backlog will never be mailed. Turning it on is the **first live test** of the chain, not the last step. |
+| **X5h** | **The zero-risk rehearsal tool already exists and has never been used.** The deployed `push-dispatch` v6 carries a `test` action behind the same admin+AAL2 gate as broadcast, but targeting **only the calling admin's own devices**. `notification_log where kind='test'` is **0 rows, ever**. Anyone planning the X5 lifecycle rehearsal or the X7 login test should start here — it exercises the push path with a blast radius of one device. |
+
+### The counts had all moved
+
+| Figure | This page said | Live 2026-09-10 |
+| --- | --- | --- |
+| Orders | 68 | **72** — and one was placed 2026-09-09 |
+| Still at `received` | 62 | **66** |
+| Ever past `received` | 0 | **0** — X5 is unchanged and that is the point |
+| Stale queue to cancel | 62 | **66** — it grew |
+| Alerts ever raised | 112, then 136 | **160**, still **0** that have ever left the database |
+| Branch near-duplicate groups | 3 | **15** |
+| Active products without a description | "40 have no English" | **40 have neither language** |
+| Repository migrations / live rows | — | **128 / 133**, one unapplied (Moyasar, frozen) |
+
+### X3 is one step from done, and it is the cheapest blocker left
+
+Three of the four dispatch steps are complete: the base migration applied
+2026-09-07, `operations-alert-dispatch` deployed the same day, and the scheduler
+applied with its two Vault secrets. **Only `external_dispatch_enabled` remains**
+— Alerts → Settings, an admin at **AAL2**. No agent can flip it: the RPC behind
+it is gated on `is_admin()`, so a service-role connection cannot substitute.
+Until it is on, all 160 alerts stop inside the database and
+`INCIDENT_RESPONSE.md` §1b's named watcher — **whose table is still unfilled**
+(see **E5**) — is the only thing standing between a Friday-night failure and
+nobody knowing.
+
+### Fixed in source on 2026-09-10, all riding the X2 build
+
+Recorded here so the build is known to carry them: **C2** (the location purpose
+string, in the locale files that iOS actually reads), **B8** (the three
+placeholder purpose strings), **F3** (the AA-failing policy link, plus a
+28-assertion dark-mode contrast contract), **F5** (three of four sub-minimum tap
+targets), the Expo SDK patch drift (11 packages, `expo` 57.0.14 → 57.0.21, RN
+0.86.2 → 0.86.3), and an Android `submit` profile in `eas.json`, which had none.
+
+**D5 was re-reviewed and deliberately not touched.** The `image-size` exception
+holds: the latest published version is still 2.0.2 and the advisories cover
+`<= 2.0.2`, so npm's `fixAvailable: true` is optimism rather than a patch. The
+gate passes, the ancestry is unchanged by the SDK bump, and the expiry stays
+**2026-10-02** — `DEPENDENCY_ADVISORIES.md` says not to extend it merely to keep
+CI green.
+
 ## Go / no-go summary
 
 **Revised 2026-09-03 by the addendum above. The 2026-09-02 list had three items; it
@@ -306,6 +416,23 @@ on the list with a much smaller shape. Nothing here has been quietly retired.
    run* rather than *a thing that may already be broken*. **Reclassify it when you
    plan the week: it is the cheapest item left on this list.** *(2026-09-03, credential
    verified 2026-09-07)*
+
+**Revised again 2026-09-10 — the nine become eleven, and two of them are cheap.**
+The 2026-09-03 list stands, with these amendments:
+
+- **A5 joins it** — no breach-notification path exists at all (it was ⬜, it is
+  now ❌). Hours of writing plus a named person. **Cheapest item on the page.**
+- **A9 joins it** — the live privacy policy names the wrong map sub-processor,
+  in the document whose URL goes into both store listings. Draft ready; one
+  environment variable to read first.
+- **X3 shrinks to one click** — three of its four steps are done. It is now the
+  cheapest *owner* item, not a project.
+- **X2 shrinks in scope but not in necessity** — the web channel already carries
+  the merged work to customers, so X2 is about the store binaries and the device
+  gate, not about delivering features.
+- **E5 hardens** — the incident-response contacts are placeholders, all five
+  roles unfilled. X3's stopgap depends on it, so it is not separable from X3.
+- **X7 stays the cheapest test**, unchanged: one real login.
 
 **Additionally, and only if taking card payment:** G1/G2 (no provider, weeks of
 onboarding), the 8-week-old payment bundles that cannot be redeployed safely one at a

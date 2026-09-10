@@ -7,8 +7,33 @@ This document owns two separate mechanisms, at very different stages:
 | **Campaigns** (#100) | Schema applied to Production, **inert** — no discount can affect a total. |
 | **Comped customers** (2026-08-26) | **APPLIED to Production 2026-08-26.** Live and automatic the moment an administrator adds a member; `comp_members` is currently empty. |
 
-Coupons (`public.coupons` + `validate_coupon`) are the third and oldest
-mechanism; they are live and are described where they are used rather than here.
+| **Coupons** (`public.coupons` + `validate_coupon`) | **LIVE AND UNBOUNDED — 2 active codes, verified 2026-09-10.** See below. |
+
+Coupons are the third and oldest mechanism, and the status line above is
+deliberately blunt because this table previously passed over them in a sentence
+while labelling its two *inert* neighbours precisely. That asymmetry is how the
+go-live re-verification nearly missed them.
+
+**Measured live 2026-09-10:** `coupons` holds **2 rows, both `is_active`**. Both
+carry `starts_at` **null**, `ends_at` **null**, `usage_limit` **null**,
+`min_order_amount` **0** and `max_discount_amount` **null** — no expiry, no
+ceiling, no minimum spend, no cap. One is **percentage 15%**, one is **fixed
+10 SAR**. `usage_count` is **0**, so nothing has been redeemed and the exposure
+is entirely forward-looking.
+
+They are **reachable by every customer right now**: `CheckoutScreen.tsx` renders
+the "Promo code" section unconditionally, on both the native and web channels,
+and `validate_coupon` is live. **There is no admin screen for coupons** — the
+only admin file that references them is `ReportsPanel.tsx` — so changing or
+disabling one is a direct database write and therefore a CLAUDE.md §5 action.
+
+Decision and options: `docs/OWNER_ACTIONS.md` §36; launch impact:
+`docs/GO_LIVE_READINESS.md` **G8**.
+
+**The lesson this section now carries.** Campaigns are inert and
+`loyalty_multipliers` is empty, both verified repeatedly. Coupons are neither,
+and they are the mechanism actually wired into the money path. *Checking two
+discount tables and finding both inert is not evidence about a third.*
 
 ## Part 1 — Campaigns (#100)
 

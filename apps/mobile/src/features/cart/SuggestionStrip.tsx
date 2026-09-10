@@ -12,7 +12,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { DishIcon } from '../../components/Icons';
 import { Price } from '../../components/Price';
-import { motion, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { hitTarget, motion, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
@@ -119,5 +119,5 @@ const useStyles = makeStyles((color) => ({
   img: { width: '100%' as const, height: 96, backgroundColor: color.appSurface2 },
   imgEmpty: { alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: color.appSurface3 },
   body: { padding: space.s3, gap: space.s1 },
-  action: { marginTop: space.s1, backgroundColor: color.ember, borderRadius: radius.md, paddingVertical: space.s2, minHeight: 34, justifyContent: 'center' as const },
+  action: { marginTop: space.s1, backgroundColor: color.ember, borderRadius: radius.md, paddingVertical: space.s2, minHeight: hitTarget, justifyContent: 'center' as const },
 }));
