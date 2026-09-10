@@ -2432,6 +2432,61 @@ running a separate pass; the English it mirrors is in
 Not blocking: the previous Arabic was also engineering-drafted, so this is not a
 regression — it is one more string on an existing list.
 
+## 36. TWO LIVE PROMO CODES ARE REDEEMABLE TODAY, UNCAPPED — decide before launch
+
+**Opened 2026-09-10.** The sharpest finding of the go-live re-verification, and
+the only one that costs money per order rather than a review cycle.
+
+`public.coupons` holds **2 rows, both active**. Verified live:
+
+| Property | Both rows |
+| --- | --- |
+| `starts_at` / `ends_at` | **null** — never expire |
+| `usage_limit` | **null** — no ceiling |
+| `min_order_amount` | **0** — no minimum spend |
+| `max_discount_amount` | **null** — no cap |
+| Shape | one **percentage 15%**, one **fixed 10 SAR** |
+| `usage_count` | **0** — nothing redeemed yet |
+
+The customer surface is **unconditional**: `CheckoutScreen.tsx` renders the
+"Promo code" section with no gate, so the field is on every checkout on both
+channels today. **And there is no admin screen for coupons** — the only admin
+file that mentions them is `ReportsPanel.tsx`. Switching them off is a direct
+database write, which is why this is yours.
+
+**Nothing has been redeemed, so the exposure is entirely forward-looking.** The
+decision is one of:
+
+1. **Deactivate both** — the safe default if they are leftover test data.
+2. **Keep them and bound them** — set `ends_at`, `usage_limit` and
+   `max_discount_amount` deliberately, so a code cannot be shared publicly and
+   drain margin indefinitely.
+3. **Keep as-is knowingly** — coherent only if you intend an open, permanent
+   discount and have priced it.
+
+I can write the migration for whichever you pick, and can build the admin screen
+`coupons` has never had. Applying it is a separate §5 approval.
+
+### On completion
+
+Update `docs/GO_LIVE_READINESS.md` G8 and `docs/DISCOUNTS_CAMPAIGNS.md`, and say
+which of the three options was chosen and why.
+
+## 37. Two Production hygiene items from the same pass
+
+**`latency-probe` is an ACTIVE Edge Function with no source in the repository.**
+Version 2, `verify_jwt: true`, last updated 2026-08-30. It is outside change
+control, outside the Deno typecheck gate and outside review. Either restore its
+source or delete the deployment — both are §5 actions. (An earlier session
+verified it unreferenced and safe to delete; the deletion was never performed.)
+
+**The live admin console offers Moyasar as a selectable payment provider**, with
+a full credential form — the deployed `AdminDashboard` chunk ships
+`providerOptions:["tap","moyasar"]`. Selecting it is inert today (the migration
+is unapplied, no function is deployed), but §6 says choosing the provider is a
+deliberate owner action and the console currently presents it as a dropdown.
+Worth a guard rather than a redesign.
+
 ## Owner-action closeout rule
 
 When an item is completed:
