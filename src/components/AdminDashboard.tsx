@@ -26,6 +26,7 @@ import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { CompMembersPanel } from './admin/CompMembersPanel';
+import { CouponsPanel } from './admin/CouponsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
 import { IntegrationsPanel } from './admin/IntegrationsPanel';
 import { BannerManagementPanel } from './admin/BannerManagementPanel';
@@ -290,6 +291,14 @@ export const AdminDashboard: React.FC = () => {
               Ungated: the RPCs it calls refuse a non-admin themselves, and a
               capability probe would only hide the reason for the refusal. */}
           {activeTab === 'comps' && <CompMembersPanel lang={adminLang} />}
+
+          {/* TAB: PROMO CODES — what a customer can take off a bill.
+              Ungated for the same reason as comps: `coupons_admin_all` is an
+              ALL policy gated on is_admin() (role AND AAL2), so the table
+              refuses a non-admin itself and a probe would only hide why.
+              Read-only for an accountant: they need to see what a discount
+              costs without being able to create one. */}
+          {activeTab === 'coupons' && <CouponsPanel lang={adminLang} readOnly={isAccountant} />}
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}

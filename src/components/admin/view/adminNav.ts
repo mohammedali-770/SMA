@@ -22,13 +22,14 @@
 import {
   Activity, BarChart3, BellRing, Building2, ClipboardList, FileSpreadsheet,
   Gift, HeartPulse, Images, Layers, Plug, Scale, Settings, ShieldAlert,
-  SlidersHorizontal, Store, Wallet,
+  SlidersHorizontal, Store, Ticket, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
 export type AdminTab =
   | 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'comps'
-  | 'integrations' | 'health' | 'alerts' | 'integrity' | 'settings' | 'legal';
+  | 'coupons' | 'integrations' | 'health' | 'alerts' | 'integrity' | 'settings'
+  | 'legal';
 
 export interface AdminNavItem {
   tab: AdminTab;
@@ -53,6 +54,12 @@ export const ADMIN_NAV: AdminNavItem[] = [
   // Finance rather than Settings: a comp is a money decision, and it belongs
   // next to the reports that show what it cost.
   { tab: 'comps', icon: Gift, en: 'Comped Customers', ar: 'عملاء الضيافة' },
+  // Finance for the same reason as comps: a promo code is money off an order.
+  // It sits here rather than under Settings because the question it answers —
+  // "what can a customer take off a bill right now" — is a financial one, and
+  // because it was the absence of any screen at all that let two open-ended
+  // codes sit live (GO_LIVE_READINESS G8).
+  { tab: 'coupons', icon: Ticket, en: 'Promo Codes', ar: 'رموز الخصم' },
   { tab: 'integrations', icon: Plug, en: 'Integrations', ar: 'الربط والتكاملات' },
   { tab: 'health', icon: HeartPulse, en: 'Operations Health', ar: 'صحة العمليات', gated: 'health' },
   { tab: 'alerts', icon: BellRing, en: 'Operations Alerts', ar: 'التنبيهات والملخص', gated: 'alerts' },
@@ -119,7 +126,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     id: 'finance', icon: Wallet, en: 'Finance', ar: 'المالية',
-    tabs: ['reports', 'comps'], collapsible: true,
+    tabs: ['reports', 'comps', 'coupons'], collapsible: true,
   },
   {
     id: 'system', icon: SlidersHorizontal, en: 'System', ar: 'النظام',

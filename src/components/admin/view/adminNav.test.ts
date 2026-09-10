@@ -68,7 +68,12 @@ describe('the agreed structure', () => {
     expect(tabsOf('operations')).toEqual(['orders', 'health', 'alerts', 'integrity']);
     expect(tabsOf('catalog')).toEqual(['menu', 'banners']);
     expect(tabsOf('branches')).toEqual(['branches']);
-    expect(tabsOf('finance')).toEqual(['reports', 'comps']);
+    // `coupons` joined Finance on 2026-09-10 rather than System, on the same
+    // reasoning as `comps`: a promo code is money off a bill, so it belongs
+    // beside the reports that show what it cost. Updated deliberately —
+    // this assertion is the agreed structure, so a tab appearing here
+    // without a decision is exactly what it exists to catch.
+    expect(tabsOf('finance')).toEqual(['reports', 'comps', 'coupons']);
     expect(tabsOf('system')).toEqual(['integrations', 'settings', 'legal']);
   });
 

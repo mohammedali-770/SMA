@@ -2461,10 +2461,12 @@ regression — it is one more string on an existing list.
 > different order of problem. They are recorded here by id prefix (`e367b35f`
 > percentage 15%, `e6f1227a` fixed 10 SAR) rather than by code.
 >
-> **What is still not built:** `coupons` has no admin screen. Re-enabling,
-> bounding or adding a code remains a direct database write. If promo codes are
-> ever a real feature, that screen — and `ends_at` / `usage_limit` /
-> `max_discount_amount` as first-class fields — is the work.
+> **The screen that was missing now exists**, added the same day: **Finance →
+> Promo Codes**. Re-enabling, bounding or adding a code is no longer a database
+> write. It renders each way a code is unbounded as its own badge, prices a
+> draft before it is saved, refuses to delete a redeemed code, and holds a
+> percentage to 0-100 — a ceiling the column itself does not have. Detail:
+> `docs/DISCOUNTS_CAMPAIGNS.md`.
 
 ### The original item, kept for its reasoning
 

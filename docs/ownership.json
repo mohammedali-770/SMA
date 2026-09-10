@@ -108,6 +108,15 @@
       ]
     },
     {
+      "id": "coupons",
+      "why": "Promo codes are money off a real order, and until 2026-09-10 they had no admin surface at all — which is how two open-ended codes sat live in Production unnoticed. The screen and the document that explains what a code can cost have to move together.",
+      "sources": [
+        "src/lib/couponsApi.ts",
+        "src/components/admin/CouponsPanel.tsx"
+      ],
+      "docs": ["docs/DISCOUNTS_CAMPAIGNS.md"]
+    },
+    {
       "id": "loyalty",
       "why": "Loyalty is LIVE: points are earned and spent by real customers, and a silent change here changes what somebody is charged. The rule exists because the earning and redemption logic is duplicated in TWO SQL functions - place_order (what happens) and compute_order_snapshot (what the checkout screen promises) - plus a client mirror in previewTotals.ts, so a rule can be applied in one place and silently missed in another. Migrations are not listed (they are append-only, each its own file); this covers the code that reads the settings, mirrors the rules and lets an administrator change them. Added 2026-09-07 with the pickup-only channel rule, which was the first loyalty behaviour change to discover that no rule fired at all.",
       "sources": [

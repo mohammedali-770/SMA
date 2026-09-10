@@ -27,11 +27,38 @@ rows are now `is_active = false` — **deactivated, not deleted** — and
 `validate_coupon` was called read-only afterwards to prove it: both return
 `valid = false`, discount **0**, *"Coupon is inactive"*.
 
-**What has NOT changed: there is still no admin screen for coupons** — the only
-admin file that references them is `ReportsPanel.tsx` — so re-enabling, bounding
-or adding a code remains a direct database write and a CLAUDE.md §5 action. If
-promo codes ever become a real feature, that screen, plus `ends_at`,
-`usage_limit` and `max_discount_amount` as first-class fields, is the work.
+**That gap is now closed.** Until 2026-09-10 there was no admin screen for
+coupons at all — the only admin file that referenced them was `ReportsPanel.tsx`
+— so re-enabling, bounding or adding a code meant a direct database write.
+**Promo Codes** now sits under **Finance**, beside Comped Customers, built on
+`src/lib/couponsApi.ts` and `src/components/admin/CouponsPanel.tsx`.
+
+It is deliberately not a plain CRUD form, because a list with an edit button
+would have rendered those two codes perfectly and told the operator nothing:
+
+- **Unboundedness is rendered.** Each way a code is open-ended — no expiry, no
+  usage limit, an uncapped percentage — gets its own badge on the row. An empty
+  "expires" column reads as missing data; a badge reads as a decision.
+- **The draft is priced before it is saved**, in the same words the row will
+  use, because that is when the decision is actually made.
+- **Stopping is the primary action, and deleting a redeemed code is not
+  offered.** `orders.coupon_code` is TEXT with no foreign key (`coupons` has
+  zero inbound FKs), so deleting a used code destroys the only record of what it
+  was and leaves a discounted order nobody can explain. `couponsApi.remove`
+  refuses it as well, so the rule survives a caller that forgets the button.
+- **A percentage is held to 0-100 in the client, and nowhere else.**
+  `coupons_value_check` is only `value >= 0`, so a 500% row is legal;
+  `validate_coupon` clamps the discount to the subtotal, so it would not go
+  negative — every order would simply be free. Unlike `loyalty_multipliers`,
+  whose `between 1 and 10` CHECK makes that a rejected insert, here the ceiling
+  is `validateDraft` and nothing else. **If that needs to be real, it belongs in
+  a migration.**
+
+Writes are ordinary RLS-gated table operations rather than an RPC:
+`coupons_admin_all` is an `ALL` policy for `authenticated` with `is_admin()` on
+both `USING` and `WITH CHECK`, so role AND AAL2 already gate every one. An
+accountant sees the screen read-only — the exposure without the ability to
+create it.
 
 Record: `docs/OWNER_ACTIONS.md` §36; launch impact:
 `docs/GO_LIVE_READINESS.md` **G8**.
