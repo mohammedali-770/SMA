@@ -50,8 +50,6 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "eslint": "^9.0.0",
-    "eslint-config-expo": "~57.0.2",
     "typescript": "~6.0.3"
   },
   "//overrides": "Transitive-only security patches. Each package appears exactly once in this tree and every bump stays within the same major, so no dependent's API expectations change. Plain `npm audit fix` here re-resolves ~95 packages (the whole Expo CLI toolchain, RN codegen, Sentry) — far too much churn for a store-bound app, so the advisories are pinned surgically instead. nanoid 3.3.18 closes GHSA-2v37-7h3g-55p8 inside the existing PostCSS-compatible 3.x range. js-yaml reaches this tree only via expo -> @expo/cli -> @expo/xcpretty, an Xcode log formatter that runs on a macOS build host and is never bundled into the app; 4.3.1 is the patched release inside xcpretty's own `^4.1.0` range. The remaining moderate advisories are upstream Expo issues with no non-breaking fix; see docs/DEPENDENCY_ADVISORIES.md.",
