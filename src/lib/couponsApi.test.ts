@@ -207,14 +207,109 @@ describe('toIso', () => {
   });
 });
 
-describe('remove refuses to destroy the record behind a discounted order', () => {
-  it('throws for a redeemed code without touching the database', async () => {
-    await expect(couponsApi.remove({ id: 'c1', usage_count: 1 })).rejects.toThrow(/cannot be deleted/i);
+describe('remove mirrors the database trigger, not the usage counter', () => {
+  const none: ReadonlySet<string> = new Set();
+
+  it('refuses a code an ORDER refers to even when usage_count is zero', async () => {
+    // The case the first version got wrong. `guard_used_coupon_identity` keys
+    // on `orders.coupon_code`; `admin_set_order_status` decrements
+    // `usage_count` when an order is cancelled, and the cancelled order keeps
+    // its code. So 0 uses does not mean deletable, and offering Delete there
+    // produced a "never redeemed" confirmation followed by a 23503.
+    await expect(
+      couponsApi.remove({ id: 'c1', code: 'WELCOME10', usage_count: 0 }, new Set(['WELCOME10'])),
+    ).rejects.toThrow(/cannot be deleted/i);
+  });
+
+  it('matches the trigger case-insensitively, as the trigger does', async () => {
+    // The trigger compares `upper(btrim(...))` on both sides.
+    await expect(
+      couponsApi.remove({ id: 'c1', code: '  welcome10 ', usage_count: 0 }, new Set(['WELCOME10'])),
+    ).rejects.toThrow();
+  });
+
+  it('still refuses on a positive usage count', async () => {
+    await expect(couponsApi.remove({ id: 'c1', code: 'WELCOME10', usage_count: 1 }, none)).rejects.toThrow();
   });
 
   it('the guard lives in the api, not only in the button', async () => {
-    // The panel hides Delete for a used code. This asserts the rule survives a
+    // The panel withholds Delete for these. This asserts the rule survives a
     // caller that does not — which is the whole reason it is here as well.
-    await expect(couponsApi.remove({ id: 'c1', usage_count: 42 })).rejects.toThrow();
+    await expect(couponsApi.remove({ id: 'c1', code: 'X', usage_count: 42 }, none)).rejects.toThrow();
+  });
+});
+
+describe('a FIXED coupon never carries a discount cap', () => {
+  it('is asserted through create, because validate_coupon applies the cap to both types', async () => {
+    // A stale cap left by a type switch would silently turn a fixed 50 into a
+    // 10. The panel clears the field; this is the half a caller cannot bypass.
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ insert });
+
+    await couponsApi.create(draft({ type: 'fixed', value: '50', maxDiscountAmount: '10' }));
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(insert.mock.calls[0][0]).toMatchObject({ type: 'fixed', max_discount_amount: null });
+  });
+
+  it('keeps the cap for a percentage coupon', async () => {
+    const insert = vi.fn().mockResolvedValue({ error: null });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ insert });
+
+    await couponsApi.create(draft({ type: 'percentage', value: '15', maxDiscountAmount: '30' }));
+    expect(insert.mock.calls[0][0]).toMatchObject({ type: 'percentage', max_discount_amount: 30 });
+  });
+});
+
+describe('updateBounds changes what a code is bounded by, never what it is', () => {
+  it('writes only the four bound columns', async () => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ update });
+
+    await couponsApi.updateBounds('c1', {
+      minOrderAmount: '25',
+      maxDiscountAmount: '40',
+      usageLimit: '100',
+      endsAt: '2026-12-31T00:00',
+    });
+
+    const patch = update.mock.calls[0][0];
+    expect(Object.keys(patch).sort()).toEqual([
+      'ends_at',
+      'max_discount_amount',
+      'min_order_amount',
+      'usage_limit',
+    ]);
+    // The omissions are the point: the trigger raises 23503 on a code change
+    // for a referenced coupon, and re-pricing a live code is a different
+    // decision from bounding it.
+    expect(patch).not.toHaveProperty('code');
+    expect(patch).not.toHaveProperty('type');
+    expect(patch).not.toHaveProperty('value');
+    expect(eq).toHaveBeenCalledWith('id', 'c1');
+  });
+
+  it('clears a bound when the field is blanked, rather than leaving it', async () => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ update });
+
+    await couponsApi.updateBounds('c1', {
+      minOrderAmount: '',
+      maxDiscountAmount: '',
+      usageLimit: '',
+      endsAt: '',
+    });
+    expect(update.mock.calls[0][0]).toEqual({
+      // NOT NULL with 0 meaning "no minimum"; the other three use null.
+      min_order_amount: 0,
+      max_discount_amount: null,
+      usage_limit: null,
+      ends_at: null,
+    });
   });
 });

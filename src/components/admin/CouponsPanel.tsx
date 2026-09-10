@@ -49,6 +49,7 @@ import {
   normaliseCode,
   validateDraft,
   type Coupon,
+  type CouponBounds,
   type CouponDraft,
   type CouponRisk,
   type CouponState,
@@ -129,7 +130,7 @@ function stateTone(s: CouponState): 'success' | 'neutral' | 'warning' {
   return 'warning';
 }
 
-export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: boolean }) {
+export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
   const isRTL = lang === 'ar';
   const pick = (t: { en: string; ar: string }) => (isRTL ? t.ar : t.en);
 
@@ -137,16 +138,41 @@ export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: 
   const [draft, setDraft] = useState<CouponDraft>(EMPTY_DRAFT);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  /**
+   * SUCCESSFUL load, not merely "a load was attempted".
+   *
+   * The two were the same flag, and a failed `list()` therefore left `rows`
+   * empty and rendered the definitive line "No promo code is live" beside the
+   * error. On a screen whose entire purpose is reassurance about discount
+   * exposure, a connectivity blip would have produced exactly the false
+   * all-clear this feature exists to prevent. Review caught it on #358.
+   */
+  const [loadOk, setLoadOk] = useState(false);
+  /**
+   * Codes an ORDER refers to. This — not `usage_count` — decides deletability,
+   * because `guard_used_coupon_identity` keys on `orders.coupon_code`, while
+   * `admin_set_order_status` decrements `usage_count` when an order is
+   * cancelled and the cancelled order keeps its code.
+   */
+  const [referenced, setReferenced] = useState<ReadonlySet<string>>(new Set());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [bounds, setBounds] = useState<CouponBounds>({
+    minOrderAmount: '',
+    maxDiscountAmount: '',
+    usageLimit: '',
+    endsAt: '',
+  });
 
   const refresh = useCallback(async () => {
     try {
-      setRows(await couponsApi.list());
+      const [list, refs] = await Promise.all([couponsApi.list(), couponsApi.listReferencedCodes()]);
+      setRows(list);
+      setReferenced(refs);
       setError(null);
+      setLoadOk(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoaded(true);
+      setLoadOk(false);
     }
   }, []);
 
@@ -241,7 +267,7 @@ export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: 
           is the question this screen exists to answer at a glance. Rendered
           even at zero: an explicit "none live" is the reassurance that was
           missing when two were. */}
-      {loaded ? (
+      {loadOk ? (
         <Notice tone={liveCount > 0 ? 'warning' : 'info'} title={isRTL ? 'الوضع الحالي' : 'Right now'}>
           {liveCount === 0
             ? isRTL
@@ -253,176 +279,185 @@ export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: 
         </Notice>
       ) : null}
 
-      {!readOnly ? (
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div>
-              <label className={LABEL} htmlFor="cp-code">
-                {isRTL ? 'الرمز' : 'Code'}
-              </label>
-              <input
-                id="cp-code"
-                className={INPUT}
-                value={draft.code}
-                /* Upper-cased as the operator types rather than on save: the
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label className={LABEL} htmlFor="cp-code">
+              {isRTL ? 'الرمز' : 'Code'}
+            </label>
+            <input
+              id="cp-code"
+              className={INPUT}
+              value={draft.code}
+              /* Upper-cased as the operator types rather than on save: the
                    column CHECK refuses `code <> upper(code)`, and
                    `validate_coupon` upper-cases the customer's input before
                    matching — so a lowercase code would be both a failed insert
                    and, if it somehow existed, unredeemable by anybody. */
-                onChange={(e) => set('code', normaliseCode(e.target.value))}
-                placeholder="WELCOME10"
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-type">
-                {isRTL ? 'النوع' : 'Type'}
-              </label>
-              <select
-                id="cp-type"
-                className={SELECT}
-                value={draft.type}
-                onChange={(e) => set('type', e.target.value as Coupon['type'])}
-                disabled={busy}
-              >
-                <option value="percentage">{isRTL ? 'نسبة مئوية' : 'Percentage'}</option>
-                <option value="fixed">{isRTL ? 'مبلغ ثابت' : 'Fixed amount'}</option>
-              </select>
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-value">
-                {draft.type === 'percentage'
-                  ? isRTL
-                    ? 'النسبة (١-١٠٠)'
-                    : 'Percent (1-100)'
-                  : isRTL
-                    ? 'المبلغ'
-                    : 'Amount'}
-              </label>
-              <input
-                id="cp-value"
-                className={`${INPUT} font-ds-num`}
-                type="number"
-                step="0.01"
-                min={0}
-                value={draft.value}
-                onChange={(e) => set('value', e.target.value)}
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-limit">
-                {isRTL ? 'حد الاستخدام' : 'Usage limit'}
-              </label>
-              <input
-                id="cp-limit"
-                className={`${INPUT} font-ds-num`}
-                type="number"
-                step="1"
-                min={0}
-                value={draft.usageLimit}
-                onChange={(e) => set('usageLimit', e.target.value)}
-                placeholder={isRTL ? 'بلا حد' : 'unlimited'}
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-min">
-                {isRTL ? 'أقل مبلغ للطلب' : 'Minimum spend'}
-              </label>
-              <input
-                id="cp-min"
-                className={`${INPUT} font-ds-num`}
-                type="number"
-                step="0.01"
-                min={0}
-                value={draft.minOrderAmount}
-                onChange={(e) => set('minOrderAmount', e.target.value)}
-                placeholder={isRTL ? 'لا يوجد' : 'none'}
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-cap">
-                {isRTL ? 'سقف الخصم' : 'Discount cap'}
-              </label>
-              <input
-                id="cp-cap"
-                className={`${INPUT} font-ds-num`}
-                type="number"
-                step="0.01"
-                min={0}
-                value={draft.maxDiscountAmount}
-                onChange={(e) => set('maxDiscountAmount', e.target.value)}
-                placeholder={isRTL ? 'بلا سقف' : 'uncapped'}
-                disabled={busy || draft.type === 'fixed'}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-start">
-                {isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}
-              </label>
-              <input
-                id="cp-start"
-                className={INPUT}
-                type="datetime-local"
-                value={draft.startsAt}
-                onChange={(e) => set('startsAt', e.target.value)}
-                disabled={busy}
-              />
-            </div>
-            <div>
-              <label className={LABEL} htmlFor="cp-end">
-                {isRTL ? 'ينتهي' : 'Expires'}
-              </label>
-              <input
-                id="cp-end"
-                className={INPUT}
-                type="datetime-local"
-                value={draft.endsAt}
-                onChange={(e) => set('endsAt', e.target.value)}
-                disabled={busy}
-              />
-            </div>
+              onChange={(e) => set('code', normaliseCode(e.target.value))}
+              placeholder="WELCOME10"
+              disabled={busy}
+            />
           </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-type">
+              {isRTL ? 'النوع' : 'Type'}
+            </label>
+            <select
+              id="cp-type"
+              className={SELECT}
+              value={draft.type}
+              onChange={(e) => {
+                const type = e.target.value as Coupon['type'];
+                // Cleared, not merely disabled: `validate_coupon` applies
+                // `max_discount_amount` to a FIXED coupon too, so a stale cap
+                // of 10 left behind by a type switch would silently turn a
+                // fixed 50 into a 10. Review, #358.
+                setDraft((d) => ({
+                  ...d,
+                  type,
+                  maxDiscountAmount: type === 'fixed' ? '' : d.maxDiscountAmount,
+                }));
+              }}
+              disabled={busy}
+            >
+              <option value="percentage">{isRTL ? 'نسبة مئوية' : 'Percentage'}</option>
+              <option value="fixed">{isRTL ? 'مبلغ ثابت' : 'Fixed amount'}</option>
+            </select>
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-value">
+              {draft.type === 'percentage'
+                ? isRTL
+                  ? 'النسبة (١-١٠٠)'
+                  : 'Percent (1-100)'
+                : isRTL
+                  ? 'المبلغ'
+                  : 'Amount'}
+            </label>
+            <input
+              id="cp-value"
+              className={`${INPUT} font-ds-num`}
+              type="number"
+              step="0.01"
+              min={0}
+              value={draft.value}
+              onChange={(e) => set('value', e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-limit">
+              {isRTL ? 'حد الاستخدام' : 'Usage limit'}
+            </label>
+            <input
+              id="cp-limit"
+              className={`${INPUT} font-ds-num`}
+              type="number"
+              step="1"
+              min={0}
+              value={draft.usageLimit}
+              onChange={(e) => set('usageLimit', e.target.value)}
+              placeholder={isRTL ? 'بلا حد' : 'unlimited'}
+              disabled={busy}
+            />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-min">
+              {isRTL ? 'أقل مبلغ للطلب' : 'Minimum spend'}
+            </label>
+            <input
+              id="cp-min"
+              className={`${INPUT} font-ds-num`}
+              type="number"
+              step="0.01"
+              min={0}
+              value={draft.minOrderAmount}
+              onChange={(e) => set('minOrderAmount', e.target.value)}
+              placeholder={isRTL ? 'لا يوجد' : 'none'}
+              disabled={busy}
+            />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-cap">
+              {isRTL ? 'سقف الخصم' : 'Discount cap'}
+            </label>
+            <input
+              id="cp-cap"
+              className={`${INPUT} font-ds-num`}
+              type="number"
+              step="0.01"
+              min={0}
+              value={draft.maxDiscountAmount}
+              onChange={(e) => set('maxDiscountAmount', e.target.value)}
+              placeholder={isRTL ? 'بلا سقف' : 'uncapped'}
+              disabled={busy || draft.type === 'fixed'}
+            />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-start">
+              {isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}
+            </label>
+            <input
+              id="cp-start"
+              className={INPUT}
+              type="datetime-local"
+              value={draft.startsAt}
+              onChange={(e) => set('startsAt', e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="cp-end">
+              {isRTL ? 'ينتهي' : 'Expires'}
+            </label>
+            <input
+              id="cp-end"
+              className={INPUT}
+              type="datetime-local"
+              value={draft.endsAt}
+              onChange={(e) => set('endsAt', e.target.value)}
+              disabled={busy}
+            />
+          </div>
+        </div>
 
-          {problems.length > 0 && draftStarted ? (
-            <Notice tone="blocking" title={isRTL ? 'راجع الحقول' : 'Check the fields'}>
-              <ul className="list-disc ps-4 space-y-0.5">
-                {problems.map((p) => (
-                  <li key={p}>{pick(PROBLEM_TEXT[p])}</li>
-                ))}
-              </ul>
-            </Notice>
-          ) : null}
+        {problems.length > 0 && draftStarted ? (
+          <Notice tone="blocking" title={isRTL ? 'راجع الحقول' : 'Check the fields'}>
+            <ul className="list-disc ps-4 space-y-0.5">
+              {problems.map((p) => (
+                <li key={p}>{pick(PROBLEM_TEXT[p])}</li>
+              ))}
+            </ul>
+          </Notice>
+        ) : null}
 
-          {/* THE DRAFT, PRICED. The moment the decision is actually made is
+        {/* THE DRAFT, PRICED. The moment the decision is actually made is
               before Create, not after — so the ways this code would be
               open-ended are stated here, in the same words the row will use. */}
-          {draftRisks.length > 0 ? (
-            <Notice tone="warning" title={isRTL ? 'هذا الرمز غير محدود' : 'This code is unbounded'}>
-              <ul className="list-disc ps-4 space-y-0.5">
-                {draftRisks.map((r) => (
-                  <li key={r}>{pick(RISK_TEXT[r])}</li>
-                ))}
-              </ul>
-              <p className="mt-1">
-                {isRTL
-                  ? 'يمكن إنشاؤه هكذا، لكن هذا هو الشكل الذي أدّى إلى وجود رمزين مفتوحين في الإنتاج دون أن يلاحظهما أحد.'
-                  : 'You can still create it — but this is the exact shape that left two open-ended codes live in Production unnoticed.'}
-              </p>
-            </Notice>
-          ) : null}
+        {draftRisks.length > 0 ? (
+          <Notice tone="warning" title={isRTL ? 'هذا الرمز غير محدود' : 'This code is unbounded'}>
+            <ul className="list-disc ps-4 space-y-0.5">
+              {draftRisks.map((r) => (
+                <li key={r}>{pick(RISK_TEXT[r])}</li>
+              ))}
+            </ul>
+            <p className="mt-1">
+              {isRTL
+                ? 'يمكن إنشاؤه هكذا، لكن هذا هو الشكل الذي أدّى إلى وجود رمزين مفتوحين في الإنتاج دون أن يلاحظهما أحد.'
+                : 'You can still create it — but this is the exact shape that left two open-ended codes live in Production unnoticed.'}
+            </p>
+          </Notice>
+        ) : null}
 
-          <Button
-            onClick={() => void create()}
-            disabled={busy || problems.length > 0}
-            label={isRTL ? 'إنشاء رمز' : 'Create code'}
-          />
-        </div>
-      ) : null}
+        <Button
+          onClick={() => void create()}
+          disabled={busy || problems.length > 0}
+          label={isRTL ? 'إنشاء رمز' : 'Create code'}
+        />
+      </div>
 
-      {loaded && rows.length === 0 ? (
+      {loadOk && rows.length === 0 ? (
         <Text variant="caption" tone="tertiary" as="p">
           {isRTL ? 'لا توجد رموز خصم.' : 'No promo codes exist.'}
         </Text>
@@ -435,8 +470,15 @@ export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: 
               {rows.map((c) => {
                 const state = couponState(c, now);
                 const risks = couponRisks(c);
-                const used = c.usage_count > 0;
-                return (
+                // NOT `usage_count > 0`. `guard_used_coupon_identity` keys on
+                // `orders.coupon_code`, and a cancelled order keeps its code
+                // while `admin_set_order_status` decrements the count — so a
+                // coupon can read 0 uses and still be undeletable. Offering
+                // Delete there produced a "never redeemed" confirmation
+                // followed by a 23503. Review, #358.
+                const orderRefers = referenced.has(c.code.trim().toUpperCase());
+                const undeletable = c.usage_count > 0 || orderRefers;
+                const row = (
                   <tr key={c.id} className="border-t border-con-line">
                     <td className={TD}>
                       <Text variant="body" as="span" className="font-ds-num">
@@ -486,48 +528,159 @@ export function CouponsPanel({ lang, readOnly }: { lang: 'en' | 'ar'; readOnly: 
                       <StatusPill label={pick(STATE_TEXT[state])} tone={stateTone(state)} />
                     </td>
                     <td className={TD}>
-                      {!readOnly ? (
-                        <div className="flex gap-1.5">
-                          <Button
-                            variant="ghost"
-                            disabled={busy}
-                            label={c.is_active ? (isRTL ? 'إيقاف' : 'Stop') : isRTL ? 'تفعيل' : 'Start'}
-                            onClick={() => void act(() => couponsApi.setActive(c.id, !c.is_active))}
-                          />
-                          {/* Absent, not merely disabled, once a code has been
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          label={c.is_active ? (isRTL ? 'إيقاف' : 'Stop') : isRTL ? 'تفعيل' : 'Start'}
+                          onClick={() => void act(() => couponsApi.setActive(c.id, !c.is_active))}
+                        />
+                        {/* Absent, not merely disabled, once a code has been
                               redeemed: orders record `coupon_code` as text with
                               no foreign key, so deleting a used code leaves a
                               discounted order whose discount cannot be
                               explained. `couponsApi.remove` refuses it too, so
                               the rule survives a future caller. */}
-                          {!used ? (
-                            <Button
-                              variant="ghost"
-                              disabled={busy}
-                              label={isRTL ? 'حذف' : 'Delete'}
-                              leading={<Trash2 className="size-3.5 text-danger-ds" aria-hidden="true" />}
-                              onClick={() => {
-                                if (
-                                  confirm(
-                                    isRTL
-                                      ? `حذف الرمز ${c.code}؟ لم يُستخدم بعد.`
-                                      : `Delete ${c.code}? It has never been redeemed.`,
-                                  )
-                                ) {
-                                  void act(() => couponsApi.remove(c));
-                                }
-                              }}
-                            />
-                          ) : (
-                            <Text variant="caption" tone="tertiary" as="span">
-                              {isRTL ? 'مستخدَم' : 'Redeemed'}
-                            </Text>
-                          )}
-                        </div>
-                      ) : null}
+                        {/* Re-bounding an EXISTING code is the action the
+                              screen was built for and did not have: a redeemed
+                              unbounded code cannot be deleted, so without this
+                              the operator was still left with the database
+                              write this panel is meant to replace. Review, #358. */}
+                        <Button
+                          variant="ghost"
+                          disabled={busy}
+                          label={
+                            editing === c.id ? (isRTL ? 'إلغاء' : 'Cancel') : isRTL ? 'الحدود' : 'Bounds'
+                          }
+                          onClick={() => {
+                            if (editing === c.id) {
+                              setEditing(null);
+                              return;
+                            }
+                            setEditing(c.id);
+                            setBounds({
+                              minOrderAmount: c.min_order_amount ? String(c.min_order_amount) : '',
+                              maxDiscountAmount:
+                                c.max_discount_amount === null ? '' : String(c.max_discount_amount),
+                              usageLimit: c.usage_limit === null ? '' : String(c.usage_limit),
+                              endsAt: c.ends_at ? c.ends_at.slice(0, 16) : '',
+                            });
+                          }}
+                        />
+                        {!undeletable ? (
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            label={isRTL ? 'حذف' : 'Delete'}
+                            leading={<Trash2 className="size-3.5 text-danger-ds" aria-hidden="true" />}
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  isRTL
+                                    ? `حذف الرمز ${c.code}؟ لا يشير إليه أي طلب.`
+                                    : `Delete ${c.code}? No order refers to it.`,
+                                )
+                              ) {
+                                void act(() => couponsApi.remove(c, referenced));
+                              }
+                            }}
+                          />
+                        ) : (
+                          <Text variant="caption" tone="tertiary" as="span">
+                            {isRTL ? 'مرتبط بطلب' : 'On an order'}
+                          </Text>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
+                const editorRow =
+                  editing === c.id ? (
+                    <tr key={`${c.id}-bounds`} className="border-t border-con-line bg-con-surface-2">
+                      <td className={TD} colSpan={7}>
+                        <div className="space-y-2">
+                          <Text variant="caption" tone="secondary" as="p">
+                            {isRTL
+                              ? `حدود ${c.code}. لا يمكن تغيير الرمز ولا قيمته — أوقفه وأنشئ غيره إذا لزم.`
+                              : `Bounds for ${c.code}. The code and its value cannot be changed — stop it and make a new one instead.`}
+                          </Text>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div>
+                              <label className={LABEL} htmlFor={`cb-end-${c.id}`}>
+                                {isRTL ? 'ينتهي' : 'Expires'}
+                              </label>
+                              <input
+                                id={`cb-end-${c.id}`}
+                                className={INPUT}
+                                type="datetime-local"
+                                value={bounds.endsAt}
+                                onChange={(e) => setBounds((b) => ({ ...b, endsAt: e.target.value }))}
+                                disabled={busy}
+                              />
+                            </div>
+                            <div>
+                              <label className={LABEL} htmlFor={`cb-limit-${c.id}`}>
+                                {isRTL ? 'حد الاستخدام' : 'Usage limit'}
+                              </label>
+                              <input
+                                id={`cb-limit-${c.id}`}
+                                className={`${INPUT} font-ds-num`}
+                                type="number"
+                                step="1"
+                                min={0}
+                                value={bounds.usageLimit}
+                                onChange={(e) => setBounds((b) => ({ ...b, usageLimit: e.target.value }))}
+                                disabled={busy}
+                              />
+                            </div>
+                            <div>
+                              <label className={LABEL} htmlFor={`cb-min-${c.id}`}>
+                                {isRTL ? 'أقل مبلغ للطلب' : 'Minimum spend'}
+                              </label>
+                              <input
+                                id={`cb-min-${c.id}`}
+                                className={`${INPUT} font-ds-num`}
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={bounds.minOrderAmount}
+                                onChange={(e) => setBounds((b) => ({ ...b, minOrderAmount: e.target.value }))}
+                                disabled={busy}
+                              />
+                            </div>
+                            <div>
+                              <label className={LABEL} htmlFor={`cb-cap-${c.id}`}>
+                                {isRTL ? 'سقف الخصم' : 'Discount cap'}
+                              </label>
+                              <input
+                                id={`cb-cap-${c.id}`}
+                                className={`${INPUT} font-ds-num`}
+                                type="number"
+                                step="0.01"
+                                min={0}
+                                value={bounds.maxDiscountAmount}
+                                onChange={(e) =>
+                                  setBounds((b) => ({ ...b, maxDiscountAmount: e.target.value }))
+                                }
+                                disabled={busy}
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            disabled={busy}
+                            label={isRTL ? 'حفظ الحدود' : 'Save bounds'}
+                            onClick={() =>
+                              void act(async () => {
+                                await couponsApi.updateBounds(c.id, bounds);
+                                setEditing(null);
+                              })
+                            }
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null;
+                return editorRow ? [row, editorRow] : row;
               })}
             </tbody>
           </table>

@@ -257,7 +257,7 @@ export const AdminDashboard: React.FC = () => {
         <AdminSidebar
           active={activeTab}
           onSelect={setActiveTab}
-          visibility={{ health: healthVisible, alerts: alertsVisible, integrity: watchdogVisible }}
+          visibility={{ health: healthVisible, alerts: alertsVisible, integrity: watchdogVisible, coupons: !isAccountant }}
           lang={adminLang}
           liveOrderCount={activeOrdersCount}
           healthAlert={healthAlert}
@@ -293,12 +293,16 @@ export const AdminDashboard: React.FC = () => {
           {activeTab === 'comps' && <CompMembersPanel lang={adminLang} />}
 
           {/* TAB: PROMO CODES — what a customer can take off a bill.
-              Ungated for the same reason as comps: `coupons_admin_all` is an
-              ALL policy gated on is_admin() (role AND AAL2), so the table
-              refuses a non-admin itself and a probe would only hide why.
-              Read-only for an accountant: they need to see what a discount
-              costs without being able to create one. */}
-          {activeTab === 'coupons' && <CouponsPanel lang={adminLang} readOnly={isAccountant} />}
+              ADMIN ONLY, and not for tidiness. `coupons_admin_all` is the
+              table's only policy and is gated on is_admin(), which accepts the
+              `admin` role alone. An accountant would get an empty result from
+              RLS and read "No promo code is live" — the exact false all-clear
+              this screen exists to prevent. Showing it to them truthfully
+              needs a staff SELECT policy, which is a migration; until then the
+              honest answer is not to show it. Review, #358. */}
+          {activeTab === 'coupons' && !isAccountant && (
+            <CouponsPanel lang={adminLang} />
+          )}
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}

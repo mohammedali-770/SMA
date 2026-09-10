@@ -57,6 +57,14 @@ export interface Coupon {
   created_at: string;
 }
 
+/** The four columns an existing code may be re-bounded by. */
+export interface CouponBounds {
+  minOrderAmount: string;
+  maxDiscountAmount: string;
+  usageLimit: string;
+  endsAt: string;
+}
+
 export interface CouponDraft {
   code: string;
   type: CouponType;
@@ -235,7 +243,12 @@ export const couponsApi = {
       // "no minimum" means there. Blank ceilings ARE null — that column uses
       // null for "no bound", and 0 would mean "always discount nothing".
       min_order_amount: optionalNumber(draft.minOrderAmount) ?? 0,
-      max_discount_amount: optionalNumber(draft.maxDiscountAmount),
+      // Never for a FIXED code, even if the field holds a stale value from a
+      // type switch: `validate_coupon` applies `max_discount_amount` to both
+      // types, so a fixed 50 carrying a leftover cap of 10 would silently
+      // become a 10. The panel also clears the field on the type change; this
+      // is the half that cannot be bypassed by a caller. Review, #358.
+      max_discount_amount: draft.type === 'fixed' ? null : optionalNumber(draft.maxDiscountAmount),
       usage_limit: optionalNumber(draft.usageLimit),
       starts_at: toIso(draft.startsAt),
       ends_at: toIso(draft.endsAt),
@@ -257,19 +270,75 @@ export const couponsApi = {
   },
 
   /**
-   * Deleting is refused once a code has been redeemed, and the reason is in the
-   * schema rather than in taste: `orders.coupon_code` stores the code as TEXT
-   * with no foreign key (`coupons` has zero inbound FKs). So deleting a used
-   * code does not break an order — it silently destroys the only record of what
-   * that code was, leaving a discounted order whose discount cannot be
-   * explained. Deactivation keeps both.
+   * The codes that any order references, upper-cased.
    *
-   * Thrown here rather than shown as a disabled button alone, so the rule holds
-   * even if a future caller forgets the button.
+   * This is what decides whether a coupon may be deleted, and `usage_count` is
+   * NOT — a distinction the first version of this module got wrong. The
+   * authority is the `guard_used_coupon_identity` trigger, which raises 23503
+   * on DELETE when `orders.coupon_code` matches, and `usage_count` is a
+   * different number: `admin_set_order_status` decrements it when an order is
+   * cancelled, while the cancelled order keeps its `coupon_code`. So a coupon
+   * can read `usage_count = 0` and still be undeletable.
+   *
+   * Mirrored client-side only so the panel does not offer an action the
+   * database will refuse; the trigger remains the guard.
    */
-  async remove(coupon: Pick<Coupon, 'id' | 'usage_count'>): Promise<void> {
-    if (coupon.usage_count > 0) {
-      throw new Error('A code that has been redeemed cannot be deleted — switch it off instead.');
+  async listReferencedCodes(): Promise<Set<string>> {
+    const rows = unwrap<{ coupon_code: string | null }[]>(
+      await supabase.from('orders').select('coupon_code').not('coupon_code', 'is', null),
+    );
+    return new Set(rows.map((r) => (r.coupon_code ?? '').trim().toUpperCase()).filter(Boolean));
+  },
+
+  /**
+   * Change what an existing code is bounded BY, without changing what it IS.
+   *
+   * Only the four bound columns are editable, and the omissions are deliberate:
+   *
+   *   `code`  — `guard_used_coupon_identity` raises 23503 on any change to the
+   *             code of a referenced coupon, and silently renaming a code
+   *             customers already hold is not a thing to offer regardless.
+   *   `type` and `value` — changing what a live code is WORTH mid-flight is a
+   *             different decision from bounding it, and one that would
+   *             retroactively confuse every order already discounted by it.
+   *             Stop the code and make a new one.
+   *
+   * This exists because without it the screen cannot do the thing it was built
+   * for. An unbounded code that has been redeemed cannot be deleted (the
+   * trigger refuses) and could not be bounded (nothing wrote these columns), so
+   * the operator was still left with the direct database write the panel is
+   * supposed to replace. Review caught that on #358.
+   */
+  async updateBounds(id: string, bounds: CouponBounds): Promise<void> {
+    const patch = {
+      min_order_amount: optionalNumber(bounds.minOrderAmount) ?? 0,
+      max_discount_amount: optionalNumber(bounds.maxDiscountAmount),
+      usage_limit: optionalNumber(bounds.usageLimit),
+      ends_at: toIso(bounds.endsAt),
+    };
+    const { error } = await supabase.from('coupons').update(patch).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+
+  /**
+   * Deleting is refused for any code an ORDER references, which is not the same
+   * as "has been redeemed" — see `listReferencedCodes`. The reason is in the
+   * schema rather than in taste: `orders.coupon_code` stores the code as TEXT
+   * with no foreign key (`coupons` has zero inbound FKs), so deleting it does
+   * not break the order — it silently destroys the only record of what that
+   * code was, leaving a discounted order whose discount cannot be explained.
+   * Deactivation keeps both.
+   *
+   * Thrown here rather than shown as a hidden button alone, so the rule holds
+   * even if a future caller forgets the button. The database still has the
+   * final say via `guard_used_coupon_identity`.
+   */
+  async remove(
+    coupon: Pick<Coupon, 'id' | 'code' | 'usage_count'>,
+    referenced: ReadonlySet<string>,
+  ): Promise<void> {
+    if (coupon.usage_count > 0 || referenced.has(coupon.code.trim().toUpperCase())) {
+      throw new Error('A code an order refers to cannot be deleted — switch it off instead.');
     }
     const { error } = await supabase.from('coupons').delete().eq('id', coupon.id);
     if (error) throw new Error(error.message);

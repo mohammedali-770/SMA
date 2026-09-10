@@ -37,10 +37,12 @@ export interface AdminNavItem {
   en: string;
   ar: string;
   /**
-   * Tabs whose visibility depends on a runtime capability probe. The shell
-   * supplies the answer; an item without this is always shown.
+   * Tabs whose visibility is decided by the shell rather than here. Three are
+   * runtime capability probes; `coupons` is a ROLE question, and it uses the
+   * same mechanism because the rule is identical — the shell knows, this module
+   * only describes what a tab IS. An item without this is always shown.
    */
-  gated?: 'health' | 'alerts' | 'integrity';
+  gated?: 'health' | 'alerts' | 'integrity' | 'coupons';
 }
 
 /** Order is the displayed order. Labels are inline because they are nav-only. */
@@ -59,7 +61,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   // "what can a customer take off a bill right now" — is a financial one, and
   // because it was the absence of any screen at all that let two open-ended
   // codes sit live (GO_LIVE_READINESS G8).
-  { tab: 'coupons', icon: Ticket, en: 'Promo Codes', ar: 'رموز الخصم' },
+  { tab: 'coupons', icon: Ticket, en: 'Promo Codes', ar: 'رموز الخصم', gated: 'coupons' },
   { tab: 'integrations', icon: Plug, en: 'Integrations', ar: 'الربط والتكاملات' },
   { tab: 'health', icon: HeartPulse, en: 'Operations Health', ar: 'صحة العمليات', gated: 'health' },
   { tab: 'alerts', icon: BellRing, en: 'Operations Alerts', ar: 'التنبيهات والملخص', gated: 'alerts' },
@@ -73,6 +75,16 @@ export interface GatedVisibility {
   health: boolean;
   alerts: boolean;
   integrity: boolean;
+  /**
+   * Admin only, and not for tidiness. `coupons_admin_all` is the table's ONLY
+   * policy and it is gated on `is_admin()`, which accepts the `admin` role
+   * alone — not `accountant`. An accountant opening this tab would get an
+   * empty result from RLS and read the panel's "No promo code is live", which
+   * is the precise false all-clear the screen exists to prevent. Hidden rather
+   * than shown read-only, because showing it truthfully would need a staff
+   * SELECT policy, and that is a migration. Review caught it on #358.
+   */
+  coupons: boolean;
 }
 
 /** The nav items to render, in order. */

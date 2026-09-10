@@ -18,8 +18,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminSidebar } from './AdminSidebar';
 import type { AdminTab, GatedVisibility } from './adminNav';
 
-const ALL: GatedVisibility = { health: true, alerts: true, integrity: true };
-const NONE: GatedVisibility = { health: false, alerts: false, integrity: false };
+const ALL: GatedVisibility = { health: true, alerts: true, integrity: true, coupons: true };
+const NONE: GatedVisibility = { health: false, alerts: false, integrity: false, coupons: false };
 
 function setup(over: {
   active?: AdminTab;

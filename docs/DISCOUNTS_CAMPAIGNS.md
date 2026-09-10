@@ -41,11 +41,23 @@ would have rendered those two codes perfectly and told the operator nothing:
   "expires" column reads as missing data; a badge reads as a decision.
 - **The draft is priced before it is saved**, in the same words the row will
   use, because that is when the decision is actually made.
-- **Stopping is the primary action, and deleting a redeemed code is not
-  offered.** `orders.coupon_code` is TEXT with no foreign key (`coupons` has
-  zero inbound FKs), so deleting a used code destroys the only record of what it
-  was and leaves a discounted order nobody can explain. `couponsApi.remove`
-  refuses it as well, so the rule survives a caller that forgets the button.
+- **An existing code can be RE-BOUNDED**, which is the action the screen exists
+  for. Expiry, usage limit, minimum spend and discount cap are editable on any
+  row; `code`, `type` and `value` are not — `guard_used_coupon_identity` raises
+  23503 on a code change for a referenced coupon, and re-pricing a live code is
+  a different decision from bounding it. Without this the screen could not fix
+  the very situation it was built for: a redeemed unbounded code can never be
+  deleted, so it could only have been stopped, and the operator would still have
+  needed the database write. Review caught that on #358.
+- **Stopping is the primary action, and Delete is withheld for any code an ORDER
+  REFERS TO — which is not the same as "has been redeemed".**
+  `guard_used_coupon_identity` keys on `orders.coupon_code`, while
+  `admin_set_order_status` decrements `usage_count` when an order is cancelled
+  and the cancelled order keeps its code. So a coupon can read zero uses and
+  still be undeletable, and keying the button on the counter produced a "never
+  redeemed" confirmation followed by a database error. The panel now reads the
+  referenced codes; `couponsApi.remove` mirrors the same rule, and the trigger
+  remains the authority.
 - **A percentage is held to 0-100 in the client, and nowhere else.**
   `coupons_value_check` is only `value >= 0`, so a 500% row is legal;
   `validate_coupon` clamps the discount to the subtotal, so it would not go
@@ -54,11 +66,22 @@ would have rendered those two codes perfectly and told the operator nothing:
   is `validateDraft` and nothing else. **If that needs to be real, it belongs in
   a migration.**
 
+- **A failed load never produces a false all-clear.** The standing line reads
+  "No promo code is live" only after a load that SUCCEEDED. It once printed that
+  beside a connectivity error, which on a screen whose purpose is reassurance
+  about discount exposure is the exact failure it exists to prevent.
+
 Writes are ordinary RLS-gated table operations rather than an RPC:
 `coupons_admin_all` is an `ALL` policy for `authenticated` with `is_admin()` on
-both `USING` and `WITH CHECK`, so role AND AAL2 already gate every one. An
-accountant sees the screen read-only — the exposure without the ability to
-create it.
+both `USING` and `WITH CHECK`, so role AND AAL2 already gate every one.
+
+**The tab is ADMIN-ONLY, and that is a consequence of the same policy rather
+than a preference.** `is_admin()` accepts the `admin` role alone — not
+`accountant` — and `coupons_admin_all` is the table's only policy, so an
+accountant opening this screen would receive an empty result from RLS and read
+"No promo code is live" even with codes live. Showing it to them truthfully
+would need a staff SELECT policy, which is a migration; until somebody wants
+that, the honest answer is to hide the tab (`GatedVisibility.coupons`).
 
 Record: `docs/OWNER_ACTIONS.md` §36; launch impact:
 `docs/GO_LIVE_READINESS.md` **G8**.
@@ -92,7 +115,7 @@ The 2026-09-02 dead-code audit established a fact this document did not state:
   plus a `compute_campaign_discount` preview), `selectLiveCampaigns`,
   `formatCampaignSummary`. Its **only importer in the whole repository is its own
   test file.**
-- There is **no Campaigns tab**. `ADMIN_NAV` has 13 entries and all 13 are routed;
+- There is **no Campaigns tab**. `ADMIN_NAV` has 14 entries and all 14 are routed;
   none of them is campaigns. The two `campaign` matches in `SettingsPanel.tsx` are
   the *loyalty* toggle ("Active Rewards Campaign"), a different feature.
 - `grep -il campaign apps/mobile/src` returns **nothing** — the customer app has

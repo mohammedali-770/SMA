@@ -16,7 +16,9 @@ import type { Coupon } from '../../lib/couponsApi';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
+  listReferencedCodes: vi.fn(),
   create: vi.fn(),
+  updateBounds: vi.fn(),
   setActive: vi.fn(),
   remove: vi.fn(),
 }));
@@ -48,14 +50,16 @@ const coupon = (over: Partial<Coupon> = {}): Coupon => ({
 beforeEach(() => {
   vi.clearAllMocks();
   api.list.mockResolvedValue([]);
+  api.listReferencedCodes.mockResolvedValue(new Set<string>());
   api.create.mockResolvedValue(undefined);
+  api.updateBounds.mockResolvedValue(undefined);
   api.setActive.mockResolvedValue(undefined);
   api.remove.mockResolvedValue(undefined);
 });
 
 afterEach(cleanup);
 
-const renderPanel = (readOnly = false) => render(<CouponsPanel lang="en" readOnly={readOnly} />);
+const renderPanel = () => render(<CouponsPanel lang="en" />);
 
 describe('the standing answer to "what can be redeemed right now"', () => {
   it('says plainly when nothing is live', async () => {
@@ -142,6 +146,17 @@ describe('the guards that the database does not provide', () => {
     expect(input.value).toBe('WELCOME10');
   });
 
+  it('clears a stale percentage cap when the type switches to fixed', async () => {
+    // validate_coupon applies max_discount_amount to a fixed coupon too, so a
+    // leftover cap of 10 would silently turn a fixed 50 into a 10.
+    renderPanel();
+    await screen.findByText(/No promo code is live/i);
+    fireEvent.change(screen.getByLabelText('Code'), { target: { value: 'FIXED50' } });
+    fireEvent.change(screen.getByLabelText('Discount cap'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Type'), { target: { value: 'fixed' } });
+    expect((screen.getByLabelText('Discount cap') as HTMLInputElement).value).toBe('');
+  });
+
   it('creates a valid bounded code', async () => {
     renderPanel();
     await screen.findByText(/No promo code is live/i);
@@ -157,22 +172,33 @@ describe('the guards that the database does not provide', () => {
   });
 });
 
-describe('stopping is primary; deleting a redeemed code is not offered', () => {
-  it('offers Delete for a code nothing has ever used', async () => {
+describe('stopping is primary; deleting a referenced code is not offered', () => {
+  it('offers Delete only when no order refers to the code', async () => {
     api.list.mockResolvedValue([coupon({ usage_count: 0 })]);
     renderPanel();
     await screen.findByText('WELCOME10');
     expect(screen.getByRole('button', { name: /Delete/i })).toBeTruthy();
   });
 
-  it('withholds Delete once a code has been redeemed, and says why in a word', async () => {
-    // orders.coupon_code is text with no foreign key, so deleting a used code
-    // leaves a discounted order whose discount cannot be explained.
+  it('withholds Delete when an ORDER refers to it, even at zero uses', async () => {
+    // The case the first version got wrong. `guard_used_coupon_identity` keys
+    // on orders.coupon_code, and a cancelled order keeps its code while
+    // admin_set_order_status decrements usage_count — so 0 uses did not mean
+    // deletable, and Delete produced a "never redeemed" confirmation followed
+    // by a 23503.
+    api.list.mockResolvedValue([coupon({ usage_count: 0 })]);
+    api.listReferencedCodes.mockResolvedValue(new Set(['WELCOME10']));
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    expect(screen.queryByRole('button', { name: /Delete/i })).toBeNull();
+    expect(screen.getByText('On an order')).toBeTruthy();
+  });
+
+  it('withholds Delete on a positive usage count too', async () => {
     api.list.mockResolvedValue([coupon({ usage_count: 3, usage_limit: 10 })]);
     renderPanel();
     await screen.findByText('WELCOME10');
     expect(screen.queryByRole('button', { name: /Delete/i })).toBeNull();
-    expect(screen.getByText('Redeemed')).toBeTruthy();
   });
 
   it('stopping a live code calls setActive(false)', async () => {
@@ -192,23 +218,70 @@ describe('stopping is primary; deleting a redeemed code is not offered', () => {
   });
 });
 
-describe('an accountant can read what a discount costs but not create one', () => {
-  it('hides the form and the row actions', async () => {
-    api.list.mockResolvedValue([coupon()]);
-    renderPanel(true);
-    await screen.findByText('WELCOME10');
-    expect(screen.queryByLabelText('Code')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Create code/i })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Stop$/i })).toBeNull();
-    // But the risk badges still render — seeing the exposure is the read half.
-    expect(screen.getAllByText('Never expires').length).toBeGreaterThan(0);
+describe('the accountant case is handled by NOT mounting this panel', () => {
+  it('is asserted where the decision lives — the nav gate, not a prop here', () => {
+    // The panel used to take `readOnly` so an accountant could see the screen
+    // without editing it. That was impossible: `coupons_admin_all` is gated on
+    // is_admin(), which excludes `accountant`, so RLS would hand them an empty
+    // list and this panel would report "No promo code is live" — the exact
+    // false all-clear it exists to prevent. The tab is now hidden for them
+    // instead (`GatedVisibility.coupons`, pinned in adminNav.test.ts), and the
+    // dead prop was removed rather than left with a story attached.
+    expect(CouponsPanel.length).toBe(1);
   });
 });
 
-describe('a failed load is reported rather than shown as an empty list', () => {
+describe('an existing code can be re-bounded — the thing the screen is for', () => {
+  it('writes only the bounds, never the code or its value', async () => {
+    // Without this an unbounded code that had been redeemed could be neither
+    // deleted (the trigger refuses) nor bounded, so the operator was still
+    // left with the database write this panel replaces.
+    api.list.mockResolvedValue([coupon({ usage_count: 4 })]);
+    renderPanel();
+    await screen.findByText('WELCOME10');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Bounds$/i }));
+    // Scoped by the editor's own input ids: the create form above carries the
+    // same visible labels, so a bare getByLabelText matches both and would
+    // silently drive the wrong form.
+    fireEvent.change(await screen.findByLabelText('Expires', { selector: '#cb-end-c1' }), {
+      target: { value: '2026-12-31T00:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Usage limit', { selector: '#cb-limit-c1' }), {
+      target: { value: '25' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save bounds/i }));
+
+    await waitFor(() => expect(api.updateBounds).toHaveBeenCalledTimes(1));
+    expect(api.updateBounds.mock.calls[0][0]).toBe('c1');
+    expect(api.updateBounds.mock.calls[0][1]).toMatchObject({ usageLimit: '25' });
+  });
+});
+
+describe('a failed load never produces a false all-clear', () => {
   it('surfaces the error', async () => {
     api.list.mockRejectedValue(new Error('permission denied for table coupons'));
     renderPanel();
     expect(await screen.findByText(/permission denied for table coupons/i)).toBeTruthy();
+  });
+
+  it('does NOT claim that no code is live when the load failed', async () => {
+    // The whole point of this screen is reassurance about discount exposure. A
+    // connectivity blip printing "No promo code is live" beside an error is the
+    // exact false all-clear it exists to prevent.
+    api.list.mockRejectedValue(new Error('network'));
+    renderPanel();
+    await screen.findByText(/network/i);
+    expect(screen.queryByText(/No promo code is live/i)).toBeNull();
+  });
+
+  it('a failing reference lookup also suppresses the count', async () => {
+    // Deletability depends on it, so a partial load must not be presented as a
+    // complete picture either.
+    api.list.mockResolvedValue([coupon()]);
+    api.listReferencedCodes.mockRejectedValue(new Error('network'));
+    renderPanel();
+    await screen.findByText(/network/i);
+    expect(screen.queryByText(/can be redeemed right now/i)).toBeNull();
   });
 });
