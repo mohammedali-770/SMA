@@ -2472,13 +2472,23 @@ I can write the migration for whichever you pick, and can build the admin screen
 Update `docs/GO_LIVE_READINESS.md` G8 and `docs/DISCOUNTS_CAMPAIGNS.md`, and say
 which of the three options was chosen and why.
 
-## 37. Two Production hygiene items from the same pass
+## 37. One Production hygiene item from the same pass (the other was withdrawn)
 
-**`latency-probe` is an ACTIVE Edge Function with no source in the repository.**
-Version 2, `verify_jwt: true`, last updated 2026-08-30. It is outside change
-control, outside the Deno typecheck gate and outside review. Either restore its
-source or delete the deployment — both are §5 actions. (An earlier session
-verified it unreferenced and safe to delete; the deletion was never performed.)
+**~~`latency-probe` has no source in the repository.~~ WITHDRAWN — see §23,
+which already answered this and is the reason this paragraph is kept rather than
+deleted.** §23 is a **closed owner decision to KEEP** the slug, taken 2026-09-03
+on live evidence: the deployed body returns **HTTP 410 with a fixed JSON string
+— no database call, no secret, no outbound request** — and it has **0
+invocations**. Re-verified today: **0 cron jobs and 0 database functions**
+reference it.
+
+**The mistake is recorded because §23 predicted it in as many words:** *"What
+must not happen is that it is treated as an unexplained orphan and investigated
+from scratch."* That is precisely what happened — a re-verification pass found
+the slug, confirmed the facts, and inferred an outstanding action that had been
+closed a week earlier. The facts were verified; the **interpretation** was not,
+and the answer was in the same file being edited. **Before recording a finding
+against a live artifact, search the decision register for its name.**
 
 **The live admin console offers Moyasar as a selectable payment provider**, with
 a full credential form — the deployed `AdminDashboard` chunk ships
