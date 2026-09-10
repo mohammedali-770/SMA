@@ -8,13 +8,13 @@ const order = (o: Partial<Order>): Order => o as Order;
 describe('buildCouponUsage', () => {
   it('groups by the REAL coupon code and sums the real coupon discount', () => {
     const rows = buildCouponUsage([
-      order({ couponCode: 'SPICY15', discountAmount: 8.1 }),
-      order({ couponCode: 'SPICY15', discountAmount: 5.4 }),
-      order({ couponCode: 'RIYADH10', discountAmount: 10 }),
+      order({ couponCode: 'SEEDPCT15', discountAmount: 8.1 }),
+      order({ couponCode: 'SEEDPCT15', discountAmount: 5.4 }),
+      order({ couponCode: 'SEEDFIX10', discountAmount: 10 }),
     ]);
     expect(rows).toEqual([
-      { code: 'SPICY15', count: 2, savings: 13.5 },
-      { code: 'RIYADH10', count: 1, savings: 10 },
+      { code: 'SEEDPCT15', count: 2, savings: 13.5 },
+      { code: 'SEEDFIX10', count: 1, savings: 10 },
     ]);
   });
 

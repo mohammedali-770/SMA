@@ -83,6 +83,31 @@ accountant opening this screen would receive an empty result from RLS and read
 would need a staff SELECT policy, which is a migration; until somebody wants
 that, the honest answer is to hide the tab (`GatedVisibility.coupons`).
 
+### Where the two live codes came from, and a correction
+
+**`supabase/seed.sql` carried them.** It seeded two coupons whose names and
+values match the Production rows exactly — a percentage 15 and a fixed 10 —
+`is_active = true`, `min_order_amount = 0`, and no expiry, usage limit or cap.
+The live rows were created 2026-07-08, the day the project was created. The rule
+against seeding Production already existed (`supabase/README.md`), so nothing
+here was a defect on its own; but a fixture that reads like real marketing is one
+copy-paste away from becoming real marketing.
+
+**Renamed 2026-09-10** to `SEEDPCT15` and `SEEDFIX10` across all six files that
+carried them — `seed.sql`, two Vitest suites and three SQL suites. The names now
+say what they are at a glance. They stay active and unbounded on purpose: the
+SQL suites place real orders against them, and a local console should render the
+"Never expires / Unlimited uses / Uncapped %" badges the promo-codes screen
+exists for. Verified by the full chain — 128 migrations, 68 of 70 suites, zero
+new failures — which is what proves the seed and the suites still agree.
+
+**A correction worth leaving visible.** When the deactivation was recorded, and
+again in the merge message for the admin screen, this repository was described as
+deliberately not carrying the live codes. That was true of the files written
+then and false of the repository: the codes were in six pre-existing files the
+whole time, and one `git grep` would have said so. A claim about a whole tree
+needs a search of the whole tree.
+
 Record: `docs/OWNER_ACTIONS.md` §36; launch impact:
 `docs/GO_LIVE_READINESS.md` **G8**.
 

@@ -45,8 +45,21 @@ insert into public.product_modifier_groups (product_id, group_id) values
   ('a0000000-0000-0000-0000-000000000002','90000000-0000-0000-0000-000000000001')
 on conflict (product_id, group_id) do nothing;
 
--- ---- coupons (mirror the app's current demo codes) ------------------------
+-- ---- coupons -------------------------------------------------------------
+-- FIXTURES. The names say so on purpose: this file previously seeded two codes
+-- that read like real marketing ("15% off", "10 off Riyadh"), and two rows with
+-- exactly those names and values were found ACTIVE in Production on 2026-09-10
+-- with no expiry, no usage limit, no minimum spend and no cap — redeemable by
+-- anyone who guessed them. See `docs/GO_LIVE_READINESS.md` G8 and
+-- `docs/OWNER_ACTIONS.md` §36. Nothing here caused that on its own — the rule
+-- against seeding Production is in `supabase/README.md` — but a fixture that
+-- looks like a live code is one copy-paste away from becoming one.
+--
+-- They stay ACTIVE and UNBOUNDED deliberately, for two reasons: the SQL suites
+-- place real orders against them, and a local console showing the promo-codes
+-- screen should render the "Never expires / Unlimited uses / Uncapped %" badges
+-- that screen exists for. Do NOT copy this shape into Production.
 insert into public.coupons (code, type, value, is_active, min_order_amount) values
-  ('SPICY15','percentage',15,true,0),
-  ('RIYADH10','fixed',10,true,0)
+  ('SEEDPCT15','percentage',15,true,0),
+  ('SEEDFIX10','fixed',10,true,0)
 on conflict (code) do nothing;

@@ -25,7 +25,7 @@
 --               the pre-fix definition.
 --
 -- Seed fixtures (supabase/seed.sql): branch 001 (delivery_fee 15,
--- min_delivery_order 40), product 001 at 32.00, coupon SPICY15 (percentage 15).
+-- min_delivery_order 40), product 001 at 32.00, coupon SEEDPCT15 (percentage 15).
 --
 -- Runs against a throwaway chain-applied Postgres. Every case raises on
 -- failure, so the script aborts non-zero; a clean run prints the final notice
@@ -310,12 +310,12 @@ select set_config('test.auth_uid', :member, true);
 do $$
 declare o public.orders; v_used integer; v_bal integer; v_ledger integer;
 begin
-  select usage_count into v_used from public.coupons where code = 'SPICY15';
+  select usage_count into v_used from public.coupons where code = 'SEEDPCT15';
 
   o := public.place_order(
         'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
         '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb,
-        null, 'SPICY15', null, 300);
+        null, 'SEEDPCT15', null, 300);
 
   if o.total <> 0 then raise exception 'FAIL 7: total is %', o.total; end if;
   if o.coupon_code is not null then
@@ -327,7 +327,7 @@ begin
 
   -- The point of skipping the block: a limited code must not burn a use on an
   -- order that was free anyway.
-  if (select usage_count from public.coupons where code = 'SPICY15') <> coalesce(v_used, 0) then
+  if (select usage_count from public.coupons where code = 'SEEDPCT15') <> coalesce(v_used, 0) then
     raise exception 'FAIL 7: the coupon usage_count was burned on a comped order';
   end if;
 
@@ -352,15 +352,15 @@ select set_config('test.auth_uid', :payer, true);
 do $$
 declare o public.orders; v_before integer; v_after integer;
 begin
-  select usage_count into v_before from public.coupons where code = 'SPICY15';
+  select usage_count into v_before from public.coupons where code = 'SEEDPCT15';
   o := public.place_order(
         'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
         '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb,
-        null, 'SPICY15');
+        null, 'SEEDPCT15');
   if o.discount_amount <= 0 then
     raise exception 'FAIL 7b: the coupon did not apply to a paying customer';
   end if;
-  select usage_count into v_after from public.coupons where code = 'SPICY15';
+  select usage_count into v_after from public.coupons where code = 'SEEDPCT15';
   if v_after <> coalesce(v_before, 0) + 1 then
     raise exception 'FAIL 7b: usage_count went % -> %', v_before, v_after;
   end if;
