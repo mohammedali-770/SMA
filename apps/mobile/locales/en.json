@@ -1,6 +1,6 @@
 {
   "ios": {
     "CFBundleDisplayName": "Spicy Meal",
-    "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your location only to center the delivery map on you. You can always move the pin manually."
+    "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your precise location while you are choosing a delivery point, so your pin lands at the right door for the driver. You can always move the pin yourself, and your location is never used in the background."
   }
 }

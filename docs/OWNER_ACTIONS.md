@@ -2386,6 +2386,52 @@ Until both are done, leave `loyalty_expiry_enabled` off. The mechanism is applie
 and proven inert (`docs/MIGRATIONS.md` ledger row 84); nothing degrades by
 waiting.
 
+## 34. Privacy policy names the wrong map sub-processor — publish the correction
+
+**Opened 2026-09-10** by the go-live re-verification. It is the only live legal
+statement found that the software does not match, and the URL it is served at is
+the one going into both store listings.
+
+`privacy_policy` v2.1 lists `Mapbox — the map you use to choose a delivery
+location` in both languages. The shipped web bundle carries a **Google** Maps key
+and **no Mapbox token** (`pk.` absent, `AIza` present), and `googleMaps.ts` uses
+Google **Places** for address search. So a named processor receives nothing while
+an unnamed one receives the customer's delivery coordinates — wrong in both
+directions at once.
+
+**Replacement text for both languages, plus the evidence and its limits, is in
+[`docs/legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`](legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md).**
+Publishing is a §5 live write and stays yours.
+
+**One thing to check first, because it decides which text to publish.** The
+evidence proves the **web** channel. Both providers are compiled into both
+artifacts, and the native build's `EXPO_PUBLIC_MAP_PROVIDER` is not readable from
+a session. Read it in the EAS `production` environment: if it is `google`, publish
+Option A; if it is not, publish Option B, which names both.
+
+The Arabic is engineering-drafted and carries the same caveat as §29 and §33a.
+The English may be published alone if the Arabic must wait — a correct English
+disclosure beside an unchanged Arabic one beats leaving both wrong.
+
+### On completion
+
+Bump to v2.2 with the publication date (a sub-processor change is substantive,
+not a typo fix), update `docs/GO_LIVE_READINESS.md` A9, and close this item.
+
+## 35. Native Arabic read of the corrected iOS location purpose string
+
+**Opened 2026-09-10.** `apps/mobile/locales/ar.json` now carries a new
+engineering-drafted Arabic sentence — the iOS permission prompt a customer reads
+before granting location. It ships in the next native build.
+
+It is short, it is user-facing at a permission moment, and it has never been read
+by a native speaker. Fold it into the same review as §29 and §33a rather than
+running a separate pass; the English it mirrors is in
+`apps/mobile/app.json` under `ios.infoPlist.NSLocationWhenInUseUsageDescription`.
+
+Not blocking: the previous Arabic was also engineering-drafted, so this is not a
+regression — it is one more string on an existing list.
+
 ## Owner-action closeout rule
 
 When an item is completed:

@@ -14,6 +14,10 @@ export const darkPalette: AppPalette = {
   ember: '#D63245',
   emberDeep: '#A92435',
   emberGlow: '#ED7480',
+  // Brand ink for normal-size text. Lighter than `ember` because the ground is
+  // dark: `ember` measures 3.15:1 at worst here, `emberText` 5.31:1. Pinned by
+  // `contrastContract.test.ts`.
+  emberText: '#ED7480',
   saffron: '#E6B84A',
   brandViolet: '#B8AEC4',
   brandVioletSoft: '#9E93AA',

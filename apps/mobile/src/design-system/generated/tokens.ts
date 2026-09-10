@@ -34,6 +34,22 @@ export const color = {
   ember: '#E02D3D',
   emberDeep: '#AE0F20',
   emberGlow: '#FF6A3D',
+  /**
+   * Brand red for NORMAL-SIZE TEXT, and the only brand token that is safe there.
+   *
+   * `ember` is a fill colour. As an ink it measures 4.08:1 at worst across the
+   * grounds text actually lands on in light, and 3.15:1 in dark — under WCAG AA
+   * (4.5:1) in both themes. It is fine as a BACKGROUND (white on `ember` is
+   * 4.55 light / 4.77 dark) and fine as LARGE text at the 3:1 threshold, which
+   * is why the 28pt chevron, the 72pt confirmation number and the quantity
+   * signs still use it.
+   *
+   * Deliberately NOT an alias of `emberDeep`, though they share a value today.
+   * `emberDeep` is a fill (pressed states, gradient stops); this is an ink. The
+   * two answer to different constraints, and `contrastContract.test.ts` records
+   * why aliasing tokens that merely happen to match is a trap.
+   */
+  emberText: '#AE0F20',
   saffron: '#FFB800',
   brandViolet: '#422E87',
   brandVioletSoft: '#6B4BD6',

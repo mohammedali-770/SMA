@@ -10,7 +10,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { color, radius, space } from '../../../design-system/generated/tokens';
+import { color, hitTarget, radius, space } from '../../../design-system/generated/tokens';
 import { StatusPill } from '../../../design-system/ui/Chip';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
@@ -66,7 +66,7 @@ const useStyles = makeStyles((colors) => ({
   },
   info: { flex: 1, gap: space.s1, alignItems: 'flex-start' },
   change: {
-    minHeight: 36,
+    minHeight: hitTarget,
     justifyContent: 'center',
     paddingHorizontal: space.s3,
     borderRadius: radius.pill,

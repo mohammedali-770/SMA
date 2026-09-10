@@ -10,7 +10,7 @@ import { Price } from '../../components/Price';
 import { QtyStepper } from '../../components/QtyStepper';
 import { EmptyView } from '../../components/StateViews';
 import { priceAccessibilityLabel } from '../../design-system/generated/money';
-import { radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { hitTarget, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useOrderContext } from '../../store';
@@ -111,7 +111,7 @@ const useStyles = makeStyles((color) => ({
   root: { flex: 1, backgroundColor: color.appBg }, line: { backgroundColor: color.appSurface, borderRadius: radius.lg, borderWidth: 1, borderColor: color.appLine, padding: space.s3, gap: space.s3 },
   editArea: { flexDirection: 'row' as const, gap: space.s3 }, lineImg: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: color.appSurface2 }, lineImgEmpty: { alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: color.appSurface3 }, lineBody: { flex: 1, gap: space.s1, justifyContent: 'center' as const },
   lineTop: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const, gap: space.s3 }, lineBottom: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, borderTopWidth: 1, borderTopColor: color.appLine, paddingTop: space.s2 },
-  removeBtn: { minHeight: 34, justifyContent: 'center' as const, paddingHorizontal: space.s3, borderRadius: radius.pill, backgroundColor: color.dangerTint }, pressed: { opacity: 0.72 },
+  removeBtn: { minHeight: hitTarget, justifyContent: 'center' as const, paddingHorizontal: space.s3, borderRadius: radius.pill, backgroundColor: color.dangerTint }, pressed: { opacity: 0.72 },
   footer: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, backgroundColor: color.appSurface, borderTopWidth: 1, borderTopColor: color.appLine, paddingHorizontal: space.s4, paddingTop: space.s3, gap: space.s3 }, subtotalRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },
   checkoutBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, backgroundColor: color.ember, borderRadius: radius.lg, paddingHorizontal: space.s5, paddingVertical: space.s4, minHeight: 54 }, checkoutBtnDisabled: { backgroundColor: color.disabledBg, justifyContent: 'center' as const },
 }));
