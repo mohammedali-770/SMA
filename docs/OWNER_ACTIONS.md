@@ -2432,7 +2432,41 @@ running a separate pass; the English it mirrors is in
 Not blocking: the previous Arabic was also engineering-drafted, so this is not a
 regression — it is one more string on an existing list.
 
-## 36. TWO LIVE PROMO CODES ARE REDEEMABLE TODAY, UNCAPPED — decide before launch
+## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
+
+> **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
+> Both rows are now `is_active = false`. **Deactivated, not deleted** — the rows
+> and their history survive, so the decision is reversible.
+>
+> **It is proven, not assumed.** `validate_coupon` is `STABLE`, so it was called
+> read-only against each code afterwards: both return `valid = false`, discount
+> **0**, reason **"Coupon is inactive"**. Checking the flag alone would have
+> proved only that a column changed.
+>
+> **The gate was confirmed BEFORE the write, too.** `validate_coupon` has exactly
+> one overload and its body carries `if not c.is_active then` — so the flag is
+> load-bearing. Had it not been, setting it would have been theatre.
+>
+> **Nothing else moved, measured:** 2 coupon rows before and after, `usage_count`
+> still **0** on both, **72** orders unchanged with **0** carrying any discount,
+> and the money-path pair identical (`place_order` `e54caa33…`,
+> `compute_order_snapshot` `ca276a84…`). `validate_coupon` itself is unchanged
+> (`01c64516…`) — this was a data change, not a schema or function change, which
+> is why it is **not** a migration.
+>
+> **The codes were guessable, and that is the part worth remembering.** Both were
+> ordinary brand-and-number strings of the kind a customer would try on spec —
+> seeded on 2026-07-08, the day the project was created, never edited and never
+> redeemed. An unbounded discount is bad; an unbounded *guessable* discount is a
+> different order of problem. They are recorded here by id prefix (`e367b35f`
+> percentage 15%, `e6f1227a` fixed 10 SAR) rather than by code.
+>
+> **What is still not built:** `coupons` has no admin screen. Re-enabling,
+> bounding or adding a code remains a direct database write. If promo codes are
+> ever a real feature, that screen — and `ends_at` / `usage_limit` /
+> `max_discount_amount` as first-class fields — is the work.
+
+### The original item, kept for its reasoning
 
 **Opened 2026-09-10.** The sharpest finding of the go-live re-verification, and
 the only one that costs money per order rather than a review cycle.
