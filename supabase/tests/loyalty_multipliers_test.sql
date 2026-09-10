@@ -84,12 +84,12 @@ begin
   end if;
 
   -- And the pro-rata coupon case, also from step 2: 100.00 subtotal, 64%
-  -- eligible, SPICY15 takes 15.00 => base 54.40 => 54.
+  -- eligible, SEEDPCT15 takes 15.00 => base 54.40 => 54.
   o := public.place_order(
         'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
         '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":2},
           {"product_id":"a0000000-0000-0000-0000-000000000004","quantity":6}]'::jsonb,
-        null, 'SPICY15');
+        null, 'SEEDPCT15');
   if o.loyalty_points_earned <> 54 then
     raise exception 'FAIL 2: pro-rata order earned %, expected 54 -- step 2 arithmetic moved',
       o.loyalty_points_earned;

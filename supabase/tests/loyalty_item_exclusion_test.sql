@@ -182,13 +182,13 @@ do $$
 declare o public.orders;
 begin
   -- 2 beef (64.00, eligible) + 6 cola (36.00, excluded) = 100.00 subtotal.
-  -- Eligible share = 64%. SPICY15 takes 15% = 15.00, of which 9.60 is the
+  -- Eligible share = 64%. SEEDPCT15 takes 15% = 15.00, of which 9.60 is the
   -- eligible share, leaving a base of 54.40 => 54 points.
   o := public.place_order(
         'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
         '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":2},
           {"product_id":"a0000000-0000-0000-0000-000000000004","quantity":6}]'::jsonb,
-        null, 'SPICY15');
+        null, 'SEEDPCT15');
 
   if o.subtotal <> 100.00 then
     raise exception 'FAIL 4: subtotal is %, expected 100.00 (fixture drift)', o.subtotal;

@@ -94,7 +94,7 @@ describe('order mapper', () => {
       branch_name_en: 'Olaya', branch_name_ar: 'العليا', status: 'received', order_type: 'delivery',
       subtotal: 54, delivery_fee: 15, discount_amount: 5.4, loyalty_discount_amount: 0,
       vat_amount: 8.3, total: 63.6, payment_status: 'pending', payment_method: null,
-      coupon_code: 'SPICY15', notes: null, created_at: '2026-07-07T00:00:00Z',
+      coupon_code: 'SEEDPCT15', notes: null, created_at: '2026-07-07T00:00:00Z',
       sync_status: 'syncing',
       address_snapshot: { id: 'a1', label: 'Home', description: 'St', national_short_address: 'RRBB1234', latitude: 24.7, longitude: 46.6, is_default: true },
       order_items: [
@@ -109,7 +109,7 @@ describe('order mapper', () => {
     } as unknown as DbOrderWithItems;
     const o = mapOrder(row);
     expect(o.orderNumber).toBe('SM-2026-000001');
-    expect(o.couponCode).toBe('SPICY15'); // real coupon code carried through for reports
+    expect(o.couponCode).toBe('SEEDPCT15'); // the code is carried through verbatim for reports
     expect(o.orderSyncStatus).toBe('pending_sync'); // 'syncing' -> 'pending_sync'
     expect(o.paymentStatus).toBe('pending');
     expect(o.address?.nationalShortAddress).toBe('RRBB1234');
