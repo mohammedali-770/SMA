@@ -40,6 +40,19 @@ export const REASON_OPTIONS: { code: OpsReasonCode; key: OpsStringKey }[] = [
   { code: 'other',          key: 'reason_other' },
 ];
 
+/**
+ * The copy key for one item-closure reason.
+ *
+ * Exists because `reason_code` was fetched on every call-centre read and then
+ * dropped before rendering: an operator could see that something was off and
+ * when it returned, but never why — while the cashier who closed it had picked
+ * from this exact vocabulary. Null for an untimed admin closure, which nobody
+ * gave a reason for.
+ */
+export function reasonKey(code: OpsReasonCode | null): OpsStringKey | null {
+  return REASON_OPTIONS.find((r) => r.code === code)?.key ?? null;
+}
+
 export interface ClosedItem {
   product: Product;
   snoozedUntil: string | null;
@@ -229,3 +242,8 @@ export const DELIVERY_REASON_OPTIONS: { code: DeliveryReasonCode; key: OpsString
   { code: 'area_incident',    key: 'dreason_area_incident' },
   { code: 'other',            key: 'dreason_other' },
 ];
+
+/** The copy key for one DELIVERY reason. Same purpose as `reasonKey`. */
+export function deliveryReasonKey(code: DeliveryReasonCode | null): OpsStringKey | null {
+  return DELIVERY_REASON_OPTIONS.find((r) => r.code === code)?.key ?? null;
+}

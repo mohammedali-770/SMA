@@ -18,6 +18,11 @@ const ops = vi.hoisted(() => ({
   pauseDelivery: vi.fn(),
   disableArea: vi.fn(),
   enableArea: vi.fn(),
+  // The board's single refresh now also loads delivery-closure requests.
+  // Mocked empty by default: these cases are about closures, and the request
+  // queue has its own coverage in RequestsWaitingCard.test.tsx.
+  pendingDeliveryRequests: vi.fn(),
+  resolveDeliveryRequest: vi.fn(),
 }));
 vi.mock('../../lib/opsApi', () => ({ opsApi: ops }));
 
@@ -102,6 +107,8 @@ beforeEach(() => {
   ops.pauseDelivery.mockResolvedValue(undefined);
   ops.disableArea.mockResolvedValue(undefined);
   ops.enableArea.mockResolvedValue(undefined);
+  ops.pendingDeliveryRequests.mockResolvedValue([]);
+  ops.resolveDeliveryRequest.mockResolvedValue({ status: 'accepted' });
   config.allAreas.mockResolvedValue([]);
   config.workingHours.mockResolvedValue([]);
 });
