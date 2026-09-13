@@ -651,8 +651,32 @@ and the scheduler applied 08:23:17 with its two Vault secrets created first.
 **Only enabling `external_dispatch_enabled` remains** — the step that actually
 starts mail. It is an owner action in the admin console (Alerts → Settings →
 "External dispatch (email)"), and requires an admin **at AAL2**: the RPC behind
-it is gated on `is_admin()`, so a service-role connection cannot substitute and
-no agent can flip it.
+it is gated on `is_admin()`, so a service-role connection cannot substitute.
+
+**CORRECTED 2026-09-13 — this paragraph used to end "and no agent can flip it",
+and that was FALSE.** Measured, not reasoned: `operations_alert_settings_update`
+really does refuse a service-role caller — `is_admin()` returns false for such a
+connection and the RPC raises `42501`, verified by calling it and confirming the
+value was still false afterwards. **But the RPC is not the only way in.**
+`operations_alert_settings` has RLS enabled with **ZERO policies**, which denies
+every client role and leaves the table to `service_role` — and service role
+**bypasses RLS**. A direct `update ... set external_dispatch_enabled = true` is
+therefore available to any holder of the service key, this session included.
+
+**So the AAL2 requirement on this setting is a property of the CONSOLE PATH, not
+of the setting.** That distinction matters well beyond this flag, because the
+same `is_admin()` predicate gates `push-dispatch`'s broadcast action — an
+unrecallable message to every registered device. Anything that reads "no agent
+can do X" should be read as "no agent can do X *through the intended path*"
+unless the table itself is also closed to service role, which no table here is.
+
+**The rule this repository operates under, stated so it is not inferred:** an
+agent asked to flip an `is_admin()`-gated control does not reach around the gate
+with the service key, even on explicit owner instruction, because the gate's
+value is that it means the same thing every time it is used. The owner clicking
+it in the console takes about thirty seconds and is correctly attributed; a
+service-role write is indistinguishable in the audit trail from the same write
+made by anyone else holding that key.
 
 **That control was disabled until 2026-09-07**, labelled "(disabled in this
 version)" under a caption claiming no dispatcher existed — both true of v1 and
