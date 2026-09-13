@@ -350,7 +350,9 @@ sorts ahead of everything, so "apply the outstanding migrations" would sweep the
 frozen payment file in first. **Name the target by version.** The new file is not
 frozen and not urgent: it changes no money path, sends nothing, and its whole
 effect is unreachable until `external_dispatch_enabled` is turned on — which is
-itself an owner action at AAL2 that no agent can perform.
+itself an owner action at AAL2 in the admin console. **Corrected 2026-09-13:
+this said "that no agent can perform", which was false — the RPC refuses an
+agent, the table does not. See the X3 paragraph below.**
 
 **Superseded, kept because the count is the point: 126 repository files / 131
 live history rows / exactly ONE unapplied — Moyasar, unapplied on purpose.**
@@ -651,8 +653,58 @@ and the scheduler applied 08:23:17 with its two Vault secrets created first.
 **Only enabling `external_dispatch_enabled` remains** — the step that actually
 starts mail. It is an owner action in the admin console (Alerts → Settings →
 "External dispatch (email)"), and requires an admin **at AAL2**: the RPC behind
-it is gated on `is_admin()`, so a service-role connection cannot substitute and
-no agent can flip it.
+it is gated on `is_admin()`, so a service-role connection cannot substitute *for
+an admin in that RPC*. Do not quote that clause without the correction below
+attached — `docs/GO_LIVE_READINESS.md` already did, and was false for it.
+
+**CORRECTED 2026-09-13 — this paragraph used to end "and no agent can flip it",
+and that was FALSE.** Measured, not reasoned: `operations_alert_settings_update`
+really does refuse a service-role caller — `is_admin()` returns false for such a
+connection and the RPC raises `42501`, verified by calling it and confirming the
+value was still false afterwards. **But the RPC is not the only way in.**
+`operations_alert_settings` has RLS enabled with **ZERO policies**, which denies
+every client role and leaves the table to `service_role` — and service role
+**bypasses RLS**. A direct `update ... set external_dispatch_enabled = true` is
+therefore available to any holder of the service key — and to this session, which
+reaches Postgres as `postgres`: table owner, `rolbypassrls`, `UPDATE` granted.
+Same capability by a different role, so the conclusion is if anything broader
+than "the service key".
+
+**So the AAL2 requirement on this setting is a property of the CONSOLE PATH, not
+of the setting.** Anything that reads "no agent can do X" should be read as "no
+agent can do X *through the intended path*" until the other paths are checked.
+The gate and the data are two different questions.
+
+**`push-dispatch`'s broadcast is the COUNTEREXAMPLE, and it is why the check has
+to be made each time rather than assumed in either direction.** The same
+`is_admin()` predicate guards it — `supabase/functions/push-dispatch/index.ts:291`,
+reached from the broadcast arm at `:487-489`, which carries no
+`isServiceRoleCall` branch, unlike the `order_status` arm at `:325-330`. But
+there the gate really does close the outcome, because a broadcast is an HTTP POST
+to Expo and **not a table write**: no row a service key could write sends one.
+The alert flag is the opposite shape — its outcome *is* a row. **Ask what the
+action writes, not only what predicate guards it.** (Audience, corrected while
+writing this: a broadcast targets `is_active` **and** `promos_enabled`
+— `index.ts:500-504` — so opted-in devices, not "every registered device". §7
+above states it correctly; the first draft of this paragraph did not, and live
+`push_devices` is 4 registered / 4 active / **1** opted in.)
+
+**"The table is open to service role" is not universal either, and the exception
+is pointed.** Measured 2026-09-13: all **59** application tables in `public` are
+open to `service_role` for select/insert/update/delete — 59/59, zero exceptions,
+which is what makes the reasoning above sound for anything this product owns.
+Outside `public`, **38 of 105** base tables refuse `service_role` writes, and
+`auth.mfa_factors` is among them — the TOTP factor store that makes AAL2 mean
+anything is itself closed to the service key. A table-level barrier does exist
+here; it is just not around application data.
+
+**The rule this repository operates under, stated so it is not inferred:** an
+agent asked to flip an `is_admin()`-gated control does not reach around the gate
+with the service key, even on explicit owner instruction, because the gate's
+value is that it means the same thing every time it is used. The owner clicking
+it in the console takes about thirty seconds and is correctly attributed; a
+service-role write is indistinguishable in the audit trail from the same write
+made by anyone else holding that key.
 
 **That control was disabled until 2026-09-07**, labelled "(disabled in this
 version)" under a caption claiming no dispatcher existed — both true of v1 and

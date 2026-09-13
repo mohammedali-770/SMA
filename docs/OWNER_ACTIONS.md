@@ -1955,8 +1955,17 @@ act. There is **one** admin with an email address today.
    **How:** admin console → **Alerts** tab → **Settings** → the **"External
    dispatch (email)"** checkbox. You must be signed in as an admin **with your
    two-factor step completed** — the RPC behind it requires AAL2, so an admin at
-   AAL1 is refused with a two-factor message. There is no service-role side door,
-   by design.
+   AAL1 is refused with a two-factor message.
+
+   **Corrected 2026-09-13 — this said "There is no service-role side door, by
+   design."** The RPC has none; the *table* does. `operations_alert_settings` has
+   RLS enabled with **zero policies**, which leaves it to `service_role`, and
+   service role bypasses RLS — so a service-key holder can set the flag with a
+   direct `UPDATE`. Nothing about your console path changed, and no agent session
+   will take the other one (`CLAUDE.md` §8 states that as a standing rule). But
+   the reason to click it yourself is **attribution**, not impossibility: a
+   service-role write is indistinguishable in the audit trail from the same write
+   by anyone else holding that key.
 
    **This was briefly impossible, and the note is worth keeping.** Until
    2026-09-07 the console rendered that control **disabled**, labelled
