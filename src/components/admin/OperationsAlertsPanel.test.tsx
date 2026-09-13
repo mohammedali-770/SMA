@@ -64,7 +64,7 @@ function makeDigest(overrides: Partial<OperationsDigest> = {}): OperationsDigest
     warning_open_count: 0,
     content: {},
     rendered_subject: 'Daily operations digest — 2026-07-21',
-    rendered_body: 'No incidents in this period.\nExternal delivery is disabled in this version.',
+    rendered_body: 'No incidents in this period.\nExternal delivery is disabled.',
     preview: false,
     ...overrides,
   };
@@ -264,7 +264,7 @@ describe('OperationsAlertsPanel — daily digest', () => {
 
     expect(await screen.findByText('Daily operations digest — 2026-07-21')).toBeTruthy();
     expect(screen.getByText(/No incidents in this period\./)).toBeTruthy();
-    expect(screen.getByText(/External delivery is disabled in this version\./)).toBeTruthy();
+    expect(screen.getByText(/External delivery is disabled\./)).toBeTruthy();
     // History rows: one date per language.
     expect(screen.getAllByText('2026-07-21').length).toBe(2);
   });

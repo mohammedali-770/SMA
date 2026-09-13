@@ -226,15 +226,52 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-09, after `20260914120000_platform_rollup_suppression`
-was APPLIED: 128 repository files / 133 live history rows / exactly ONE unapplied —
-Moyasar, unapplied on purpose.** Latest live version `20260909121702`, applied
-12:17:02 UTC on explicit owner approval naming the target by version; ledger
-row 88.
+**Current position 2026-09-15: 129 repository files / 133 live history rows /
+TWO unapplied — Moyasar (frozen on purpose) and
+`20260915120000_digest_external_delivery_line` (written, validated, awaiting
+approval).** Latest live version is still `20260909121702` (ledger row 88);
+nothing has been applied since.
 
-**THE COUNT IS BACK TO THE DANGEROUS SHAPE.** One file left means "apply the
-outstanding migrations" reads like a no-op and is the one instruction that would
-break the §6 freeze. **Name the target by version.**
+**The count went 1 → 2 by a new file, which restores the *appearance* of an
+innocent referent without making a bulk apply any safer.** `20260824100000`
+still sorts ahead of everything, so "apply the outstanding migrations" would
+sweep the frozen payment file in first. **Name the target by version.**
+
+**The new file makes the daily digest stop lying about external delivery.**
+`operations_digest_build` ended every digest — English *and* Arabic — with a
+fixed sentence saying external delivery is disabled "in this version". That was
+true while v1 had no dispatcher; since 2026-09-07 the dispatcher is deployed and
+only `external_dispatch_enabled` holds mail back, so the sentence becomes false
+the moment the flag is turned on, inside an artifact that is **stored** and read
+after the fact. The footer is now derived from the live flag in both languages.
+It changes no money path, sends nothing, and needs no deploy — the signature is
+unchanged, so existing callers bind to the new body (row 77's lesson).
+
+**A NEGATIVE SEARCH IS NOT EVIDENCE OF ABSENCE.** The working note that produced
+this file claimed the Arabic digest had no equivalent line. It does, and always
+did (`20260723090000…:2054`). The claim came from querying the live function
+body for a **guessed** Arabic phrase, getting nothing, and reading that as
+absence — without ever checking the term against a case it should have matched.
+This is §9-B.7's stale-fingerprint lesson in different clothes: evidence quoted
+without being recomputed from the artifact. **Validate a search term on a known
+positive before trusting its null result.**
+
+**A VERIFICATION BLOCK PASSED WHILE PROVING NOTHING, and the mechanism
+generalises to every assertion in this repository.** Its first draft read
+`->> 'body'`; the real key is `rendered_body`, so it got NULL — and `NULL <> 'x'`
+is NULL, not true, so **every** comparison was skipped and the block reported
+success. Use `is distinct from` for any assertion that could see a NULL, and
+fail explicitly when the value under test is NULL. A check that cannot fail is
+worse than no check, because it is counted as evidence.
+
+**PROVING THE CURRENT STATE IS NOT PROVING BOTH.** Mutation testing then showed
+the block still passed when the *enabled* branch was corrupted, because the live
+flag is false so that branch never executes. Both branches are now asserted at
+source level, and both states exercised for real in
+`supabase/tests/operations_digest_external_delivery_line_test.sql` — which can
+mutate the flag because it rolls back. The migration deliberately does **not**
+write, since a write would bump `operations_alert_settings.updated_at` on a
+migration meant to change nothing.
 
 **Nothing moved, measured:** outbox still 156 rows with 0 on `email`, dispatch
 still false, money-path pair unchanged, `operations_alerts_derive_pre_stranded`
@@ -774,6 +811,7 @@ by version.**
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260915120000_digest_external_delivery_line.sql` | **UNAPPLIED — written, validated, awaiting owner approval.** Redefines `operations_digest_build` so the closing external-delivery line is derived from `external_dispatch_enabled` instead of asserting, unconditionally and in both languages, that delivery is disabled "in this version". sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`, 423 lines / 20 247 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched; it sends nothing; NO DEPLOY IMPLIED** (unchanged signature, so callers bind to the new body). Applying it changes no stored digest — digests already written are rows — and with the flag false the new footer reads "External delivery is disabled.", the same claim minus the false version clause. **Derived, not retyped:** the body is extracted from `20260723090000_smart_operations_alerts_digest.sql` lines 1889-2141 (the only migration that has ever defined it) under four anchored substitutions, each asserted to match exactly once; a diff of old vs new body shows only those four regions, 253 → 271 lines. Its own verification asserts one overload, five `v_external_on` references enumerated by site, both retracted literals absent, all four replacement literals present, then **calls** the function in both languages and compares the final rendered line against the live flag. Validated on the local chain harness (129 migrations, 71 suites, 69 passed, 2 quarantined, 0 new failures) and mutation-tested five ways — all five killed by the migration's check, four of five by the paired suite (the fifth mutates the checker itself). |
 | `20260907120000_loyalty_pickup_only.sql` | **APPLIED 2026-09-09 05:50:16 UTC**, live version `20260909055016`, on explicit owner approval ("apply 20260907120000" — named by version), one call, target named explicitly. Ledger row 82. Body fidelity proven byte-for-byte against the merged file (`prosrc` md5 `8351e2641b1cb45ab5dcbc52d8c8194f` / `3d042e691ad933b121552dde146ce06d`), which matters because the MCP tool takes SQL inline and a transcription slip would have been silent. Both functions remain `service_role`-only. Delivery behaviour was proven on the LOCAL harness, not in Production, because asserting it needs a real `place_order` and that means a real kitchen ticket. Historical description follows. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
 | `20260908120000_loyalty_item_exclusion.sql` | **APPLIED 2026-09-09 06:20:00 UTC**, live version `20260909062000`, on explicit owner approval ("apply 20260908120000" — named by version), one call. Ledger row 83. Step 1's gate was confirmed present in both live bodies BEFORE sending, not merely trusted to the file's own check. All three bodies verified byte-identical against the merged file. Applying excluded nothing (0 of 61 products). `compute_order_snapshot` verified still closed to both `anon` and `authenticated` after the new wrapper landed. Historical description follows. Per-item loyalty exclusion: `products.earns_loyalty_points` (defaults TRUE, so applying it excludes nothing), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points` — a narrow `SECURITY DEFINER` RPC so checkout can show the figure without a third copy of the rule or opening `compute_order_snapshot` to clients. sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions again**, so their hashes change a second time. Its self-verification refuses to land unless the pickup-only gate from `20260907120000` is already present in both functions, which is what enforces the order. Validated on the local chain harness (122 migrations, 64 suites, 0 new failures) and mutation-tested three ways. No deploy implied. |
 | `20260909120000_loyalty_expiry.sql` | **APPLIED 2026-09-09 06:53:34 UTC**, live version `20260909065334`, on explicit owner approval ("apply 20260909120000" — named by version), one call. Ledger row 84. sha256 `7606d27a05e77ac887c47dc833bf0fd03a373664ac300cd989fe59f49c1fbedd`, 384 lines / 18 546 bytes — recorded at apply time, since no fingerprint existed for this file beforehand. **Applying it expired nothing** (5 409 points, 111 ledger rows, 0 `expire` rows, all unchanged); the cron job is live and was proven inert by invoking the driver, which returned `disabled`. Money-path hashes **unchanged** — the one loyalty step that redefines neither. All 111 existing ledger rows were counted through the widened type CHECK before sending (0 violations), per row 79's lesson. Historical description follows. Points expiry on a fixed calendar reset: four settings columns plus a system-owned `loyalty_expiry_next_run_on`, the ledger type CHECK widened to admit `expire`, `run_loyalty_expiry()` and a daily `pg_cron` job. **Independent of the other two loyalty files — it redefines neither money-path function, so their hashes are unchanged by it.** Applying it changes nothing: expiry defaults OFF and its self-verification asserts the live row is disabled and unscheduled. **Enabling it is a separate decision and needs updated T&Cs first.** No deploy implied. |
