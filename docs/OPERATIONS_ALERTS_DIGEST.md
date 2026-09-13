@@ -9,11 +9,34 @@ owner-approved baseline completed on 2026-07-22 (all-clear, platform
 healthy), and the activation migration
 `supabase/migrations/20260723120000_activate_operations_alerts_digest_cron.sql`
 enables the two **internal** automations and schedules them (see
-"Internal automation" below). **External delivery remains disabled and
-structurally impossible**: no dispatcher exists, the outbox dormancy
-constraint is in force, and the settings RPC hard-rejects enabling
-external dispatch. Ledger reconciliation of `docs/MIGRATIONS.md` is owned
-by Issue #76.
+"Internal automation" below). Ledger reconciliation of `docs/MIGRATIONS.md`
+is owned by Issue #76.
+
+> **CORRECTED 2026-09-13 — this block used to say external delivery was
+> "disabled and structurally impossible: no dispatcher exists, the outbox
+> dormancy constraint is in force, and the settings RPC hard-rejects enabling
+> external dispatch." All three clauses became false on 2026-09-07 and the
+> Status block was never updated.** Measured live on 2026-09-13:
+>
+> | Was claimed | Live |
+> | --- | --- |
+> | no dispatcher exists | `operations-alert-dispatch` is **ACTIVE, version 1** (`verify_jwt = false`), deployed 2026-09-07 07:18:43 UTC |
+> | nothing polls the outbox | `pg_cron` job `operations-alert-dispatch`, `*/5 * * * *`, **active** |
+> | `operations_alert_outbox_v1_dormancy` in force | **Dropped.** Replaced by `operations_alert_outbox_v2_dispatch`, which permits the full `pending`/`processing`/`sent`/`failed` lifecycle for `email` |
+> | settings RPC hard-rejects | **No longer.** The `P0001` reject is gone from the live body; the RPC accepts `external_dispatch_enabled` and knows the v2 columns |
+>
+> **What IS still true, and it is the only thing keeping mail off the wire:**
+> `external_dispatch_enabled` is `false`. Everything downstream is built,
+> applied and deployed; the flag is the last interlock, and turning it on is
+> an owner action (`OWNER_ACTIONS.md` §28 step 4). `whatsapp` and `push`
+> remain structurally blocked by the v2 constraint — that part of the v1
+> story survives intact.
+>
+> The lesson worth keeping: this document grew a v2 section at the top while
+> its **Status** block, its outbox section, its defaults table, its runbook
+> guarantees and its closing "future version" section all still described v1.
+> A reader who trusted the Status block would have concluded that enabling
+> the flag could not send anything.
 
 Deliverables:
 
@@ -292,7 +315,7 @@ and never impersonates a staff user or fakes JWT claims.
 | `operations_alert_state` | One row per condition generation; `open`/`recovered`; partial unique index on `(fingerprint) WHERE status='open'` guarantees at most one open alert per identity. |
 | `operations_alert_events` | Append-only timeline: `baseline_observed`, `opened`, `escalated`, `downgraded`, `reminder`, `recovered` (with `notification_suppressed`). |
 | `operations_digest_runs` | One stored digest per `(scope, digest_date, language)` with exact UTC period bounds and rendered subject/body. |
-| `operations_alert_outbox` | Dormant notification intents (see below). |
+| `operations_alert_outbox` | Notification intents — dormant for `in_app`, `whatsapp` and `push`; a real delivery record for `email` since v2 (see below). |
 
 All six tables have RLS enabled with **no policies and no role grants**:
 they are readable/writable only through the `SECURITY DEFINER` RPCs. The
@@ -419,24 +442,46 @@ identities.
 | `operations_alert_settings_get()` | — | 42501 | ✔ | ✔ | — |
 | `operations_alert_settings_update()` | — | 42501 | 42501 | ✔ | — |
 
-`operations_alert_settings_update` accepts a strict whitelist patch and
-**hard-rejects** `external_dispatch_enabled = true` (`P0001`,
-"external dispatch cannot be enabled in this version") — even for admins.
+`operations_alert_settings_update` accepts a strict whitelist patch.
+**Corrected 2026-09-13: it no longer hard-rejects `external_dispatch_enabled
+= true`.** v1 raised `P0001` ("external dispatch cannot be enabled in this
+version") even for admins; `20260903120000` removed that interlock for the
+**email** channel, and the live function body no longer contains the reject.
+An admin at AAL2 can now set the flag through this RPC, which is exactly what
+the console toggle does. The whitelist itself is unchanged, and the admin-only
+gate (`is_admin()`, role **and** AAL2) is unchanged.
 
-## Dormant delivery (outbox)
+## Delivery (outbox) — dormant for two channels, live-capable for email
 
-The outbox records notification *intents*, never deliveries:
+**Corrected 2026-09-13. This section described v1 and was false in three
+places**; the v1 text is quoted in each correction rather than deleted,
+because the v1 design is still the reason the structure looks as it does.
 
-- In-app rows (`channel='in_app'`, EN + AR) are the only "active" channel and
-  are merely `recorded` — the admin inbox reads state/events directly.
-- External channels (`email`, `whatsapp`, `push`) may exist only as
-  `blocked` (`blocked_reason='external_dispatch_disabled'`) or `cancelled`.
-- The named CHECK constraint `operations_alert_outbox_v1_dormancy` makes an
-  external `pending`/`sent`/`failed` row **structurally impossible** in v1;
-  idempotency keys make intent recording replay-safe.
+The outbox records notification *intents*. For `in_app` it still records only
+intents; for `email` a row is now a real delivery record.
 
-No dispatcher process exists anywhere in the codebase. Nothing polls the
-outbox. No provider credentials are read.
+- In-app rows (`channel='in_app'`, EN + AR) are `recorded` or `cancelled` —
+  the admin inbox reads state/events directly. Unchanged.
+- **`email` rows now carry the full lifecycle** — `pending`, `processing`,
+  `sent`, `failed`, `cancelled`, `blocked` — one row per event rather than
+  one per language. ~~"External channels (`email`, `whatsapp`, `push`) may
+  exist only as `blocked` or `cancelled`."~~
+- `whatsapp` and `push` **are** still restricted to `blocked`
+  (`blocked_reason='external_dispatch_disabled'`) or `cancelled`. That half of
+  the v1 rule survives, and is enforced by the replacement constraint.
+- The CHECK constraint is **`operations_alert_outbox_v2_dispatch`**, not
+  `operations_alert_outbox_v1_dormancy` — the v1 constraint was dropped by
+  `20260903120000`. Verified live 2026-09-13; `..._v1_dormancy` no longer
+  exists on the table. Idempotency keys still make intent recording
+  replay-safe. ~~"makes an external `pending`/`sent`/`failed` row structurally
+  impossible in v1"~~ — it is impossible for `whatsapp`/`push` only.
+
+~~"No dispatcher process exists anywhere in the codebase. Nothing polls the
+outbox. No provider credentials are read."~~ **All three are now false.**
+`operations-alert-dispatch` (Edge Function, ACTIVE v1) polls via the `pg_cron`
+job of the same name every five minutes and reads the configured SMTP
+credential. What stops mail leaving is `external_dispatch_enabled = false`,
+checked before any claim — a flag, not an absence.
 
 ## Admin UI
 
@@ -451,13 +496,21 @@ truthful error banner for auth/network failures. Sections:
 - **Daily digest** — EN/AR live preview (today so far) and stored digest
   history; Arabic renders RTL.
 - **Settings** — staff see a read-only view; admins can toggle the
-  whitelisted switches through the settings RPC. The external-dispatch
-  toggle is rendered permanently disabled with an explanatory note.
+  whitelisted switches through the settings RPC. **Corrected 2026-09-13:**
+  ~~"The external-dispatch toggle is rendered permanently disabled with an
+  explanatory note."~~ It is a live checkbox wired to `saveSettings`
+  (`OperationsAlertsPanel.tsx:541-548`). It was disabled until 2026-09-07,
+  under a caption claiming no dispatcher existed — with a **test pinning the
+  disabled state**, so the limitation had become self-enforcing while the
+  backend was ready. Review caught it on #332.
 
-The header always shows "External delivery disabled" and, while the
-evaluator switch is off, a dormant-mode notice. Backend values are
-authoritative; the client normalizes defensively and never invents an
-enabled flag or a healthy state.
+**Corrected 2026-09-13:** ~~"The header always shows 'External delivery
+disabled'."~~ It branches on the live flag — "External delivery ON (email)"
+when enabled, "External delivery disabled" when not, and a neutral "External
+delivery" when the value is unknown (`OperationsAlertsPanel.tsx:241-259`).
+It was hardcoded until #333. While the evaluator switch is off it still shows
+a dormant-mode notice. Backend values are authoritative; the client normalizes
+defensively and never invents an enabled flag or a healthy state.
 
 ## Defaults (dormant)
 
@@ -465,7 +518,7 @@ enabled flag or a healthy state.
 | --- | --- |
 | `alert_evaluation_enabled` | `false` |
 | `digest_generation_enabled` | `false` |
-| `external_dispatch_enabled` | `false` (cannot be enabled in v1) |
+| `external_dispatch_enabled` | `false` — **and settable since v2.** ~~"cannot be enabled in v1"~~ (corrected 2026-09-13). Still `false` in Production; enabling it is an owner action at AAL2 |
 | `timezone` | `Asia/Riyadh` |
 | `digest_local_time` | `08:00` |
 | `warning_reminder_minutes` | `1440` |
@@ -497,11 +550,21 @@ idempotently skipped (`generated: []`). If the database or job runner is
 down at 08:00, the next hourly tick recovers the digest instead of losing
 the day. Overlap is prevented by advisory locks in both engines.
 
-**Internal-only guarantees (unchanged by activation):** external dispatch
-disabled (settings hard-reject + `operations_alert_outbox_v1_dormancy`
-constraint), no dispatcher exists, no provider credentials, no Push /
-Email / WhatsApp / SMS / OTP messages, no automatic remediation. The
-system only observes, evaluates, records, and renders internally.
+**Corrected 2026-09-13 — these were the v1 guarantees and the mechanism
+behind them has changed.** ~~"external dispatch disabled (settings
+hard-reject + `operations_alert_outbox_v1_dormancy` constraint), no
+dispatcher exists, no provider credentials"~~ — the hard-reject is gone, the
+constraint is replaced by `operations_alert_outbox_v2_dispatch`, a dispatcher
+is deployed, and the SMTP credential is configured and read.
+
+**What holds today:** nothing external is sent, because
+`external_dispatch_enabled` is `false` and the dispatcher checks it before
+claiming any row. No Push / WhatsApp / SMS / OTP messages are ever sent by
+this subsystem — those channels are still structurally blocked by the v2
+constraint — and there is still **no automatic remediation**. The system
+observes, evaluates, records and renders; with the flag off it also sends
+nothing. The difference from v1 is that this is now a **flag**, not an
+absence.
 
 **Verifying job health**
 
@@ -569,37 +632,92 @@ and disabled external dispatch untouched. Never reset
 migration-history tables.
 
 **Launch-day verification checklist**
-1. `cron.job` shows exactly 5 jobs (3 pre-existing + the 2 above), active.
+1. `cron.job` shows this subsystem's jobs active: `operations-alerts-evaluator`
+   (`*/5 * * * *`), `operations-digest-generator` (`0 * * * *`) and — since
+   `20260903130000` — `operations-alert-dispatch` (`*/5 * * * *`).
+   **Corrected 2026-09-13: this said "exactly 5 jobs (3 pre-existing + the 2
+   above)".** The database now holds **10** jobs, **9** active; the single
+   inactive one is `payment-refund-worker`, deliberately off under the §6
+   payment freeze. Count this subsystem's three rather than the total, which
+   grows with unrelated features.
 2. Latest evaluator runs are `success` (or safe skips), cadence ≈ 5 min.
 3. Yesterday's digest exists in both languages after 08:00 Riyadh.
 4. Operations Alerts inbox shows a truthful state (empty when healthy).
-5. `operations_alert_outbox` contains no external-channel rows outside
-   `blocked`/`cancelled` (constraint makes anything else impossible).
+5. `operations_alert_outbox` contains no `whatsapp`/`push` rows outside
+   `blocked`/`cancelled` — the v2 constraint still makes anything else
+   impossible for those two channels. **Corrected 2026-09-13: `email` is no
+   longer covered by that check.** While `external_dispatch_enabled` is
+   `false` there should be **zero** `email` rows at all; verify that instead
+   (measured 2026-09-13: 268 outbox rows, 0 on `email`).
 6. `external_dispatch_enabled` is still `false`.
 7. Operations Health tab unchanged and healthy.
 
-## External delivery (still a future version)
+## External delivery — BUILT AND DEPLOYED, waiting on one flag
 
-A reviewed dispatcher (Edge Function or job) plus a migration that
-drops/replaces the `operations_alert_outbox_v1_dormancy` constraint and
-lifts the settings-RPC hard-reject. Until all three ship together —
-each requiring separate explicit owner approval — external delivery
-remains structurally impossible.
+**Corrected 2026-09-13.** This section read ~~"A reviewed dispatcher (Edge
+Function or job) plus a migration that drops/replaces the
+`operations_alert_outbox_v1_dormancy` constraint and lifts the settings-RPC
+hard-reject. Until all three ship together — each requiring separate explicit
+owner approval — external delivery remains structurally impossible."~~
+
+**All three shipped, on 2026-09-07.** The prediction was accurate about what
+would be needed; nobody came back and updated the section once it happened.
+
+| Step | State |
+| --- | --- |
+| Migration `20260903120000` (constraint + hard-reject) | APPLIED 06:46:38 UTC, live version `20260907064638` |
+| Edge Function `operations-alert-dispatch` | DEPLOYED 07:18:43 UTC, ACTIVE v1 |
+| Scheduler `20260903130000` + two Vault secrets | APPLIED 08:23:17 UTC, live version `20260907082317`; `pg_cron` `*/5 * * * *`, active |
+| `external_dispatch_enabled` | **`false` — the only remaining interlock** |
+
+Turning the flag on is an owner action at AAL2 in the admin console
+(`OWNER_ACTIONS.md` §28 step 4). The AAL2 requirement is a property of that
+console path rather than of the setting — see `CLAUDE.md` §8, which records
+the measurement and the standing rule that an agent does not reach around the
+gate with the service key.
+
+**Expected volume at the default `critical` floor**, measured 2026-09-13 over
+the preceding 7 days: **4** `critical` opens, versus 56 `warning` opens and 60
+`info` recoveries. So single-digit emails per week as configured; lowering the
+floor to `warning` would mean roughly 116. There is **no backfill** — the
+producers only write `email` rows while the flag is already true, so the 268
+rows already in the outbox (0 on `email`) stay where they are.
+
+### Known defect, not fixed by this document
+
+`operations_digest_build` appends the literal line **"External delivery is
+disabled in this version."** to every English digest, unconditionally —
+verified in the live function body on 2026-09-13, and originating at
+`20260723090000_smart_operations_alerts_digest.sql:2110`. It is true today
+only by accident of the flag being off. **The moment external dispatch is
+enabled, every digest will carry a false sentence**, and the Arabic digest has
+no equivalent line at all. Fixing it needs a migration redefining
+`operations_digest_build`, which is a separate owner-approved action; it is
+recorded here rather than quietly left.
 
 ## Rollback plan
 
 The feature is additive, so rollback is a follow-up migration (never an
 edit of an applied one). **In an activated environment the automation must
-be stopped FIRST** — otherwise the two cron jobs keep firing every 5
-minutes/hourly against dropped functions, producing recurring pg_cron
-failures:
+be stopped FIRST** — otherwise the cron jobs keep firing against dropped
+functions, producing recurring pg_cron failures:
+
+> **Corrected 2026-09-13 — this plan named TWO cron jobs and there are now
+> THREE.** `operations-alert-dispatch` (`*/5 * * * *`, active) was added by
+> `20260903130000` and never added here. Following the plan as written would
+> have left it firing every five minutes against a dropped
+> `invoke_operations_alert_dispatch()` — precisely the failure mode the
+> warning immediately above exists to prevent. Step 1 now includes it, and
+> `external_dispatch_enabled` is set `false` first so nothing is claimed
+> mid-teardown.
 
 1. unschedule the automation and disable the engine flags (the "Safe
    disable / rollback" block in the runbook above:
    `cron.unschedule('operations-alerts-evaluator')`,
-   `cron.unschedule('operations-digest-generator')`, then set
-   `alert_evaluation_enabled = false` and
-   `digest_generation_enabled = false`);
+   `cron.unschedule('operations-digest-generator')`,
+   **`cron.unschedule('operations-alert-dispatch')`**, then set
+   `external_dispatch_enabled = false`, `alert_evaluation_enabled = false`
+   and `digest_generation_enabled = false`);
 2. drops the six `operations_alert*`/`operations_digest*` tables and the
    alert/digest functions;
 3. restores `operations_health_summary()` to its original self-contained
@@ -616,7 +734,10 @@ automatically once the probe RPC is gone.
 PG16 harness alongside the existing suites; single transaction, rolled
 back): object/security contract matrix, authorization matrix (7 customer
 denials, staff/admin split, wrapper ≡ snapshot output), dblink concurrency
-skip, dormant no-op, settings whitelist + external-dispatch hard-reject,
+skip, dormant no-op, settings whitelist + **the v2 positive path** (the RPC
+must accept enabling external dispatch, then return it to `false`) — corrected
+2026-09-13, this said "external-dispatch hard-reject", which the suite stopped
+asserting when v2 landed —
 baseline no-storm, open/dedup, escalation, downgrade, exactly-once
 recovery, reopen generations, reminder cooldowns, incident grouping, safe
 evidence & fingerprint charset, optional-system opt-in/mute, Riyadh
@@ -626,5 +747,7 @@ read-only sweep over operational tables, and fail-safe error handling.
 
 Frontend: 35 vitest cases across the capability classifier, the defensive
 normalizers, and the panel (inbox, filters, timelines, digest EN/AR + RTL,
-settings role split, disabled external toggle, fail-visible errors,
+settings role split, **the enabled external toggle** (corrected 2026-09-13 —
+this said "disabled external toggle"; the test pinning that state was the #332
+defect and was revisited when the limitation was lifted), fail-visible errors,
 no-action-buttons guarantee).
