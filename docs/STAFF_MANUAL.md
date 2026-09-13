@@ -129,6 +129,33 @@ it currently cannot sell with the time each item returns, and the two controls
 call-centre staff may use: pause or resume delivery, and disable or enable a
 named area.
 
+### A branch can now ASK for delivery to be closed
+
+Added 2026-09-13. A branch still cannot close delivery — that has not changed
+and is not going to. What it can now do is **send a request**: a duration, a
+reason, and an optional note. The request appears on the call-centre board, and
+an operator **accepts** (which closes delivery, for the requested time or a time
+the operator chooses) or **declines** (which changes nothing and records why).
+
+What to know while using it:
+
+- **Filing a request changes nothing.** Delivery keeps running until someone
+  accepts. If the branch genuinely cannot deliver, it must keep saying so until
+  an operator answers — the request is a message, not an action.
+- **One waiting request per branch.** A second one is refused while the first is
+  unanswered; withdraw it and send a new one if the situation changed.
+- **A request expires after an hour.** An hour-old "no drivers" may no longer be
+  true, so an unanswered request retires itself and the operator is told to ask
+  the branch for a fresh one rather than acting on stale information.
+- **The branch can withdraw** its own waiting request — when the driver turns up,
+  withdraw rather than leaving the call centre to act on it.
+- **The reason and note travel with it**, and the call centre sees both. "No
+  driver — both riders called in sick" is answerable; a bare request is not.
+
+Accepting applies exactly the same pause an operator would have set by hand,
+with the same audit trail, because it runs through the same control rather than
+a parallel one.
+
 **Two reasons an item cannot be ordered, and they need different answers.** An
 item the branch **closed** is their decision — ask them to reopen it. An item
 listed as **blocked** was never closed by anyone: every choice in one of its
