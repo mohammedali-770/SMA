@@ -12,6 +12,7 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import type { DeliveryArea, WorkingHoursDay } from '../../lib/branchConfigApi';
 import { WEEKDAYS, formatWindow } from '../admin/view/branches/workingHours';
+import { reasonKey } from './branchConsole';
 import type { BranchClosureSummary } from './callCentre';
 import { nonBlockingOptions, returnLabel } from './callCentre';
 import type { OpsLangValue } from './useOpsLang';
@@ -180,11 +181,21 @@ export const BranchDetailPanel: React.FC<{
             <Text variant="caption" tone="tertiary" as="p">—</Text>
           ) : (
             <div className="space-y-1">
-              {summary.closedProducts.map(({ product, snoozedUntil }) => {
+              {summary.closedProducts.map(({ product, snoozedUntil, reasonCode }) => {
                 const remaining = returnLabel(snoozedUntil, now);
+                // WHY, not just what and when. reason_code was fetched on every
+                // read and dropped before rendering, so an operator could see an
+                // item was off but never that the branch said "equipment down"
+                // — a different phone call from "out of stock".
+                const why = reasonKey(reasonCode);
                 return (
                   <div key={product.id} className="flex items-center justify-between gap-2">
-                    <Text variant="caption" as="span">{isRTL ? product.nameAr : product.nameEn}</Text>
+                    <div className="min-w-0">
+                      <Text variant="caption" as="span">{isRTL ? product.nameAr : product.nameEn}</Text>
+                      {why ? (
+                        <Text variant="caption" tone="tertiary" as="p">{t(why)}</Text>
+                      ) : null}
+                    </div>
                     <Text variant="caption" tone="tertiary" as="span" numeric>
                       {!snoozedUntil ? t('untimed') : remaining ? `${t('backIn')} ${remaining}` : t('reopeningNow')}
                     </Text>

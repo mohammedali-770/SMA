@@ -13,9 +13,11 @@ import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { LiveModeBadge } from '../admin/view/LiveModeBadge';
+import { RequestsWaitingCard } from './RequestsWaitingCard';
 import { DeliveryArea, WorkingHoursDay, branchConfig } from '../../lib/branchConfigApi';
 import {
   BranchAvailabilityRow, BranchDeliveryState, BranchModifierAvailabilityRow, DeliveryReasonCode,
+  DeliveryRequestRow,
   opsApi,
 } from '../../lib/opsApi';
 import {
@@ -57,6 +59,8 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
     useState<(BranchModifierAvailabilityRow & { branchId: string })[]>([]);
   const [areas, setAreas] = useState<DeliveryArea[]>([]);
   const [deliveryState, setDeliveryState] = useState<BranchDeliveryState[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<DeliveryRequestRow[]>([]);
+  const [requestError, setRequestError] = useState<string | null>(null);
   const [hours, setHours] = useState<WorkingHoursDay[]>([]);
   const [hoursBranchId, setHoursBranchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,12 +87,34 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
     return () => window.clearInterval(id);
   }, []);
 
+  /**
+   * Answer one request.
+   *
+   * The server may report `expired` rather than throwing: a request can lapse
+   * between this board rendering and the operator clicking, and the RPC retires
+   * it and says so instead of acting on an hour-old reason. Surfacing that as a
+   * message rather than silence is the point — the operator needs to know the
+   * branch must send a new one.
+   */
+  const answerRequest = async (requestId: string, accept: boolean) => {
+    setBusy(true); setRequestError(null);
+    try {
+      const out = await opsApi.resolveDeliveryRequest({ requestId, accept });
+      if (out.status === 'expired') setRequestError(t('requestNowExpired'));
+      await refresh();
+    } catch (e) {
+      setRequestError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const refresh = useCallback(async () => {
     try {
       // One round of reads, and one failure mode. A partial board is worse than
       // an error here: an operator cannot tell "no options closed" from "the
       // option read failed", and would tell a customer the item is fine.
-      const [avail, modAvail, allAreas, delivery] = await Promise.all([
+      const [avail, modAvail, allAreas, delivery, pending] = await Promise.all([
         opsApi.allAvailability(),
         opsApi.allModifierAvailability(),
         branchConfig.allAreas(),
@@ -97,11 +123,13 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
         // all-clear, and resuming left the branch marked paused, until the
         // whole application was reloaded.
         opsApi.branchDeliveryState(),
+        opsApi.pendingDeliveryRequests(),
       ]);
       setAvailability(avail);
       setModAvailability(modAvail);
       setAreas(allAreas);
       setDeliveryState(delivery);
+      setPendingRequests(pending);
       setLastUpdated(Date.now());
       setError(null);
     } catch (e) {
@@ -137,8 +165,10 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
     () => ({
       branches: liveBranches, products, availability, areas,
       modifierGroups, modifierAvailability: modAvailability,
+      pendingRequests,
     }),
-    [liveBranches, products, availability, areas, modifierGroups, modAvailability],
+    [liveBranches, products, availability, areas, modifierGroups, modAvailability,
+     pendingRequests],
   );
   const summaries = useMemo(() => buildClosureSummaries(boardInput), [boardInput]);
   // Branches whose only issue is an option that blocks nothing. Not board-worthy
@@ -221,6 +251,18 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
             variant="secondary" leading={<RefreshCw className="size-4" />} />
         </div>
       </div>
+
+      {/* Requests waiting for a decision, above everything that is merely
+          reported. Renders nothing when the queue is empty. */}
+      <RequestsWaitingCard
+        requests={pendingRequests}
+        branches={branches}
+        now={now}
+        busy={busy}
+        error={requestError}
+        i18n={i18n}
+        onAnswer={(id, accept) => { void answerRequest(id, accept); }}
+      />
 
       {toast ? <Notice title={toast} tone="warning" /> : null}
       {error ? <Notice title={t('loadFailed')} action={error} tone="blocking" /> : null}

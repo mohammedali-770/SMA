@@ -4,7 +4,9 @@
  */
 
 import type { Branch, Modifier, ModifierGroup, Product } from '../../types';
-import type { BranchAvailabilityRow, BranchModifierAvailabilityRow } from '../../lib/opsApi';
+import type {
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryRequestRow, OpsReasonCode,
+} from '../../lib/opsApi';
 import type { DeliveryArea } from '../../lib/branchConfigApi';
 import { formatRemaining, groupsForProduct, requiredCount } from './branchConsole';
 
@@ -31,6 +33,15 @@ export interface ClosedOption {
   modifier: Modifier;
   group: ModifierGroup;
   snoozedUntil: string | null;
+  /**
+   * WHY the branch closed it.
+   *
+   * This was fetched on every read and then dropped before rendering, so an
+   * operator could see that something was off and when it returned but never
+   * why — while the cashier who closed it had picked from a five-item
+   * vocabulary. "Out of stock" and "equipment down" are different phone calls.
+   */
+  reasonCode: OpsReasonCode | null;
 }
 
 /**
@@ -70,8 +81,12 @@ export interface BlockedProduct {
 
 export interface BranchClosureSummary {
   branch: Branch;
-  /** Products closed at this branch right now. */
-  closedProducts: { product: Product; snoozedUntil: string | null }[];
+  /** Products closed at this branch right now, with the branch's stated reason. */
+  closedProducts: {
+    product: Product;
+    snoozedUntil: string | null;
+    reasonCode: OpsReasonCode | null;
+  }[];
   /**
    * Products still marked available that no customer can order, because a
    * required option group has run out at this branch.
@@ -89,6 +104,17 @@ export interface BranchClosureSummary {
    */
   deliveryUntil: string | null;
   disabledAreas: DeliveryArea[];
+  /**
+   * Delivery-closure requests this branch is waiting on.
+   *
+   * Kept SEPARATE from the closure lists rather than folded into them, for the
+   * same reason closed and blocked products are separate: they demand different
+   * things of the operator. Everything else on this board has already happened
+   * and is merely reported; a waiting request is the only item that asks the
+   * operator to DECIDE something. One list would let the thing needing action
+   * disappear among the things that do not.
+   */
+  pendingRequests: DeliveryRequestRow[];
   /**
    * How loud this branch should be on the board. Delivery being off is a bigger
    * operational fact than one sold-out item, so it counts for more than a single
@@ -119,6 +145,11 @@ export interface BuildSummariesInput {
   modifierGroups: ModifierGroup[];
   modifierAvailability: (BranchModifierAvailabilityRow & { branchId: string })[];
   areas: DeliveryArea[];
+  /**
+   * Requests still waiting for an answer. Optional so every existing caller and
+   * test keeps working unchanged; absent means none.
+   */
+  pendingRequests?: DeliveryRequestRow[];
 }
 
 /** The same ordering rule for a derived return time. */
@@ -177,13 +208,13 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
   const { branches, products, availability, modifierGroups, modifierAvailability, areas } = input;
   const productById = new Map(products.map((p) => [p.id, p]));
 
-  const closedByBranch = new Map<string, { product: Product; snoozedUntil: string | null }[]>();
+  const closedByBranch = new Map<string, BranchClosureSummary['closedProducts']>();
   for (const row of availability) {
     if (row.isAvailable) continue;
     const product = productById.get(row.productId);
     if (!product) continue;                       // catalog row gone; nothing to name
     const list = closedByBranch.get(row.branchId) ?? [];
-    list.push({ product, snoozedUntil: row.snoozedUntil });
+    list.push({ product, snoozedUntil: row.snoozedUntil, reasonCode: row.reasonCode });
     closedByBranch.set(row.branchId, list);
   }
 
@@ -201,11 +232,18 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     const modifier = group.modifiers.find((m) => m.id === row.modifierId);
     if (!modifier) continue;
     const list = closedOptionsByBranch.get(row.branchId) ?? [];
-    list.push({ modifier, group, snoozedUntil: row.snoozedUntil });
+    list.push({ modifier, group, snoozedUntil: row.snoozedUntil, reasonCode: row.reasonCode });
     closedOptionsByBranch.set(row.branchId, list);
     const ids = closedOptionIdsByBranch.get(row.branchId) ?? new Set<string>();
     ids.add(row.modifierId);
     closedOptionIdsByBranch.set(row.branchId, ids);
+  }
+
+  const requestsByBranch = new Map<string, DeliveryRequestRow[]>();
+  for (const req of input.pendingRequests ?? []) {
+    const list = requestsByBranch.get(req.branchId) ?? [];
+    list.push(req);
+    requestsByBranch.set(req.branchId, list);
   }
 
   const disabledByBranch = new Map<string, DeliveryArea[]>();
@@ -232,8 +270,14 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       alreadyClosed: new Set(closedProducts.map((c) => c.product.id)),
     });
 
+    const pendingRequests = requestsByBranch.get(branch.id) ?? [];
+
+    // A branch with NOTHING closed but a request waiting must still reach the
+    // board: it is asking for something. Omitting it would make the one item
+    // that needs an operator the one item the board never shows.
     if (closedProducts.length === 0 && blockedProducts.length === 0
-        && !deliveryPaused && disabledAreas.length === 0) continue;
+        && !deliveryPaused && disabledAreas.length === 0
+        && pendingRequests.length === 0) continue;
 
     summaries.push({
       branch,
@@ -244,8 +288,11 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       deliveryPaused,
       deliveryUntil,
       disabledAreas,
+      pendingRequests,
+      // A waiting request weighs more than delivery already being off: the
+      // paused branch has been dealt with, the waiting one has not.
       severity: closedProducts.length + blockedProducts.length + disabledAreas.length
-        + (deliveryPaused ? 5 : 0),
+        + (deliveryPaused ? 5 : 0) + (pendingRequests.length > 0 ? 6 : 0),
     });
   }
 
@@ -344,7 +391,7 @@ export function optionOnlyBranches(input: BuildSummariesInput): OptionOnlyBranch
     const modifier = group?.modifiers.find((m) => m.id === row.modifierId);
     if (!group || !modifier) continue;
     const list = byBranch.get(row.branchId) ?? [];
-    list.push({ modifier, group, snoozedUntil: row.snoozedUntil });
+    list.push({ modifier, group, snoozedUntil: row.snoozedUntil, reasonCode: row.reasonCode });
     byBranch.set(row.branchId, list);
   }
 
@@ -379,6 +426,9 @@ export function nonBlockingOptions(summary: BranchClosureSummary): ClosedOption[
  * branch does not know it has happened, so nobody is dealing with it.
  */
 export function severityBand(summary: BranchClosureSummary): 'critical' | 'warning' | 'info' {
+  // A waiting request is critical even at an otherwise healthy branch: somebody
+  // is on the other end of it, and it expires unanswered.
+  if (summary.pendingRequests.length > 0) return 'critical';
   if (summary.deliveryPaused) return 'critical';
   if (summary.blockedProducts.length > 0) return 'warning';
   if (summary.severity >= 3) return 'warning';

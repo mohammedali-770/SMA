@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**175 TypeScript test files declaring 2725 test blocks, plus 73 SQL suites.**
+**176 TypeScript test files declaring 2737 test blocks, plus 73 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -188,7 +188,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-89 files, 1235 declared test blocks.
+90 files, 1247 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -227,10 +227,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/ops/BranchConsole.test.tsx` | 15 | BranchConsole |
 | `src/components/ops/branchReference.test.ts` | 20 | delivery request state |
 | `src/components/ops/BranchReferenceCard.test.tsx` | 9 | BranchReferenceCard |
-| `src/components/ops/callCentre.test.ts` | 51 | buildClosureSummaries |
+| `src/components/ops/callCentre.test.ts` | 56 | buildClosureSummaries |
 | `src/components/ops/CallCentreConsole.test.tsx` | 28 | CallCentreConsole |
 | `src/components/ops/opsRefreshQueue.test.ts` | 5 | makeRefreshQueue |
 | `src/components/ops/opsStrings.test.ts` | 4 | ops console copy |
+| `src/components/ops/RequestsWaitingCard.test.tsx` | 7 | RequestsWaitingCard |
 | `src/components/Price.contract.test.tsx` | 13 | digits render mono |
 | `src/components/Price.test.tsx` | 6 | Price (web) |
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
