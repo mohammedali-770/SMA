@@ -156,6 +156,31 @@ Accepting applies exactly the same pause an operator would have set by hand,
 with the same audit trail, because it runs through the same control rather than
 a parallel one.
 
+### The branch reference sheet
+
+Added 2026-09-13. The branch console gains a second section: the reference
+material a cashier actually needs at the counter — telephone numbers, links,
+free-text notes, and **credentials**. Before this, a branch account could not
+see so much as its own branch's telephone number.
+
+**Who can see what.** A branch sees **its own** branch's entries and no other's.
+The call centre can read every branch's entries, because it needs branch
+reference material while a customer is on the line — but it **cannot reveal any
+branch's credentials**. Only the branch itself, or an administrator, can do that.
+
+**Credentials are handled differently from everything else, on purpose.**
+
+- They are **not stored beside the other text.** The value is held in Supabase
+  Vault; the reference row holds only a pointer. A copy of the database does not
+  hand anyone the passwords.
+- They are **shown masked**, and revealed only when you deliberately ask.
+- **Every reveal is recorded** — who looked, at which entry, and when. Not the
+  value; just the fact. If a credential has to be rotated after somebody leaves,
+  that record is how you know what they saw.
+
+Treat a reveal as a deliberate act rather than a glance. Administrators add and
+rotate these entries; branches and the call centre never edit them.
+
 **Two reasons an item cannot be ordered, and they need different answers.** An
 item the branch **closed** is their decision — ask them to reopen it. An item
 listed as **blocked** was never closed by anyone: every choice in one of its

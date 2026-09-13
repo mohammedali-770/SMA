@@ -134,6 +134,19 @@ lives only in `integration_settings`; the admin UI reads the non-secret projecti
 - **PII retention** in `payment_records.raw` and the authenticated webhook log
   paths (full gateway payload, staff-only). Standard for reconciliation; consider a
   retention/redaction policy and row TTL before scale.
+- **Branch credential store, added 2026-09-13 (`20260917120000`, not yet
+  applied).** The branch reference sheet lets an administrator store credentials
+  for cashier use. The posture chosen, in preference to a plaintext column with
+  RLS: values live in **Supabase Vault**, so `vault.decrypted_secrets` — readable
+  by `postgres` and `service_role` only, never by `authenticated` — is the store,
+  and the reference table holds a pointer. The single door is a `SECURITY DEFINER`
+  RPC that is **branch-scoped**, **writes an audit row before returning**, and
+  emits no `NOTICE` (a notice would put the value in the Postgres log). The call
+  centre can read entry rows for every branch but can reveal **no** branch's
+  credentials. Residual risk, stated rather than buried: `branch_staff` accounts
+  have **no MFA**, so a compromised branch session can reveal that branch's
+  credentials — the audit trail is what bounds the damage, not prevention.
+
 - **Leaked-password protection is OFF** in Supabase Auth (advisor `0027`). Enable
   HaveIBeenPwned checking in the dashboard (Auth → Policies) — free, no code.
 - **Coupon/loyalty cross-account abuse beyond the counter** is bounded by the fixes
