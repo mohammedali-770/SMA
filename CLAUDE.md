@@ -226,18 +226,48 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-15: 129 repository files / 133 live history rows /
-TWO unapplied — Moyasar (frozen on purpose) and
-`20260915120000_digest_external_delivery_line` (written, validated, awaiting
-approval).** Latest live version is still `20260909121702` (ledger row 88);
-nothing has been applied since.
+**Current position 2026-09-13, after `20260915120000_digest_external_delivery_line`
+was APPLIED: 129 repository files / 134 live history rows / exactly ONE unapplied —
+Moyasar, unapplied on purpose.** Latest live version `20260913054610`, applied
+05:46:10 UTC on explicit owner approval naming the target by version; ledger
+row 89.
 
-**The count went 1 → 2 by a new file, which restores the *appearance* of an
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE.** One file left means "apply the
+outstanding migrations" reads like a no-op and is the one instruction that would
+break the §6 freeze — there is no other file it could mean. **Name the target by
+version.**
+
+**APPLYING IT CHANGED NOTHING, AND THE PROOF IS A TIMESTAMP RATHER THAN A
+COUNT.** `operations_alert_settings.updated_at` is still `2026-07-22
+16:55:57.003975+00`, unmoved — so the migration performed **no write at all**.
+That is by design: it deliberately does not flip the flag to exercise both
+branches, because that would bump this column on a change meant to move nothing.
+Outbox still 272 rows with 0 on `email`; 108 stored digests unchanged (it
+rewrites no digest already written, only what future renders say); money-path
+pair unchanged (`e54caa33…` / `ca276a84…`); Moyasar re-verified absent.
+
+**It was called afterwards, independently of its own block**, in both languages:
+`External delivery is disabled.` / `الإرسال الخارجي معطل.`, with the retracted
+sentence unreachable in either rendered output.
+
+**A ONE-BYTE HASH DISCREPANCY WAS A MEASUREMENT ERROR, NOT A TRANSCRIPTION SLIP
+— the third of its kind here, and the first at the OPENING delimiter.** `prosrc`
+includes the newline immediately **after** `as $$`, and the extraction had
+started past it. Row 81 recorded the `md5(prosrc)` vs `md5(pg_get_functiondef)`
+basis trap; row 88 recorded the closing delimiter. All three times the file was
+fine and the measurement was not. **Check the span before reporting a mismatch.**
+
+**Superseded, kept because the count is the point: 129 repository files / 133
+live history rows / TWO unapplied — Moyasar (frozen on purpose) and
+`20260915120000_digest_external_delivery_line` (written, validated, awaiting
+approval).**
+
+**That count went 1 → 2 by a new file, which restored the *appearance* of an
 innocent referent without making a bulk apply any safer.** `20260824100000`
 still sorts ahead of everything, so "apply the outstanding migrations" would
 sweep the frozen payment file in first. **Name the target by version.**
 
-**The new file makes the daily digest stop lying about external delivery.**
+**The file makes the daily digest stop lying about external delivery.**
 `operations_digest_build` ended every digest — English *and* Arabic — with a
 fixed sentence saying external delivery is disabled "in this version". That was
 true while v1 had no dispatcher; since 2026-09-07 the dispatcher is deployed and
@@ -811,7 +841,7 @@ by version.**
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260915120000_digest_external_delivery_line.sql` | **UNAPPLIED — written, validated, awaiting owner approval.** Redefines `operations_digest_build` so the closing external-delivery line is derived from `external_dispatch_enabled` instead of asserting, unconditionally and in both languages, that delivery is disabled "in this version". sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`, 423 lines / 20 247 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched; it sends nothing; NO DEPLOY IMPLIED** (unchanged signature, so callers bind to the new body). Applying it changes no stored digest — digests already written are rows — and with the flag false the new footer reads "External delivery is disabled.", the same claim minus the false version clause. **Derived, not retyped:** the body is extracted from `20260723090000_smart_operations_alerts_digest.sql` lines 1889-2141 (the only migration that has ever defined it) under four anchored substitutions, each asserted to match exactly once; a diff of old vs new body shows only those four regions, 253 → 271 lines. Its own verification asserts one overload, five `v_external_on` references enumerated by site, both retracted literals absent, all four replacement literals present, then **calls** the function in both languages and compares the final rendered line against the live flag. Validated on the local chain harness (129 migrations, 71 suites, 69 passed, 2 quarantined, 0 new failures) and mutation-tested five ways — all five killed by the migration's check, four of five by the paired suite (the fifth mutates the checker itself). |
+| `20260915120000_digest_external_delivery_line.sql` | **APPLIED 2026-09-13 05:46:10 UTC**, live version `20260913054610`, on explicit owner approval ("apply 20260915120000" — named by version), one call. Ledger row 89, and the row that returns the outstanding count to ONE. The merged copy was re-hashed and matched before sending; the stored body is **byte-identical** (`96bd50d399c8f47a0a50bb62f050ceae`, 11 689 chars). **Applying it performed no write at all** — `operations_alert_settings.updated_at` is still 2026-07-22 16:55:57, which is stronger evidence than any row count; outbox 272/0-email, 108 stored digests, money-path pair all unchanged. Called live afterwards in both languages. A one-byte hash discrepancy was traced to the extraction span (the newline after `as $$`), not to the file. Historical description follows.  Redefines `operations_digest_build` so the closing external-delivery line is derived from `external_dispatch_enabled` instead of asserting, unconditionally and in both languages, that delivery is disabled "in this version". sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`, 423 lines / 20 247 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched; it sends nothing; NO DEPLOY IMPLIED** (unchanged signature, so callers bind to the new body). Applying it changes no stored digest — digests already written are rows — and with the flag false the new footer reads "External delivery is disabled.", the same claim minus the false version clause. **Derived, not retyped:** the body is extracted from `20260723090000_smart_operations_alerts_digest.sql` lines 1889-2141 (the only migration that has ever defined it) under four anchored substitutions, each asserted to match exactly once; a diff of old vs new body shows only those four regions, 253 → 271 lines. Its own verification asserts one overload, five `v_external_on` references enumerated by site, both retracted literals absent, all four replacement literals present, then **calls** the function in both languages and compares the final rendered line against the live flag. Validated on the local chain harness (129 migrations, 71 suites, 69 passed, 2 quarantined, 0 new failures) and mutation-tested five ways — all five killed by the migration's check, four of five by the paired suite (the fifth mutates the checker itself). |
 | `20260907120000_loyalty_pickup_only.sql` | **APPLIED 2026-09-09 05:50:16 UTC**, live version `20260909055016`, on explicit owner approval ("apply 20260907120000" — named by version), one call, target named explicitly. Ledger row 82. Body fidelity proven byte-for-byte against the merged file (`prosrc` md5 `8351e2641b1cb45ab5dcbc52d8c8194f` / `3d042e691ad933b121552dde146ce06d`), which matters because the MCP tool takes SQL inline and a transcription slip would have been silent. Both functions remain `service_role`-only. Delivery behaviour was proven on the LOCAL harness, not in Production, because asserting it needs a real `place_order` and that means a real kitchen ticket. Historical description follows. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
 | `20260908120000_loyalty_item_exclusion.sql` | **APPLIED 2026-09-09 06:20:00 UTC**, live version `20260909062000`, on explicit owner approval ("apply 20260908120000" — named by version), one call. Ledger row 83. Step 1's gate was confirmed present in both live bodies BEFORE sending, not merely trusted to the file's own check. All three bodies verified byte-identical against the merged file. Applying excluded nothing (0 of 61 products). `compute_order_snapshot` verified still closed to both `anon` and `authenticated` after the new wrapper landed. Historical description follows. Per-item loyalty exclusion: `products.earns_loyalty_points` (defaults TRUE, so applying it excludes nothing), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points` — a narrow `SECURITY DEFINER` RPC so checkout can show the figure without a third copy of the rule or opening `compute_order_snapshot` to clients. sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions again**, so their hashes change a second time. Its self-verification refuses to land unless the pickup-only gate from `20260907120000` is already present in both functions, which is what enforces the order. Validated on the local chain harness (122 migrations, 64 suites, 0 new failures) and mutation-tested three ways. No deploy implied. |
 | `20260909120000_loyalty_expiry.sql` | **APPLIED 2026-09-09 06:53:34 UTC**, live version `20260909065334`, on explicit owner approval ("apply 20260909120000" — named by version), one call. Ledger row 84. sha256 `7606d27a05e77ac887c47dc833bf0fd03a373664ac300cd989fe59f49c1fbedd`, 384 lines / 18 546 bytes — recorded at apply time, since no fingerprint existed for this file beforehand. **Applying it expired nothing** (5 409 points, 111 ledger rows, 0 `expire` rows, all unchanged); the cron job is live and was proven inert by invoking the driver, which returned `disabled`. Money-path hashes **unchanged** — the one loyalty step that redefines neither. All 111 existing ledger rows were counted through the widened type CHECK before sending (0 violations), per row 79's lesson. Historical description follows. Points expiry on a fixed calendar reset: four settings columns plus a system-owned `loyalty_expiry_next_run_on`, the ledger type CHECK widened to admit `expire`, `run_loyalty_expiry()` and a daily `pg_cron` job. **Independent of the other two loyalty files — it redefines neither money-path function, so their hashes are unchanged by it.** Applying it changes nothing: expiry defaults OFF and its self-verification asserts the live row is disabled and unscheduled. **Enabling it is a separate decision and needs updated T&Cs first.** No deploy implied. |
