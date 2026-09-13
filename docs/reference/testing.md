@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**173 TypeScript test files declaring 2696 test blocks, plus 71 SQL suites.**
+**173 TypeScript test files declaring 2696 test blocks, plus 73 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -44,6 +44,8 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/branch_availability_retention_test.sql`
 - `supabase/tests/branch_availability_snooze_test.sql`
 - `supabase/tests/branch_delivery_control_test.sql`
+- `supabase/tests/branch_delivery_requests_test.sql`
+- `supabase/tests/branch_reference_entries_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/comp_members_test.sql`
 - `supabase/tests/coupon_code_identity_guard_test.sql`
