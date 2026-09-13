@@ -422,9 +422,15 @@ identities.
   top recurring conditions, and explicit no-incident lines
   ("No incidents in this period." / "لا توجد حوادث خلال هذه الفترة.") —
   a quiet day still yields a truthful digest.
-- Every rendered digest ends with "External delivery is disabled in this
-  version." (AR equivalent) so a stored digest can never be mistaken for a
-  sent message.
+- Every rendered digest ends with a line stating whether external delivery is
+  on, **derived from the live flag** rather than fixed — "External delivery is
+  disabled." / "الإرسال الخارجي معطل." when off, "External delivery is enabled
+  (email)." / "الإرسال الخارجي مُفعّل (بريد)." when on. A stored digest can
+  therefore never be mistaken for a sent message, and equally never claims to
+  be unsendable while mail is going out. **Corrected 2026-09-15:** this said
+  the footer was the fixed sentence "External delivery is disabled in this
+  version."; `20260915120000_digest_external_delivery_line` replaced it,
+  because the version claim became false the moment the dispatcher shipped.
 - `operations_digest_preview(p_language)` is a staff-gated, **read-only**
   "today so far" render (`preview: true`); it stores nothing.
 
@@ -683,17 +689,39 @@ floor to `warning` would mean roughly 116. There is **no backfill** — the
 producers only write `email` rows while the flag is already true, so the 268
 rows already in the outbox (0 on `email`) stay where they are.
 
-### Known defect, not fixed by this document
+### The digest footer — defect recorded 2026-09-13, FIXED 2026-09-15 (unapplied)
 
-`operations_digest_build` appends the literal line **"External delivery is
-disabled in this version."** to every English digest, unconditionally —
-verified in the live function body on 2026-09-13, and originating at
-`20260723090000_smart_operations_alerts_digest.sql:2110`. It is true today
-only by accident of the flag being off. **The moment external dispatch is
-enabled, every digest will carry a false sentence**, and the Arabic digest has
-no equivalent line at all. Fixing it needs a migration redefining
-`operations_digest_build`, which is a separate owner-approved action; it is
-recorded here rather than quietly left.
+`operations_digest_build` appended the literal line **"External delivery is
+disabled in this version."** to every digest, unconditionally. True only by
+accident of the flag being off; the moment dispatch is enabled, every digest
+would assert something false — in an artifact that is *stored* and read after
+the fact.
+
+`20260915120000_digest_external_delivery_line.sql` replaces it with a line
+derived from the live flag, in both languages. **Written and validated, NOT
+YET APPLIED** — applying it is an owner action under CLAUDE.md §5, and it is
+the second outstanding migration alongside the frozen Moyasar file, so name
+the target by version.
+
+**A CORRECTION THAT IS WORTH MORE THAN THE FIX.** The 2026-09-13 revision of
+this section said *"the Arabic digest has no equivalent line at all"*. **That
+was false.** The Arabic line exists and always has —
+`الإرسال الخارجي معطل في هذا الإصدار.` at
+`20260723090000_smart_operations_alerts_digest.sql:2054`. The claim came from
+querying the live function body for a **guessed** Arabic phrase, getting no
+match, and reading that as absence. The search term was never validated
+against a case it should have matched.
+
+**A negative search proves nothing until the term is shown to find the
+positive case.** This is the same failure as §8's stale-fingerprint lesson in
+`CLAUDE.md` wearing different clothes: a number — or here a null result —
+quoted as evidence, without being recomputed from the artifact. Both languages
+were affected, and the fix covers both.
+
+**No new Arabic copy was drafted.** Both replacement phrasings are lifted from
+copy already shipping in the admin console
+(`OperationsAlertsPanel.tsx:256-257`), so nothing engineering-drafted enters a
+stored artifact.
 
 ## Rollback plan
 
@@ -744,6 +772,25 @@ evidence & fingerprint charset, optional-system opt-in/mute, Riyadh
 digest-boundary math (20:59:59Z vs 21:00:01Z), digest idempotency +
 no-incident rendering + preview read-only, outbox dormancy CHECK, engine
 read-only sweep over operational tables, and fail-safe error handling.
+
+`supabase/tests/operations_digest_external_delivery_line_test.sql` pins the
+flag-derived footer added by `20260915120000`: **two flag states x two
+languages**, asserting the exact final line each time, that the retracted
+"in this version" sentence is unreachable in either state, and that the footer
+is the *last* line of a stored-mode render rather than merely present. It
+mutates `external_dispatch_enabled` inside the rolled-back transaction, which
+is why it lives here rather than in the migration's own verification block —
+that block must not write, because a write would bump
+`operations_alert_settings.updated_at` on a migration meant to change nothing.
+
+**Both checks guard against a vacuous pass, and that is not theoretical.** The
+first draft of the migration's verification read `->> 'body'`; the real key is
+`rendered_body`, so it got NULL — and `NULL <> 'x'` is NULL rather than true,
+so every assertion was silently skipped and the block reported success. Both
+now read the right key, use `is distinct from`, and fail explicitly if
+`rendered_body` comes back NULL. Mutation-tested five ways; all five killed by
+the migration's check, four of five by this suite (the fifth mutates the
+checker itself, so only the checker can catch it).
 
 Frontend: 35 vitest cases across the capability classifier, the defensive
 normalizers, and the panel (inbox, filters, timelines, digest EN/AR + RTL,

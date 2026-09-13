@@ -24,6 +24,44 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-15 — the count is TWO again, and the second file is not
+> frozen.** `20260915120000_digest_external_delivery_line.sql` is **written,
+> validated and NOT applied**. It redefines `operations_digest_build` so the
+> line closing every digest is derived from `external_dispatch_enabled` rather
+> than asserting, unconditionally and in both languages, that external delivery
+> is disabled "in this version" — a claim that becomes false the moment the flag
+> is turned on, inside an artifact that is stored and read afterwards.
+>
+> sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`,
+> 423 lines / 20 247 bytes — **re-hash the merged copy before applying** (§9-B.7).
+> Money path untouched, nothing sent, **no deploy implied** (unchanged signature,
+> so callers bind to the new body — row 77's lesson). Applying it changes no
+> stored digest; with the flag false the new footer makes the same claim as
+> before, minus the version clause. Validated on the local chain harness at
+> **129 migrations / 71 suites / 69 passed / 2 quarantined / 0 new failures**,
+> and mutation-tested five ways.
+>
+> **This restores the *appearance* of an innocent referent without making a bulk
+> apply any safer.** `20260824100000` still sorts ahead of everything, so "apply
+> the outstanding migrations" takes the frozen payment file first. Name the
+> target by version.
+>
+> **Three authoring failures are recorded here because they generalise beyond
+> this file.** (1) The note that motivated it claimed the Arabic digest had no
+> equivalent line; it does, and always did — the claim came from searching the
+> live body for a **guessed** Arabic phrase and reading the null result as
+> absence. **A negative search proves nothing until the term is validated on a
+> known positive.** (2) The migration's first verification block read
+> `->> 'body'` when the key is `rendered_body`, got NULL, and **passed** — because
+> `NULL <> 'x'` is NULL rather than true, so every assertion was skipped. Use
+> `is distinct from`, and fail explicitly on NULL. (3) Mutation testing then
+> showed it still passing when the *enabled* branch was corrupted, because the
+> live flag is false so that branch never runs — **proving the current state is
+> not proving both**. Both branches are now asserted at source level, and both
+> states exercised in the paired suite, which can mutate the flag because it
+> rolls back. The migration itself performs no write, since one would bump
+> `operations_alert_settings.updated_at` on a change meant to move nothing.
+
 > **Updated 2026-09-09 (final) — `20260914120000` is APPLIED, and the count is
 > back to ONE: Moyasar, frozen on purpose.**
 > **128 repository files / 133 live history rows**, latest live version
