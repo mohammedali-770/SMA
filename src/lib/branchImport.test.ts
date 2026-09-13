@@ -5,8 +5,14 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  resolveBranch, parseTime, parseDayCell, splitRows,
-  parseHours, parseAreas, hoursTemplate, areasTemplate,
+  resolveBranch,
+  parseTime,
+  parseDayCell,
+  splitRows,
+  parseHours,
+  parseAreas,
+  hoursTemplate,
+  areasTemplate,
   WEEKDAY_KEYS,
   type ImportBranch,
 } from './branchImport';
@@ -28,8 +34,14 @@ const HOURS_HEADER = 'branch\tsun\tmon\ttue\twed\tthu\tfri\tsat';
 
 describe('splitRows', () => {
   it('uses tabs when the document contains any, commas otherwise', () => {
-    expect(splitRows('a\tb\nc\td')).toEqual([['a', 'b'], ['c', 'd']]);
-    expect(splitRows('a,b\nc,d')).toEqual([['a', 'b'], ['c', 'd']]);
+    expect(splitRows('a\tb\nc\td')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
+    expect(splitRows('a,b\nc,d')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
   });
 
   it('does not switch delimiter per line', () => {
@@ -39,7 +51,10 @@ describe('splitRows', () => {
   });
 
   it('trims each cell and tolerates CRLF', () => {
-    expect(splitRows(' a \t b \r\n c \t d ')).toEqual([['a', 'b'], ['c', 'd']]);
+    expect(splitRows(' a \t b \r\n c \t d ')).toEqual([
+      ['a', 'b'],
+      ['c', 'd'],
+    ]);
   });
 });
 
@@ -98,7 +113,10 @@ describe('parseDayCell', () => {
 
   it('parses a normal window', () => {
     expect(parseDayCell('11:00-23:00')).toEqual({
-      isClosed: false, opensAt: '11:00', closesAt: '23:00', message: null,
+      isClosed: false,
+      opensAt: '11:00',
+      closesAt: '23:00',
+      message: null,
     });
   });
 
@@ -142,7 +160,10 @@ describe('parseHours', () => {
     expect(plan.rows[0].days.map((d) => d.dayOfWeek)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     // dayOfWeek 5 is Friday, which is the column headed `fri`.
     expect(plan.rows[0].days[5]).toEqual({
-      dayOfWeek: 5, isClosed: false, opensAt: '13:00', closesAt: '02:00',
+      dayOfWeek: 5,
+      isClosed: false,
+      opensAt: '13:00',
+      closesAt: '02:00',
     });
     expect(plan.rows[0].closedCount).toBe(0);
   });
@@ -226,11 +247,7 @@ describe('parseHours', () => {
 
   it('skips blank lines in the middle of a paste without shifting line numbers', () => {
     const plan = parseHours(
-      [
-        HOURS_HEADER,
-        '',
-        'Nowhere\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed',
-      ].join('\n'),
+      [HOURS_HEADER, '', 'Nowhere\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed'].join('\n'),
       BRANCHES,
     );
     expect(plan.errors[0].line).toBe(3);
@@ -281,21 +298,17 @@ describe('parseAreas', () => {
   });
 
   it('MARKS a duplicate of an existing area, because addArea always inserts', () => {
-    const plan = parseAreas(
-      `${AREAS_HEADER}\nOlaya\tالسليمانية\tSulaimaniyah`,
-      BRANCHES,
-      [{ branchId: 'b-olaya', nameAr: 'السليمانية' }],
-    );
+    const plan = parseAreas(`${AREAS_HEADER}\nOlaya\tالسليمانية\tSulaimaniyah`, BRANCHES, [
+      { branchId: 'b-olaya', nameAr: 'السليمانية' },
+    ]);
     expect(plan.errors).toEqual([]);
     expect(plan.rows[0].duplicate).toBe(true);
   });
 
   it('scopes the duplicate check to the branch', () => {
-    const plan = parseAreas(
-      `${AREAS_HEADER}\nMalaz\tالسليمانية\tSulaimaniyah`,
-      BRANCHES,
-      [{ branchId: 'b-olaya', nameAr: 'السليمانية' }],
-    );
+    const plan = parseAreas(`${AREAS_HEADER}\nMalaz\tالسليمانية\tSulaimaniyah`, BRANCHES, [
+      { branchId: 'b-olaya', nameAr: 'السليمانية' },
+    ]);
     expect(plan.rows[0].duplicate).toBe(false);
   });
 
@@ -308,10 +321,7 @@ describe('parseAreas', () => {
   });
 
   it('reports an unresolved branch by pasted line and keeps the rest', () => {
-    const plan = parseAreas(
-      [AREAS_HEADER, 'Nowhere\tحي\t', 'Malaz\tحي\t'].join('\n'),
-      BRANCHES,
-    );
+    const plan = parseAreas([AREAS_HEADER, 'Nowhere\tحي\t', 'Malaz\tحي\t'].join('\n'), BRANCHES);
     expect(plan.errors).toEqual([{ line: 2, message: 'no branch matches "Nowhere"' }]);
     expect(plan.rows).toHaveLength(1);
   });
@@ -328,9 +338,7 @@ describe('templates', () => {
     expect(plan.errors).toEqual([]);
     expect(plan.rows).toHaveLength(BRANCHES.length);
     expect(plan.rows.every((r) => r.closedCount === 7)).toBe(true);
-    expect(plan.rows.map((r) => r.branch.id).sort()).toEqual(
-      BRANCHES.map((b) => b.id).sort(),
-    );
+    expect(plan.rows.map((r) => r.branch.id).sort()).toEqual(BRANCHES.map((b) => b.id).sort());
   });
 
   it('uses the id for a branch whose name is not unique, so its own sheet imports', () => {

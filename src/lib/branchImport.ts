@@ -37,13 +37,24 @@ export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
 
 /** Longer spellings people actually paste, mapped to the canonical key. */
 const WEEKDAY_ALIASES: Record<string, WeekdayKey> = {
-  sun: 'sun', sunday: 'sun',
-  mon: 'mon', monday: 'mon',
-  tue: 'tue', tues: 'tue', tuesday: 'tue',
-  wed: 'wed', weds: 'wed', wednesday: 'wed',
-  thu: 'thu', thur: 'thu', thurs: 'thu', thursday: 'thu',
-  fri: 'fri', friday: 'fri',
-  sat: 'sat', saturday: 'sat',
+  sun: 'sun',
+  sunday: 'sun',
+  mon: 'mon',
+  monday: 'mon',
+  tue: 'tue',
+  tues: 'tue',
+  tuesday: 'tue',
+  wed: 'wed',
+  weds: 'wed',
+  wednesday: 'wed',
+  thu: 'thu',
+  thur: 'thu',
+  thurs: 'thu',
+  thursday: 'thu',
+  fri: 'fri',
+  friday: 'fri',
+  sat: 'sat',
+  saturday: 'sat',
 };
 
 export interface RowError {
@@ -95,10 +106,7 @@ export interface BranchResolution {
   message: string | null;
 }
 
-export function resolveBranch(
-  token: string,
-  branches: readonly ImportBranch[],
-): BranchResolution {
+export function resolveBranch(token: string, branches: readonly ImportBranch[]): BranchResolution {
   const needle = token.trim();
   if (!needle) return { branch: null, message: 'the branch column is empty' };
 
@@ -153,7 +161,9 @@ export function parseDayCell(raw: string): DayCellResult {
   const parts = cell.split(/\s*[-–]\s*/);
   if (parts.length !== 2) {
     return {
-      isClosed: false, opensAt: null, closesAt: null,
+      isClosed: false,
+      opensAt: null,
+      closesAt: null,
       message: `"${cell}" is not a time window (expected 11:00-23:00 or "closed")`,
     };
   }
@@ -161,7 +171,9 @@ export function parseDayCell(raw: string): DayCellResult {
   const closesAt = parseTime(parts[1]);
   if (!opensAt || !closesAt) {
     return {
-      isClosed: false, opensAt: null, closesAt: null,
+      isClosed: false,
+      opensAt: null,
+      closesAt: null,
       message: `"${cell}" has a time that is not HH:MM`,
     };
   }
@@ -332,9 +344,7 @@ export function parseAreas(
     return { rows: [], errors };
   }
 
-  const already = new Set(
-    existing.map((a) => `${a.branchId}::${a.nameAr.trim()}`),
-  );
+  const already = new Set(existing.map((a) => `${a.branchId}::${a.nameAr.trim()}`));
   // Duplicates WITHIN the paste count too, or one run inserts the same area twice.
   const inPaste = new Set<string>();
 
@@ -354,7 +364,7 @@ export function parseAreas(
       errors.push({ line, message: 'name_ar is required' });
       continue;
     }
-    const nameEn = enIdx === -1 ? null : ((cells[enIdx] ?? '').trim() || null);
+    const nameEn = enIdx === -1 ? null : (cells[enIdx] ?? '').trim() || null;
 
     const key = `${resolved.branch.id}::${nameAr}`;
     const duplicate = already.has(key) || inPaste.has(key);

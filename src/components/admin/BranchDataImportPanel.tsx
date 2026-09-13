@@ -13,8 +13,14 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { branchConfig } from '../../lib/branchConfigApi';
 import {
-  areasTemplate, hoursTemplate, parseAreas, parseHours,
-  type AreaPlan, type ExistingArea, type HoursPlan, type ImportBranch,
+  areasTemplate,
+  hoursTemplate,
+  parseAreas,
+  parseHours,
+  type AreaPlan,
+  type ExistingArea,
+  type HoursPlan,
+  type ImportBranch,
 } from '../../lib/branchImport';
 
 /**
@@ -68,7 +74,9 @@ export interface BranchDataImportPanelProps {
 }
 
 export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
-  branches, lang, disabled = false,
+  branches,
+  lang,
+  disabled = false,
 }) => {
   const isRTL = lang === 'ar';
 
@@ -96,7 +104,8 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
    * screen opened, and a stale list would call a real duplicate new.
    */
   const handleParseAreas = async () => {
-    setAreasOutcome(null); setLoadError(null);
+    setAreasOutcome(null);
+    setLoadError(null);
     let rows: ExistingArea[] = existing;
     try {
       rows = (await branchConfig.allAreas()).map((a) => ({ branchId: a.branchId, nameAr: a.nameAr }));
@@ -132,12 +141,17 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
     setAreasBusy(true);
     const outcome: ApplyOutcome = { done: 0, skipped: 0, failures: [] };
     for (const row of areasPlan.rows) {
-      if (row.duplicate) { outcome.skipped += 1; continue; }
+      if (row.duplicate) {
+        outcome.skipped += 1;
+        continue;
+      }
       try {
         await branchConfig.addArea(row.branch.id, row.nameAr, row.nameEn);
         outcome.done += 1;
       } catch (e) {
-        outcome.failures.push(`${row.branch.nameEn} / ${row.nameAr}: ${e instanceof Error ? e.message : String(e)}`);
+        outcome.failures.push(
+          `${row.branch.nameEn} / ${row.nameAr}: ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     }
     setAreasOutcome(outcome);
@@ -153,9 +167,11 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
   const errorList = (errors: { line: number; message: string }[]) => (
     <Notice
       title={isRTL ? `صفوف مرفوضة: ${errors.length}` : `${errors.length} row(s) refused`}
-      action={isRTL
-        ? 'صحّح هذه الصفوف وألصق مرة أخرى. لن تُكتب.'
-        : 'Correct these rows and paste again. They will not be written.'}
+      action={
+        isRTL
+          ? 'صحّح هذه الصفوف وألصق مرة أخرى. لن تُكتب.'
+          : 'Correct these rows and paste again. They will not be written.'
+      }
       tone="warning"
     >
       <ul className="list-disc ps-4">
@@ -172,20 +188,40 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
 
   const outcomeNotice = (outcome: ApplyOutcome) => (
     <Notice
-      title={outcome.failures.length === 0
-        ? (isRTL ? 'تم التطبيق' : 'Applied')
-        : (isRTL ? 'تم التطبيق جزئيًا' : 'Partly applied')}
+      title={
+        outcome.failures.length === 0
+          ? isRTL
+            ? 'تم التطبيق'
+            : 'Applied'
+          : isRTL
+            ? 'تم التطبيق جزئيًا'
+            : 'Partly applied'
+      }
       action={[
         isRTL ? `كُتب: ${outcome.done}` : `written: ${outcome.done}`,
-        outcome.skipped > 0 ? (isRTL ? `مكرر متجاوَز: ${outcome.skipped}` : `duplicates skipped: ${outcome.skipped}`) : '',
-        outcome.failures.length > 0 ? (isRTL ? `فشل: ${outcome.failures.length}` : `failed: ${outcome.failures.length}`) : '',
-      ].filter(Boolean).join(' · ')}
+        outcome.skipped > 0
+          ? isRTL
+            ? `مكرر متجاوَز: ${outcome.skipped}`
+            : `duplicates skipped: ${outcome.skipped}`
+          : '',
+        outcome.failures.length > 0
+          ? isRTL
+            ? `فشل: ${outcome.failures.length}`
+            : `failed: ${outcome.failures.length}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       tone={outcome.failures.length === 0 ? 'success' : 'blocking'}
     >
       {outcome.failures.length > 0 ? (
         <ul className="list-disc ps-4">
           {outcome.failures.map((f, i) => (
-            <li key={i}><Text variant="caption" tone="danger" as="span">{f}</Text></li>
+            <li key={i}>
+              <Text variant="caption" tone="danger" as="span">
+                {f}
+              </Text>
+            </li>
           ))}
         </ul>
       ) : null}
@@ -203,9 +239,11 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
 
       <Notice
         title={isRTL ? 'لا يُكتب شيء حتى تضغط تطبيق' : 'Nothing is written until you press Apply'}
-        action={isRTL
-          ? 'اللصق يفحص فقط. راجع المعاينة أولًا.'
-          : 'Pasting only checks the sheet. Read the preview first.'}
+        action={
+          isRTL
+            ? 'اللصق يفحص فقط. راجع المعاينة أولًا.'
+            : 'Pasting only checks the sheet. Read the preview first.'
+        }
         tone="info"
       />
 
@@ -214,7 +252,9 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
       {/* ---------------------------------------------------------------- */}
       <Card className="space-y-3">
         <div>
-          <Text variant="title" as="h4">{isRTL ? 'ساعات العمل' : 'Working hours'}</Text>
+          <Text variant="title" as="h4">
+            {isRTL ? 'ساعات العمل' : 'Working hours'}
+          </Text>
           <Text variant="body" tone="tertiary" as="p" className="mt-1">
             {isRTL
               ? 'صف لكل فرع وعمود لكل يوم. الخلية إما 11:00-02:00 أو "closed". النافذة التي تنتهي بعد منتصف الليل صحيحة.'
@@ -237,7 +277,11 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
             rows={6}
             dir="ltr"
             value={hoursText}
-            onChange={(e) => { setHoursText(e.target.value); setHoursPlan(null); setHoursOutcome(null); }}
+            onChange={(e) => {
+              setHoursText(e.target.value);
+              setHoursPlan(null);
+              setHoursOutcome(null);
+            }}
             placeholder="branch&#9;sun&#9;mon&#9;tue&#9;wed&#9;thu&#9;fri&#9;sat"
             className={TEXTAREA}
           />
@@ -246,7 +290,10 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
         <Button
           label={isRTL ? 'فحص' : 'Check'}
           variant="secondary"
-          onClick={() => { setHoursOutcome(null); setHoursPlan(parseHours(hoursText, branches)); }}
+          onClick={() => {
+            setHoursOutcome(null);
+            setHoursPlan(parseHours(hoursText, branches));
+          }}
           disabled={hoursText.trim() === '' || hoursBusy}
         />
 
@@ -254,7 +301,9 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
           <div className="space-y-3 rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface-2 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
-                label={isRTL ? `فروع جاهزة: ${hoursPlan.rows.length}` : `${hoursPlan.rows.length} branch(es) ready`}
+                label={
+                  isRTL ? `فروع جاهزة: ${hoursPlan.rows.length}` : `${hoursPlan.rows.length} branch(es) ready`
+                }
                 tone={hoursPlan.rows.length > 0 ? 'success' : 'neutral'}
               />
               {hoursPlan.errors.length > 0 ? (
@@ -271,12 +320,21 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
               <div className="max-h-[180px] overflow-y-auto rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface">
                 <ul>
                   {hoursPlan.rows.map((r) => (
-                    <li key={r.branch.id} className="flex items-center justify-between gap-2 border-b border-con-line px-3 py-1.5 last:border-b-0">
-                      <Text variant="caption" as="span">{isRTL ? r.branch.nameAr : r.branch.nameEn}</Text>
+                    <li
+                      key={r.branch.id}
+                      className="flex items-center justify-between gap-2 border-b border-con-line px-3 py-1.5 last:border-b-0"
+                    >
+                      <Text variant="caption" as="span">
+                        {isRTL ? r.branch.nameAr : r.branch.nameEn}
+                      </Text>
                       <Text variant="caption" tone="tertiary" numeric as="span">
                         {r.closedCount === 0
-                          ? (isRTL ? 'سبعة أيام عمل' : 'open 7 days')
-                          : (isRTL ? `مغلق ${r.closedCount} يوم` : `${r.closedCount} day(s) closed`)}
+                          ? isRTL
+                            ? 'سبعة أيام عمل'
+                            : 'open 7 days'
+                          : isRTL
+                            ? `مغلق ${r.closedCount} يوم`
+                            : `${r.closedCount} day(s) closed`}
                       </Text>
                     </li>
                   ))}
@@ -285,10 +343,18 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
             ) : null}
 
             <Button
-              label={hoursBusy
-                ? (isRTL ? '...جاري التطبيق' : 'Applying…')
-                : (isRTL ? `تطبيق على ${hoursPlan.rows.length} فرع` : `Apply to ${hoursPlan.rows.length} branch(es)`)}
-              onClick={() => { void handleApplyHours(); }}
+              label={
+                hoursBusy
+                  ? isRTL
+                    ? '...جاري التطبيق'
+                    : 'Applying…'
+                  : isRTL
+                    ? `تطبيق على ${hoursPlan.rows.length} فرع`
+                    : `Apply to ${hoursPlan.rows.length} branch(es)`
+              }
+              onClick={() => {
+                void handleApplyHours();
+              }}
               disabled={disabled || hoursBusy || hoursPlan.rows.length === 0}
               className="w-full"
             />
@@ -303,7 +369,9 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
       {/* ---------------------------------------------------------------- */}
       <Card className="space-y-3">
         <div>
-          <Text variant="title" as="h4">{isRTL ? 'مناطق التوصيل' : 'Delivery areas'}</Text>
+          <Text variant="title" as="h4">
+            {isRTL ? 'مناطق التوصيل' : 'Delivery areas'}
+          </Text>
           <Text variant="body" tone="tertiary" as="p" className="mt-1">
             {isRTL
               ? 'صف لكل منطقة. الاسم العربي مطلوب والإنجليزي اختياري. المنطقة الموجودة مسبقًا تُتجاوز ولا تُضاف مرتين.'
@@ -326,7 +394,11 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
             rows={6}
             dir="ltr"
             value={areasText}
-            onChange={(e) => { setAreasText(e.target.value); setAreasPlan(null); setAreasOutcome(null); }}
+            onChange={(e) => {
+              setAreasText(e.target.value);
+              setAreasPlan(null);
+              setAreasOutcome(null);
+            }}
             placeholder="branch&#9;name_ar&#9;name_en"
             className={TEXTAREA}
           />
@@ -335,16 +407,20 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
         <Button
           label={isRTL ? 'فحص' : 'Check'}
           variant="secondary"
-          onClick={() => { void handleParseAreas(); }}
+          onClick={() => {
+            void handleParseAreas();
+          }}
           disabled={areasText.trim() === '' || areasBusy}
         />
 
         {loadError ? (
           <Notice
             title={isRTL ? 'تعذّر قراءة المناطق الحالية' : 'Existing areas could not be read'}
-            action={isRTL
-              ? `لا يمكن كشف المكرر، وقد تُضاف المنطقة مرتين. ${loadError}`
-              : `Duplicates cannot be detected, so an area may be added twice. ${loadError}`}
+            action={
+              isRTL
+                ? `لا يمكن كشف المكرر، وقد تُضاف المنطقة مرتين. ${loadError}`
+                : `Duplicates cannot be detected, so an area may be added twice. ${loadError}`
+            }
             tone="warning"
           />
         ) : null}
@@ -353,16 +429,20 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
           <div className="space-y-3 rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface-2 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
-                label={isRTL
-                  ? `مناطق جديدة: ${areasPlan.rows.filter((r) => !r.duplicate).length}`
-                  : `${areasPlan.rows.filter((r) => !r.duplicate).length} new area(s)`}
+                label={
+                  isRTL
+                    ? `مناطق جديدة: ${areasPlan.rows.filter((r) => !r.duplicate).length}`
+                    : `${areasPlan.rows.filter((r) => !r.duplicate).length} new area(s)`
+                }
                 tone={areasPlan.rows.some((r) => !r.duplicate) ? 'success' : 'neutral'}
               />
               {areasPlan.rows.some((r) => r.duplicate) ? (
                 <StatusPill
-                  label={isRTL
-                    ? `موجود مسبقًا: ${areasPlan.rows.filter((r) => r.duplicate).length}`
-                    : `${areasPlan.rows.filter((r) => r.duplicate).length} already there`}
+                  label={
+                    isRTL
+                      ? `موجود مسبقًا: ${areasPlan.rows.filter((r) => r.duplicate).length}`
+                      : `${areasPlan.rows.filter((r) => r.duplicate).length} already there`
+                  }
                   tone="info"
                 />
               ) : null}
@@ -380,9 +460,12 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
               <div className="max-h-[180px] overflow-y-auto rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface">
                 <ul>
                   {areasPlan.rows.map((r, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2 border-b border-con-line px-3 py-1.5 last:border-b-0">
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-2 border-b border-con-line px-3 py-1.5 last:border-b-0"
+                    >
                       <Text variant="caption" as="span">
-                        {(isRTL ? r.branch.nameAr : r.branch.nameEn)} — {r.nameAr}
+                        {isRTL ? r.branch.nameAr : r.branch.nameEn} — {r.nameAr}
                         {r.nameEn ? ` (${r.nameEn})` : ''}
                       </Text>
                       {r.duplicate ? (
@@ -397,12 +480,18 @@ export const BranchDataImportPanel: React.FC<BranchDataImportPanelProps> = ({
             ) : null}
 
             <Button
-              label={areasBusy
-                ? (isRTL ? '...جاري التطبيق' : 'Applying…')
-                : (isRTL
-                  ? `إضافة ${areasPlan.rows.filter((r) => !r.duplicate).length} منطقة`
-                  : `Add ${areasPlan.rows.filter((r) => !r.duplicate).length} area(s)`)}
-              onClick={() => { void handleApplyAreas(); }}
+              label={
+                areasBusy
+                  ? isRTL
+                    ? '...جاري التطبيق'
+                    : 'Applying…'
+                  : isRTL
+                    ? `إضافة ${areasPlan.rows.filter((r) => !r.duplicate).length} منطقة`
+                    : `Add ${areasPlan.rows.filter((r) => !r.duplicate).length} area(s)`
+              }
+              onClick={() => {
+                void handleApplyAreas();
+              }}
               disabled={disabled || areasBusy || !areasPlan.rows.some((r) => !r.duplicate)}
               className="w-full"
             />

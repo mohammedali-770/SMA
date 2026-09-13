@@ -31,9 +31,7 @@ const HOURS_HEADER = 'branch\tsun\tmon\ttue\twed\tthu\tfri\tsat';
 const OPEN_ROW = '11:00-23:00\t11:00-23:00\t11:00-23:00\t11:00-23:00\t11:00-23:00\t11:00-23:00\t11:00-23:00';
 
 function renderPanel(disabled = false) {
-  return render(
-    <BranchDataImportPanel branches={BRANCHES} lang="en" disabled={disabled} />,
-  );
+  return render(<BranchDataImportPanel branches={BRANCHES} lang="en" disabled={disabled} />);
 }
 
 /**
@@ -73,7 +71,10 @@ describe('BranchDataImportPanel — working hours', () => {
 
   it('previews the branches it will touch before any write', async () => {
     renderPanel();
-    paste(0, `${HOURS_HEADER}\nOlaya\t${OPEN_ROW}\nMalaz\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed`);
+    paste(
+      0,
+      `${HOURS_HEADER}\nOlaya\t${OPEN_ROW}\nMalaz\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed\tclosed`,
+    );
     check(0);
     await screen.findByText('2 branch(es) ready');
     expect(screen.getByText('Olaya')).toBeTruthy();
@@ -92,7 +93,10 @@ describe('BranchDataImportPanel — working hours', () => {
     expect(branchId).toBe('b-olaya');
     expect(days).toHaveLength(7);
     expect(days[0]).toEqual({
-      dayOfWeek: 0, isClosed: false, opensAt: '11:00', closesAt: '23:00',
+      dayOfWeek: 0,
+      isClosed: false,
+      opensAt: '11:00',
+      closesAt: '23:00',
     });
     await screen.findByText('Applied');
   });
@@ -157,7 +161,15 @@ describe('BranchDataImportPanel — delivery areas', () => {
 
   it('SKIPS an area the branch already has rather than inserting a second one', async () => {
     api.allAreas.mockResolvedValue([
-      { id: 'a1', branchId: 'b-olaya', nameAr: 'السليمانية', nameEn: null, sortOrder: 0, isDisabled: false, disabledUntil: null },
+      {
+        id: 'a1',
+        branchId: 'b-olaya',
+        nameAr: 'السليمانية',
+        nameEn: null,
+        sortOrder: 0,
+        isDisabled: false,
+        disabledUntil: null,
+      },
     ]);
     renderPanel();
     paste(1, [AREAS_HEADER, 'Olaya\tالسليمانية\t', 'Malaz\tالمروج\t'].join('\n'));
