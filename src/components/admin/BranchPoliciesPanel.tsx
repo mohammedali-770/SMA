@@ -1,7 +1,9 @@
 import React, { Suspense, useState } from 'react';
+import { Upload } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
 import { Text } from '../../design-system/ui/Text';
+import { BranchDataImportPanel } from './BranchDataImportPanel';
 import { PauseDeliveryDialog } from '../ops/PauseDeliveryDialog';
 import { DeliveryReasonCode, opsApi } from '../../lib/opsApi';
 import type { GeoJSONGeometry } from '../../lib/geo';
@@ -43,6 +45,10 @@ export const BranchPoliciesPanel: React.FC = () => {
   const [pauseBranchId, setPauseBranchId] = useState<string | null>(null);
   const [pausing, setPausing] = useState(false);
   const [pauseError, setPauseError] = useState<string | null>(null);
+  // A sub-tab rather than a section below the grid: forty branch cards is a long
+  // scroll, and an import nobody finds is an import nobody uses. Same shape as
+  // MenuManagementPanel's CSV tab, for the same reason.
+  const [subTab, setSubTab] = useState<'branches' | 'import'>('branches');
 
   const zoneForBranch = (branchId: string) => deliveryZones.find(z => z.branchId === branchId && z.isActive);
   const zoneBranch = branches.find(b => b.id === zoneBranchId) ?? null;
@@ -93,10 +99,42 @@ export const BranchPoliciesPanel: React.FC = () => {
     }
   };
 
+  const tabButton = (id: typeof subTab, label: string, icon?: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setSubTab(id)}
+      aria-current={subTab === id ? 'page' : undefined}
+      className={[
+        'ds-motion inline-flex min-h-11 items-center gap-1.5 border-b-2 px-4',
+        'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2',
+        subTab === id ? 'border-ember' : 'border-transparent hover:bg-con-surface-2',
+      ].join(' ')}
+    >
+      {icon}
+      <Text variant="label" tone={subTab === id ? 'ember' : 'secondary'} as="span">{label}</Text>
+    </button>
+  );
+
   return (
     <div className="space-y-4">
-      <Text variant="heading" as="h3">{t.branch_tab}</Text>
+      <div className="flex border-b border-con-line">
+        {tabButton('branches', t.branch_tab)}
+        {tabButton(
+          'import',
+          isRTL ? 'استيراد بيانات الفروع' : 'Data import',
+          <Upload className="size-3.5" aria-hidden="true" />,
+        )}
+      </div>
 
+      {subTab === 'import' ? (
+        <BranchDataImportPanel
+          branches={branches.map((b) => ({ id: b.id, nameEn: b.nameEn, nameAr: b.nameAr }))}
+          lang={adminLang}
+          disabled={isAccountant}
+        />
+      ) : null}
+
+      {subTab === 'branches' ? (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {branches.map((branch) => (
           <BranchCard
@@ -117,6 +155,7 @@ export const BranchPoliciesPanel: React.FC = () => {
           />
         ))}
       </div>
+      ) : null}
 
       {pauseBranch && (
         <PauseDeliveryDialog

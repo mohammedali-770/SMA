@@ -108,6 +108,17 @@
       ]
     },
     {
+      "id": "branch-reference-data",
+      "why": "A branch's trading hours and delivery areas are what the customer app uses to decide whether a branch can be ordered from and where it delivers, so a wrong value turns a customer away and nothing alerts on it. The bulk importer writes both for up to forty branches in one press, which makes a silent parsing change forty times as expensive as a form does - chiefly the branch-matching rule, where guessing at an ambiguous name would write hours onto the wrong row. Added 2026-09-13 with that importer, when both tables were still completely empty in Production.",
+      "sources": [
+        "src/lib/branchImport.ts",
+        "src/lib/branchConfigApi.ts",
+        "src/components/admin/BranchDataImportPanel.tsx",
+        "src/components/admin/view/branches/workingHours.ts"
+      ],
+      "docs": ["docs/BRANCH_ONBOARDING.md"]
+    },
+    {
       "id": "coupons",
       "why": "Promo codes are money off a real order, and until 2026-09-10 they had no admin surface at all — which is how two open-ended codes sat live in Production unnoticed. The screen and the document that explains what a code can cost have to move together.",
       "sources": [

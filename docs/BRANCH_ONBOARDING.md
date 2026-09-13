@@ -99,6 +99,71 @@ If delivery is being launched, perform a separate approved delivery process vali
 - [ ] staff have read `STAFF_MANUAL.md`;
 - [ ] branch knows the incident/escalation contact, not merely “ask IT.”
 
+## 7b. Trading hours and delivery areas — Admin → Branches → Data import
+
+Two branch-level features are fully built, tested and RLS'd, and were **entirely
+empty in Production** as of 2026-09-13: across 40 branch rows there were **zero
+working-hours rows and zero delivery areas**. Every screen that answers "when is
+this branch open" or "where does it deliver" therefore rendered a dash, for every
+branch. Filling that in through the per-branch editors is forty visits.
+
+**Admin → Branches → Data import** takes both as a paste from a spreadsheet. It
+adds no server surface: every write goes through the same two admin RPCs the
+per-branch editors already use — `admin_upsert_branch_working_hours` and
+`admin_add_delivery_area` — so an administrator can do nothing there that they
+could not already do one form at a time, and an accountant cannot use it at all.
+
+### What the format is
+
+Working hours are **wide**: one row per branch, one column per weekday, with a
+**required header** naming the days. The header is required on purpose — a
+positional format silently writes Tuesday's hours onto Monday the first time
+somebody reorders the columns. A cell is either a window (`11:00-02:00`) or a
+closed marker (`closed`, `off`, `-`, `x`, `مغلق`, or simply empty).
+
+**A window whose close is at or before its open is valid** and means it crosses
+midnight. That is the normal case here, not the exception:
+`admin_upsert_branch_working_hours` says so explicitly, and rejecting it would
+have made the import useless for most branches.
+
+Delivery areas are one row per area: `branch`, `name_ar` (required) and an
+optional `name_en`.
+
+Both boxes offer a **downloadable template listing every branch**, pre-filled as
+closed — an invented `09:00-22:00` would look like data.
+
+### What it refuses to guess
+
+The branch column accepts an id, an English name or an Arabic name. **An
+ambiguous name is an error, not a coin flip.** The live table holds visible
+duplicates (the same branch with and without a `lazywait_branch_id`), so picking
+the first match would write trading hours onto whichever row happened to sort
+first and nothing downstream would notice. For the same reason a template emits
+the **id** rather than the name for any branch whose name is not unique, plus a
+trailing `note` column so a human can still tell two identically named branches
+apart.
+
+A branch listed twice in one paste is refused as well, naming the earlier line:
+otherwise whichever row came last would win, silently.
+
+### What it does not do
+
+- **Nothing is written on paste.** Pasting parses; a separate button applies. The
+  preview between the two names the branches that will be touched and the rows
+  that were refused.
+- **An area the branch already has is skipped, not inserted again.**
+  `admin_add_delivery_area` always INSERTs, so re-running the same sheet without
+  that check would double every area. Duplicates *within* one paste count too.
+  The existing list is re-read at each check rather than at mount, because the
+  administrator may have added an area in the editor since the screen opened.
+- **It never deletes.** The import fills a gap; it does not reconcile a list. An
+  area an operator has disabled is not something a paste box should remove.
+- Applying is **sequential**, so a partial failure reports exactly how far it got
+  and which branches refused — forty concurrent RPCs would be unkind to the
+  database and muddle the reporting.
+
+Rules and their tests: `src/lib/branchImport.ts` and `src/lib/branchImport.test.ts`.
+
 ## 8. Go-live check
 
 Before setting the branch live:

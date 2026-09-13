@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**174 TypeScript test files declaring 2682 test blocks, plus 73 SQL suites.**
+**176 TypeScript test files declaring 2737 test blocks, plus 73 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -188,10 +188,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-88 files, 1192 declared test blocks.
+90 files, 1247 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
+| `src/components/admin/BranchDataImportPanel.test.tsx` | 12 | BranchDataImportPanel — working hours |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
 | `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
 | `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
@@ -249,6 +250,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/api.test.ts` | 6 | admin.deleteBranch |
 | `src/lib/banners.test.ts` | 13 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
+| `src/lib/branchImport.test.ts` | 43 | splitRows |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
