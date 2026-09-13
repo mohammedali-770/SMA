@@ -24,6 +24,19 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-13 — the count is THREE, and TWO of the three are not
+> frozen.** Outstanding: `20260824100000_moyasar_payment_provider.sql` (frozen
+> under §6, unapplied on purpose), `20260916120000_branch_delivery_requests.sql`
+> and `20260917120000_branch_reference_entries.sql`. The two new files are
+> ordinary, unfrozen work — which restores the *appearance* of an innocent
+> referent without making a bulk apply any safer: `20260824100000` still sorts
+> ahead of everything, so "apply the outstanding migrations" would sweep the
+> frozen payment file in first. **Name the target by version.**
+>
+> The two are INDEPENDENT of each other — neither redefines a function the
+> other defines, and neither touches the money path — so they may be applied in
+> either order, each on its own approval.
+
 > **Updated 2026-09-13 — `20260917120000_branch_reference_entries.sql` is
 > written, validated and NOT applied.** It gives a cashier a branch reference
 > sheet — links, numbers, notes and **credentials** — where today a branch_staff
@@ -64,6 +77,44 @@ to Production.**
 > the harness takes three, real Vault takes four with the fourth defaulted, so
 > one call form reaches both. A four-argument call would compile locally and
 > fail in Production.
+
+> **Updated 2026-09-13 — `20260916120000_branch_delivery_requests.sql`.**
+> `20260916120000_branch_delivery_requests.sql` is **written, validated and NOT
+> applied**. It lets a BRANCH ask the CALL CENTRE to close delivery and lets the
+> call centre accept or decline — request only. It does **not** move the
+> 2026-08-20 delivery boundary: `set_branch_delivery_pause` is untouched, its
+> gate is still `is_admin() or is_call_center()`, and the accept path calls that
+> RPC rather than writing `branches` itself, so the pause keeps one
+> implementation, one validation and one audit trail.
+>
+> sha256 `7fc226e10646369c841ec2d1ff6c76f0bd2f54b970e5a4119141e475ac066ba6`,
+> 452 lines / 21079 bytes — **re-hash the merged copy before applying** (§9-B.7).
+> New objects only; money path untouched; **no deploy implied**. Applying it
+> creates an EMPTY table and closes nothing, which its own block asserts.
+>
+> **A raise rolls back the write that preceded it, and that shaped the design.**
+> The first version of `resolve_branch_delivery_request` retired an expired
+> request and then raised — so the retirement was rolled back and the row stayed
+> `pending` forever, meeting the next operator as the same dead request. Caught
+> by CASE 14 of the paired suite, which asserts the row is actually retired
+> rather than that an error was thrown. Expiry now RETURNS a result. **A
+> plpgsql function cannot both persist a write and raise; if a state transition
+> must survive, it cannot be announced with an exception.**
+>
+> **MUTATION TESTING FOUND A TEST THAT PASSED FOR THE WRONG REASON.** Widening
+> `resolve`'s gate to admit a branch operator did NOT fail the suite: the branch
+> still got `42501`, because the accept path calls `set_branch_delivery_pause`,
+> which refuses them anyway. That defence-in-depth is real and is a direct
+> consequence of reusing the pause RPC instead of forking it — the branch is
+> blocked at BOTH layers — but it meant the self-approval case proved less than
+> it appeared to. CASE 19 now pins every gate at source level. **When a mutant
+> survives, ask whether the test was measuring what its name claims.**
+>
+> Coverage: `branch_delivery_requests_test.sql`, 19 cases weighted toward what
+> must NOT happen — filing changes no delivery state, a branch still cannot
+> pause delivery, the call centre cannot file, a branch cannot file or withdraw
+> for another branch, a customer can neither file nor read. Cold: 130
+> migrations, 72 suites, 70 passed, 2 quarantined, 0 new failures.
 
 > **Updated 2026-09-13 (final) — `20260915120000` is APPLIED, and the count is
 > back to ONE: Moyasar, frozen on purpose.** Applied 05:46:10 UTC on explicit
