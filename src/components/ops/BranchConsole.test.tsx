@@ -21,6 +21,16 @@ const mocks = vi.hoisted(() => ({
   reopenProduct: vi.fn(),
   snoozeModifier: vi.fn(),
   reopenModifier: vi.fn(),
+  // The console's single refresh also loads the delivery-request panel and the
+  // reference sheet. They are mocked empty here because this suite is about
+  // item availability; their own behaviour is covered by
+  // branchReference.test.ts and BranchReferenceCard.test.tsx.
+  deliveryRequests: vi.fn(),
+  branchReference: vi.fn(),
+  branchDeliveryState: vi.fn(),
+  requestDeliveryPause: vi.fn(),
+  cancelDeliveryRequest: vi.fn(),
+  revealReference: vi.fn(),
 }));
 vi.mock('../../lib/opsApi', () => ({ opsApi: mocks }));
 
@@ -73,6 +83,12 @@ beforeEach(() => {
   mocks.reopenProduct.mockResolvedValue(undefined);
   mocks.snoozeModifier.mockResolvedValue(undefined);
   mocks.reopenModifier.mockResolvedValue(undefined);
+  mocks.deliveryRequests.mockResolvedValue([]);
+  mocks.branchReference.mockResolvedValue([]);
+  mocks.branchDeliveryState.mockResolvedValue([]);
+  mocks.requestDeliveryPause.mockResolvedValue(undefined);
+  mocks.cancelDeliveryRequest.mockResolvedValue(undefined);
+  mocks.revealReference.mockResolvedValue('');
 });
 afterEach(cleanup);
 
