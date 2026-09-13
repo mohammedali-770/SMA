@@ -24,6 +24,47 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-13 — `20260917120000_branch_reference_entries.sql` is
+> written, validated and NOT applied.** It gives a cashier a branch reference
+> sheet — links, numbers, notes and **credentials** — where today a branch_staff
+> account cannot see so much as its own branch's telephone number.
+>
+> **The credential decision is the point of this file.** Owner decision
+> 2026-09-13: secret values live in **Supabase Vault**, are shown masked,
+> revealed only on an explicit action, and **every reveal is audited**. A
+> plaintext column with RLS was considered and rejected. `vault.decrypted_secrets`
+> is readable by `postgres` and `service_role` and by **nobody else** —
+> `authenticated` holds no privilege on it at all (measured live) — so the only
+> door is the definer RPC, which is where branch scoping and the audit row sit.
+> The entry table stores a vault id, never a value.
+>
+> **The asymmetry is deliberate and is the part to review:** the call centre can
+> READ every branch's entry rows (it needs branch reference material on a call)
+> but can reveal **no** branch's credentials. A console watching forty branches
+> is the wrong place to be able to read forty passwords.
+>
+> sha256 `df8c205cbd78c4f43be7b59088f9f0128c38ce43cd7f23eeb557377fc7db26e6`,
+> 379 lines / 18 297 bytes — **re-hash the merged copy before applying** (§9-B.7).
+> New objects only; money path untouched; **no deploy implied**; both tables are
+> created empty, which its own block asserts.
+>
+> **WHAT THE LOCAL SUITE PROVES, AND WHAT IT DOES NOT.** The harness stubs Vault
+> without encryption (`.github/sql-ci/harness.sql`), so the 15 cases prove
+> wiring, authorization, branch scoping and the audit row — and say **nothing**
+> about cryptography, which is Vault's and is exercised only in Production. A
+> passing local run is not evidence that a secret was encrypted.
+>
+> **An authoring failure worth recording: I added a second `vault.create_secret`
+> stub to `bootstrap.sql` without checking whether one already existed.** It
+> did, in `harness.sql`. The result was an ambiguous overload that broke an
+> unrelated suite (`operations_alert_email_dispatch_test`) as collateral. The
+> addition was reverted; the existing stub was exactly the right shape. **Look
+> for the helper before writing it — a duplicate is worse than an absence,
+> because it breaks things that were working.** The calls pass THREE arguments:
+> the harness takes three, real Vault takes four with the fourth defaulted, so
+> one call form reaches both. A four-argument call would compile locally and
+> fail in Production.
+
 > **Updated 2026-09-13 (final) — `20260915120000` is APPLIED, and the count is
 > back to ONE: Moyasar, frozen on purpose.** Applied 05:46:10 UTC on explicit
 > owner approval naming the target by version; live version `20260913054610`,
