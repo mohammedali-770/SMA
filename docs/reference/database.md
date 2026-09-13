@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **129**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260915120000_digest_external_delivery_line.sql`.
+Migration files in the repository: **131**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260917120000_branch_reference_entries.sql`.
 
 ## Tables
 
@@ -28,9 +28,12 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 3 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branch_delivery_events` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
+| `branch_delivery_requests` | `20260916120000_branch_delivery_requests.sql` | 0 | 1 |
 | `branch_delivery_zones` | `20260710120000_delivery_zones.sql` | 0 | 3 |
 | `branch_modifier_availability` | `20260820140000_branch_modifier_availability.sql` | 0 | 2 |
 | `branch_product_availability` | `20260707120200_catalog.sql` | 1 | 1 |
+| `branch_reference_entries` | `20260917120000_branch_reference_entries.sql` | 0 | 1 |
+| `branch_reference_reveals` | `20260917120000_branch_reference_entries.sql` | 0 | 1 |
 | `branch_working_hours` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branches` | `20260707120200_catalog.sql` | 3 | 3 |
 | `campaign_redemptions` | `20260728120000_discounts_campaigns.sql` | 0 | 1 |
@@ -58,7 +61,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `operations_alert_settings` | `20260723090000_smart_operations_alerts_digest.sql` | 1 | **none declared** |
 | `operations_alert_state` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
 | `operations_digest_runs` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
-| `ops_change_events` | `20260820130000_ops_change_events.sql` | 0 | 1 |
+| `ops_change_events` | `20260820130000_ops_change_events.sql` | 1 | 1 |
 | `order_change_events` | `20260724200000_order_read_contracts.sql` | 0 | 1 |
 | `order_integrity_alert_outbox` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
 | `order_integrity_config` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
@@ -91,6 +94,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `adjust_loyalty_points` | 2 | `20260707120900_loyalty_audit.sql` |
 | `admin_add_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_clear_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
+| `admin_delete_branch_reference` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `admin_delete_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_list_comp_member_audit` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `admin_list_comp_members` | 2 | `20260827100000_comp_members_by_phone.sql` |
@@ -106,6 +110,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_set_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `admin_set_user_role` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_update_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
+| `admin_upsert_branch_reference` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `admin_upsert_branch_working_hours` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `anonymize_account_data` | 3 | `20260827110000_comp_erasure.sql` |
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
@@ -114,7 +119,9 @@ A function defined by more than one migration has been redefined; the last defin
 | `begin_payment_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
 | `begin_session_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
 | `branch_availability_sweep` | 4 | `20260822090000_branch_availability_retention.sql` |
+| `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
+| `cancel_branch_delivery_request` | 1 | `20260916120000_branch_delivery_requests.sql` |
 | `claim_comp_membership` | 1 | `20260827100000_comp_members_by_phone.sql` |
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |
@@ -255,9 +262,11 @@ A function defined by more than one migration has been redefined; the last defin
 | `release_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `reorder_categories` | 1 | `20260827150000_menu_display_order.sql` |
 | `reorder_products` | 1 | `20260827150000_menu_display_order.sql` |
+| `request_branch_delivery_pause` | 1 | `20260916120000_branch_delivery_requests.sql` |
 | `request_customer_pos_resend` | 2 | `20260813143000_manual_only_pos_resend.sql` |
 | `requeue_lazywait_order` | 4 | `20260827120000_lazywait_delivery_sync.sql` |
 | `resolve_account_deletion_request` | 1 | `20260810120000_account_deletion_manual_review_resolution.sql` |
+| `resolve_branch_delivery_request` | 1 | `20260916120000_branch_delivery_requests.sql` |
 | `run_loyalty_expiry` | 1 | `20260909120000_loyalty_expiry.sql` |
 | `set_branch_delivery_pause` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `set_branch_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
