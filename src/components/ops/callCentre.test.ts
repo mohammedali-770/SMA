@@ -503,11 +503,70 @@ describe('nonBlockingOptions', () => {
   });
 });
 
+describe('pending delivery requests on the board', () => {
+  const pending = (branchId: string) => ({
+    id: `r-${branchId}`, branchId, requestedMinutes: 60,
+    reasonCode: 'no_driver' as const, note: null,
+    requestedAt: '2026-09-13T11:30:00Z', expiresAt: '2026-09-13T12:30:00Z',
+    status: 'pending' as const, resolutionNote: null, appliedMinutes: null,
+  });
+
+  it('puts a branch on the board when its ONLY issue is a waiting request', () => {
+    // The thing needing an operator must not be the thing the board omits.
+    const out = buildClosureSummaries({
+      branches: [branch('a')], products: [], availability: [],
+      modifierGroups: [], modifierAvailability: [], areas: [],
+      pendingRequests: [pending('a')],
+    });
+    expect(out.map((s) => s.branch.id)).toEqual(['a']);
+    expect(out[0].pendingRequests).toHaveLength(1);
+  });
+
+  it('leaves a healthy branch off the board when nothing is waiting', () => {
+    const out = buildClosureSummaries({
+      branches: [branch('a')], products: [], availability: [],
+      modifierGroups: [], modifierAvailability: [], areas: [],
+      pendingRequests: [],
+    });
+    expect(out).toEqual([]);
+  });
+
+  it('is CRITICAL, so it cannot hide among amber rows', () => {
+    const out = buildClosureSummaries({
+      branches: [branch('a')], products: [], availability: [],
+      modifierGroups: [], modifierAvailability: [], areas: [],
+      pendingRequests: [pending('a')],
+    });
+    expect(severityBand(out[0])).toBe('critical');
+  });
+
+  it('outranks a branch whose delivery is already paused', () => {
+    // The paused branch has been dealt with; the waiting one has not.
+    const out = buildClosureSummaries({
+      branches: [
+        { ...branch('paused'), deliveryTemporarilyClosed: true },
+        branch('asking'),
+      ],
+      products: [], availability: [], modifierGroups: [], modifierAvailability: [], areas: [],
+      pendingRequests: [pending('asking')],
+    });
+    expect(out.map((s) => s.branch.id)).toEqual(['asking', 'paused']);
+  });
+
+  it('omitting pendingRequests entirely keeps every existing caller working', () => {
+    const out = buildClosureSummaries({
+      branches: [branch('a')], products: [], availability: [],
+      modifierGroups: [], modifierAvailability: [], areas: [],
+    });
+    expect(out).toEqual([]);
+  });
+});
+
 describe('severityBand', () => {
   const summary = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
     closedOptions: [], deliveryPaused: false,
-    deliveryUntil: null, disabledAreas: [], severity: 0, ...over,
+    deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity: 0, ...over,
   });
 
   it('treats paused delivery as critical whatever else is true', () => {
@@ -540,7 +599,7 @@ describe('compareSummaries', () => {
   const at = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
     closedOptions: [], deliveryPaused: false, deliveryUntil: null, disabledAreas: [],
-    severity: 0, ...over,
+    pendingRequests: [], severity: 0, ...over,
   });
 
   it('a paused branch outranks a branch with MORE closures', () => {
@@ -588,7 +647,7 @@ describe('newlyClosedBranchIds', () => {
   ): BranchClosureSummary => ({
     branch: branch(id), closedProducts: [], blockedProducts: [], blockingIncidents: [],
     closedOptions: [], deliveryPaused: false,
-    deliveryUntil: null, disabledAreas: [], severity, ...over,
+    deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity, ...over,
   });
 
   it('reports a branch that has just appeared on the board', () => {
@@ -616,7 +675,7 @@ describe('newlyClosedBranchIds', () => {
     // its sauce group empties in the same poll. Count stays at 1; nobody knows
     // the item is still off the menu.
     const before = s('a', 1, {
-      closedProducts: [{ product: product('p1'), snoozedUntil: null }],
+      closedProducts: [{ product: product('p1'), snoozedUntil: null, reasonCode: null }],
     });
     const after = s('a', 1, {
       blockedProducts: [{ product: product('p1'), groups: [], earliestReturn: null }],
@@ -639,7 +698,7 @@ describe('newlyClosedBranchIds', () => {
     const before = s('a', 1, {
       blockedProducts: [{ product: product('p1'), groups: [], earliestReturn: null }],
     });
-    const after = s('a', 1, { closedProducts: [{ product: product('p1'), snoozedUntil: null }] });
+    const after = s('a', 1, { closedProducts: [{ product: product('p1'), snoozedUntil: null, reasonCode: null }] });
     expect(newlyClosedBranchIds([before], [after])).toEqual([]);
   });
 });

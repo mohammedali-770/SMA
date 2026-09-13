@@ -179,6 +179,17 @@ export const OPS_STRINGS = {
     referenceAuditNotice: 'يُسجَّل كل إظهار لبيانات الدخول: من أظهرها ومتى.',
     referenceCopy: 'نسخ',
     referenceCopied: 'تم النسخ',
+
+    // call-centre: answering a branch's delivery request
+    requestsWaiting: 'طلبات بانتظار الرد',
+    requestsNoneTitle: 'لا توجد طلبات',
+    requestFrom: 'طلب من',
+    requestAccept: 'موافقة وإغلاق التوصيل',
+    requestDecline: 'رفض',
+    requestAnswerFailed: 'تعذّر الرد على الطلب',
+    requestNowExpired: 'انتهت صلاحية الطلب قبل الرد عليه',
+    requestAskedFor: 'المدة المطلوبة',
+    reasonLabelShort: 'السبب',
   },
   en: {
     branchConsole: 'Branch Console',
@@ -330,6 +341,17 @@ export const OPS_STRINGS = {
     referenceAuditNotice: 'Every time a login is shown it is recorded — who showed it, and when.',
     referenceCopy: 'Copy',
     referenceCopied: 'Copied',
+
+    // call-centre: answering a branch's delivery request
+    requestsWaiting: 'Requests waiting',
+    requestsNoneTitle: 'No requests waiting',
+    requestFrom: 'Request from',
+    requestAccept: 'Accept and close delivery',
+    requestDecline: 'Decline',
+    requestAnswerFailed: 'The request could not be answered',
+    requestNowExpired: 'That request expired before it was answered',
+    requestAskedFor: 'Asked for',
+    reasonLabelShort: 'Reason',
   },
 } as const;
 

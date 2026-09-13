@@ -366,6 +366,62 @@ export const opsApi = {
     fail(error);
   },
 
+  /**
+   * Every request still waiting, across all branches. Call-centre side.
+   *
+   * Filters on status only. Expiry is decided by the client from `expiresAt`,
+   * because the server retires a stale request only when somebody touches it —
+   * so a row can sit at 'pending' past its own expiry, and a board that trusted
+   * status alone would offer an Accept button that cannot work.
+   */
+  async pendingDeliveryRequests(): Promise<DeliveryRequestRow[]> {
+    const { data, error } = await supabase
+      .from('branch_delivery_requests')
+      .select(
+        'id, branch_id, requested_minutes, reason_code, note, requested_at, expires_at, status, resolution_note, applied_minutes',
+      )
+      .eq('status', 'pending')
+      .order('requested_at', { ascending: true });
+    fail(error);
+    return (data ?? []).map((r) => ({
+      id: r.id as string,
+      branchId: r.branch_id as string,
+      requestedMinutes: r.requested_minutes as number,
+      reasonCode: r.reason_code as DeliveryReasonCode,
+      note: (r.note as string | null) ?? null,
+      requestedAt: r.requested_at as string,
+      expiresAt: r.expires_at as string,
+      status: r.status as DeliveryRequestRow['status'],
+      resolutionNote: (r.resolution_note as string | null) ?? null,
+      appliedMinutes: (r.applied_minutes as number | null) ?? null,
+    }));
+  },
+
+  /**
+   * Accept or decline one request.
+   *
+   * Accepting applies the pause through the same RPC an operator's manual pause
+   * uses, so there is one implementation and one audit trail. Returns the
+   * server's own view, which may be `expired` — a request can lapse between the
+   * board rendering and the operator clicking, and the server says so rather
+   * than acting on stale information.
+   */
+  async resolveDeliveryRequest(input: {
+    requestId: string;
+    accept: boolean;
+    minutes?: number | null;
+    note?: string | null;
+  }): Promise<{ status: string }> {
+    const { data, error } = await supabase.rpc('resolve_branch_delivery_request', {
+      p_request_id: input.requestId,
+      p_accept: input.accept,
+      p_minutes: input.minutes ?? null,
+      p_note: input.note?.trim() ? input.note.trim() : null,
+    });
+    fail(error);
+    return { status: String((data as { status?: string } | null)?.status ?? 'unknown') };
+  },
+
   /** Withdraw a request the branch no longer needs. Branch-scoped server-side. */
   async cancelDeliveryRequest(requestId: string): Promise<void> {
     const { error } = await supabase.rpc('cancel_branch_delivery_request', {
