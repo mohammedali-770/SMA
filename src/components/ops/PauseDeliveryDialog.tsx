@@ -32,7 +32,22 @@ export const PauseDeliveryDialog: React.FC<{
   error: string | null;
   onCancel: () => void;
   onConfirm: (minutes: number, reason: DeliveryReasonCode, note: string) => void;
-}> = ({ branchName, lang, busy, error, onCancel, onConfirm }) => {
+  /**
+   * Copy overrides so the BRANCH console can reuse this exact form to REQUEST a
+   * closure rather than perform one. The duration, reason vocabulary, note
+   * limit and validation are identical on both paths — only the words and what
+   * the confirm does differ — so forking the component would mean maintaining
+   * two forms that must agree and eventually would not.
+   */
+  titleKey?: Parameters<typeof opsT>[1];
+  confirmKey?: Parameters<typeof opsT>[1];
+  hintKey?: Parameters<typeof opsT>[1];
+}> = ({
+  branchName, lang, busy, error, onCancel, onConfirm,
+  titleKey = 'pauseDeliveryTitle',
+  confirmKey = 'confirmPause',
+  hintKey = 'deliveryAutoResumeHint',
+}) => {
   const t = (k: Parameters<typeof opsT>[1]) => opsT(lang, k);
   const isRTL = lang === 'ar';
   const [minutes, setMinutes] = useState(DELIVERY_DURATION_OPTIONS[0].minutes);
@@ -41,7 +56,7 @@ export const PauseDeliveryDialog: React.FC<{
 
   return (
     <AdminModal
-      title={t('pauseDeliveryTitle')}
+      title={t(titleKey)}
       subtitle={branchName}
       isRTL={isRTL}
       onClose={onCancel}
@@ -51,7 +66,7 @@ export const PauseDeliveryDialog: React.FC<{
         <div className="flex flex-wrap justify-end gap-2">
           <Button label={t('cancel')} onClick={onCancel} variant="secondary" disabled={busy} />
           <Button
-            label={busy ? t('working') : t('confirmPause')}
+            label={busy ? t('working') : t(confirmKey)}
             onClick={() => onConfirm(minutes, reason, note)}
             disabled={busy}
           />
@@ -91,7 +106,7 @@ export const PauseDeliveryDialog: React.FC<{
           />
         </div>
 
-        <Text variant="caption" tone="tertiary" as="p">{t('deliveryAutoResumeHint')}</Text>
+        <Text variant="caption" tone="tertiary" as="p">{t(hintKey)}</Text>
       </div>
     </AdminModal>
   );
