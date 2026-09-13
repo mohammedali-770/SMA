@@ -270,7 +270,10 @@ begin
   raise notice 'DORMANT NO-OP OK';
 end $$;
 
--- ---- E. SETTINGS RPC (admin-only; external dispatch hard-rejected) ---------
+-- ---- E. SETTINGS RPC (admin-only; external dispatch SETTABLE since v2) -----
+-- Corrected 2026-09-13: this header said "external dispatch hard-rejected",
+-- which stopped being true when 20260903120000 removed the v1 reject. The
+-- block below has asserted the opposite — the v2 positive path — since then.
 do $$
 declare
   v_raised integer := 0;
