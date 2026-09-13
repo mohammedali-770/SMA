@@ -13,7 +13,8 @@ import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import {
-  BranchAvailabilityRow, BranchModifierAvailabilityRow, OpsReasonCode, opsApi,
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, BranchReferenceRow,
+  DeliveryReasonCode, DeliveryRequestRow, OpsReasonCode, opsApi,
 } from '../../lib/opsApi';
 import type { Modifier, Product } from '../../types';
 import {
@@ -28,7 +29,10 @@ import {
   productBlockedByOptions,
   searchableGroups,
 } from './branchConsole';
+import { BranchReferenceCard } from './BranchReferenceCard';
 import { CloseItemDialog } from './CloseItemDialog';
+import { DeliveryRequestCard } from './DeliveryRequestCard';
+import { PauseDeliveryDialog } from './PauseDeliveryDialog';
 import type { OpsLangValue } from './useOpsLang';
 
 /**
@@ -68,6 +72,14 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
+  // Delivery-closure requests and the reference sheet. Both are branch-scoped
+  // server-side; nothing here re-checks that, and nothing here should.
+  const [requests, setRequests] = useState<DeliveryRequestRow[]>([]);
+  const [reference, setReference] = useState<BranchReferenceRow[]>([]);
+  const [deliveryClosed, setDeliveryClosed] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
   // Drives the countdowns. One timer for the whole screen rather than one per
   // row, so a branch with thirty closed items still ticks once a second.
   const [now, setNow] = useState(() => Date.now());
@@ -82,12 +94,21 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     if (!branchId) { setLoading(false); return; }
     setError(null);
     try {
-      const [productRows, optionRows] = await Promise.all([
-        opsApi.branchAvailability(branchId),
-        opsApi.branchModifierAvailability(branchId),
-      ]);
+      const [productRows, optionRows, requestRows, referenceRows, deliveryStates] =
+        await Promise.all([
+          opsApi.branchAvailability(branchId),
+          opsApi.branchModifierAvailability(branchId),
+          opsApi.deliveryRequests(branchId),
+          opsApi.branchReference(branchId),
+          opsApi.branchDeliveryState(),
+        ]);
       setRows(productRows);
       setModRows(optionRows);
+      setRequests(requestRows);
+      setReference(referenceRows);
+      setDeliveryClosed(
+        deliveryStates.find((d) => d.branchId === branchId)?.deliveryTemporarilyClosed ?? false,
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -127,6 +148,40 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     return c ? (isRTL ? c.nameAr : c.nameEn) : t('uncategorized');
   };
   const productName = (p: Product) => (isRTL ? p.nameAr : p.nameEn);
+
+  /**
+   * Ask the call centre to close delivery.
+   *
+   * On success this refreshes rather than optimistically inserting a row: the
+   * server decides the expiry and may refuse for reasons the client cannot see
+   * (a request filed from another device a second earlier). Showing a waiting
+   * state the server did not create is exactly the lie this screen must avoid.
+   */
+  const sendRequest = async (minutes: number, reason: DeliveryReasonCode, note: string) => {
+    if (!branchId) return;
+    setBusy(true); setDialogError(null);
+    try {
+      await opsApi.requestDeliveryPause({ branchId, minutes, reasonCode: reason, note });
+      setRequesting(false);
+      await refresh();
+    } catch (e) {
+      setDialogError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const withdrawRequest = async (requestId: string) => {
+    setBusy(true); setRequestError(null);
+    try {
+      await opsApi.cancelDeliveryRequest(requestId);
+      await refresh();
+    } catch (e) {
+      setRequestError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const confirmClose = async (minutes: number, reason: OpsReasonCode, note: string) => {
     if (!branchId || !target) return;
@@ -211,6 +266,25 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
 
       {branch && !branch.isActive ? <Notice title={t('branchClosed')} tone="warning" /> : null}
       {error ? <Notice title={t('loadFailed')} action={error} tone="blocking" /> : null}
+
+      {/* ---- delivery: ask the call centre, and see the answer ---- */}
+      <DeliveryRequestCard
+        requests={requests}
+        deliveryClosed={deliveryClosed}
+        now={now}
+        busy={busy || requesting}
+        error={requestError}
+        i18n={i18n}
+        onRequest={() => { setRequestError(null); setRequesting(true); }}
+        onWithdraw={(id) => { void withdrawRequest(id); }}
+      />
+
+      {/* ---- the reference sheet a cashier actually looks things up in ---- */}
+      <BranchReferenceCard
+        entries={reference}
+        i18n={i18n}
+        onReveal={(id) => opsApi.revealReference(id)}
+      />
 
       {/* ---- what is off right now ---- */}
       <Card className="space-y-3 p-4">
@@ -399,6 +473,20 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
           ))
         )}
       </Card>
+
+      {requesting ? (
+        <PauseDeliveryDialog
+          branchName={branch ? (isRTL ? branch.nameAr : branch.nameEn) : ''}
+          lang={isRTL ? 'ar' : 'en'}
+          busy={busy}
+          error={dialogError}
+          onCancel={() => { setRequesting(false); setDialogError(null); }}
+          onConfirm={(minutes, reason, note) => { void sendRequest(minutes, reason, note); }}
+          titleKey="requestCloseTitle"
+          confirmKey="confirmRequest"
+          hintKey="requestHint"
+        />
+      ) : null}
 
       {target ? (
         <CloseItemDialog
