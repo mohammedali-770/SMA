@@ -24,6 +24,98 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-13 — the count is THREE, and TWO of the three are not
+> frozen.** Outstanding: `20260824100000_moyasar_payment_provider.sql` (frozen
+> under §6, unapplied on purpose), `20260916120000_branch_delivery_requests.sql`
+> and `20260917120000_branch_reference_entries.sql`. The two new files are
+> ordinary, unfrozen work — which restores the *appearance* of an innocent
+> referent without making a bulk apply any safer: `20260824100000` still sorts
+> ahead of everything, so "apply the outstanding migrations" would sweep the
+> frozen payment file in first. **Name the target by version.**
+>
+> The two are INDEPENDENT of each other — neither redefines a function the
+> other defines, and neither touches the money path — so they may be applied in
+> either order, each on its own approval.
+
+> **Updated 2026-09-13 — `20260917120000_branch_reference_entries.sql` is
+> written, validated and NOT applied.** It gives a cashier a branch reference
+> sheet — links, numbers, notes and **credentials** — where today a branch_staff
+> account cannot see so much as its own branch's telephone number.
+>
+> **The credential decision is the point of this file.** Owner decision
+> 2026-09-13: secret values live in **Supabase Vault**, are shown masked,
+> revealed only on an explicit action, and **every reveal is audited**. A
+> plaintext column with RLS was considered and rejected. `vault.decrypted_secrets`
+> is readable by `postgres` and `service_role` and by **nobody else** —
+> `authenticated` holds no privilege on it at all (measured live) — so the only
+> door is the definer RPC, which is where branch scoping and the audit row sit.
+> The entry table stores a vault id, never a value.
+>
+> **The asymmetry is deliberate and is the part to review:** the call centre can
+> READ every branch's entry rows (it needs branch reference material on a call)
+> but can reveal **no** branch's credentials. A console watching forty branches
+> is the wrong place to be able to read forty passwords.
+>
+> sha256 `df8c205cbd78c4f43be7b59088f9f0128c38ce43cd7f23eeb557377fc7db26e6`,
+> 379 lines / 18 297 bytes — **re-hash the merged copy before applying** (§9-B.7).
+> New objects only; money path untouched; **no deploy implied**; both tables are
+> created empty, which its own block asserts.
+>
+> **WHAT THE LOCAL SUITE PROVES, AND WHAT IT DOES NOT.** The harness stubs Vault
+> without encryption (`.github/sql-ci/harness.sql`), so the 15 cases prove
+> wiring, authorization, branch scoping and the audit row — and say **nothing**
+> about cryptography, which is Vault's and is exercised only in Production. A
+> passing local run is not evidence that a secret was encrypted.
+>
+> **An authoring failure worth recording: I added a second `vault.create_secret`
+> stub to `bootstrap.sql` without checking whether one already existed.** It
+> did, in `harness.sql`. The result was an ambiguous overload that broke an
+> unrelated suite (`operations_alert_email_dispatch_test`) as collateral. The
+> addition was reverted; the existing stub was exactly the right shape. **Look
+> for the helper before writing it — a duplicate is worse than an absence,
+> because it breaks things that were working.** The calls pass THREE arguments:
+> the harness takes three, real Vault takes four with the fourth defaulted, so
+> one call form reaches both. A four-argument call would compile locally and
+> fail in Production.
+
+> **Updated 2026-09-13 — `20260916120000_branch_delivery_requests.sql`.**
+> `20260916120000_branch_delivery_requests.sql` is **written, validated and NOT
+> applied**. It lets a BRANCH ask the CALL CENTRE to close delivery and lets the
+> call centre accept or decline — request only. It does **not** move the
+> 2026-08-20 delivery boundary: `set_branch_delivery_pause` is untouched, its
+> gate is still `is_admin() or is_call_center()`, and the accept path calls that
+> RPC rather than writing `branches` itself, so the pause keeps one
+> implementation, one validation and one audit trail.
+>
+> sha256 `7fc226e10646369c841ec2d1ff6c76f0bd2f54b970e5a4119141e475ac066ba6`,
+> 452 lines / 21079 bytes — **re-hash the merged copy before applying** (§9-B.7).
+> New objects only; money path untouched; **no deploy implied**. Applying it
+> creates an EMPTY table and closes nothing, which its own block asserts.
+>
+> **A raise rolls back the write that preceded it, and that shaped the design.**
+> The first version of `resolve_branch_delivery_request` retired an expired
+> request and then raised — so the retirement was rolled back and the row stayed
+> `pending` forever, meeting the next operator as the same dead request. Caught
+> by CASE 14 of the paired suite, which asserts the row is actually retired
+> rather than that an error was thrown. Expiry now RETURNS a result. **A
+> plpgsql function cannot both persist a write and raise; if a state transition
+> must survive, it cannot be announced with an exception.**
+>
+> **MUTATION TESTING FOUND A TEST THAT PASSED FOR THE WRONG REASON.** Widening
+> `resolve`'s gate to admit a branch operator did NOT fail the suite: the branch
+> still got `42501`, because the accept path calls `set_branch_delivery_pause`,
+> which refuses them anyway. That defence-in-depth is real and is a direct
+> consequence of reusing the pause RPC instead of forking it — the branch is
+> blocked at BOTH layers — but it meant the self-approval case proved less than
+> it appeared to. CASE 19 now pins every gate at source level. **When a mutant
+> survives, ask whether the test was measuring what its name claims.**
+>
+> Coverage: `branch_delivery_requests_test.sql`, 19 cases weighted toward what
+> must NOT happen — filing changes no delivery state, a branch still cannot
+> pause delivery, the call centre cannot file, a branch cannot file or withdraw
+> for another branch, a customer can neither file nor read. Cold: 130
+> migrations, 72 suites, 70 passed, 2 quarantined, 0 new failures.
+
 > **Updated 2026-09-13 (final) — `20260915120000` is APPLIED, and the count is
 > back to ONE: Moyasar, frozen on purpose.** Applied 05:46:10 UTC on explicit
 > owner approval naming the target by version; live version `20260913054610`,
