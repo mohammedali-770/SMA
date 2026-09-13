@@ -16,20 +16,33 @@ import { BranchReferenceCard } from './BranchReferenceCard';
 import { SECRET_MASK } from './branchReference';
 import { opsT } from './opsStrings';
 
-const i18n = { t: (k: Parameters<typeof opsT>[1]) => opsT('en', k), isRTL: false, lang: 'en' as const,
-  setLang: () => {} };
+const i18n = {
+  t: (k: Parameters<typeof opsT>[1]) => opsT('en', k),
+  isRTL: false,
+  lang: 'en' as const,
+  setLang: () => {},
+};
 
 function row(over: Partial<BranchReferenceRow> = {}): BranchReferenceRow {
   return {
-    id: 'e1', branchId: 'b1', kind: 'text',
-    labelEn: 'Bin day', labelAr: 'يوم النفايات',
-    valuePlain: 'Tuesday', sortOrder: 0, ...over,
+    id: 'e1',
+    branchId: 'b1',
+    kind: 'text',
+    labelEn: 'Bin day',
+    labelAr: 'يوم النفايات',
+    valuePlain: 'Tuesday',
+    sortOrder: 0,
+    ...over,
   };
 }
 
 const secretRow = row({
-  id: 's1', kind: 'secret', labelEn: 'Aggregator password',
-  labelAr: 'كلمة المرور', valuePlain: null, sortOrder: 1,
+  id: 's1',
+  kind: 'secret',
+  labelEn: 'Aggregator password',
+  labelAr: 'كلمة المرور',
+  valuePlain: null,
+  sortOrder: 1,
 });
 
 afterEach(cleanup);
@@ -46,9 +59,7 @@ describe('BranchReferenceCard', () => {
     // every time the screen opened and make the trail worthless for the only
     // question it exists to answer: who looked, and when.
     const onReveal = vi.fn().mockResolvedValue('secret-value');
-    render(
-      <BranchReferenceCard entries={[row(), secretRow]} i18n={i18n as never} onReveal={onReveal} />,
-    );
+    render(<BranchReferenceCard entries={[row(), secretRow]} i18n={i18n as never} onReveal={onReveal} />);
     // Give any effect a chance to run before asserting absence.
     await waitFor(() => expect(screen.getByText('Aggregator password')).toBeTruthy());
     expect(onReveal).not.toHaveBeenCalled();
@@ -92,8 +103,7 @@ describe('BranchReferenceCard', () => {
     render(<BranchReferenceCard entries={[secretRow]} i18n={i18n as never} onReveal={onReveal} />);
 
     fireEvent.click(screen.getByRole('button', { name: opsT('en', 'referenceReveal') }));
-    await waitFor(() =>
-      expect(screen.getByText('Not authorized to reveal this entry')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Not authorized to reveal this entry')).toBeTruthy());
     expect(screen.getByText(SECRET_MASK)).toBeTruthy();
   });
 
@@ -103,9 +113,7 @@ describe('BranchReferenceCard', () => {
     );
     expect(screen.queryByText(opsT('en', 'referenceAuditNotice'))).toBeNull();
 
-    rerender(
-      <BranchReferenceCard entries={[row(), secretRow]} i18n={i18n as never} onReveal={vi.fn()} />,
-    );
+    rerender(<BranchReferenceCard entries={[row(), secretRow]} i18n={i18n as never} onReveal={vi.fn()} />);
     expect(screen.getByText(opsT('en', 'referenceAuditNotice'))).toBeTruthy();
   });
 

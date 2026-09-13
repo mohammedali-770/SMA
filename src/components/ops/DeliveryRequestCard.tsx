@@ -44,7 +44,9 @@ export const DeliveryRequestCard: React.FC<{
     <Card className="space-y-3 p-4">
       <div className="flex items-center gap-2">
         <Truck className="size-4 text-ember" aria-hidden="true" />
-        <Text variant="heading" as="h2">{t('deliveryRequestSection')}</Text>
+        <Text variant="heading" as="h2">
+          {t('deliveryRequestSection')}
+        </Text>
         {waiting ? <StatusPill label={t('requestWaiting')} tone="warning" /> : null}
       </div>
 
@@ -53,15 +55,20 @@ export const DeliveryRequestCard: React.FC<{
       {waiting ? (
         <div className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3">
           {/* The live fact first. The request is secondary to what is true now. */}
-          <Text variant="label" as="p">{t('requestWaitingHint')}</Text>
+          <Text variant="label" as="p">
+            {t('requestWaitingHint')}
+          </Text>
           <div className="flex items-center gap-2">
             <Clock className="size-4 text-amber-ink shrink-0" aria-hidden="true" />
             <Text variant="caption" tone="tertiary" as="p" numeric>
-              {t('requestExpiresIn')} {minutesUntilExpiry(waiting, now)}{t('requestMinutesShort')}
+              {t('requestExpiresIn')} {minutesUntilExpiry(waiting, now)}
+              {t('requestMinutesShort')}
             </Text>
           </div>
           {waiting.note ? (
-            <Text variant="caption" tone="tertiary" as="p">{waiting.note}</Text>
+            <Text variant="caption" tone="tertiary" as="p">
+              {waiting.note}
+            </Text>
           ) : null}
           <Button
             label={t('withdrawRequest')}
@@ -83,15 +90,15 @@ export const DeliveryRequestCard: React.FC<{
           )}
 
           {deliveryClosed ? (
-            <Text variant="caption" tone="tertiary" as="p">{t('requestBlockedClosed')}</Text>
+            <Text variant="caption" tone="tertiary" as="p">
+              {t('requestBlockedClosed')}
+            </Text>
           ) : null}
 
-          <Button
-            label={t('requestCloseDelivery')}
-            onClick={onRequest}
-            disabled={busy || !allowed}
-          />
-          <Text variant="caption" tone="tertiary" as="p">{t('requestHint')}</Text>
+          <Button label={t('requestCloseDelivery')} onClick={onRequest} disabled={busy || !allowed} />
+          <Text variant="caption" tone="tertiary" as="p">
+            {t('requestHint')}
+          </Text>
         </>
       )}
     </Card>

@@ -7,8 +7,17 @@ import { describe, expect, it } from 'vitest';
 
 import type { BranchReferenceRow, DeliveryRequestRow } from '../../lib/opsApi';
 import {
-  SECRET_MASK, awaitingRequest, canRequest, displayValue, isAwaiting, isHidden,
-  lastAnswered, minutesUntilExpiry, orderedEntries, safeHref, telHref,
+  SECRET_MASK,
+  awaitingRequest,
+  canRequest,
+  displayValue,
+  isAwaiting,
+  isHidden,
+  lastAnswered,
+  minutesUntilExpiry,
+  orderedEntries,
+  safeHref,
+  telHref,
 } from './branchReference';
 
 const NOW = Date.parse('2026-09-13T12:00:00Z');
@@ -55,9 +64,11 @@ describe('delivery request state', () => {
   });
 
   it.each(['accepted', 'declined', 'cancelled', 'expired'] as const)(
-    'does not treat a %s request as awaiting', (status) => {
+    'does not treat a %s request as awaiting',
+    (status) => {
       expect(isAwaiting(req({ status }), NOW)).toBe(false);
-    });
+    },
+  );
 
   it('reports minutes left, rounded up, and never negative', () => {
     expect(minutesUntilExpiry(req(), NOW)).toBe(30);
@@ -106,8 +117,7 @@ describe('reference values', () => {
     const secret = entry({ kind: 'secret', valuePlain: null });
     expect(displayValue(secret, undefined)).toBe(SECRET_MASK);
     // A length-derived mask would leak the length; assert it does not vary.
-    expect(displayValue(entry({ kind: 'secret', valuePlain: null, id: 'e2' }), undefined))
-      .toBe(SECRET_MASK);
+    expect(displayValue(entry({ kind: 'secret', valuePlain: null, id: 'e2' }), undefined)).toBe(SECRET_MASK);
     expect(displayValue(secret, 'revealed-value')).toBe('revealed-value');
   });
 
@@ -125,10 +135,10 @@ describe('reference values', () => {
 
 describe('safeHref allowlists the scheme', () => {
   it('accepts http and https', () => {
-    expect(safeHref(entry({ kind: 'link', valuePlain: 'https://example.com/a' })))
-      .toBe('https://example.com/a');
-    expect(safeHref(entry({ kind: 'link', valuePlain: 'http://example.com/' })))
-      .toBe('http://example.com/');
+    expect(safeHref(entry({ kind: 'link', valuePlain: 'https://example.com/a' }))).toBe(
+      'https://example.com/a',
+    );
+    expect(safeHref(entry({ kind: 'link', valuePlain: 'http://example.com/' }))).toBe('http://example.com/');
   });
 
   it.each([
@@ -148,8 +158,7 @@ describe('safeHref allowlists the scheme', () => {
 
 describe('telHref', () => {
   it('strips formatting and keeps a leading plus', () => {
-    expect(telHref(entry({ kind: 'phone', valuePlain: '+966 55 123 4567' })))
-      .toBe('tel:+966551234567');
+    expect(telHref(entry({ kind: 'phone', valuePlain: '+966 55 123 4567' }))).toBe('tel:+966551234567');
   });
 
   it('refuses something too short to be a number, and other kinds', () => {

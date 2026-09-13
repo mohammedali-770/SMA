@@ -64,7 +64,9 @@ export const BranchReferenceCard: React.FC<{
     <Card className="space-y-3 p-4">
       <div className="flex items-center gap-2">
         <BookOpen className="size-4 text-ember" aria-hidden="true" />
-        <Text variant="heading" as="h2">{t('referenceSection')}</Text>
+        <Text variant="heading" as="h2">
+          {t('referenceSection')}
+        </Text>
       </div>
 
       {error ? <Notice title={t('referenceRevealFailed')} action={error} tone="blocking" /> : null}
@@ -86,7 +88,9 @@ export const BranchReferenceCard: React.FC<{
                 className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
               >
                 <div className="min-w-0">
-                  <Text variant="label" as="p">{label}</Text>
+                  <Text variant="label" as="p">
+                    {label}
+                  </Text>
                   {href ? (
                     <a
                       href={href}
@@ -98,7 +102,10 @@ export const BranchReferenceCard: React.FC<{
                       <ExternalLink className="size-3 shrink-0" aria-hidden="true" />
                     </a>
                   ) : tel ? (
-                    <a href={tel} className="inline-flex items-center gap-1 text-[15px] text-ember-text underline">
+                    <a
+                      href={tel}
+                      className="inline-flex items-center gap-1 text-[15px] text-ember-text underline"
+                    >
                       <Phone className="size-3 shrink-0" aria-hidden="true" />
                       <span dir="ltr">{shown}</span>
                     </a>
@@ -120,7 +127,9 @@ export const BranchReferenceCard: React.FC<{
                   hidden ? (
                     <Button
                       label={pending === entry.id ? t('loading') : t('referenceReveal')}
-                      onClick={() => { void reveal(entry.id); }}
+                      onClick={() => {
+                        void reveal(entry.id);
+                      }}
                       disabled={pending !== null}
                       variant="secondary"
                       leading={<Eye className="size-4" />}
@@ -141,7 +150,9 @@ export const BranchReferenceCard: React.FC<{
       )}
 
       {hasSecret ? (
-        <Text variant="caption" tone="tertiary" as="p">{t('referenceAuditNotice')}</Text>
+        <Text variant="caption" tone="tertiary" as="p">
+          {t('referenceAuditNotice')}
+        </Text>
       ) : null}
     </Card>
   );
