@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**178 TypeScript test files declaring 2768 test blocks, plus 73 SQL suites.**
+**179 TypeScript test files declaring 2781 test blocks, plus 74 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -63,6 +63,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/lazywait_sync_health_summary_test.sql`
 - `supabase/tests/lazywait_sync_scheduler_test.sql`
 - `supabase/tests/lazywait_variant_import_test.sql`
+- `supabase/tests/loyalty_earn_on_settlement_test.sql`
 - `supabase/tests/loyalty_expiry_test.sql`
 - `supabase/tests/loyalty_item_exclusion_test.sql`
 - `supabase/tests/loyalty_multipliers_test.sql`
@@ -118,7 +119,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-64 files, 926 declared test blocks.
+65 files, 933 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -153,6 +154,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
+| `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
 | `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
@@ -286,7 +288,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-23 files, 584 declared test blocks.
+23 files, 590 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -295,7 +297,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 17 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
-| `supabase/functions/_shared/lazywait.test.ts` | 96 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
+| `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |

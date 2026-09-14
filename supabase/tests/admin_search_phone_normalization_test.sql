@@ -29,8 +29,8 @@ insert into auth.users (id, email) values
 -- The two storage shapes that actually coexist in Production, side by side.
 insert into public.profiles (id, role, full_name, phone_number) values
   (:admin,   'admin',    'Search Admin',  '+966500000101'),
-  (:plus,    'customer', 'Plus Shape',    '+966555820667'),
-  (:bare,    'customer', 'Bare Shape',    '966555820668'),
+  (:plus,    'customer', 'Plus Shape',    '+966555000667'),
+  (:bare,    'customer', 'Bare Shape',    '966555000668'),
   (:nophone, 'customer', 'No Phone At All', null)
 on conflict (id) do update set role = excluded.role,
   full_name = excluded.full_name, phone_number = excluded.phone_number;
@@ -75,8 +75,8 @@ do $$
 declare v_shape text; v_hits integer;
 begin
   foreach v_shape in array array[
-    '+966555820667', '966555820667', '00966555820667', '0555820667', '555820667',
-    '+966 55 582 0667', '055-582-0667'
+    '+966555000667', '966555000667', '00966555000667', '0555000667', '555000667',
+    '+966 55 500 0667', '055-500-0667'
   ] loop
     select count(*) into v_hits
       from jsonb_array_elements(public.admin_search_role_candidates(v_shape)) e
@@ -95,7 +95,7 @@ do $$
 declare v_shape text; v_hits integer;
 begin
   foreach v_shape in array array[
-    '+966555820668', '966555820668', '00966555820668', '0555820668', '555820668'
+    '+966555000668', '966555000668', '00966555000668', '0555000668', '555000668'
   ] loop
     select count(*) into v_hits
       from jsonb_array_elements(public.admin_search_role_candidates(v_shape)) e
@@ -116,7 +116,7 @@ do $$
 declare v_wrong integer;
 begin
   select count(*) into v_wrong
-    from jsonb_array_elements(public.admin_search_role_candidates('+966555820667')) e
+    from jsonb_array_elements(public.admin_search_role_candidates('+966555000667')) e
    where e ->> 'id' = '00000000-0000-0000-0000-0000000cb003';
   if v_wrong <> 0 then
     raise exception 'FAIL 4: a complete number also matched a different customer';
@@ -131,8 +131,11 @@ do $$
 declare v_hits integer; v_all integer;
 begin
   -- A prefix typed with the trunk zero, which never matched before.
+  -- The prefix tracks the fixture numbers: when the real customer number was
+  -- scrubbed out of this public repository on 2026-09-14 the digits changed, and
+  -- a hardcoded prefix is exactly the kind of thing a find-and-replace misses.
   select count(*) into v_hits
-    from jsonb_array_elements(public.admin_search_role_candidates('05558')) e
+    from jsonb_array_elements(public.admin_search_role_candidates('05550')) e
    where e ->> 'id' in ('00000000-0000-0000-0000-0000000cb002',
                         '00000000-0000-0000-0000-0000000cb003');
   if v_hits <> 2 then

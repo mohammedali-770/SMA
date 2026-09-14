@@ -97,8 +97,23 @@ Deno.serve(async (req: Request) => {
   //    code the customer was never sent. Both functions now share one budget
   //    through `otp_send_reservations`.
   //
-  //    Fails OPEN on an RPC error, deliberately: a limiter that cannot be reached
-  //    must not become an outage of the entire login system.
+  //    IT FAILS CLOSED ON AN RPC ERROR. It used to fail open, on the reasoning
+  //    that "a limiter that cannot be reached must not become an outage of the
+  //    entire login system". That reasoning does not survive looking at where
+  //    this call sits: `resolveWhatsAppConfig` at step 5 just read
+  //    `integration_settings` through this same admin client and returned 503 if
+  //    it could not. So by the time control reaches here, Postgres is reachable
+  //    — the general-outage case the old comment feared has already been handled
+  //    upstream, and failing open here bought availability that was not actually
+  //    at risk.
+  //
+  //    What `gateErr` really means is that something specific is wrong with the
+  //    limiter itself: a missing function, a revoked grant, a signature change.
+  //    In that state the correct answer is to stop, because this reservation is
+  //    the ONLY per-phone throttle on a live, billable Meta channel — the 2026-09-13
+  //    audit's finding 1.4. An attacker who can induce one RPC error would
+  //    otherwise have removed rate limiting from the customer login path
+  //    entirely, which is a worse outage than a login pause and an invisible one.
   const { data: gateRows, error: gateErr } = await admin.rpc('otp_reserve_send', {
     p_phone: norm.e164,
     p_purpose: 'auth_login',
@@ -106,7 +121,17 @@ Deno.serve(async (req: Request) => {
     p_max_per_hour: cfg.maxPerHour,
     p_max_per_day: cfg.maxPerDay,
   });
-  const gate = gateErr ? null : (Array.isArray(gateRows) ? gateRows[0] : gateRows);
+  if (gateErr) {
+    // Distinct from the 503s above so an operator reading logs can tell "the
+    // limiter is broken" apart from "WhatsApp login is switched off". The
+    // message stays generic for the customer.
+    console.error('otp_reserve_send failed; refusing to deliver unthrottled', {
+      code: gateErr.code ?? null,
+      message: gateErr.message ?? null,
+    });
+    return hookError(503, 'Verification is temporarily unavailable. Please try again shortly.');
+  }
+  const gate = Array.isArray(gateRows) ? gateRows[0] : gateRows;
   // 429 so Supabase surfaces rate limiting rather than a delivery fault. The
   // reason is NOT echoed: 'cooldown' vs 'daily_limit' would tell an enumerator
   // how much traffic a given number has already had.

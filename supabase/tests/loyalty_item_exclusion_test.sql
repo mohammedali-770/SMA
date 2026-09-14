@@ -126,7 +126,7 @@ begin
   end if;
   -- And the ledger agrees with the order column.
   if not exists (select 1 from public.loyalty_transactions
-                 where order_id = o.id and type = 'earn' and points = 32) then
+                 where order_id = o.id and type = 'earn_pending' and points = 32) then
     raise exception 'FAIL 2: no earn ledger row for 32 points';
   end if;
 
