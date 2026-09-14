@@ -689,6 +689,49 @@ floor to `warning` would mean roughly 116. There is **no backfill** — the
 producers only write `email` rows while the flag is already true, so the 268
 rows already in the outbox (0 on `email`) stay where they are.
 
+### The SMTP endpoint is validated, not merely read (2026-09-14)
+
+`operations-alert-dispatch` read `host`, `port` and `username` out of
+`integration_settings.public_config` and handed them straight to `Deno.connect`.
+Writing that row needs `is_admin()` — role **and** AAL2 — so this was never an
+anonymous SSRF; it is containment for a compromised admin session or a leaked
+service key, which bypasses RLS entirely. One row edit turned a scheduled,
+service-role Edge Function into a connector to any address it could reach.
+
+`_shared/smtpTarget.ts` now parses the row and refuses, with a reason code, an
+IP literal in any of its four spellings (dotted, decimal, hex, octal) and IPv6;
+loopback, private and link-local space — `169.254.169.254` is the cloud metadata
+endpoint; the `.local`, `.internal` and `.home.arpa` suffixes; a malformed
+hostname; and a port outside 1-65535. An optional `SMTP_ALLOWED_HOSTS`
+environment allowlist pins the endpoint further; unset, which is how it stands,
+means "any public hostname" — so setting it only ever narrows.
+
+A refusal returns `disabled`, not `error`, on purpose: a bad endpoint is a
+configuration state, and an error would have the scheduler retrying a row that
+cannot be delivered until somebody edits it.
+
+**The live row passes unchanged** — `mail.spicymeal.com.sa`, port 465,
+`secure: true` — and that exact configuration is a test case, because a guard
+that refuses the only real endpoint is worse than none.
+
+#### What was deliberately NOT added, and why
+
+The same review asked for a config-level requirement that TLS be on before the
+SMTP password is sent. **denomailer already enforces that, and better.** Reading
+`denomailer@1.6.0/client/basic/client.ts`: it issues `STARTTLS` whenever the
+server advertises it, and then
+
+> `if (!this.config.debug.allowUnsecure && !this.secure) { … throw new Error("Connection is not secure! Don't send authentication over non secure connection!") }`
+
+— before `AUTH` is written. This function never passes `debug`, so the refusal is
+active. A config flag here would add nothing **and** would wrongly reject a
+STARTTLS-on-587 relay, which is the commonest kind.
+
+What *could* regress is somebody setting `debug.allowUnsecure` to silence that
+error, at which point the password crosses the wire in cleartext and nothing else
+would notice. `_shared/smtpTarget.test.ts` pins the absence of `allowUnsecure`
+and `noStartTLS` in the dispatcher source.
+
 ### The digest footer — defect recorded 2026-09-13, FIXED 2026-09-15 (unapplied)
 
 `operations_digest_build` appended the literal line **"External delivery is

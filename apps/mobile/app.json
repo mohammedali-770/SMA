@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "sa.com.spicymeal.app",
+      "allowBackup": false,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
