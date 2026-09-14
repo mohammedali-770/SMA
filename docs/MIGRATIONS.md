@@ -122,6 +122,60 @@ to Production.**
 > comments stripped. `place_order` matched live exactly. Deriving without
 > checking would have been deriving from a picture rather than the artifact.
 
+> **Updated 2026-09-14 — `20260919120000_security_audit_db_hardening` is written,
+> validated and NOT applied. The count is now FOUR.** Outstanding: Moyasar
+> (frozen), `20260917120000`, `20260918120000` and this one. Moyasar still sorts
+> ahead of everything — **name the target by version**.
+>
+> Five independent hardening items from the 2026-09-13 audit, sharing a migration
+> because each is small and none interacts with another.
+>
+> 1. **Erasure left the per-item note behind** (finding 2.5).
+>    `anonymize_account_data` nulled `orders.customer_name/phone/notes/
+>    address_snapshot` but never `order_items.note` — customer free text that in
+>    practice carries an address or a phone. The customer was told in writing it
+>    had been removed.
+> 2. **`deactivate_push_device` silenced ANY device by token alone** (2.8). Now
+>    scoped to the caller's own row. `register_push_device` keeps its documented
+>    shared-handset reassignment — that asymmetry is deliberate: silencing has no
+>    legitimate cross-customer flow, reassignment does.
+> 3. **Eleven tables carried redundant `anon` INSERT/UPDATE/DELETE grants.** RLS
+>    denied them all (no policy matches anon, and RLS default-denies), so this was
+>    never exploitable; removed so one careless future policy cannot become an
+>    anonymous write. `anon` KEEPS select — the signed-out menu needs it.
+> 4. **Two functions with a mutable `search_path`** pinned. Neither is
+>    `SECURITY DEFINER`, so this is hygiene, not escalation — done so the real
+>    findings are not buried under a known-benign advisor warning.
+> 5. **The Promo Codes panel could not load** (2.7) — `couponsApi` selected
+>    `orders.coupon_code`, which `authenticated` cannot read.
+>
+> sha256 `4c030fa139248766c60bd7a6828656166a36e208e32a475a0566749f19ff5d1e`,
+> 364 lines / 17642 bytes — re-hash the MERGED copy before applying, per §15.
+> **Money path untouched. No deploy implied** (unchanged signatures).
+>
+> **TWO OF MY OWN MISTAKES WERE CAUGHT BY THE HARNESS AND ARE RECORDED BECAUSE
+> THEY GENERALISE.**
+>
+> **(a) I retyped a function instead of deriving it.** The header claimed
+> "derived by anchored substitution"; it was not — `anonymize_account_data` was
+> reconstructed by hand and referenced `whatsapp_message_logs.to_phone`, a column
+> that does not exist (it is `phone_e164`). Three suites failed instantly. The
+> body is now genuinely derived from `20260827110000` by substitution, with every
+> pre-existing cleanup asserted present. **A claim of derivation in a header is
+> not derivation.**
+>
+> **(b) My first fix for 2.7 widened a customer-facing contract.** It granted
+> `select (coupon_code) on orders to authenticated`, which fixed the admin panel
+> and simultaneously let every CUSTOMER read it. `order_read_contracts_test`
+> CASE 1 pins the exact column set and failed with "customer may read UNEXPECTED
+> columns: {coupon_code}". `orders` exposes a deliberate allowlist with
+> customer_id / customer_name / customer_phone held outside it, and an admin
+> convenience is no reason to widen it. The read moved behind
+> `admin_coupon_usage_counts()`, admin-gated, computing the aggregate in the
+> database. **An admin feature is not a reason to relax a customer boundary.**
+>
+> Cold chain: 132 migrations, 73 suites, 71 passed, 2 quarantined, **0 new
+
 > **Updated 2026-09-14 — `20260920120000_promo_disclosure_hardening` is written,
 > validated and NOT applied. The count is now FIVE.** Outstanding: Moyasar
 > (frozen), `20260917120000`, `20260918120000`, `20260919120000` and this one.
