@@ -128,6 +128,14 @@
       ]
     },
     {
+      "number": "+966500000201",
+      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql"]
+    },
+    {
+      "number": "+966500000202",
+      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql"]
+    },
+    {
       "number": "+966500000301",
       "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql"]
     },

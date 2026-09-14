@@ -125,7 +125,7 @@ begin
 
   -- And the LEDGER recorded it, rather than only the order column.
   if not exists (select 1 from public.loyalty_transactions
-                 where order_id = o.id and type = 'earn' and points = 64) then
+                 where order_id = o.id and type = 'earn_pending' and points = 64) then
     raise exception 'FAIL 2: no earn ledger row for the pickup order';
   end if;
 

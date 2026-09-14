@@ -149,9 +149,12 @@ begin
     jsonb_build_array(jsonb_build_object('product_id', v_prod, 'quantity', 1)),
     null, null, null, 0, v_idem, 'cash'));
 
+  -- 'earn_pending', not 'earn', since 20260918120000: place_order records the
+  -- points at creation but does not credit them until delivery (audit 1.1). The
+  -- property this case exists for -- exactly ONE row per placement -- is unchanged.
   select count(*) into n from public.loyalty_transactions
-   where profile_id = v_cust and type = 'earn';
-  if n <> 1 then raise exception 'AWARD FAILED: expected exactly 1 earn row, got %', n; end if;
+   where profile_id = v_cust and type = 'earn_pending';
+  if n <> 1 then raise exception 'AWARD FAILED: expected exactly 1 pending-earn row, got %', n; end if;
 
   -- IDEMPOTENCY: the same key must not award twice.
   v_order2 := to_jsonb(public.place_order(
@@ -161,7 +164,7 @@ begin
   if (v_order2->>'id') is distinct from (v_order->>'id') then
     raise exception 'IDEMPOTENCY FAILED: a second order was created'; end if;
   select count(*) into n from public.loyalty_transactions
-   where profile_id = v_cust and type = 'earn';
+   where profile_id = v_cust and type = 'earn_pending';
   if n <> 1 then raise exception 'IDEMPOTENCY FAILED: awarded % times', n; end if;
 
   -- Nothing written by the real pricing path leaks the identifier.
@@ -169,13 +172,41 @@ begin
    where profile_id = v_cust and public.text_has_internal_order_number(reason);
   if v_bad <> 0 then raise exception 'LEAK: % loyalty rows carry an order number', v_bad; end if;
 
-  -- Amounts and balances are unchanged by the text normalization.
+  -- Amounts are unchanged by the text normalization.
   select points, balance_after into v_pts, v_bal from public.loyalty_transactions
-   where profile_id = v_cust and type = 'earn';
+   where profile_id = v_cust and type = 'earn_pending';
   if v_pts <> 100 then raise exception 'AWARD FAILED: expected 100 points, got %', v_pts; end if;
-  if v_bal <> 100 then raise exception 'AWARD FAILED: balance_after = %', v_bal; end if;
+
+  -- THE BALANCE MUST NOT MOVE YET, and that is the point of 20260918120000.
+  -- Before it, these 100 points were spendable the instant the order existed,
+  -- on an order with payment_status = 'pending' that nobody had paid for. The
+  -- ledger row records the promise; balance_after therefore reports the
+  -- unchanged balance, not the promised one.
+  if v_bal <> 0 then raise exception 'PENDING EARN FAILED: balance_after = %, expected 0', v_bal; end if;
+  if (select loyalty_points from public.profiles where id = v_cust) <> 0 then
+    raise exception 'PENDING EARN FAILED: an unpaid order credited the balance'; end if;
+
+  -- And it MUST move on delivery. Asserting only the negative above would pass
+  -- against a change that simply broke earning altogether.
+  perform set_config('test.is_admin', 'true', true);
+  perform set_config('test.is_staff', 'true', true);
+  perform public.admin_set_order_status((v_order->>'id')::uuid, 'preparing');
+  perform public.admin_set_order_status((v_order->>'id')::uuid, 'ready');
+  perform public.admin_set_order_status((v_order->>'id')::uuid, 'delivered');
   if (select loyalty_points from public.profiles where id = v_cust) <> 100 then
-    raise exception 'AWARD FAILED: profile balance not updated'; end if;
+    raise exception 'PROMOTION FAILED: delivery did not credit the pending earn (balance %)',
+      (select loyalty_points from public.profiles where id = v_cust); end if;
+  select count(*) into n from public.loyalty_transactions
+   where profile_id = v_cust and type = 'earn';
+  if n <> 1 then raise exception 'PROMOTION FAILED: expected 1 earn row after delivery, got %', n; end if;
+
+  -- Idempotent: a repeated delivered transition must not credit twice.
+  begin
+    perform public.admin_set_order_status((v_order->>'id')::uuid, 'delivered');
+  exception when others then null;  -- terminal-status rejection is fine
+  end;
+  if (select loyalty_points from public.profiles where id = v_cust) <> 100 then
+    raise exception 'PROMOTION FAILED: credited twice'; end if;
 
   -- The order itself still carries its authoritative pricing.
   if (v_order->>'total')::numeric <> 100 then
