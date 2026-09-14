@@ -1143,7 +1143,7 @@ approval, and leaving it alone is the correct default.
 **Why this exists.** The owner asked for a comp that starts from a phone number:
 *"when the number of someone in comped customers enters the app, they should see
 the prices as 0."* The panel's first live use had already shown why — a search
-for `+966555820667` returned "No matching customers", correctly, because nobody
+for `+966555000667` returned "No matching customers", correctly, because nobody
 with that number had signed up, and there was no way to comp them anyway.
 
 **Done.** All three applied on 2026-08-27 on the owner's explicit approval, one
