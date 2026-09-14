@@ -831,6 +831,54 @@ misleading in the other direction. The two halves are written to the same cases
 — `loyalty_earn_on_settlement_test.sql` and `loyaltyEarnState.test.ts` — so a
 divergence shows up as a disagreement rather than as silence.
 
+### The fix covered ONE of the TWO creation paths (corrected `20260921120000`)
+
+`20260918120000` was applied on 2026-09-14 and reported as closing the finding.
+It did not, quite. This repository has **two** functions that create an order and
+move a loyalty balance:
+
+| Function | Reached from | Fixed by |
+| --- | --- | --- |
+| `place_order` | cash / direct checkout | `20260918120000` |
+| `insert_order_from_snapshot` | `begin_checkout_session` / `complete_checkout_session` | **`20260921120000`** |
+
+Only the first was touched. The second still ran the line the finding is about —
+
+```sql
+set loyalty_points = greatest(0, v_bal_start - v_redeemed + v_earned)
+```
+
+— and still wrote a real, spendable `'earn'` row at **creation**.
+
+**Nothing minted points through it, and that is a bound rather than a
+dismissal.** `insert_order_from_snapshot` is `service_role`-only. Its ONLINE arm
+requires a verified payment, and online payment is disabled under CLAUDE.md §6
+(measured: 3 online orders, all `pending`, none ever paid). Its other arm is the
+**zero-total** path for comped customers, and a comped order earns 0, so it
+writes no ledger row at all. The defect returns the moment online payment is
+enabled — which is a live goal, not a hypothetical — and an order inserted
+`paid` would credit spendable points before anyone had collected it.
+
+`20260921120000` applies the identical treatment: `earn_pending` at creation,
+redemption still debiting, and the `redeem` row's `balance_after` no longer
+subtracting an earn that is no longer in the balance. The promotion and the
+cancellation reversal needed **no change at all** — both already read the ledger
+(`type = 'earn_pending'` to promote, `type = 'earn'` to reverse), so a
+snapshot-path order flows through them untouched.
+
+**How it was missed, because the shape will recur.** The finding was about a
+*behaviour* — "an unpaid order can mint spendable points" — and the fix, the
+tests and the report were all organised around a *function*. Every test
+exercised the path that had been fixed, so nothing failed. A grep for the
+defective expression rather than for `place_order` would have found the second
+copy in one command. **When a finding is about a behaviour, enumerate every
+implementation of that behaviour before declaring it closed.**
+
+The concrete repair is a test rather than a note:
+`loyalty_earn_snapshot_path_test.sql` CASE 6 asserts the property of **both**
+creation paths in one place, so the next divergence fails a test instead of
+waiting to be read out of a diff.
+
 ### Four existing suites were revised, deliberately
 
 Three asserted an `earn` row at creation; they now assert `earn_pending`, and
