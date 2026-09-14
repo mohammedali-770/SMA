@@ -76,7 +76,7 @@ declare v_shape text; v_hits integer;
 begin
   foreach v_shape in array array[
     '+966555000667', '966555000667', '00966555000667', '0555000667', '555000667',
-    '+966 55 582 0667', '055-582-0667'
+    '+966 55 500 0667', '055-500-0667'
   ] loop
     select count(*) into v_hits
       from jsonb_array_elements(public.admin_search_role_candidates(v_shape)) e
@@ -131,8 +131,11 @@ do $$
 declare v_hits integer; v_all integer;
 begin
   -- A prefix typed with the trunk zero, which never matched before.
+  -- The prefix tracks the fixture numbers: when the real customer number was
+  -- scrubbed out of this public repository on 2026-09-14 the digits changed, and
+  -- a hardcoded prefix is exactly the kind of thing a find-and-replace misses.
   select count(*) into v_hits
-    from jsonb_array_elements(public.admin_search_role_candidates('05558')) e
+    from jsonb_array_elements(public.admin_search_role_candidates('05550')) e
    where e ->> 'id' in ('00000000-0000-0000-0000-0000000cb002',
                         '00000000-0000-0000-0000-0000000cb003');
   if v_hits <> 2 then
