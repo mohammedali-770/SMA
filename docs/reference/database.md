@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **132**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260918120000_loyalty_earn_on_settlement.sql`.
+Migration files in the repository: **133**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260919120000_security_audit_db_hardening.sql`.
 
 ## Tables
 
@@ -94,6 +94,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `adjust_loyalty_points` | 2 | `20260707120900_loyalty_audit.sql` |
 | `admin_add_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_clear_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
+| `admin_coupon_usage_counts` | 1 | `20260919120000_security_audit_db_hardening.sql` |
 | `admin_delete_branch_reference` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `admin_delete_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_list_comp_member_audit` | 2 | `20260827100000_comp_members_by_phone.sql` |
@@ -112,7 +113,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_update_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_upsert_branch_reference` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `admin_upsert_branch_working_hours` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
-| `anonymize_account_data` | 3 | `20260827110000_comp_erasure.sql` |
+| `anonymize_account_data` | 4 | `20260919120000_security_audit_db_hardening.sql` |
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
@@ -146,7 +147,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `customer_pos_resend_eligibility` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_limit` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_window` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
-| `deactivate_push_device` | 1 | `20260714090000_push_notifications.sql` |
+| `deactivate_push_device` | 2 | `20260919120000_security_audit_db_hardening.sql` |
 | `emit_branch_availability_event` | 1 | `20260820110000_branch_availability_snooze.sql` |
 | `emit_branch_delivery_event` | 1 | `20260820120000_branch_delivery_control.sql` |
 | `emit_delivery_area_event` | 1 | `20260820120000_branch_delivery_control.sql` |

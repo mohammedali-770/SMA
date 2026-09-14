@@ -657,3 +657,22 @@ language for money nobody paid, and `order_refund_due` (which requires
 `total > 0`) will never enrol it. The defect pre-dates this work; comped orders
 make it reachable. Flagged rather than fixed, because changing refund language
 is payment-adjacent and §6 is active.
+
+## Coupon usage is read through an admin RPC (2026-09-14)
+
+`couponsApi.listReferencedCodes()` used to select `orders.coupon_code` directly.
+That column is **not** in the allowlist `orders` exposes to `authenticated`, so
+the query failed outright against Production and the Promo Codes panel could not
+load at all — found by the 2026-09-13 security audit (finding 2.7).
+
+The obvious fix — granting the column — was tried and **rejected by the test
+suite**, correctly. `order_read_contracts_test` CASE 1 pins the exact set of
+columns a customer may read on `orders`; `customer_id`, `customer_name` and
+`customer_phone` are deliberately held outside it, and widening that allowlist
+for an admin screen would have loosened a customer-facing boundary to gain an
+internal convenience.
+
+Usage counts now come from `admin_coupon_usage_counts()` — `SECURITY DEFINER`,
+gated on `is_admin()` (role **and** AAL2), returning `{CODE: count}`. No new
+column exposure, and the aggregate is computed in the database rather than by
+shipping every order's coupon code to the browser to be counted there.

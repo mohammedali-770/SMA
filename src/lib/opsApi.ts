@@ -442,6 +442,21 @@ export const opsApi = {
       .select('id, branch_id, kind, label_en, label_ar, value_plain, sort_order')
       .eq('branch_id', branchId)
       .order('sort_order', { ascending: true });
+
+    // DEGRADE, DO NOT THROW, when the table is not there.
+    //
+    // `20260917120000` is merged but unapplied, so in Production this table does
+    // not exist yet — and `fail(error)` took down the ENTIRE branch console with
+    // it, including the availability controls a branch needs mid-service. An
+    // optional reference sheet must never cost an operator the ability to snooze
+    // a sold-out item (2026-09-13 audit, finding 2.7).
+    //
+    // Narrow on purpose: only "relation does not exist" (Postgres 42P01, or
+    // PostgREST's PGRST205 schema-cache miss) is swallowed. A permission error,
+    // a network failure or a malformed query still raises, because those mean
+    // something the operator should see.
+    const code = (error as { code?: string } | null)?.code;
+    if (error && (code === '42P01' || code === 'PGRST205')) return [];
     fail(error);
     return (data ?? []).map((r) => ({
       id: r.id as string,
