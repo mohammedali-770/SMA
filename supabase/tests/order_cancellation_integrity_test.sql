@@ -62,6 +62,21 @@ begin
     10, 40, now()
   );
 
+  -- The matching ledger row, added 2026-09-14.
+  --
+  -- This fixture hand-builds a placed order instead of calling place_order, and
+  -- it used to set orders.loyalty_points_earned WITHOUT the 'earn' row that
+  -- place_order always writes alongside it. That incompleteness was invisible
+  -- while cancellation reversed the COLUMN. Since 20260918120000 it reverses
+  -- what was actually CREDITED -- the ledger -- so a fixture with no ledger row
+  -- now represents an order that earned nothing, which is not the scenario this
+  -- case is about. Adding the row makes the fixture a faithful post-placement
+  -- state rather than an approximate one.
+  insert into public.loyalty_transactions
+    (profile_id, order_id, type, points, balance_after, reason, created_by)
+  values
+    (v_customer, v_order, 'earn', 10, 70, 'Earned on order (fixture)', v_customer);
+
   insert into t_cancel_ctx values (v_customer, v_admin, v_branch, v_coupon, v_order);
 end $$;
 
@@ -259,6 +274,14 @@ begin
     id, customer_id, branch_id, status, order_type, subtotal, total,
     payment_status, payment_method, loyalty_points_earned, loyalty_points_redeemed
   ) values (v_order, v_customer, v_branch, 'received', 'pickup', 50, 50, 'pending', 'cash', 10, 40);
+
+  -- Same reason as CASE 4: the credit is the ledger row, not the column. The
+  -- shortfall this case exists to prove is unchanged -- the customer earned 10
+  -- and has only 2 left, so the reversal can recover 2 and must say so.
+  insert into public.loyalty_transactions
+    (profile_id, order_id, type, points, balance_after, reason, created_by)
+  values
+    (v_customer, v_order, 'earn', 10, 2, 'Earned on order (fixture)', v_customer);
 
   perform set_config('test.auth_uid', v_admin::text, true);
   perform set_config('test.is_admin', 'true', true);

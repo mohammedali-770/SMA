@@ -1931,6 +1931,36 @@ Consequences worth holding in mind:
 
 Full behaviour, administration and deploy order: `docs/DISCOUNTS_CAMPAIGNS.md`.
 
+## 10g. The receipt says whether the points are EARNED or still owed
+
+Since `20260918120000` an order's loyalty points are a promise until the order
+settles: `place_order` records an `earn_pending` ledger row and moves no
+balance, and the `delivered` transition promotes it.
+
+`orders.loyalty_points_earned` does not follow that. It is written at creation
+and stays positive for the order's whole life, so a receipt that renders any
+positive value as `+64 Loyalty points` told the customer they had been awarded
+points on an order that had not been delivered, on one that was **cancelled**
+and would never earn them at all, and on an unpaid **online** order the server
+will never credit.
+
+`loyaltyEarnState` (`apps/mobile/src/features/orders/`) answers one question —
+have these points actually been credited? — and the receipt renders one of three
+things:
+
+| State | Receipt shows | When |
+| --- | --- | --- |
+| `credited` | "+64 Loyalty points" | delivered, and paid if the method is online |
+| `pending` | "+64 Loyalty points once delivered" | anything before that |
+| `forfeited` | nothing at all | cancelled, or the order earned nothing |
+
+**It mirrors the server's promotion gate, and that duplication is the risk.** If
+the gate in `admin_set_order_status` changes, this must change with it or the
+receipt starts misleading in the other direction. Both halves are written to the
+same cases — `supabase/tests/loyalty_earn_on_settlement_test.sql` and
+`loyaltyEarnState.test.ts` — so a divergence surfaces as a disagreement rather
+than as silence. Rationale and the online asymmetry: `docs/LOYALTY.md`.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and

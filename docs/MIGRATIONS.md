@@ -36,10 +36,99 @@ to Production.**
 > validated, awaiting approval). Moyasar still sorts ahead of everything.
 > **Name the target by version.**
 
+> **Updated 2026-09-14 — `20260918120000_loyalty_earn_on_settlement` is written,
+> validated and NOT applied. The count is now THREE.** Outstanding: Moyasar
+> (frozen), `20260917120000` and this one. Moyasar still sorts ahead of
+> everything — **name the target by version**.
+>
+> **Corrected while merging.** This block was written when `20260916120000` was
+> still outstanding and said FOUR, listing it. It was applied on 2026-09-13
+> (ledger row 90, recorded immediately above), so that figure was stale before
+> this ever merged — §15's stale-picture problem in its mildest form, and worth
+> fixing at the merge rather than carrying a wrong number into the file whose
+> entire job is to hold the right one.
+>
+> Security audit finding 1.1. `place_order` credited earned points to the
+> spendable balance at order CREATION, on an order inserted with
+> `payment_status = 'pending'`. The cancellation reversal can only claw back
+> points STILL IN THE BALANCE and logs a *shortfall* when it cannot — so the
+> attack was: place a large cash order, never collect it, spend the points
+> immediately, let it be cancelled. The reversal recovers nothing. Measured
+> before writing: **65 of 65** orders that ever earned did so while unpaid, all
+> 8 654 points.
+>
+> Earning is now `earn_pending` at creation, promoted to a real `earn` on
+> DELIVERY. Redemption still debits at creation. Cancellation reverses what was
+> actually CREDITED (the ledger) rather than what the order PROMISED
+> (`orders.loyalty_points_earned`).
+>
+> **REVIEW FOUND THE FIX INCOMPLETE, AND THE CORRECTION IS THE POINT OF THIS
+> ROW.** The first version promoted ANY delivered order. It justified that with
+> "an online order that was never paid never reaches `delivered`" — which is
+> false: `LiveOrdersPanel` deliberately lets staff advance an unpaid ONLINE order
+> past a `window.confirm()` (a warning, not a block), and this RPC read neither
+> payment field. So an unpaid online order could be marked delivered and mint
+> spendable points — the very defect this file exists to close, moved rather than
+> removed — and `delivered` is terminal, so the cancellation reversal can never
+> run. **Not theoretical: all three online orders in Production are `pending`,
+> and no online order has ever been paid.** Online now additionally requires
+> `payment_status = 'paid'`; cash keeps delivery-as-settlement. #372.
+>
+> **`is distinct from 'online'`, not `= 'cash'`** — the column is nullable with
+> no default and one legacy order carries NULL, which must keep behaving like
+> cash rather than be silently denied.
+>
+> **Paying after delivery is too late**, and that is asserted rather than
+> glossed: `admin_set_order_status` returns early on an unchanged status, so
+> there is no second `delivered` transition to carry the promotion. Accepted —
+> promoting from the payment path would mean editing code frozen under §6.
+>
+> **A NEW SUITE, because the behaviour had none of its own.** The change was
+> covered only by edits to neighbouring suites, which is how the online case got
+> through authoring. `loyalty_earn_on_settlement_test.sql` now covers it in 8
+> cases, and **writing it found two further things by running rather than by
+> reasoning**: the original idempotence case was VACUOUS (the early return fires
+> before the promotion, so it proved the wrong guard — the promotion's own
+> `not exists ... type = 'earn'` is now asserted at source level instead), and
+> the paid-after-delivery consequence above. Mutation-tested three ways, all
+> three killed by BOTH the migration's own block and the suite: dropping the
+> gate (CASE 4), gating online out entirely (CASE 5), and `= 'cash'` (CASE 6).
+>
+> sha256 `19a2fb4978c5488e235653275200188260d6dfe98f99d791500d2470e0a7b38a`,
+> 906 lines / 43355 bytes — re-hash the MERGED copy before applying, per §15.
+> **It redefines BOTH money-path functions**, so their hashes change. Derived
+> from `20260910120000` (place_order) and `20260810100000`
+> (admin_set_order_status) by anchored substitution, each anchor asserted to
+> match exactly once; nothing retyped. **No deploy implied** — both signatures
+> unchanged. Applying it credits nobody and rewrites no existing row.
+>
+> Cold chain: 132 migrations, 73 suites, 71 passed, 2 quarantined, **0 new
+> failures**. Mutation-tested two ways, both killed — reintroducing the
+> credit-at-creation is caught by the migration's own block; removing the
+> promotion is caught by the paired test's POSITIVE assertion (added precisely
+> so the suite cannot pass against a change that broke earning altogether).
+>
+> **The harness caught a design error in the verification block itself.** Its
+> first draft required the ledger to be NON-EMPTY before claiming rows were
+> preserved — true in Production, false on a fresh database — so it encoded an
+> environment assumption as an invariant and failed the chain immediately. A
+> migration must apply to both. What is actually guaranteed needs no count:
+> neither statement touches a row, and `add constraint` validates every existing
+> row as it runs.
+>
+> **A stale-base trap was avoided by checking.** The repository's latest
+> definition of `admin_set_order_status` does NOT hash-match live — live carries
+> the same logic with **0 comment lines** (103 vs 124). Functionally identical,
+> comments stripped. `place_order` matched live exactly. Deriving without
+> checking would have been deriving from a picture rather than the artifact.
+
 > **Updated 2026-09-14 — `20260919120000_security_audit_db_hardening` is written,
-> validated and NOT applied.** Five independent hardening items from the
-> 2026-09-13 audit, sharing a migration because each is small and none interacts
-> with another.
+> validated and NOT applied. The count is now FOUR.** Outstanding: Moyasar
+> (frozen), `20260917120000`, `20260918120000` and this one. Moyasar still sorts
+> ahead of everything — **name the target by version**.
+>
+> Five independent hardening items from the 2026-09-13 audit, sharing a migration
+> because each is small and none interacts with another.
 >
 > 1. **Erasure left the per-item note behind** (finding 2.5).
 >    `anonymize_account_data` nulled `orders.customer_name/phone/notes/

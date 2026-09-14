@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **132**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260919120000_security_audit_db_hardening.sql`.
+Migration files in the repository: **133**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260919120000_security_audit_db_hardening.sql`.
 
 ## Tables
 
@@ -51,7 +51,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `lazywait_sync_requests` | `20260720120000_lazywait_sync_scheduler.sql` | 0 | **none declared** |
 | `legal_documents` | `20260712140000_legal_documents.sql` | 0 | 5 |
 | `loyalty_multipliers` | `20260910120000_loyalty_multipliers.sql` | 0 | 4 |
-| `loyalty_transactions` | `20260707120900_loyalty_audit.sql` | 3 | 1 |
+| `loyalty_transactions` | `20260707120900_loyalty_audit.sql` | 4 | 1 |
 | `modifier_groups` | `20260707120200_catalog.sql` | 1 | 1 |
 | `modifiers` | `20260707120200_catalog.sql` | 1 | 3 |
 | `notification_log` | `20260714090000_push_notifications.sql` | 1 | 2 |
@@ -107,7 +107,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_order_stats` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
 | `admin_search_role_candidates` | 2 | `20260827090000_admin_search_phone_normalization.sql` |
 | `admin_set_comp_member` | 2 | `20260827100000_comp_members_by_phone.sql` |
-| `admin_set_order_status` | 2 | `20260810100000_order_status_cancellation_integrity.sql` |
+| `admin_set_order_status` | 3 | `20260918120000_loyalty_earn_on_settlement.sql` |
 | `admin_set_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `admin_set_user_role` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_update_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
@@ -247,7 +247,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
-| `place_order` | 16 | `20260910120000_loyalty_multipliers.sql` |
+| `place_order` | 17 | `20260918120000_loyalty_earn_on_settlement.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
