@@ -116,6 +116,13 @@ export const LAZYWAIT_BASE_URL_NOT_CONFIGURED = 'lazywait_base_url_not_configure
  */
 export const LAZYWAIT_BASE_URL_INVALID = 'lazywait_base_url_invalid';
 
+/**
+ * The configured host is not on the allowlist. Distinct from _INVALID so an
+ * operator who mistyped a hostname is told something different from an operator
+ * who pointed the integration somewhere it is not permitted to go.
+ */
+export const LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED = 'lazywait_base_url_host_not_allowed';
+
 /** Thrown when a Lazywait call is attempted with no usable base URL. */
 export class LazywaitConfigError extends Error {
   readonly reason: string;
@@ -128,7 +135,8 @@ export class LazywaitConfigError extends Error {
 
 export type LazywaitBaseUrlFailure =
   | typeof LAZYWAIT_BASE_URL_NOT_CONFIGURED
-  | typeof LAZYWAIT_BASE_URL_INVALID;
+  | typeof LAZYWAIT_BASE_URL_INVALID
+  | typeof LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED;
 
 export type ResolvedBaseUrl =
   | { ok: true; baseUrl: string }
@@ -142,10 +150,21 @@ export type ResolvedBaseUrl =
  * - absent / empty / whitespace-only -> `LAZYWAIT_BASE_URL_NOT_CONFIGURED`;
  * - present but not an absolute http(s) URL -> `LAZYWAIT_BASE_URL_INVALID`.
  *
- * The shape check is deliberately narrow — it asks only "would `fetch` accept
- * this?", via the same `URL` parse the platform performs, plus an http/https
- * protocol requirement. It does NOT check the host, path or reachability, so it
- * cannot reject a legitimately reconfigured POS. `https://apiv2-dev.lazywait
+ * A THIRD failure was added on 2026-09-14: present, well-formed and https, but
+ * pointing at a host this integration is not allowed to contact ->
+ * `LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED`.
+ *
+ * This reverses what the previous revision of this comment said. It used to
+ * read "it does NOT check the host, path or reachability, so it cannot reject a
+ * legitimately reconfigured POS" — narrowness framed as a feature. The
+ * 2026-09-13 audit showed what that narrowness cost: `base_url` is a DB column
+ * an administrator edits in a browser, and `lazywaitFetch` attaches the live POS
+ * Bearer token to whatever it names. Accepting any well-formed URL meant one
+ * save could exfiltrate that token to an arbitrary host, or reach
+ * 169.254.169.254. The host is now checked against an allowlist that covers
+ * `lazywait.com` and its subdomains, which admits both the host in use today
+ * and the production host a move would use — so the original concern, not
+ * rejecting a legitimate reconfiguration, is still met. `https://apiv2-dev.lazywait
  * .com/v1`, the live value, is pinned as passing in `lazywait.test.ts`.
  *
  * The returned value is trimmed with trailing slashes stripped, exactly as
@@ -165,10 +184,66 @@ export function resolveLazywaitBaseUrl(raw: unknown): ResolvedBaseUrl {
   } catch {
     return { ok: false, reason: LAZYWAIT_BASE_URL_INVALID };
   }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+
+  // HTTPS ONLY. `http:` used to be accepted, which put the Bearer token on the
+  // wire in cleartext for anyone on the path.
+  if (parsed.protocol !== 'https:') {
     return { ok: false, reason: LAZYWAIT_BASE_URL_INVALID };
   }
+
+  // THE HOST MUST BE ON AN ALLOWLIST, and this is the load-bearing check.
+  //
+  // `base_url` is a DB column an administrator edits in the browser
+  // (`integration_settings.public_config`). `lazywaitFetch` attaches the live
+  // POS Bearer token to every request built from it. Shape validation alone
+  // therefore bought nothing: `https://collector.attacker.example/v1` is a
+  // perfectly well-formed URL, and one save plus one "Pull catalog" would have
+  // handed the token to whoever owns that host — the 2026-09-13 audit's finding
+  // 2.2. The same field could reach link-local metadata endpoints
+  // (169.254.169.254) and anything else inside the function's network.
+  //
+  // Note what this does NOT rely on: it is not a blocklist of bad hosts, which
+  // can always be evaded (decimal IPs, redirects, DNS rebinding). It is a
+  // positive list of the only hosts this integration is allowed to talk to.
+  if (!isAllowedLazywaitHost(parsed.hostname)) {
+    return { ok: false, reason: LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED };
+  }
+
   return { ok: true, baseUrl: trimmed.replace(/\/+$/, '') };
+}
+
+/**
+ * Hosts this integration may contact.
+ *
+ * Defaults to `lazywait.com` and its subdomains, which covers both the host in
+ * use today (`apiv2-dev.lazywait.com`, the live POS for this account) and the
+ * `apiv2.lazywait.com` a production move would use — so this closes the hole
+ * without breaking either.
+ *
+ * `LAZYWAIT_ALLOWED_HOSTS` (comma-separated) can extend it. Deliberately an
+ * Edge Function environment variable rather than another DB column: changing it
+ * requires a deploy, so it cannot be done from the admin console by whoever the
+ * attacker is in the scenario above.
+ */
+export function isAllowedLazywaitHost(hostname: string): boolean {
+  const host = hostname.trim().toLowerCase().replace(/\.$/, '');
+  if (!host) return false;
+
+  // An IP literal is never a legitimate POS host and is the SSRF shape.
+  // Covers dotted-quad, bare decimal/hex (2130706433, 0x7f000001) and IPv6,
+  // which `new URL()` hands back wrapped in brackets.
+  if (/^\[?[0-9a-f:]*:[0-9a-f:.]*\]?$/i.test(host)) return false;
+  if (/^[0-9.]+$/.test(host)) return false;
+  if (/^(0x[0-9a-f]+|\d+)$/i.test(host)) return false;
+
+  const env = (globalThis as { Deno?: { env?: { get(k: string): string | undefined } } }).Deno?.env;
+  const extra = (env?.get('LAZYWAIT_ALLOWED_HOSTS') ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean);
+
+  const allowed = ['lazywait.com', ...extra];
+  return allowed.some((a) => host === a || host.endsWith(`.${a}`));
 }
 
 // ---------------------------------------------------------------------------
