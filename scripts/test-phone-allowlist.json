@@ -136,6 +136,22 @@
       "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql"]
     },
     {
+      "number": "+966500000211",
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+    },
+    {
+      "number": "+966500000212",
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+    },
+    {
+      "number": "+966500000213",
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+    },
+    {
+      "number": "+966500000214",
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+    },
+    {
       "number": "+966500000301",
       "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql"]
     },
