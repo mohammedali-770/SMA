@@ -364,18 +364,47 @@ to Production.**
 > `0a3dcc0c6c6ee61642a439b128d630de` / 5 555 chars, against a hash pre-computed
 > from the merged file.
 >
-> **IT WAS NOT CALLED LIVE, AND THE REASON IS THE INTERESTING PART.** Row 86's
-> rule is that a clean apply proves storage, not execution. But this function
-> inserts a real order, and `public.orders` carries 12 non-internal triggers
-> including POS-sync enrolment and change-event emission — so even an aborted
-> transaction would enrol food nobody ordered. The risk was excluded
-> structurally instead: the identifier sets of the old and new bodies are
-> **identical in both directions**, zero added and zero removed, so there is no
-> name that could fail to resolve. The only changes are three string literals,
-> and the one reaching a constrained column was checked against the live CHECK
-> first. **When a body is derived from a running one by substitution, an
-> identifier-set diff is better evidence than a single call** — it covers every
-> path, not the one the call happened to take.
+> **IT WAS NOT CALLED LIVE. THE FIRST VERSION OF THIS PARAGRAPH JUSTIFIED THAT
+> WITH A FALSE CLAIM, AND THE CORRECTION IS WORTH MORE THAN THE ORIGINAL.** It
+> said that because `public.orders` carries 12 non-internal triggers including
+> POS-sync enrolment, "even an aborted transaction would enrol food nobody
+> ordered". **That is wrong.** Review caught it on #378, and the premise was then
+> measured rather than argued: of those 12 triggers, **11 are fully
+> transactional** — BEFORE ROW triggers that mutate `NEW`, and two AFTER ROW
+> triggers (`emit_order_change_event`, `open_order_refund_record`) that insert
+> ordinary rows. All of it rolls back, and the sync worker reads **committed**
+> rows, so nothing would ever have been enrolled. The claim also contradicted
+> this ledger's own precedent: row 87 used exactly that aborted-transaction
+> probe, and `20260920120000` (row 95) ships one.
+>
+> **Exactly one residue would survive an abort**, and it is the only honest
+> reason to hesitate: `set_orders_number` calls `nextval`, and a sequence advance
+> is not transactional. A probe would therefore burn one order number and leave a
+> gap in the `SM-2026-…` series. Small, real, and nothing like "enrolling food
+> nobody ordered".
+>
+> **So the record now says what was actually done and what it does and does not
+> prove.** The identifier sets of the old and new bodies are **identical in both
+> directions**, zero added and zero removed — which establishes that **no name
+> can fail to resolve**, and that is all it establishes. **It is NOT true that
+> the only changes are three string literals**, and the first version of this row
+> said so; review caught that too. The migration also removes `+ v_earned` from
+> the profile balance update and `- v_earned` from the redemption row's
+> `balance_after`. Those are **arithmetic edits, central to the behaviour**, and
+> an identifier-set comparison cannot exclude an operator or type error in them.
+>
+> **What actually covers the arithmetic is the local harness, not the diff.**
+> `loyalty_earn_snapshot_path_test.sql` executes the real function six times and
+> asserts these exact figures — the balance not moving at creation, and the
+> redeem row's `balance_after` being 400 after redeeming 100 of 500 — and two of
+> the four killed mutants target precisely these two edits (restore the credit,
+> restore the `balance_after` subtraction).
+>
+> **The generalisable rule, narrowed to what it can carry:** an identifier-set
+> diff is strong evidence about **name resolution** across every path, and is
+> worth doing when a body is derived from a running one. It is **not** evidence
+> about changed expressions. Where those matter and a rollback-safe probe is
+> available, run the probe — this row did not, and says so.
 
 > **Superseded — `20260917120000` and `20260918120000` are
 > APPLIED, and `20260921120000_loyalty_earn_snapshot_path` is written and NOT

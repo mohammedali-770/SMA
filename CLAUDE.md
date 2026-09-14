@@ -325,21 +325,44 @@ at `0a3dcc0c6c6ee61642a439b128d630de` / 5 555 chars, against a hash **pre-comput
 from the merged file** rather than read back and rationalised. Containment
 re-measured: `anon` NO, `authenticated` NO, `service_role` YES. Moyasar absent.
 
-**A NEW METHOD, WORTH REUSING: WHEN A BODY IS DERIVED FROM A RUNNING ONE, DIFF
-THE IDENTIFIER SETS.** Row 86's rule is that a clean apply proves storage, not
-execution — a `plpgsql` body is not name-resolved at creation. But calling this
-one inserts a REAL ORDER, and `public.orders` carries **12 non-internal
-triggers** including POS-sync enrolment and change-event emission, so even a
-transaction aborted by a `RAISE` would enrol food nobody ordered. Instead the
-old and new bodies were compared as identifier SETS (comments and string
-literals stripped, qualified names included): **zero added, zero removed, in
-both directions.** Every table, column, function and variable the new body
-references was already referenced by the body Production has been executing, so
-no name can fail to resolve. The only differences are three string literals, and
-the one reaching a constrained column — `'earn_pending'` into
-`loyalty_transactions.type` — was checked against the live CHECK first. That is
-**stronger** than a single call, because it covers every path rather than the one
-a call happens to take. Execution proof itself exists on the local harness.
+**AN IDENTIFIER-SET DIFF IS GOOD EVIDENCE ABOUT NAME RESOLUTION AND NOTHING
+ELSE — and the first version of this paragraph claimed more than that, twice.**
+Review caught both on #378, and both corrections are kept because the overreach
+is the instructive part.
+
+The method itself is sound and worth reusing. Row 86's rule is that a clean
+apply proves storage, not execution, because a `plpgsql` body is not
+name-resolved at creation. When a body is DERIVED from a running one, comparing
+the old and new bodies as identifier SETS (comments and string literals
+stripped, qualified names included) settles the name question across **every**
+path rather than the one a call happens to take. Here that comparison was
+**zero added, zero removed, in both directions**.
+
+**FALSE CLAIM 1, now retracted: "even a transaction aborted by a `RAISE` would
+enrol food nobody ordered".** It would not. Measured afterwards rather than
+argued: of the 12 non-internal triggers on `public.orders`, **11 are fully
+transactional** — BEFORE ROW triggers mutating `NEW`, plus two AFTER ROW
+triggers that insert ordinary rows — and the sync worker reads **committed**
+rows, so an aborted probe enrols nothing. The claim also contradicted this
+repository's own precedent: ledger row 87 used exactly that probe, and
+`20260920120000` ships one. **Exactly one residue would survive an abort:**
+`set_orders_number` calls `nextval`, and a sequence advance is not
+transactional, so a probe would burn one order number and leave a gap in the
+`SM-2026-…` series. That is the real cost, and it is nothing like the one
+claimed.
+
+**FALSE CLAIM 2, now retracted: "the only differences are three string
+literals".** The migration also removes `+ v_earned` from the profile balance
+update and `- v_earned` from the redemption row's `balance_after`. Those are
+**arithmetic edits, central to the behaviour**, and an identifier-set comparison
+cannot exclude an operator or type error in them. What actually covers them is
+the local harness — `loyalty_earn_snapshot_path_test.sql` executes the real
+function six times and asserts these exact figures, and two of the four killed
+mutants target precisely these two edits.
+
+**THE RULE, NARROWED TO WHAT IT CAN CARRY:** an identifier-set diff proves name
+resolution, not the correctness of a changed expression. Where changed
+expressions matter and a rollback-safe probe is available, run the probe.
 
 **Superseded, kept because the count is the point: 135 repository
 files / 137 live history rows / FOUR unapplied — Moyasar (frozen on purpose),
