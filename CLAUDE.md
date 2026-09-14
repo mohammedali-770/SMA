@@ -1012,6 +1012,7 @@ The hook is intended to:
 
 - deny edit/write/state-changing commands while a protected branch is checked out (except safe escape to a new feature branch/read-only inspection);
 - deny commands from any branch that push/update/delete/force-move a protected ref, including explicit refspecs;
+- deny, from any branch, the Supabase CLI commands §8 calls **permanently forbidden** — `supabase db push` and `supabase migration repair` — plus `supabase db reset` against a linked or remote database. **Added 2026-09-14**, because until then every rule here keyed on `git`, and a session on a feature branch — where the hook allows everything — could have rewritten the Production schema with this guard having nothing to say. The danger is which *database* the command reaches, not which branch is checked out. A PR merge or a function deploy is deliberately **not** on this list: the owner legitimately asks for those, a hook cannot tell an approved one from an unapproved one, and denying them would only teach the next session to route around the guard. The rule anchors to a **command position**, so writing *about* these commands — a document, a commit message, a test — is not denied as running them;
 - fail closed on malformed input/unknown branch state/unverifiable repository root.
 
 Those intentions are now **tested, and the tests run in CI**.

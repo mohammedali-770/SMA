@@ -132,6 +132,35 @@ expect deny "$FEAT_REPO" Bash "git push origin HEAD:$PROTECTED"            'refs
 expect deny "$FEAT_REPO" Bash 'git branch -D main'                         'deleting main is denied'
 expect deny "$FEAT_REPO" Bash 'git push --all origin'                      'push --all is denied'
 
+printf '\nProduction-reaching Supabase CLI commands are denied from every branch\n'
+# These run from a FEATURE branch on purpose: that is where sections 5-7 allow
+# everything, and it is the gap this rule exists to close. The danger is which
+# DATABASE the command reaches, not which branch is checked out.
+expect deny  "$FEAT_REPO" Bash 'supabase db push'                          'db push is denied'
+expect deny  "$FEAT_REPO" Bash 'npx supabase db push'                      'db push via npx is denied'
+expect deny  "$FEAT_REPO" Bash 'supabase --project-ref abc123 db push'     'an interleaved flag does not hide db push'
+expect deny  "$FEAT_REPO" Bash 'supabase db push --linked'                 'db push with a trailing flag is denied'
+expect deny  "$PROT_REPO" Bash 'supabase db push'                          'db push is denied on a protected branch too'
+expect deny  "$FEAT_REPO" Bash 'supabase migration repair --status applied 20260101000000' 'migration repair is denied'
+expect deny  "$FEAT_REPO" Bash 'supabase db reset --linked'                'db reset against the linked project is denied'
+# Local work must keep working, or the guard just teaches people to disable it.
+expect allow "$FEAT_REPO" Bash 'supabase db reset'                         'a local db reset is allowed'
+expect allow "$FEAT_REPO" Bash 'supabase migration list'                   'reading migration state is allowed'
+expect allow "$FEAT_REPO" Bash 'supabase functions list'                   'listing functions is allowed'
+# A MENTION IS NOT AN INVOCATION, and these three are why the rule anchors to a
+# command position rather than matching the word anywhere. Its first draft did
+# not, and it denied the Bash call that was writing this very file: an
+# interpreter payload is scanned raw, and a test for a forbidden command has to
+# quote the forbidden command. Writing ABOUT a command must stay possible.
+expect allow "$FEAT_REPO" Bash 'git commit -m never run supabase db push'  'the words in a commit message are not a command'
+expect allow "$FEAT_REPO" Bash 'grep -rn supabase db push docs'            'grepping the docs for the phrase is not running it'
+expect allow "$FEAT_REPO" Bash 'echo supabase db push >> /dev/null'        'echoing the phrase is not running it'
+# But a real invocation reached through a chain still starts its own segment.
+expect deny  "$FEAT_REPO" Bash 'cd /tmp && supabase db push'               'a chained invocation is still denied'
+expect deny  "$FEAT_REPO" Bash 'SUPABASE_ACCESS_TOKEN=x supabase db push'  'an environment assignment does not hide it'
+expect deny  "$FEAT_REPO" Bash "bash -c 'supabase db push'"                'an interpreter payload is still denied'
+expect deny  "$FEAT_REPO" Bash "python3 -c 'supabase db push'"             'a python payload is still denied'
+
 printf '\nDetached HEAD, mid-rebase, started from a FEATURE branch\n'
 REBASE_FEAT="$TMPROOT/rebase-feature"
 new_conflicted_rebase "$REBASE_FEAT" feat/rebasing

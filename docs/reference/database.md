@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **133**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260919120000_security_audit_db_hardening.sql`.
+Migration files in the repository: **134**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260920120000_promo_disclosure_hardening.sql`.
 
 ## Tables
 
@@ -136,7 +136,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_lazywait_mapping` | 2 | `20260824120000_product_variants.sql` |
 | `clear_modifier_snooze` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `clear_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
-| `compute_campaign_discount` | 1 | `20260728120000_discounts_campaigns.sql` |
+| `compute_campaign_discount` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
 | `compute_order_snapshot` | 8 | `20260910120000_loyalty_multipliers.sql` |
 | `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
@@ -292,7 +292,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `tap_begin_session_attempt` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
 | `text_has_internal_order_number` | 1 | `20260724130000_loyalty_reason_no_order_number.sql` |
 | `upsert_integration_settings` | 4 | `20260710170000_email_integration.sql` |
-| `validate_coupon` | 1 | `20260707120400_coupons.sql` |
+| `validate_coupon` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
 | `validate_pos_sync_notification_before_send` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `verify_account_deletion_process_secret` | 1 | `20260716160000_account_deletion_scheduler_auth.sql` |
 | `verify_operations_alert_dispatch_signature` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |

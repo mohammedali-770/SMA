@@ -116,6 +116,60 @@ Record: `docs/OWNER_ACTIONS.md` §36; launch impact:
 and they are the mechanism actually wired into the money path. *Checking two
 discount tables and finding both inert is not evidence about a third.*
 
+### What a refused code now says, and what it no longer says (2026-09-14)
+
+Both promo RPCs used to describe a promotion the caller could not use, and the
+campaign one contradicted a control that already existed.
+
+`validate_coupon` and `compute_campaign_discount` are `SECURITY DEFINER` and
+granted to `authenticated`. The coupon RPC returned the coupon's **type and
+value on every refusal** — including *'Coupon is not active yet'*, so a code
+prepared for a campaign that had not launched was readable, terms and all, by
+any signed-in customer who guessed its name. The campaign RPC returned
+`name_en`, `name_ar`, `type`, `code` and the row id for **exactly the rows the
+`campaigns` RLS policy deliberately hides** from a customer: coded, inactive,
+future and expired. A definer function was handing back what a policy two
+sections up exists to conceal.
+
+Codes are guessable by design — the two that have ever existed in Production are
+`SPICY15` and `RIYADH10` — and neither RPC is rate-limited, so the namespace is
+enumerable and every probe used to come back with the terms of whatever it hit.
+
+**The rule now, in one line: not found, switched off and not yet started are one
+answer; the terms come back only when the answer is `valid`.**
+
+| Caller's code is… | Answer | Why |
+| --- | --- | --- |
+| unknown | `Coupon not found` / `Campaign not found` | — |
+| switched off | the same, byte for byte | a code nobody was given |
+| not yet started | the same, byte for byte | announcing it discloses an unlaunched campaign |
+| expired | `Coupon has expired` | it WAS published; its existence is not a secret |
+| usage limit reached | `Coupon usage limit reached` | same |
+| below the minimum | `Order is below the coupon minimum` | same, and the customer needs to know |
+| valid | terms + the server-computed discount | unchanged |
+
+Expired and exhausted keep distinct messages deliberately. A customer holding a
+code that stopped working deserves to be told which it is, and the leak that
+mattered was the *unlaunched* one.
+
+A campaign refusal echoes the code the **caller supplied**, never the row's — so
+a campaign addressed by id cannot have its secret promo code read back through a
+failure path.
+
+`20260920120000_promo_disclosure_hardening` (written, not applied). Money path
+untouched: live `place_order` and `compute_order_snapshot` read only `valid`,
+`message` and `discount_amount` from `validate_coupon`, which was checked against
+their stored bodies before the file was written. No deploy implied. Neither
+client reads `type` or `value`, so nothing visible changes for a real customer.
+Behaviour: `supabase/tests/promo_disclosure_test.sql`.
+
+**What this does NOT fix, stated so it is not assumed:** enumeration itself.
+Nothing rate-limits either RPC, so a signed-in customer can still ask "does
+`SPICY20` exist" as often as they like and tell an expired code from an absent
+one. Closing that needs a reservation table of the kind the OTP path already has
+(`otp_send_reservations`), and it is a separate decision — the leak fixed here is
+the disclosure of what a code is WORTH, which was free and is now unavailable.
+
 ## Part 1 — Campaigns (#100)
 
 Status: **schema APPLIED to Production; NOT yet wired into pricing.**
