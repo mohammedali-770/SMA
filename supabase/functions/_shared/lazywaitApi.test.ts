@@ -34,7 +34,7 @@ import orderFixture from './__fixtures__/lazywait/order.json';
 import ordersListFixture from './__fixtures__/lazywait/orders_list.json';
 import createOrderSuccessFixture from './__fixtures__/lazywait/create_order_success.json';
 
-const CFG: LazywaitConfig = { baseUrl: 'https://apiv2.example.test/v1', clientId: 'CID_1', apiToken: 'lw_live_UNITTESTTOKEN' };
+const CFG: LazywaitConfig = { baseUrl: 'https://apiv2-dev.lazywait.com/v1', clientId: 'CID_1', apiToken: 'lw_live_UNITTESTTOKEN' };
 
 const pickupItems = [{ menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 2, unitPrice: 28.75 }];
 
