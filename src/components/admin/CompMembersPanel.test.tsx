@@ -28,7 +28,7 @@ const member = {
 };
 /** Comped by number, nobody holds it yet. */
 const pendingMember = {
-  id: 2, profile_id: null, phone_e164: '+966555820667',
+  id: 2, profile_id: null, phone_e164: '+966555000667',
   full_name: null, phone_number: null,
   is_active: true, pending: true, note: 'guest of the owner',
   added_at: '2026-08-27T00:00:00Z', updated_at: '2026-08-27T00:00:00Z',
@@ -153,13 +153,13 @@ describe('CompMembersPanel', () => {
   it('comps a phone number that belongs to no account yet', async () => {
     vi.stubGlobal('confirm', vi.fn(() => true));
     api.set.mockResolvedValue({
-      id: 9, profile_id: null, phone_e164: '+966555820667',
+      id: 9, profile_id: null, phone_e164: '+966555000667',
       is_active: true, was_active: false, pending: true,
     });
     render(<CompMembersPanel lang="en" />);
 
     fireEvent.change(await screen.findByLabelText('Phone number'), {
-      target: { value: '0555820667' },
+      target: { value: '0555000667' },
     });
     fireEvent.change(screen.getByLabelText('new-phone reason'), {
       target: { value: 'guest of the owner' },
@@ -169,7 +169,7 @@ describe('CompMembersPanel', () => {
     // The number goes to the server exactly as typed; normalization is the
     // server's job, so the panel cannot disagree with it.
     await waitFor(() => expect(api.set).toHaveBeenCalledWith(
-      { phone: '0555820667' }, true, 'guest of the owner',
+      { phone: '0555000667' }, true, 'guest of the owner',
     ));
     // A pending result must NOT be reported as a live discount.
     expect(await screen.findByText(/the comp goes live the moment they sign up/)).toBeTruthy();
@@ -193,7 +193,7 @@ describe('CompMembersPanel', () => {
     fireEvent.click(screen.getByText('Remove'));
     // No account to name, so the number is the identity the server is given.
     await waitFor(() => expect(api.set).toHaveBeenCalledWith(
-      { phone: '+966555820667' }, false, 'invitation withdrawn',
+      { phone: '+966555000667' }, false, 'invitation withdrawn',
     ));
   });
 
@@ -201,7 +201,7 @@ describe('CompMembersPanel', () => {
     api.search.mockResolvedValue([]);
     render(<CompMembersPanel lang="en" />);
     fireEvent.change(await screen.findByLabelText('Search customers'), {
-      target: { value: '+966555820667' },
+      target: { value: '+966555000667' },
     });
     fireEvent.click(screen.getByText('Search'));
     expect(await screen.findByText(/may not have an account yet/)).toBeTruthy();
