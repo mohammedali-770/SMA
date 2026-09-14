@@ -769,7 +769,7 @@ end $$;
 -- 15. One number, five shapes, one row — and a non-mobile is refused
 -- ============================================================================
 -- This is the defect that started the whole change: the admin panel searched
--- `+966555820667` against raw stored strings and found nothing, because live
+-- `+966555000667` against raw stored strings and found nothing, because live
 -- data holds four `9665…` and one `+9665…`. Canonicalising on the way IN is
 -- what makes the shape stop mattering.
 do $$

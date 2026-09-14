@@ -37,13 +37,14 @@ The *job name* is what GitHub reports as a status check context. When configurin
 | `npm run design-system:check` | `node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs` |
 | `npm run design-system:sync` | `node scripts/sync-design-system.mjs` |
 | `npm run dev` | `vite --port=3000 --host=0.0.0.0` |
-| `npm run docs:check` | `node scripts/docs-generate.mjs --check && node scripts/docs-check-ownership.mjs && node scripts/check-recorded-hashes.mjs` |
+| `npm run docs:check` | `node scripts/docs-generate.mjs --check && node scripts/docs-check-ownership.mjs && node scripts/check-recorded-hashes.mjs && node scripts/check-test-phone-numbers.mjs` |
 | `npm run docs:generate` | `node scripts/docs-generate.mjs` |
 | `npm run format` | `prettier --write` |
 | `npm run format:check` | `node scripts/format-check.mjs` |
 | `npm run lint` | `tsc --noEmit` |
 | `npm run logo:build` | `node scripts/build-logo-mark.mjs` |
 | `npm run logo:check` | `node scripts/build-logo-mark.mjs --check` |
+| `npm run phones:check` | `node scripts/check-test-phone-numbers.mjs` |
 | `npm run preview` | `vite preview` |
 | `npm run test` | `vitest run` |
 | `npm run test:watch` | `vitest` |
@@ -56,7 +57,9 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/build-logo-mark.mjs` — Generates the transparent-background brand mark from the official logo master
 - `scripts/check-design-system-hygiene.mjs` — Guards the NEW design-system code against re-introducing raw values
 - `scripts/check-recorded-hashes.mjs` — Every sha256 recorded in prose must still describe a file in the tree
+- `scripts/check-test-phone-numbers.mjs` — @license SPDX-License-Identifier: Apache-2.0
 - `scripts/docs-check-ownership.mjs` — Enforces the documentation ownership map in docs/ownership.json
 - `scripts/docs-generate.mjs` — Generates the machine-derived half of the documentation set
 - `scripts/format-check.mjs` — Two formatting rules, deliberately narrow, both scoped to this branch's diff
 - `scripts/sync-design-system.mjs` — Mirrors the canonical design-system modules into each app
+- `scripts/test-phone-allowlist.json`

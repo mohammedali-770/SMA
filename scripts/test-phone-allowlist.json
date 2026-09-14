@@ -1,0 +1,277 @@
+{
+  "$comment": [
+    "Saudi mobile numbers permitted in this PUBLIC repository.",
+    "Every entry must be INVENTED. Adding one is a deliberate act and a reviewable diff.",
+    "Enforced by scripts/check-test-phone-numbers.mjs (npm run phones:check)."
+  ],
+  "allowed": [
+    {
+      "number": "+966500000000",
+      "used_in": [
+        "apps/mobile/src/lib/orderSelect.test.ts",
+        "src/components/admin/BranchEditModal.test.tsx",
+        "src/components/admin/view/orders/OrderReceiptModal.test.tsx"
+      ]
+    },
+    {
+      "number": "+966500000001",
+      "used_in": [
+        "src/components/admin/StaffAccessPanel.test.tsx",
+        "supabase/tests/checkout_session_address_fk_test.sql",
+        "supabase/tests/comp_members_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000002",
+      "used_in": [
+        "src/components/admin/CompMembersPanel.test.tsx",
+        "src/components/admin/StaffAccessPanel.test.tsx",
+        "supabase/tests/checkout_session_address_fk_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000003",
+      "used_in": [
+        "src/components/admin/CompMembersPanel.test.tsx",
+        "supabase/tests/comp_members_test.sql",
+        "supabase/tests/discounts_campaigns_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000004",
+      "used_in": ["supabase/tests/comp_members_test.sql", "supabase/tests/otp_login_rate_limit_test.sql"]
+    },
+    {
+      "number": "+966500000005",
+      "used_in": ["supabase/tests/comp_members_test.sql", "supabase/tests/otp_login_rate_limit_test.sql"]
+    },
+    {
+      "number": "+966500000006",
+      "used_in": ["supabase/tests/comp_members_test.sql", "supabase/tests/otp_login_rate_limit_test.sql"]
+    },
+    {
+      "number": "+966500000007",
+      "used_in": ["supabase/tests/comp_members_test.sql"]
+    },
+    {
+      "number": "+966500000008",
+      "used_in": ["supabase/tests/comp_members_test.sql"]
+    },
+    {
+      "number": "+966500000009",
+      "used_in": [
+        "supabase/tests/comp_members_test.sql",
+        "supabase/tests/loyalty_reason_no_order_number_test.sql",
+        "supabase/tests/otp_login_rate_limit_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000010",
+      "used_in": ["supabase/tests/otp_retention_sweep_test.sql"]
+    },
+    {
+      "number": "+966500000011",
+      "used_in": ["supabase/tests/otp_retention_sweep_test.sql"]
+    },
+    {
+      "number": "+966500000012",
+      "used_in": [
+        "supabase/tests/otp_login_rate_limit_test.sql",
+        "supabase/tests/otp_retention_sweep_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000021",
+      "used_in": ["supabase/tests/loyalty_reason_no_order_number_test.sql"]
+    },
+    {
+      "number": "+966500000031",
+      "used_in": ["supabase/tests/order_read_contracts_test.sql"]
+    },
+    {
+      "number": "+966500000032",
+      "used_in": ["supabase/tests/order_read_contracts_test.sql"]
+    },
+    {
+      "number": "+966500000033",
+      "used_in": ["supabase/tests/order_read_contracts_test.sql"]
+    },
+    {
+      "number": "+966500000034",
+      "used_in": ["supabase/tests/order_read_contracts_test.sql"]
+    },
+    {
+      "number": "+966500000041",
+      "used_in": ["supabase/tests/admin_ranged_orders_and_stats_test.sql"]
+    },
+    {
+      "number": "+966500000042",
+      "used_in": ["supabase/tests/admin_ranged_orders_and_stats_test.sql"]
+    },
+    {
+      "number": "+966500000051",
+      "used_in": ["supabase/tests/order_flow_health_card_test.sql"]
+    },
+    {
+      "number": "+966500000091",
+      "used_in": ["supabase/tests/order_note_length_test.sql"]
+    },
+    {
+      "number": "+966500000099",
+      "used_in": ["supabase/tests/otp_login_rate_limit_test.sql"]
+    },
+    {
+      "number": "+966500000101",
+      "used_in": [
+        "supabase/tests/admin_search_phone_normalization_test.sql",
+        "supabase/tests/loyalty_pickup_only_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000301",
+      "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql"]
+    },
+    {
+      "number": "+966500000777",
+      "used_in": ["supabase/tests/loyalty_item_exclusion_test.sql"]
+    },
+    {
+      "number": "+966500000801",
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+    },
+    {
+      "number": "+966500000802",
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+    },
+    {
+      "number": "+966500000803",
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+    },
+    {
+      "number": "+966500000901",
+      "used_in": ["supabase/tests/export_my_data_test.sql", "supabase/tests/loyalty_multipliers_test.sql"]
+    },
+    {
+      "number": "+966500000902",
+      "used_in": ["supabase/tests/export_my_data_test.sql"]
+    },
+    {
+      "number": "+966500002001",
+      "used_in": ["supabase/tests/staff_access_directory_test.sql"]
+    },
+    {
+      "number": "+966500002002",
+      "used_in": ["supabase/tests/staff_access_directory_test.sql"]
+    },
+    {
+      "number": "+966500002003",
+      "used_in": ["supabase/tests/staff_access_directory_test.sql"]
+    },
+    {
+      "number": "+966500008801",
+      "used_in": ["supabase/tests/account_deletion_manual_review_resolution_test.sql"]
+    },
+    {
+      "number": "+966500008802",
+      "used_in": ["supabase/tests/account_deletion_manual_review_resolution_test.sql"]
+    },
+    {
+      "number": "+966500008811",
+      "used_in": ["supabase/tests/account_deletion_resolution_note_privacy_test.sql"]
+    },
+    {
+      "number": "+966500008812",
+      "used_in": ["supabase/tests/account_deletion_resolution_note_privacy_test.sql"]
+    },
+    {
+      "number": "+966500009901",
+      "used_in": ["supabase/tests/order_cancellation_integrity_test.sql"]
+    },
+    {
+      "number": "+966500009902",
+      "used_in": ["supabase/tests/order_cancellation_integrity_test.sql"]
+    },
+    {
+      "number": "+966500009903",
+      "used_in": ["supabase/tests/order_cancellation_integrity_test.sql"]
+    },
+    {
+      "number": "+966501234567",
+      "used_in": [
+        "apps/mobile/src/lib/observability/sanitize.test.ts",
+        "apps/mobile/src/lib/observability/webRoutes.test.ts",
+        "apps/mobile/src/lib/observability/webRoutes.ts"
+      ]
+    },
+    {
+      "number": "+966509999999",
+      "used_in": ["src/components/admin/LiveOrdersPanel.test.tsx"]
+    },
+    {
+      "number": "+966512345678",
+      "used_in": [
+        "apps/mobile/src/features/auth/loginAvailability.test.ts",
+        "apps/mobile/src/lib/phone.test.ts",
+        "docs/OWNER_ACTIONS.md"
+      ]
+    },
+    {
+      "number": "+966512999999",
+      "used_in": ["supabase/functions/_shared/whatsapp.test.ts"]
+    },
+    {
+      "number": "+966541234567",
+      "used_in": [
+        "supabase/functions/_shared/lazywait.test.ts",
+        "supabase/functions/_shared/lazywaitApi.test.ts"
+      ]
+    },
+    {
+      "number": "+966551234567",
+      "used_in": [
+        "apps/mobile/src/lib/supportContact.ts",
+        "src/components/admin/LiveOrdersPanel.test.tsx",
+        "src/components/admin/ReportsPanel.test.tsx"
+      ]
+    },
+    {
+      "number": "+966555000001",
+      "used_in": ["docs/MIGRATIONS.md", "supabase/tests/erasure_phone_normalization_test.sql"]
+    },
+    {
+      "number": "+966555000002",
+      "used_in": [
+        "supabase/tests/account_deletion_test.sql",
+        "supabase/tests/erasure_phone_normalization_test.sql"
+      ]
+    },
+    {
+      "number": "+966555000009",
+      "used_in": ["supabase/tests/erasure_phone_normalization_test.sql"]
+    },
+    {
+      "number": "+966555000667",
+      "used_in": [
+        "docs/MIGRATIONS.md",
+        "docs/OWNER_ACTIONS.md",
+        "src/components/admin/CompMembersPanel.test.tsx"
+      ]
+    },
+    {
+      "number": "+966555000668",
+      "used_in": ["supabase/tests/admin_search_phone_normalization_test.sql"]
+    },
+    {
+      "number": "+966555123456",
+      "used_in": ["supabase/migrations/20260827100000_comp_members_by_phone.sql"]
+    },
+    {
+      "number": "+966555555555",
+      "used_in": ["supabase/tests/account_deletion_test.sql"]
+    },
+    {
+      "number": "+966558124407",
+      "used_in": ["apps/mobile/src/dev/fixtureData.ts"]
+    }
+  ]
+}
