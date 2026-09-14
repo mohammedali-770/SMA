@@ -24,6 +24,83 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-14 — `20260920120000_promo_disclosure_hardening` is written,
+> validated and NOT applied.** Finding 2.9 of the 2026-09-14 audit: the two promo
+> RPCs describe a promotion the caller cannot use.
+>
+> `validate_coupon` and `compute_campaign_discount` are both `SECURITY DEFINER`
+> and both granted to `authenticated`. The coupon RPC returned the coupon's TYPE
+> and VALUE on **every** refusal, including 'Coupon is not active yet' — so a
+> code prepared for a campaign that has not launched was readable, terms and all,
+> by any signed-in customer who guessed its name. The campaign RPC was worse,
+> because it **contradicted a control that already existed**: the RLS policy on
+> `campaigns` deliberately hides coded, inactive, future and expired rows from a
+> customer, and this definer function handed back `name_en`, `name_ar`, `type`,
+> `code` and the row id for exactly those rows. The RPC undid the policy.
+>
+> Codes are guessable by design — the two that have existed in Production are
+> `SPICY15` and `RIYADH10` — and nothing rate-limits either RPC, so the namespace
+> is enumerable and every probe came back with the terms of whatever it found.
+>
+> **What changes.** Not found, switched off and not yet started now return one
+> identical answer, because those three states belong to a code that has never
+> been handed to a customer. Expired and exhausted keep their own messages **on
+> purpose**: such a code WAS published, its existence is not a secret, and a
+> customer holding one deserves to be told which it is. The descriptive fields
+> are returned only when the answer is `valid` — one rule rather than a judgement
+> per branch, so it can be verified by counting references instead of by reading.
+> A campaign refusal echoes the code the CALLER SUPPLIED, never the row's, so a
+> campaign addressed by id cannot have its secret promo code read back.
+>
+> **Money path untouched, and that was measured rather than assumed**: live
+> `place_order` and `compute_order_snapshot` read only `valid`, `message` and
+> `discount_amount` from `validate_coupon` — checked against `prosrc` before the
+> file was written. **No deploy implied** (unchanged signatures, so existing
+> callers bind to the new bodies). **Client impact: none** — both `api.ts` files
+> type the coupon result as `{ valid, code, discount_amount, message }` and never
+> read `type` or `value`.
+>
+> **Derived, not retyped.** Both bodies are extracted by `$$` span from the only
+> migrations that have ever defined them (`20260707120400_coupons.sql`,
+> `20260728120000_discounts_campaigns.sql`) and transformed by anchored
+> substitution, each anchor asserted to occur an exact number of times. Each
+> pre-image was hashed against the LIVE body first — `51d3805e52ddf0bda03cce4b980db4bf`
+> and `4d8a5cf3ff954653baf1ae51847c4b9c`, **both identical** — so the derivation
+> starts from what Production actually runs. A diff of old body against new shows
+> only the intended regions.
+>
+> sha256 `45f8ee28461f3dbe490109e9657efff630bf5df8b67cc315b66c53a7281fa966`,
+> 365 lines / 18898 bytes — re-hash the MERGED copy before applying, per §15.
+>
+> **THE MIGRATION'S OWN CHECK CANNOT PROVE THE CAMPAIGN HALF, AND SAYS SO.**
+> `compute_campaign_discount` gates on `auth.uid()`, which is null inside a
+> migration, so the file reaches that gate and no further. The coupon half IS
+> proven behaviourally: fixtures are written inside a sub-transaction, the
+> function is CALLED, and the sub-transaction is then aborted and **the rollback
+> verified** rather than assumed. Every campaign refusal branch is proven in
+> `supabase/tests/promo_disclosure_test.sql` as a real `authenticated` caller.
+>
+> **The property under test is an INDISTINGUISHABILITY, not a message**, so the
+> suite compares each hidden state against the not-found answer field by field
+> rather than against a literal — a future edit to one branch cannot then drift
+> away from the others unnoticed.
+>
+> **A MUTANT SURVIVED THE FIRST SUITE, AND THE GAP GENERALISES.** Echoing
+> `c.code` from the branch-mismatch refusal passed every case, because `code` was
+> asserted null only on the merged not-found branch. Every CASE 5 refusal is
+> addressed by id, so `code` is now asserted null on all of them: a caller who
+> supplied an id never supplied a code, and handing back the row's own secret
+> code is the same disclosure by a different door. **Test the property on every
+> path that can express it, not only on the one the fix touched.**
+>
+> Five mutants, all killed: the coupon merge and the campaign merge (each killed
+> by the migration's own block AND the suite), the coupon terms, the campaign
+> descriptors, and the code echo (suite only — the source-level check cannot see
+> it, which is stated rather than glossed).
+>
+> Cold chain: 132 migrations, 74 suites, 72 passed, 2 quarantined, **0 new
+> failures**.
+
 > **Updated 2026-09-13 — the count is THREE, and TWO of the three are not
 > frozen.** Outstanding: `20260824100000_moyasar_payment_provider.sql` (frozen
 > under §6, unapplied on purpose), `20260916120000_branch_delivery_requests.sql`

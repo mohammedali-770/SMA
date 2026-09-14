@@ -11,7 +11,10 @@
 #      installs, output redirection, interpreters). Only read-only inspection
 #      commands are allowed.
 #   2. From ANY branch, deny git commands that push to, update, delete or
-#      force-move a protected ref (explicit refspecs included).
+#      force-move a protected ref (explicit refspecs included), and the two
+#      Supabase CLI commands CLAUDE.md §8 calls permanently forbidden
+#      (`db push`, `migration repair`) plus `db reset` against a remote — none
+#      of which are git, and all of which reach Production from any branch.
 #   3. Fail CLOSED: unparseable hook input, missing tool name, unverifiable
 #      project root, or an undeterminable current branch => deny.
 #   4. Stay RECOVERABLE while failing closed. A conflicted rebase detaches
@@ -419,6 +422,52 @@ check_fetch_config() {
 
 any_branch_rules() {
   local C="$1"
+
+  # -- Supabase CLI: the two commands CLAUDE.md §8 calls PERMANENTLY FORBIDDEN.
+  #
+  # THIS GUARD USED TO SCREEN ONLY `git`. Every rule below keys on GIT_PRE, so a
+  # session on a feature branch — where sections 5-7 allow everything — could
+  # run `supabase db push` and rewrite the Production schema outside the
+  # approved migration workflow, and this hook would have had nothing to say.
+  # The protected-branch half never covered it either: the danger is not which
+  # branch is checked out, it is which DATABASE the command reaches.
+  #
+  # These two are the right shape for a hook precisely because no approval can
+  # authorise them: §8 forbids them outright, rather than conditionally. A PR
+  # merge or a function deploy is NOT added here for the opposite reason — the
+  # owner legitimately asks for those, and a hook cannot tell an approved one
+  # from an unapproved one, so denying them would only teach the next session
+  # to work around the guard.
+  #
+  # THE RULE REQUIRES A COMMAND POSITION, and the first draft did not — it
+  # matched the word `supabase` anywhere in a segment, and promptly denied the
+  # very Bash call that was writing the tests for it, because an interpreter
+  # payload is scanned RAW (correctly: a heredoc can be a real script) and the
+  # test file quotes the forbidden command a dozen times. Documenting a command
+  # must not be denied as running it. So the segment has to BEGIN with the
+  # invocation — after environment assignments and the usual runner prefixes,
+  # which is where a real one always sits — while a line that merely contains
+  # the words does not. Segments split on newlines and on | ; & , so a real
+  # `x && supabase db push` is still the start of its own segment.
+  #
+  # Once the segment is established as a supabase invocation, the subcommand is
+  # matched ANYWHERE in it, so no arrangement of --project-ref / --db-url /
+  # --workdir flags between the two tokens can hide it.
+  SUPABASE_LEAD='^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*((sudo|time|command|env|nohup)[[:space:]]+|npx[[:space:]]+(--[a-zA-Z][a-zA-Z0-9-]*[[:space:]]+)*|bunx[[:space:]]+|(pnpm|yarn)[[:space:]]+dlx[[:space:]]+)*supabase([[:space:]]|$)'
+  if str_matches "$C" "$SUPABASE_LEAD"; then
+    str_matches "$C" '(^|[[:space:]])db[[:space:]]+push([[:space:]]|$)' \
+      && deny "supabase db push is PERMANENTLY FORBIDDEN against Production (CLAUDE.md §8). Production schema changes go only through the owner-approved migration workflow in docs/MIGRATIONS.md, one file named by version."
+    str_matches "$C" '(^|[[:space:]])migration[[:space:]]+repair([[:space:]]|$)' \
+      && deny "supabase migration repair is PERMANENTLY FORBIDDEN against Production (CLAUDE.md §8). Never repair history to make counts match; report the discrepancy instead."
+    # `db reset` is local by default and is how the harness is rebuilt, so it is
+    # denied only when it names a REMOTE target — at which point it drops the
+    # database and replays the chain over live data.
+    if str_matches "$C" '(^|[[:space:]])db[[:space:]]+reset([[:space:]]|$)' \
+      && str_matches "$C" '(^|[[:space:]])(--linked|--db-url)([[:space:]]|=|$)'; then
+      deny "supabase db reset against a linked or remote database would drop and replay Production (CLAUDE.md §8, §10). Use the local SQL harness (.github/sql-ci/run.sh), which runs on a disposable database."
+    fi
+  fi
+
   str_matches "$C" "${GIT_PRE}(fetch|pull)${WB}" && GIT_FETCH_SEEN=1
   # low-level push plumbing (send-pack, http-push) exists only to update
   # remote refs and can target a protected branch (git send-pack ../r.git
