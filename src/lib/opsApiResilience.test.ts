@@ -56,9 +56,7 @@ describe('opsApi.branchReference — missing-table resilience', () => {
   it('STILL THROWS on a permission error — this must not be swallowed', async () => {
     // The whole point of the narrow check. A 42501 means the operator is not
     // allowed to see this, which is not the same as "the feature is not live".
-    from.mockReturnValue(
-      builder({ data: null, error: { code: '42501', message: 'permission denied' } }),
-    );
+    from.mockReturnValue(builder({ data: null, error: { code: '42501', message: 'permission denied' } }));
     await expect(opsApi.branchReference('b1')).rejects.toThrow(/permission denied/);
   });
 
