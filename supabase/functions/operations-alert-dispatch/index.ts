@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
+import { parseSmtpTarget } from '../_shared/smtpTarget.ts';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 /**
@@ -90,6 +91,13 @@ interface ClaimedRow {
   attempt_count: number;
 }
 
+/**
+ * OPTIONAL pin for the SMTP endpoint, comma-separated. Unset — which is how
+ * every deployment stands today — means "any public hostname", so setting it
+ * narrows the guard in `smtpTarget.ts` and never widens it.
+ */
+const SMTP_ALLOWED_HOSTS = Deno.env.get('SMTP_ALLOWED_HOSTS') ?? null;
+
 function isServiceRoleCall(req: Request): boolean {
   const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const auth = req.headers.get('Authorization') ?? '';
@@ -177,17 +185,22 @@ Deno.serve(async (req: Request) => {
   if (!cfg || !cfg.enabled) {
     return json({ status: 'disabled', reason: 'email provider disabled' }, 200);
   }
-  const pub = cfg.publicConfig as Record<string, unknown>;
-  const host = String(pub.host ?? '').trim();
-  const port = Number(String(pub.port ?? '') || '587');
-  const secure = pub.secure === true;
-  const username = String(pub.username ?? '').trim();
-  const password = String((cfg.secretConfig as Record<string, unknown>).password ?? '');
-  const fromEmail = String(pub.from_email ?? '').trim();
-  const fromName = String(pub.from_name ?? '').trim() || 'Spicy Meal';
-  if (!host || !fromEmail || !Number.isFinite(port) || port <= 0) {
-    return json({ status: 'disabled', reason: 'email provider not fully configured' }, 200);
+  // The endpoint is VALIDATED, not merely read. `public_config` is written by
+  // `upsert_integration_settings`, which requires `is_admin()` — so this is
+  // containment for a compromised admin session or a leaked service key, not an
+  // anonymous SSRF: without it, a single row edit turns this function into a
+  // connector to any address it can reach, the cloud metadata endpoint
+  // included. Reason codes and rationale: `_shared/smtpTarget.ts`.
+  const target = parseSmtpTarget(cfg.publicConfig as Record<string, unknown>, SMTP_ALLOWED_HOSTS);
+  if (target.reason !== null) {
+    // Refusing reads as `disabled` rather than `error` on purpose: a bad
+    // endpoint is a configuration state, and an error would have the scheduler
+    // retrying a row that can never be delivered until somebody edits it.
+    console.error('smtp endpoint refused', { reason: target.reason });
+    return json({ status: 'disabled', reason: `email provider ${target.reason}` }, 200);
   }
+  const { host, port, tls, username, fromEmail, fromName } = target;
+  const password = String((cfg.secretConfig as Record<string, unknown>).password ?? '');
 
   const { data: recipientRows, error: recipientsError } = await admin.rpc(
     'operations_alerts_dispatch_recipients',
@@ -220,7 +233,7 @@ Deno.serve(async (req: Request) => {
       connection: {
         hostname: host,
         port,
-        tls: secure,
+        tls,
         auth: username ? { username, password } : undefined,
       },
     });

@@ -43,6 +43,7 @@ Every environment variable the code reads, split by whether its value is visible
 Read by Edge Functions from the Deno environment. These are secrets. They live in the Supabase dashboard and in EAS, never in the repository, and they must not appear in logs, tests, fixtures or pull-request descriptions.
 
 - `SEND_SMS_HOOK_SECRET`
+- `SMTP_ALLOWED_HOSTS`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_URL`

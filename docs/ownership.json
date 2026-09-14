@@ -217,6 +217,25 @@
         "vercel.json"
       ],
       "docs": ["docs/DEPLOY.md", "docs/RELEASE_CHECKLIST.md", "docs/OWNER_ACTIONS.md"]
+    },
+    {
+      "id": "mobile-session-storage",
+      "why": "The blob supabase-js persists holds the REFRESH TOKEN — the long-lived credential that mints access tokens until it is revoked. Where it is stored is a security property, not an implementation detail, and it was AsyncStorage until 2026-09-14: app-private, but carried into adb backup, Google auto-backup and unencrypted iTunes backups. Moving it back, loosening the keychain accessibility class, or adding a quiet fallback when the keystore refuses would each undo that with no visible diff outside these files. The chunking exists only because SecureStore caps a value at 2048 bytes and a session exceeds it, so a change to the manifest or the split is a change to whether an interrupted write can leave a half-session.",
+      "sources": [
+        "apps/mobile/src/lib/supabase.ts",
+        "apps/mobile/src/lib/secureSessionStorage.ts",
+        "apps/mobile/src/lib/chunkedSecureStorage.ts"
+      ],
+      "docs": ["docs/SECURITY_REVIEW.md"]
+    },
+    {
+      "id": "alert-dispatch",
+      "why": "The only Edge Function that opens an outbound connection to an address read out of a database row, on a pg_cron schedule, with the service-role client. No rule covered it at all until 2026-09-14 — the alerts rules keyed on the admin UI and the digest migrations, so the dispatcher was deployed and scheduled with its owning document untouched. The endpoint guard in _shared/smtpTarget.ts and the absence of denomailer's debug.allowUnsecure are both load-bearing and both invisible in a diff that merely 'fixes a connection error'.",
+      "sources": [
+        "supabase/functions/operations-alert-dispatch/**",
+        "supabase/functions/_shared/smtpTarget.ts"
+      ],
+      "docs": ["docs/OPERATIONS_ALERTS_DIGEST.md"]
     }
   ]
 }
