@@ -46,7 +46,8 @@ export type BlockReason =
   | 'below-minimum'
   | 'no-payment'
   | 'delivery-unserviceable'
-  | 'need-description';
+  | 'need-description'
+  | 'no-payment-selected';
 
 /**
  * The single blocking reason for the sticky footer, in priority order.
@@ -57,6 +58,23 @@ export type BlockReason =
  * otherwise win and show a nonsensical "add X more" for a cart with nothing in
  * it. Everything upstream of the cart (no branch / closed / no order type) still
  * outranks both.
+ *
+ * `paymentBlocked` and `paymentUnselected` ARE TWO DIFFERENT PROBLEMS and used
+ * to be one input. Collapsing them was harmless only while checkout preselected
+ * a method, because "unselected" could then only mean "nothing is available".
+ * Since the customer now chooses explicitly (owner decision, 2026-09-14) the
+ * ordinary state of a freshly opened checkout is "available, not yet chosen" —
+ * and telling that customer "No payment method is available" would be a plain
+ * lie about the shop, sending them away from an order they could have placed.
+ *
+ * They also sit at opposite ends of this list, which is the second half of the
+ * same point. `no-payment` is an OUTAGE: nothing the customer does fixes it, so
+ * it belongs up with the other shop-level problems. `no-payment-selected` is an
+ * incomplete form, like `need-description`, and it is fixed by one tap on a
+ * control already on screen — so it goes LAST, after every problem that needs
+ * the customer to go somewhere else. Ranking it earlier would invite them to
+ * tap the radio and then meet a second blocker they could have been told about
+ * first.
  */
 export function resolveBlockReason(input: {
   hasBranch: boolean;
@@ -64,18 +82,22 @@ export function resolveBlockReason(input: {
   hasOrderType: boolean;
   isEmpty: boolean;
   belowMinimum: boolean;
-  paymentUnavailable: boolean;
+  /** No method is enabled at all — an outage; the customer can do nothing. */
+  paymentBlocked: boolean;
   deliveryBlocked: boolean;
   needsDescription: boolean;
+  /** A method IS available and the customer has not chosen one yet. */
+  paymentUnselected: boolean;
 }): BlockReason | null {
   if (!input.hasBranch) return 'no-branch';
   if (!input.branchOpen) return 'branch-closed';
   if (!input.hasOrderType) return 'no-order-type';
   if (input.isEmpty) return 'empty-cart';
   if (input.belowMinimum) return 'below-minimum';
-  if (input.paymentUnavailable) return 'no-payment';
+  if (input.paymentBlocked) return 'no-payment';
   if (input.deliveryBlocked) return 'delivery-unserviceable';
   if (input.needsDescription) return 'need-description';
+  if (input.paymentUnselected) return 'no-payment-selected';
   return null;
 }
 

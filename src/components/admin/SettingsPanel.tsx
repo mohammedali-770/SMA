@@ -458,9 +458,17 @@ export const SettingsPanel: React.FC = () => {
 
                         {/* DEFAULT method */}
                         <div className="p-3.5 bg-con-surface border border-con-line rounded-2xl space-y-2">
-                          <span className="font-black text-con-text text-[11px] block">{isRTL ? 'الطريقة الافتراضية' : 'Default Method'}</span>
+                          <span className="font-black text-con-text text-[11px] block">{isRTL ? 'الطريقة الاحتياطية' : 'Fallback Method'}</span>
+                          {/* This used to say "preselected in checkout", which stopped being
+                              true on 2026-09-14 when the customer app began requiring an
+                              explicit choice. It is now only what place_order uses for an
+                              order submitted with NO method at all — which the app never
+                              does. A control that describes a behaviour it no longer has is
+                              worse than no control. */}
                           <p className="text-[9.5px] text-con-text-3 font-semibold leading-relaxed">
-                            {isRTL ? 'الطريقة المختارة مسبقاً في السلة (يجب أن تكون مفعّلة).' : 'Preselected in checkout (must be an enabled method).'}
+                            {isRTL
+                              ? 'لا تُختار مسبقاً للعميل — العميل يختار بنفسه. تُستخدم فقط إذا وصل طلب دون تحديد طريقة دفع.'
+                              : 'Not preselected for the customer — they choose. Used only if an order arrives with no method specified.'}
                           </p>
                           <select
                             value={payForm.defaultMethod ?? ''}
