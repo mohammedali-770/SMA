@@ -226,8 +226,145 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-14, after `20260917120000_branch_reference_entries`
-and `20260918120000_loyalty_earn_on_settlement` were APPLIED: 135 repository
+**Current position 2026-09-14, after `20260921120000`, `20260919120000` and
+`20260920120000` were all APPLIED: 135 repository files / 140 live history rows /
+exactly ONE unapplied — Moyasar, unapplied on purpose.** Latest live version
+`20260914105232`; ledger rows 93, 94 and 95.
+
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
+rather than the bottom.** With a single file left, "apply the outstanding
+migrations" reads like a no-op and is in fact the one instruction that would
+break the §6 payment freeze — there is no other file it could plausibly mean.
+The guard that catches a bulk apply when a second, legitimate file is
+outstanding has run out of second files again. **Name the target by version.**
+That is what makes the count irrelevant in either shape.
+
+**`20260920120000` IS THE ONE WHERE "MONEY PATH UNTOUCHED" NEEDED PROVING,
+because both money-path functions CALL `validate_coupon`.** They bind the whole
+row — `select * into v_coupon from public.validate_coupon(...)` — so the return
+signature is load-bearing, not incidental. A regex over both live bodies
+enumerated every `v_coupon.<field>` reference and found exactly `valid`,
+`message`, `discount_amount` in each; **neither reads `type` nor `value`**, the
+two fields the migration nulls on refusal. The signature is unchanged after the
+apply, so the `select *` binding still resolves, and both money-path functions
+hash identically.
+
+**WHEN A FUNCTION IS `stable`, PROVE ITS BEHAVIOUR BY CALLING IT ON REAL DATA.**
+`validate_coupon` was called read-only against the two coupons Production
+actually holds — `SPICY15` and `RIYADH10`, **both switched off, both never
+used**, which is exactly the "exists but disabled" case the change is about. All
+three of `SPICY15`, `RIYADH10` and a never-created code now return
+**byte-identical** answers: `valid=false`, `type=null`, `value=null`,
+`message='Coupon not found'`. That is stronger evidence than the fixture the
+migration writes and throws away, and it cost nothing.
+
+**A REAL CUSTOMER-VISIBLE COPY CHANGE, stated rather than buried:** a customer
+typing `SPICY15` was told *"Coupon is inactive"* and is now told *"Coupon not
+found"*. Both refuse; the new one stops confirming that an unlaunched code
+exists.
+
+**Superseded, kept because the count is the point: 135 repository
+files / 139 live history rows / TWO unapplied — Moyasar (frozen on purpose) and
+`20260920120000_promo_disclosure_hardening`.** Latest live version
+`20260914104107`; ledger rows 93 and 94.
+
+**TWO IS THE SHAPE THAT LOOKS SAFE AND IS NOT.** It restores the *appearance* of
+an innocent referent for "apply the outstanding migrations" without making a bulk
+apply any safer: `20260824100000` still sorts ahead of everything, so such an
+instruction takes the frozen payment file FIRST. **Name the target by version.**
+
+**`20260919120000` changed no data, measured:** the erasure function was
+REDEFINED, not run — the 2 `order_items` rows carrying a note still carry it; 4
+push devices active; 72 orders; 2 addresses. Grants moved exactly as intended:
+`anon` INSERT/UPDATE/DELETE on the eleven catalog tables **33 → 0**, SELECT
+untouched on all 9 menu tables, pinned `search_path` **0 → 2**. Three bodies
+byte-identical against hashes pre-computed from the merged file, and
+`register_push_device` **byte-identical before and after** — the deliberate
+asymmetry survived.
+
+**THE CUSTOMER COLUMN CONTRACT DID NOT MOVE**, which is the regression review
+caught in that file's first version: `authenticated` still cannot select
+`orders.coupon_code`, `customer_name`, `customer_phone` or `customer_id`. The new
+admin aggregate is reachable by `authenticated`, not by `anon`, and gated on
+`is_admin()` — role and AAL2.
+
+**ITS ONE REAL RISK WAS NAME RESOLUTION ON THE ACCOUNT-DELETION PATH, AND THAT
+FILE'S OWN HEADER RECORDS AN EARLIER DRAFT GETTING IT WRONG** (it referenced
+`whatsapp_message_logs.to_phone`, a column that does not exist). `anonymize_
+account_data` cannot simply be called — it erases real customer data — so it was
+checked three ways instead: an identifier-set diff named exactly the new
+references, `information_schema` confirmed both `order_items` columns present,
+and **the new statement itself was run live as a read-only SELECT with the
+identical predicate** against a nonexistent customer id (0 rows, nothing
+written). The other two functions WERE called and refused at their gates —
+`42501 :: Only admins may read coupon usage` and `P0001 :: not authenticated` —
+with the outcomes read back as VALUES rather than notices.
+
+**When a function cannot be called because calling it would destroy data, run
+its new STATEMENT read-only with the identical predicate.** That resolves every
+name the statement uses and writes nothing, which is the part of row 86's lesson
+that survives a destructive function.
+
+**Superseded, kept because the count is the point: 135 repository files / 138
+live history rows / THREE unapplied —
+Moyasar (frozen on purpose), `20260919120000_security_audit_db_hardening` and
+`20260920120000_promo_disclosure_hardening`.** Latest live version
+`20260914103208`, applied 10:32:08 UTC on explicit owner approval naming the
+target by version; ledger row 93.
+
+**BOTH ORDER-CREATION PATHS NOW DEFER EARNING**, which is what audit finding 1.1
+required and what `20260918120000` was wrongly recorded as having achieved. The
+defect was confirmed still present in the LIVE body immediately before the apply,
+so this was real work rather than a no-op: `prosrc` matched both
+`%v_bal_start - v_redeemed + v_earned%` and `%, 'earn', v_earned,%`.
+
+**Applying it changed nothing measurable:** 111 ledger rows, 65 `earn`, 0
+`earn_pending`, 5 409 points across 5 customers, 72 orders — identical before and
+after. Money-path pair unchanged (`bfd3f1f4…` / `ca276a84…`). Body byte-identical
+at `0a3dcc0c6c6ee61642a439b128d630de` / 5 555 chars, against a hash **pre-computed
+from the merged file** rather than read back and rationalised. Containment
+re-measured: `anon` NO, `authenticated` NO, `service_role` YES. Moyasar absent.
+
+**AN IDENTIFIER-SET DIFF IS GOOD EVIDENCE ABOUT NAME RESOLUTION AND NOTHING
+ELSE — and the first version of this paragraph claimed more than that, twice.**
+Review caught both on #378, and both corrections are kept because the overreach
+is the instructive part.
+
+The method itself is sound and worth reusing. Row 86's rule is that a clean
+apply proves storage, not execution, because a `plpgsql` body is not
+name-resolved at creation. When a body is DERIVED from a running one, comparing
+the old and new bodies as identifier SETS (comments and string literals
+stripped, qualified names included) settles the name question across **every**
+path rather than the one a call happens to take. Here that comparison was
+**zero added, zero removed, in both directions**.
+
+**FALSE CLAIM 1, now retracted: "even a transaction aborted by a `RAISE` would
+enrol food nobody ordered".** It would not. Measured afterwards rather than
+argued: of the 12 non-internal triggers on `public.orders`, **11 are fully
+transactional** — BEFORE ROW triggers mutating `NEW`, plus two AFTER ROW
+triggers that insert ordinary rows — and the sync worker reads **committed**
+rows, so an aborted probe enrols nothing. The claim also contradicted this
+repository's own precedent: ledger row 87 used exactly that probe, and
+`20260920120000` ships one. **Exactly one residue would survive an abort:**
+`set_orders_number` calls `nextval`, and a sequence advance is not
+transactional, so a probe would burn one order number and leave a gap in the
+`SM-2026-…` series. That is the real cost, and it is nothing like the one
+claimed.
+
+**FALSE CLAIM 2, now retracted: "the only differences are three string
+literals".** The migration also removes `+ v_earned` from the profile balance
+update and `- v_earned` from the redemption row's `balance_after`. Those are
+**arithmetic edits, central to the behaviour**, and an identifier-set comparison
+cannot exclude an operator or type error in them. What actually covers them is
+the local harness — `loyalty_earn_snapshot_path_test.sql` executes the real
+function six times and asserts these exact figures, and two of the four killed
+mutants target precisely these two edits.
+
+**THE RULE, NARROWED TO WHAT IT CAN CARRY:** an identifier-set diff proves name
+resolution, not the correctness of a changed expression. Where changed
+expressions matter and a rollback-safe probe is available, run the probe.
+
+**Superseded, kept because the count is the point: 135 repository
 files / 137 live history rows / FOUR unapplied — Moyasar (frozen on purpose),
 `20260919120000_security_audit_db_hardening`,
 `20260920120000_promo_disclosure_hardening` and
@@ -941,7 +1078,9 @@ by version.**
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
 | `20260915120000_digest_external_delivery_line.sql` | **APPLIED 2026-09-13 05:46:10 UTC**, live version `20260913054610`, on explicit owner approval ("apply 20260915120000" — named by version), one call. Ledger row 89, and the row that returns the outstanding count to ONE. The merged copy was re-hashed and matched before sending; the stored body is **byte-identical** (`96bd50d399c8f47a0a50bb62f050ceae`, 11 689 chars). **Applying it performed no write at all** — `operations_alert_settings.updated_at` is still 2026-07-22 16:55:57, which is stronger evidence than any row count; outbox 272/0-email, 108 stored digests, money-path pair all unchanged. Called live afterwards in both languages. A one-byte hash discrepancy was traced to the extraction span (the newline after `as $$`), not to the file. Historical description follows.  Redefines `operations_digest_build` so the closing external-delivery line is derived from `external_dispatch_enabled` instead of asserting, unconditionally and in both languages, that delivery is disabled "in this version". sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`, 423 lines / 20 247 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched; it sends nothing; NO DEPLOY IMPLIED** (unchanged signature, so callers bind to the new body). Applying it changes no stored digest — digests already written are rows — and with the flag false the new footer reads "External delivery is disabled.", the same claim minus the false version clause. **Derived, not retyped:** the body is extracted from `20260723090000_smart_operations_alerts_digest.sql` lines 1889-2141 (the only migration that has ever defined it) under four anchored substitutions, each asserted to match exactly once; a diff of old vs new body shows only those four regions, 253 → 271 lines. Its own verification asserts one overload, five `v_external_on` references enumerated by site, both retracted literals absent, all four replacement literals present, then **calls** the function in both languages and compares the final rendered line against the live flag. Validated on the local chain harness (129 migrations, 71 suites, 69 passed, 2 quarantined, 0 new failures) and mutation-tested five ways — all five killed by the migration's check, four of five by the paired suite (the fifth mutates the checker itself). |
-| `20260921120000_loyalty_earn_snapshot_path.sql` | **WRITTEN, VALIDATED, NOT APPLIED.** Extends `20260918120000`'s rule to the SECOND order-creation path. `insert_order_from_snapshot` still ran `set loyalty_points = greatest(0, v_bal_start - v_redeemed + v_earned)` and wrote a spendable `'earn'` row at CREATION — the exact defect audit finding 1.1 is about, in the one function that migration did not touch. Verified live before writing: its `prosrc` is `da8c457bade050e0a0280a88061d0304`, 4 911 chars, byte-identical to `20260826100000_comp_order_totals.sql`. **Nothing mints points through it today** (service_role-only; the online arm needs a verified payment and online payment is off; the other arm is the zero-total comp path, which earns 0), but the defect returns the moment online payment is enabled. sha256 `ee53f298fd0cc34e7759720767065ff67e19af5f19683810387f90bdfa1c0577`, 296 lines / 14 407 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched** — it redefines exactly one function and that function is neither `place_order` nor `compute_order_snapshot`. **No deploy implied** (unchanged signature). Derived by three anchored substitutions from the only current definition, each asserted to match exactly once. A leading block **refuses to apply out of order**, asserting all three halves of `20260918120000`; each refusal was tested by building a database that fails exactly one of them. Cold chain: 135 migrations, 76 suites, 74 passed, 2 quarantined, 0 new failures; mutation-tested four ways, all four killed by BOTH the migration's own block and the paired suite. |
+| `20260920120000_promo_disclosure_hardening.sql` | **APPLIED 2026-09-14 10:52:32 UTC**, live version `20260914105232`, on explicit owner approval ("apply 20260920120000" — named by version), one call. Ledger row 95, and the row that returns the outstanding count to ONE. Audit finding 2.9: the two promo RPCs described a promotion the caller cannot use. Merged copy re-hashed and matched `45f8ee28…` (365 lines / 18 898 bytes). **MONEY PATH UNTOUCHED, and here that needed PROVING rather than asserting** — both money-path functions CALL `validate_coupon` and bind the whole row, so the return signature is load-bearing. Every `v_coupon.<field>` reference in both live bodies was enumerated: exactly `valid`, `message`, `discount_amount`; **neither reads `type` nor `value`**. Signature unchanged after the apply; both hashes identical. Both pre-images matched live before the derivation was trusted. Both new bodies byte-identical against pre-computed hashes. **Property proven LIVE on the real codes** (the function is `stable`, so calling it is read-only): `SPICY15` and `RIYADH10` — both switched off, both never used — now answer **byte-identically to a code that never existed**: `valid=false`, `type=null`, `value=null`, `message='Coupon not found'`. The migration's own fixture probe rolled back, verified independently (0 `ZZPROMO%` rows survive). **A real customer-visible copy change:** `SPICY15` was *"Coupon is inactive"*, now *"Coupon not found"*. Grants preserved (anon NO, authenticated YES on both). Data untouched. No deploy implied. |
+| `20260919120000_security_audit_db_hardening.sql` | **APPLIED 2026-09-14 10:41:07 UTC**, live version `20260914104107`, on explicit owner approval ("apply 20260919120000" — named by version), one call. Ledger row 94. Five independent items from the 2026-09-13 audit: erasure now clears `order_items.note`; `deactivate_push_device` is owner-scoped; eleven tables lose redundant `anon` write grants; two functions pin `search_path`; a new admin-gated `admin_coupon_usage_counts()` replaces a customer-visible column read. Merged copy re-hashed and matched `4c030fa1…` (364 lines / 17 642 bytes). **Money path untouched.** Three bodies byte-identical against pre-computed hashes; `register_push_device` byte-identical before and after, so the deliberate asymmetry survived. **Changed no data** — the erasure function was redefined, not run (2 item notes still present, 4 devices active, 72 orders, 2 addresses). anon writes **33 → 0** with SELECT untouched on 9 menu tables; pinned `search_path` **0 → 2**; `authenticated` still cannot read `orders.coupon_code`. **Name resolution on the deletion path was checked three ways** rather than by calling a function that erases customer data: identifier diff, `information_schema`, and the new statement run live read-only with the identical predicate (0 rows, nothing written). The other two refused at their gates (`42501`, `P0001`). No deploy implied. |
+| `20260921120000_loyalty_earn_snapshot_path.sql` | **APPLIED 2026-09-14 10:32:08 UTC**, live version `20260914103208`, on explicit owner approval ("apply 20260921120000" — named by version), one call. Ledger row 93, and the row that returns the outstanding count to THREE. The merged copy was re-hashed and matched `ee53f298…` exactly before sending. **The defect was confirmed still present in the LIVE body immediately before the apply**, so this was real work: `prosrc` matched both `%v_bal_start - v_redeemed + v_earned%` and `%, 'earn', v_earned,%`, hashing `da8c457b…` / 4 911 chars. All three ordering preconditions were verified live BEFORE sending rather than left to the file's own guard. **Body byte-identical** (`0a3dcc0c6c6ee61642a439b128d630de`, 5 555 chars) against a hash pre-computed from the merged file; no hashing trap arose. **Applying it changed nothing:** 111 ledger rows, 65 `earn`, 0 `earn_pending`, 5 409 points across 5 customers, 72 orders — all identical. Money-path pair unchanged. Containment re-measured (anon NO, authenticated NO, service_role YES). Moyasar absent. **NOT called live** — it inserts a real order and `orders` carries 12 triggers including POS-sync enrolment; name resolution was excluded structurally by an identifier-set diff instead (zero added, zero removed). Historical description follows.  Extends `20260918120000`'s rule to the SECOND order-creation path. `insert_order_from_snapshot` still ran `set loyalty_points = greatest(0, v_bal_start - v_redeemed + v_earned)` and wrote a spendable `'earn'` row at CREATION — the exact defect audit finding 1.1 is about, in the one function that migration did not touch. Verified live before writing: its `prosrc` is `da8c457bade050e0a0280a88061d0304`, 4 911 chars, byte-identical to `20260826100000_comp_order_totals.sql`. **Nothing mints points through it today** (service_role-only; the online arm needs a verified payment and online payment is off; the other arm is the zero-total comp path, which earns 0), but the defect returns the moment online payment is enabled. sha256 `ee53f298fd0cc34e7759720767065ff67e19af5f19683810387f90bdfa1c0577`, 296 lines / 14 407 bytes — re-hash the MERGED copy before applying, per §15. **Money path untouched** — it redefines exactly one function and that function is neither `place_order` nor `compute_order_snapshot`. **No deploy implied** (unchanged signature). Derived by three anchored substitutions from the only current definition, each asserted to match exactly once. A leading block **refuses to apply out of order**, asserting all three halves of `20260918120000`; each refusal was tested by building a database that fails exactly one of them. Cold chain: 135 migrations, 76 suites, 74 passed, 2 quarantined, 0 new failures; mutation-tested four ways, all four killed by BOTH the migration's own block and the paired suite. |
 | `20260918120000_loyalty_earn_on_settlement.sql` | **APPLIED 2026-09-14 07:10:44 UTC**, live version `20260914071044`, on explicit owner approval ("apply 20260918120000" — named by version), one call. Ledger row 92. Audit finding 1.1: `place_order` now records `earn_pending` and `admin_set_order_status` promotes it on DELIVERY — cash always, online only when `payment_status = 'paid'`. **Applying it credited nobody:** 5 409 points across 5 customers unchanged, 111 ledger rows unchanged, **0** `earn_pending` rows created, no existing row rewritten. The type CHECK widened 4 → 5 values, keeping all four originals. **The money-path pair moved HALF:** `place_order` `e54caa33…` → **`bfd3f1f423e61c850ab6101e37431799`**; `compute_order_snapshot` **unchanged** at `ca276a84…`. **This file's header claimed it redefined BOTH money-path functions and that was WRONG** — it redefines `place_order` and `admin_set_order_status`, and the function it did NOT touch, `insert_order_from_snapshot`, carried the same defect until `20260921120000`. **The pre-image did not match the repository and that was checked rather than assumed:** live `admin_set_order_status` is the same logic with every comment stripped (103 lines vs 124), so both sides were comment-normalized and hashed (`dc5ef031…` both) before the derivation was trusted. Both bodies verified byte-identical after the apply. No deploy implied. |
 | `20260917120000_branch_reference_entries.sql` | **APPLIED 2026-09-14 07:02:38 UTC**, live version `20260914070238`, on explicit owner approval ("apply 20260917120000" — named by version), one call. Ledger row 91. A branch reference sheet for cashiers — links, numbers, notes and **credentials**, the secret values held in Supabase Vault, shown masked, revealed only on an explicit action, every reveal audited. **Applying it revealed and stored nothing:** both new tables created empty. **Money path unchanged** (`e54caa33…` / `ca276a84…`) — new objects only. `vault.decrypted_secrets` verified unreadable by `authenticated` and `anon`, so `branch_reference_reveal` is the sole route to a secret value; it is gated on `is_admin() or is_branch_operator(branch)` and the **call centre is deliberately outside that gate**. All three new bodies were **called** live afterwards (row 86's lesson) and their outcomes read back as values, not notices: `P0002` from the reveal path, `42501` from each admin RPC's gate. All three byte-identical. **The header's claim that `vault.update_secret` takes four arguments was wrong** — live it takes five, four defaulted; named arguments made it bind either way, which is why reading the catalog rather than the header was what caught it. No deploy implied. |
 | `20260907120000_loyalty_pickup_only.sql` | **APPLIED 2026-09-09 05:50:16 UTC**, live version `20260909055016`, on explicit owner approval ("apply 20260907120000" — named by version), one call, target named explicitly. Ledger row 82. Body fidelity proven byte-for-byte against the merged file (`prosrc` md5 `8351e2641b1cb45ab5dcbc52d8c8194f` / `3d042e691ad933b121552dde146ce06d`), which matters because the MCP tool takes SQL inline and a transcription slip would have been silent. Both functions remain `service_role`-only. Delivery behaviour was proven on the LOCAL harness, not in Production, because asserting it needs a real `place_order` and that means a real kitchen ticket. Historical description follows. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
