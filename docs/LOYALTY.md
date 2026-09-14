@@ -833,6 +833,12 @@ divergence shows up as a disagreement rather than as silence.
 
 ### The fix covered ONE of the TWO creation paths (corrected `20260921120000`)
 
+> **`20260921120000` is APPLIED to Production** — 2026-09-14 10:32:08 UTC, live
+> version `20260914103208`, ledger row 93. Applying it credited nobody and
+> changed no existing row: 111 ledger rows, 65 `earn`, 0 `earn_pending`, 5 409
+> points across 5 customers, all identical before and after. **Both creation
+> paths now defer earning.**
+
 `20260918120000` was applied on 2026-09-14 and reported as closing the finding.
 It did not, quite. This repository has **two** functions that create an order and
 move a loyalty balance:
