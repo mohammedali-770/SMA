@@ -73,6 +73,8 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/rest.ts`
 - `_shared/restNoSupabaseJs.test.ts`
 - `_shared/secrets.ts`
+- `_shared/smtpTarget.test.ts`
+- `_shared/smtpTarget.ts`
 - `_shared/supabaseClient.ts`
 - `_shared/syncLog.test.ts`
 - `_shared/syncLog.ts`

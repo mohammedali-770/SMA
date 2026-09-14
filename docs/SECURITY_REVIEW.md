@@ -363,3 +363,102 @@ transactional / behavior-preserving and only take effect once deployed.
 **Go / No-Go (2026-07-09): GO (security)** — unchanged from §11, with R-1/R-2/R-3 added
 to the deploy list and the Lazywait-token rotation (§10) still **mandatory** before any
 pilot/production use.
+
+---
+
+# Re-review — 2026-09-14 (comprehensive multi-agent audit)
+
+A full audit was run at the owner's request across 14 dimensions, with every
+finding put to independent adversarial verification before it was accepted:
+**52 confirmed, 41 refuted, 0 critical, 0 high**. The highest-consequence claims
+were then checked read-only against live Production rather than against source
+alone — which is what refuted several of them (the money path does not trust
+client prices; `profiles` self-update is contained by column-level grants).
+
+Fixes shipped across five pull requests. This section records the ones that are
+not covered by another document; the rest are in the document that owns them.
+
+| Area | Where it is recorded |
+| --- | --- |
+| Test-fixture PII scrub + an allowlist guard in CI | `scripts/check-test-phone-numbers.mjs`, wired into `docs:check` |
+| Fail-closed OTP rate limiter; Lazywait `base_url` host allowlist | `WHATSAPP_LOGIN.md`, `LAZYWAIT.md` |
+| Loyalty earn deferred to settlement | `LOYALTY.md` |
+| Five database hardening items | `MIGRATIONS.md`, `DISCOUNTS_CAMPAIGNS.md` |
+| Spreadsheet formula injection in the branch templates | `BRANCH_ONBOARDING.md` |
+| SMTP endpoint validation in the alert dispatcher | `OPERATIONS_ALERTS_DIGEST.md` |
+| **The two below** | here |
+
+## S-1 The GoTrue session lived in AsyncStorage — MEDIUM — FIXED
+
+`supabase.auth` persists a JSON blob holding the access token **and the refresh
+token**. The refresh token is the long-lived credential: it mints access tokens
+until it is revoked. In AsyncStorage that blob is an ordinary row in an
+app-private SQLite file — unreadable by another app, but carried into `adb
+backup`, into Android auto-backup to the customer's Google Drive, and into an
+unencrypted iTunes backup.
+
+**Fix.** `apps/mobile/src/lib/secureSessionStorage.ts` hands supabase-js a
+keystore-backed adapter (`expo-secure-store`: Android Keystore / iOS Keychain),
+with `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`. The `THIS_DEVICE_ONLY` variant is
+the one iOS excludes from backups *and* from iCloud Keychain sync, which is the
+entire point; `AFTER_FIRST_UNLOCK` rather than `WHEN_UNLOCKED` because the app
+refreshes its token on foreground and a locked-device read must not fail.
+
+Three things made this more than a one-line swap, and each is pinned by a test in
+`chunkedSecureStorage.test.ts` (15 cases, five mutants killed):
+
+- **SecureStore documents a 2048-byte ceiling per value**, and a Supabase session
+  routinely exceeds it once the JWT and the user object are in — an Arabic name
+  pushes it further, because the limit is on **bytes** and those characters cost
+  two. The value is split across numbered entries with a manifest, split on code
+  point boundaries so a four-byte character is never cut in half.
+- **The manifest is written last.** Until it lands, the previous session is still
+  what reads back, so an interrupted write cannot leave a half-session that
+  parses. A manifest promising an entry that is not there reads as signed-out and
+  clears itself, rather than handing supabase-js a truncated blob.
+- **An existing session is adopted, not discarded.** The first read of a key
+  falls back to AsyncStorage, moves the value into the keystore, and deletes the
+  plaintext copy. Sign-out deletes the legacy copy too — otherwise the next
+  launch would adopt it straight back.
+
+**Failure is loud, deliberately.** If the keystore refuses a write, the adapter
+rejects rather than quietly writing to AsyncStorage instead. A silent fallback
+would mean the control cannot be verified from outside: the token might be in the
+keystore or might not, and nothing would say which. The cost is a rare forced
+re-login. The one exception is adoption — if the keystore refuses *there*, the
+existing session is returned and left in place, because deleting a working
+session in order to protect it helps nobody, and the next launch retries.
+
+**Visible consequence, so it is not later filed as a bug:** restoring a phone
+from a backup signs the customer out. That is correct for a credential.
+
+**Web is unchanged.** There is no keystore in a browser; `expo-secure-store` is
+unavailable there. The Expo web export keeps the behaviour it has, which is also
+what the admin web app does.
+
+**This needs a new native build to take effect** — `expo-secure-store` is a
+native module. It ships with X2.
+
+## S-2 Android `allowBackup` was at the platform default — LOW — FIXED
+
+`apps/mobile/app.json` set no `android.allowBackup`, and
+`@expo/config-plugins` defaults it to `true`, writing
+`android:allowBackup="true"` into the manifest. That is the switch that puts app
+data into `adb backup` and into Google auto-backup. It is now `false`.
+
+S-1 and S-2 are deliberately both applied rather than either alone: S-1 moves the
+credential somewhere a backup does not reach, and S-2 stops the backup for the
+data that remains (cart, language, first-run flags, the pending checkout-session
+marker). Neither depends on the other being correct.
+
+## What the audit deliberately did not touch
+
+- **`apps/mobile/src/app/payment/return.tsx`.** A deep-link finding was confirmed
+  there. It is payment return behaviour, frozen under `CLAUDE.md` §6, and fixing
+  it needs a specific owner exception rather than a self-declared one.
+- **A config-level TLS requirement for SMTP.** denomailer already refuses to send
+  `AUTH` over a connection it could not secure; adding a flag would have wrongly
+  rejected STARTTLS relays. Recorded with the quoted source in
+  `OPERATIONS_ALERTS_DIGEST.md`.
+
+Owner-only items from this audit are listed in `OWNER_ACTIONS.md`.

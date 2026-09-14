@@ -2,8 +2,10 @@
  * Supabase client for React Native / Expo.
  *
  * Differences from the web client (src/lib/supabase.ts in the web app):
- *  - Session is persisted with AsyncStorage, NOT browser localStorage (which
- *    does not exist in React Native).
+ *  - Session is persisted in the DEVICE KEYSTORE via `secureSessionStorage`,
+ *    not in browser localStorage (which does not exist in React Native) and no
+ *    longer in AsyncStorage: the blob holds the refresh token, and AsyncStorage
+ *    travels in device backups. See that module for the trade-offs.
  *  - `detectSessionInUrl: false` — there is no URL/hash to parse on native;
  *    leaving it on throws in RN.
  *  - `react-native-url-polyfill/auto` is imported first so supabase-js's use of
@@ -15,11 +17,11 @@
  * no provider secret ever lives here.
  */
 import 'react-native-url-polyfill/auto';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from './env';
+import { sessionStorage } from './secureSessionStorage';
 
 if (!isSupabaseConfigured) {
   // Surfaced once at startup. The app cannot load real data without these; the
@@ -35,7 +37,7 @@ export const supabase = createClient(
   SUPABASE_ANON_KEY || 'public-anon-key',
   {
     auth: {
-      storage: AsyncStorage,
+      storage: sessionStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,

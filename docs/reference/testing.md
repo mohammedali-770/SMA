@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**178 TypeScript test files declaring 2755 test blocks, plus 74 SQL suites.**
+**180 TypeScript test files declaring 2786 test blocks, plus 74 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -119,7 +119,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-64 files, 918 declared test blocks.
+65 files, 933 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -167,6 +167,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
+| `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 7 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
@@ -190,7 +191,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-91 files, 1252 declared test blocks.
+91 files, 1256 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -252,7 +253,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/api.test.ts` | 6 | admin.deleteBranch |
 | `src/lib/banners.test.ts` | 13 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
-| `src/lib/branchImport.test.ts` | 43 | splitRows |
+| `src/lib/branchImport.test.ts` | 47 | splitRows |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
@@ -288,7 +289,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-22 files, 578 declared test blocks.
+23 files, 590 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -307,6 +308,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
+| `supabase/functions/_shared/smtpTarget.test.ts` | 12 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |
 | `supabase/functions/_shared/tapRefund.test.ts` | 18 | classifyRefundResponse — confirmed success |

