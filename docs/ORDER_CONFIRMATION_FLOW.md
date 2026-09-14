@@ -1961,6 +1961,51 @@ same cases — `supabase/tests/loyalty_earn_on_settlement_test.sql` and
 `loyaltyEarnState.test.ts` — so a divergence surfaces as a disagreement rather
 than as silence. Rationale and the online asymmetry: `docs/LOYALTY.md`.
 
+## 10h. The payment method is chosen, never assumed (2026-09-14)
+
+Owner instruction, 2026-09-14: cash — on delivery or at the branch — is the
+launch payment method, the "online payment is unavailable" notice goes, and
+nothing is auto-selected. Full reasoning: `docs/PAYMENT_POSTPONEMENT.md` §11.
+
+What this changes on the checkout screen:
+
+- **The picker starts empty.** No radio is filled on arrival. Paying in cash is
+  an errand — having the money at the door, or at the counter — and a
+  preselected option makes that commitment for the customer, who then meets it
+  at the door.
+- **The outage notice is gone.** It said online payment was unavailable and cash
+  was enabled, which framed the intended way to pay as a degraded mode and
+  advertised one the customer cannot use.
+- **The cash note is order-type aware**, and appears only once cash is chosen:
+  *"Pay the driver in cash when your order arrives."* for delivery, *"Pay in
+  cash at the branch when you collect your order."* for pickup.
+
+**The footer gained a reason, and the split is the point.** `resolveBlockReason`
+used to take one `paymentUnavailable` input. That was safe only while a method
+was preselected, because "unselected" could then only mean "nothing is
+available". Now the ordinary state of a freshly opened checkout is *available,
+not yet chosen* — and telling that customer **"No payment method is available"**
+would be a lie about the shop, sending them away from an order they could have
+placed.
+
+| Reason | Says | When |
+| --- | --- | --- |
+| `no-payment` | "No payment method is available" | an outage — nothing is enabled, and the customer can do nothing about it |
+| `no-payment-selected` | "Choose a payment method" | a method is offered and the customer has not tapped one |
+
+They sit at **opposite ends** of the priority list, which is the second half of
+the same idea. `no-payment` ranks with the other shop-level problems. Choosing a
+method is an incomplete form, like a missing delivery landmark, and it is fixed
+by one tap on a control already on screen — so it ranks **last**, after every
+blocker that sends the customer somewhere else. Ranking it earlier would invite
+them to tap the radio and then meet a second blocker they could have been told
+about first. `checkoutGuards.test.ts` pins both the split and the ordering.
+
+**The server is untouched.** `place_order` still falls back to
+`app_settings.default_payment_method` for a submission that carries no method —
+a money-path floor, not a UI preselection. The app never reaches it, because it
+will not submit until a method is chosen.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and

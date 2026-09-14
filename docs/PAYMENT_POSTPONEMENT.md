@@ -21,6 +21,13 @@ This document is the authoritative record of the postponement. It supplements
 > stands**: no provider has been selected, nothing was deployed, no migration was
 > applied, no credential exists, and Moyasar is not enabled anywhere. See §9.
 
+> **UPDATE 2026-09-14 — CASH IS THE LAUNCH PAYMENT METHOD, AND THE CUSTOMER
+> NOW HAS TO CHOOSE IT.** Owner instruction, in these words: *"let the cash on
+> delivery or the cash on branch be the current payment method / remove the
+> message that say «الدفع الالكتروني غير متاح حاليا الدفع النقدي مفعل» / and do
+> not let the payment method to be auto selected, the user has to select"*.
+> Three consequences, all of them **client-side only**. See §11.
+
 ---
 
 ## 1. The decision
@@ -588,3 +595,90 @@ is an operational requirement no code change removes.
 | `docs/integrations/Moyasar_API_Reference.md` | The researched Moyasar API contract and its seven open questions |
 | `docs/integrations/Tap_API_Reference.md` | The researched Tap API contract |
 | `PROJECT_STATUS.md` | Overall project state and onboarding |
+
+---
+
+## 11. Cash is the launch method, and it is chosen, not assumed (2026-09-14)
+
+Owner instruction, 2026-09-14. Three changes, all in the **customer-facing
+client**. No provider was selected, no gateway touched, no Edge Function
+deployed, no migration written, no money-path function redefined. §1 and §2
+stand exactly as written.
+
+### 11.1 What the customer sees now
+
+| Before | Now |
+| --- | --- |
+| The cash option arrives **preselected** | Nothing is selected; the customer taps to choose |
+| A warning under the options: *"Online payment is currently unavailable. Cash payment is enabled."* / «الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.» | No such message. The picker offers what the shop takes and says nothing else |
+| *"Pay in cash when you receive your order."* for both fulfilments | Delivery: *"Pay the driver in cash when your order arrives."* Pickup: *"Pay in cash at the branch when you collect your order."* |
+| Place Order blocked with *"No payment method is available"* when nothing was chosen | Blocked with *"Choose a payment method"* — a different problem, said differently |
+
+### 11.2 Why the outage notice had to go
+
+It was not merely redundant, it was **wrong about what the business is**. The
+sentence framed cash as a fallback for a gateway that was down — and there is no
+gateway to be down. It advertised a way to pay that the customer cannot use, and
+it presented the ordinary, intended way to pay as a degraded mode. A shop that
+takes cash says so by taking cash.
+
+### 11.3 Why nothing is preselected
+
+Paying in cash is an errand: having the money at the door, or having it at the
+counter. A preselected radio makes that commitment on the customer's behalf and
+lets them discover it at the door. The picker now starts empty and the Place
+Order button stays dead, with its own message, until they choose.
+
+This also removes a quiet asymmetry that only worked while exactly one method
+was enabled. With both enabled, the preselection was the **administrator's**
+default rather than the customer's choice, and most people would never have
+noticed which one they were agreeing to.
+
+### 11.4 What did NOT change, and this is the part to read before editing
+
+- **`place_order` is untouched.** It still resolves
+  `app_settings.default_payment_method` when a caller submits no method at all,
+  then falls through to the first enabled one. That is a server-side floor for a
+  method-less submission, living in the money path; it is not a UI preselection
+  and this change could not have altered it without a migration.
+- **The customer app never relies on that floor** — it will not submit until a
+  method is chosen, so every order it places carries an explicit method.
+- **The admin "Default Method" control still exists** and still writes that
+  column. Its caption was corrected: it used to say *"Preselected in checkout"*,
+  which stopped being true. It now says it is not preselected for the customer
+  and is used only if an order arrives with no method specified.
+- **`payment_outage_mode` is untouched.** It remains a staff-facing label in the
+  admin console; it never drove the customer notice that was removed.
+- **The admin console's own banner stays.** *"Online is off and cash is on —
+  operations continue on cash; orders go to POS as unpaid"* is written for the
+  owner, is true, and is exactly the sort of thing staff need. Only the
+  **customer-facing** apology was removed.
+
+### 11.5 Where the rule now lives
+
+In `src/lib/payment.ts` and its mirror `apps/mobile/src/lib/payment.ts`, and
+nowhere else. `resolveDefaultMethod` and `onlineUnavailableCashOn` were
+**deleted** rather than left unused: a helper that can manufacture a payment
+method out of settings is exactly what would reintroduce this, and the next
+author reaching for one would have found it sitting there looking supported.
+
+What replaced it is `clearIfUnavailable(settings, chosen)`, whose signature is
+the guarantee — it returns the caller's own pick or `null`, so it can take a
+choice away and can never invent one. `src/lib/payment.test.ts` asserts both
+halves, including the case that looks most reasonable and is most wrong: when
+the chosen method is switched off while the other is enabled, the customer is
+NOT slid onto the other one.
+
+### 11.6 Is this covered by the §2 freeze?
+
+No, and the reasoning is recorded rather than assumed. §2 freezes payment
+initiation, verification, webhooks, returns, provider configuration and
+credentials, refund behaviour, and payment business rules. This change touches
+none of them: no charge is created, verified or refunded; no provider code runs;
+no total, fee or reconciliation figure moves; the server's own method resolution
+is byte-for-byte unchanged. What changed is which radio button starts filled and
+what sentence sits under it.
+
+It is also a **direct owner instruction in the active conversation**, which is
+what §6 of `CLAUDE.md` requires for anything in this neighbourhood. Both things
+are true; either alone would have been enough to record.

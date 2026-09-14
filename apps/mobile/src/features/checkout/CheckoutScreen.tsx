@@ -45,7 +45,7 @@ import { catalog as catalogApi, checkout, compMembership, coupons, loyaltyPrevie
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
-  availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
+  availableMethods, checkoutBlocked, clearIfUnavailable,
   type PaymentMethod,
 } from '../../lib/payment';
 import { pointInPolygon } from '../../lib/geo';
@@ -110,7 +110,11 @@ export function CheckoutScreen() {
   const orderCtx = useOrderContext();
   const orderType: OrderType | null = orderCtx.context?.orderType ?? null;
   const [showTypeChange, setShowTypeChange] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(resolveDefaultMethod(payment));
+  // NOTHING IS PRESELECTED (owner decision, 2026-09-14). Paying in cash means
+  // having the money at the door or at the counter, and that is a decision the
+  // customer should make on purpose rather than discover after the fact. The
+  // Place Order button stays dead, with its own message, until they choose.
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   // The SHARED address book, not a private copy. This screen stays mounted while
   // the customer edits addresses in Profile, so a local fetched-once list would
   // keep offering an address that has since been edited or deleted.
@@ -197,16 +201,17 @@ export function CheckoutScreen() {
   // Payment availability (admin-controlled; place_order re-validates server-side).
   const payMethods = availableMethods(payment);
   const paymentBlocked = checkoutBlocked(payment);
-  const showOnlineOutageNotice = onlineUnavailableCashOn(payment);
 
-  // Keep the chosen method valid as availability changes (e.g. admin turns online
-  // off mid-session). Never assume cash unless it's actually enabled.
+  // Keep the chosen method valid as availability changes (e.g. admin turns cash
+  // off mid-session). `clearIfUnavailable` can only ever take the choice AWAY —
+  // it returns the customer's own pick or null and cannot invent a method, so
+  // an availability change can never slide them onto a way of paying they did
+  // not agree to. Losing the selection returns the footer to
+  // "Choose a payment method", which is the truthful thing to say.
   useEffect(() => {
-    setPaymentMethod((prev) =>
-      prev && payMethods.includes(prev) ? prev : resolveDefaultMethod(payment),
-    );
+    setPaymentMethod((prev) => clearIfUnavailable(payment, prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payment.onlineEnabled, payment.cashEnabled, payment.defaultMethod]);
+  }, [payment.onlineEnabled, payment.cashEnabled]);
 
   // Preselect ONCE, as soon as the shared book has settled. The rule is
   // unchanged — the address carried in the order context wins, then the
@@ -515,7 +520,8 @@ export function CheckoutScreen() {
       hasOrderType: Boolean(orderType),
       isEmpty: cart.items.length === 0,
       belowMinimum: totals.belowMinimum,
-      paymentUnavailable: paymentBlocked || !paymentMethod,
+      paymentBlocked,
+      paymentUnselected: !paymentMethod,
       deliveryBlocked: Boolean(deliveryBlockReason),
       needsDescription: requiresDescription && !descCheck.valid,
     });
@@ -542,6 +548,14 @@ export function CheckoutScreen() {
         };
       case 'no-payment':
         return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
+      case 'no-payment-selected':
+        // Deliberately NOT the message above. Nothing is wrong here — the
+        // customer simply has not chosen yet, and the fix is one tap on a
+        // control already visible at the top of this screen.
+        return {
+          title: pick('Choose a payment method', 'اختر طريقة الدفع'),
+          action: pick('Select how you would like to pay.', 'حدّد الطريقة التي تريد الدفع بها.'),
+        };
       case 'delivery-unserviceable':
         // The fix is no longer "move the pin" — Checkout does not move pins any
         // more. It is to pick a different saved location, or add one in
@@ -921,6 +935,12 @@ export function CheckoutScreen() {
             onChange={() => setShowTypeChange(true)}
           />
 
+          {/* `cashNote` is order-type aware, because "cash" means two different
+              errands: having the money at the door, or having it at the counter.
+              The old copy said "when you receive your order" for both — true,
+              and it tells a pickup customer nothing about WHERE to pay. It
+              appears only once cash is chosen, so it reads as a consequence of
+              the choice rather than as an instruction issued in advance. */}
           <Section title={t('paymentMethodTitle')}>
             <PaymentMethodPicker
               methods={payMethods}
@@ -929,11 +949,10 @@ export function CheckoutScreen() {
               labelFor={paymentLabelFor}
               blocked={paymentBlocked}
               blockedTitle={pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
-              outageNotice={showOnlineOutageNotice
-                ? pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')
-                : null}
               cashNote={paymentMethod === 'cash'
-                ? pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')
+                ? isDelivery
+                  ? pick('Pay the driver in cash when your order arrives.', 'يُدفع المبلغ نقداً للسائق عند وصول طلبك.')
+                  : pick('Pay in cash at the branch when you collect your order.', 'يُدفع المبلغ نقداً في الفرع عند استلام طلبك.')
                 : null}
             />
           </Section>

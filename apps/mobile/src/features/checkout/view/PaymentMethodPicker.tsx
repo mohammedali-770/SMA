@@ -3,15 +3,22 @@
  *
  * Availability is admin-controlled and re-validated by the server — this
  * renders whatever `methods` it is handed and never decides what is offerable.
- * Three distinct states, deliberately different shapes:
+ * Two states now, not three:
  *
  *   nothing available   a blocking notice, no controls at all;
- *   online unavailable  a warning notice ALONGSIDE the working cash option;
- *   normal              the options.
+ *   normal              the options, NONE of them preselected.
  *
- * The second is the one that matters: an outage is a warning, not an error —
- * the customer can still order — so it must not use the same red as a blocked
- * checkout, or "you can still pay cash" reads as "checkout is broken".
+ * THE THIRD STATE WAS REMOVED ON PURPOSE (owner decision, 2026-09-14). A
+ * warning used to sit beside the working cash option saying online payment was
+ * unavailable and cash was enabled. Cash is not a fallback for a gateway that
+ * is down — it is the launch payment method, and there is no gateway to be
+ * down. Apologising for its absence advertised something the customer cannot
+ * have, and framed the normal way to pay as a degraded mode. The shop simply
+ * takes cash; the picker says so by offering it and saying nothing else.
+ *
+ * `selected` may be null and usually is on arrival. The customer chooses; the
+ * footer's blocking message is what tells them so, and the Place Order button
+ * stays dead until they do.
  */
 import React from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -29,7 +36,6 @@ export function PaymentMethodPicker({
   labelFor,
   blocked,
   blockedTitle,
-  outageNotice,
   cashNote,
 }: {
   methods: PaymentMethod[];
@@ -38,9 +44,7 @@ export function PaymentMethodPicker({
   labelFor: (m: PaymentMethod) => string;
   blocked: boolean;
   blockedTitle: string;
-  /** Shown when online is off but cash is on. */
-  outageNotice: string | null;
-  /** Shown when cash is the chosen method. */
+  /** Shown when cash is the chosen method — so it appears only after a choice. */
   cashNote: string | null;
 }) {
   const styles = useStyles();
@@ -59,7 +63,6 @@ export function PaymentMethodPicker({
         ))}
       </View>
       {cashNote ? <Text variant="caption" tone="secondary">{cashNote}</Text> : null}
-      {outageNotice ? <Notice title={outageNotice} tone="warning" /> : null}
     </View>
   );
 }

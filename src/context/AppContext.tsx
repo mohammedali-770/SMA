@@ -24,7 +24,7 @@ import {
   categoryToDbInsert, branchPatchToDb,
 } from '../lib/mappers';
 import {
-  PaymentMethod, PaymentMethodSettings, resolveDefaultMethod, availableMethods,
+  PaymentMethod, PaymentMethodSettings, clearIfUnavailable, availableMethods,
 } from '../lib/payment';
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 import { isOpsConsoleRole } from '../lib/roles';
@@ -733,14 +733,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [couponCode, cartTotal, isAuthenticated]);
 
   // ---- Keep the chosen payment method valid as availability changes ---------
-  // If the customer hasn't picked (null) or their pick is no longer offered
-  // (e.g. admin just turned online off mid-session), fall back to the resolved
-  // default. When nothing is enabled, leave it null so checkout stays blocked.
+  // It used to fall back to the admin-configured default when the customer had
+  // not picked or their pick was withdrawn. It no longer does: nothing chooses a
+  // payment method on a customer's behalf (owner decision, 2026-09-14).
+  // `clearIfUnavailable` returns their own pick or null and cannot invent one,
+  // so a mid-session availability change can only ever take the choice away —
+  // leaving checkout blocked until they choose again, which is the honest state.
   useEffect(() => {
-    const allowed = availableMethods(paymentSettings);
-    setSelectedPaymentMethod(prev =>
-      prev && allowed.includes(prev) ? prev : resolveDefaultMethod(paymentSettings),
-    );
+    setSelectedPaymentMethod(prev => clearIfUnavailable(paymentSettings, prev));
   }, [paymentSettings]);
 
   const applyCoupon = useCallback(async (code: string): Promise<{ valid: boolean; message: string }> => {
@@ -866,19 +866,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Please select or add a delivery address' };
     }
 
-    // Resolve the payment method against current availability. The client picks
+    // Check the payment method against current availability. The client picks
     // from enabled methods only; place_order re-validates server-side, so this is
     // just an early, friendly guard (never the security boundary).
+    //
+    // It no longer substitutes a default for a customer who chose nothing. The
+    // two failures are reported separately because they are different problems:
+    // an outage the customer cannot fix, and a choice they have not made yet.
     const allowed = availableMethods(paymentSettings);
     if (allowed.length === 0) {
       return { success: false, error: 'No payment method is currently available.' };
     }
-    const chosen =
-      selectedPaymentMethod && allowed.includes(selectedPaymentMethod)
-        ? selectedPaymentMethod
-        : resolveDefaultMethod(paymentSettings);
+    const chosen = clearIfUnavailable(paymentSettings, selectedPaymentMethod);
     if (!chosen) {
-      return { success: false, error: 'No payment method is currently available.' };
+      return { success: false, error: 'Please choose a payment method.' };
     }
 
     const items = cart.map(ci => ({

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  availableMethods, checkoutBlocked, resolveDefaultMethod, onlineUnavailableCashOn,
+  availableMethods, checkoutBlocked, clearIfUnavailable,
   paymentDisplayState, paymentMethodLabel, type PaymentMethodSettings,
 } from './payment';
 
@@ -13,34 +13,62 @@ describe('checkout payment availability', () => {
     const s = S({ onlineEnabled: true, cashEnabled: false });
     expect(availableMethods(s)).toEqual(['online']);
     expect(checkoutBlocked(s)).toBe(false);
-    expect(resolveDefaultMethod(s)).toBe('online');
   });
 
-  it('cash only → only cash is offered, online-unavailable notice shows', () => {
+  it('cash only → only cash is offered', () => {
     const s = S({ onlineEnabled: false, cashEnabled: true });
     expect(availableMethods(s)).toEqual(['cash']);
-    expect(resolveDefaultMethod(s)).toBe('cash');
-    expect(onlineUnavailableCashOn(s)).toBe(true);
+    expect(checkoutBlocked(s)).toBe(false);
   });
 
-  it('both enabled → customer can choose; default respected', () => {
-    const s = S({ onlineEnabled: true, cashEnabled: true, defaultMethod: 'cash' });
+  it('both enabled → both are offered, online first', () => {
+    const s = S({ onlineEnabled: true, cashEnabled: true });
     expect(availableMethods(s)).toEqual(['online', 'cash']);
     expect(checkoutBlocked(s)).toBe(false);
-    expect(resolveDefaultMethod(s)).toBe('cash');
-    expect(onlineUnavailableCashOn(s)).toBe(false);
   });
 
-  it('both disabled → checkout blocked, no default', () => {
+  it('both disabled → checkout blocked', () => {
     const s = S({ onlineEnabled: false, cashEnabled: false });
     expect(availableMethods(s)).toEqual([]);
     expect(checkoutBlocked(s)).toBe(true);
-    expect(resolveDefaultMethod(s)).toBeNull();
+  });
+});
+
+describe('clearIfUnavailable — the only automatic movement, and it only removes', () => {
+  it('keeps a choice that is still offered', () => {
+    const s = S({ onlineEnabled: true, cashEnabled: true });
+    expect(clearIfUnavailable(s, 'cash')).toBe('cash');
+    expect(clearIfUnavailable(s, 'online')).toBe('online');
   });
 
-  it('default falls back to the only enabled method when the configured default is disabled', () => {
-    const s = S({ onlineEnabled: false, cashEnabled: true, defaultMethod: 'online' });
-    expect(resolveDefaultMethod(s)).toBe('cash');
+  it('drops a choice whose method was switched off', () => {
+    const s = S({ onlineEnabled: false, cashEnabled: true });
+    expect(clearIfUnavailable(s, 'online')).toBeNull();
+  });
+
+  it('NEVER invents a method for a customer who has chosen nothing', () => {
+    // The regression this file exists to catch. Checkout used to preselect the
+    // admin default, so a customer could place a cash order without ever
+    // stating they would pay cash. Both shapes that used to produce a method
+    // out of nothing are asserted here: a configured default, and a single
+    // enabled method.
+    expect(clearIfUnavailable(S({ cashEnabled: true, defaultMethod: 'cash' }), null)).toBeNull();
+    expect(clearIfUnavailable(S({ onlineEnabled: true, cashEnabled: true, defaultMethod: 'online' }), null)).toBeNull();
+    expect(clearIfUnavailable(S({ cashEnabled: true }), null)).toBeNull();
+  });
+
+  it('does not substitute the other method when the chosen one goes away', () => {
+    // The subtler half: cash is enabled, so a fallback would have looked
+    // reasonable. Sliding the customer from online onto cash is exactly the
+    // silent decision this rule forbids.
+    const s = S({ onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash' });
+    expect(clearIfUnavailable(s, 'online')).toBeNull();
+  });
+
+  it('drops everything when nothing is enabled', () => {
+    const s = S({ onlineEnabled: false, cashEnabled: false });
+    expect(clearIfUnavailable(s, 'cash')).toBeNull();
+    expect(clearIfUnavailable(s, null)).toBeNull();
   });
 });
 

@@ -92,9 +92,10 @@ describe('resolveBlockReason — footer priority', () => {
     hasOrderType: true,
     isEmpty: false,
     belowMinimum: false,
-    paymentUnavailable: false,
+    paymentBlocked: false,
     deliveryBlocked: false,
     needsDescription: false,
+    paymentUnselected: false,
   };
 
   it('returns null when nothing blocks the order', () => {
@@ -123,12 +124,39 @@ describe('resolveBlockReason — footer priority', () => {
   });
 
   it('orders payment, delivery and description after the cart is valid', () => {
-    expect(resolveBlockReason({ ...ok, paymentUnavailable: true, deliveryBlocked: true, needsDescription: true }))
+    expect(resolveBlockReason({ ...ok, paymentBlocked: true, deliveryBlocked: true, needsDescription: true }))
       .toBe('no-payment');
     expect(resolveBlockReason({ ...ok, deliveryBlocked: true, needsDescription: true }))
       .toBe('delivery-unserviceable');
     expect(resolveBlockReason({ ...ok, needsDescription: true }))
       .toBe('need-description');
+  });
+
+  it('an unchosen method is NOT reported as an outage', () => {
+    // The whole point of splitting the input. Since checkout stopped
+    // preselecting, "not chosen" is the ordinary state of a freshly opened
+    // screen — and "No payment method is available" would tell that customer
+    // the shop cannot take their money, which is false and sends them away.
+    expect(resolveBlockReason({ ...ok, paymentUnselected: true }))
+      .toBe('no-payment-selected');
+    expect(resolveBlockReason({ ...ok, paymentBlocked: true, paymentUnselected: true }))
+      .toBe('no-payment');
+  });
+
+  it('ranks the unchosen method LAST, behind every problem fixed elsewhere', () => {
+    // One tap on a control already on screen fixes this; a delivery zone or a
+    // missing landmark does not. Telling the customer to choose a payment
+    // method first would send them back for a second blocker afterwards.
+    expect(resolveBlockReason({ ...ok, deliveryBlocked: true, paymentUnselected: true }))
+      .toBe('delivery-unserviceable');
+    expect(resolveBlockReason({ ...ok, needsDescription: true, paymentUnselected: true }))
+      .toBe('need-description');
+    expect(resolveBlockReason({ ...ok, belowMinimum: true, paymentUnselected: true }))
+      .toBe('below-minimum');
+  });
+
+  it('still returns null once a method has been chosen and nothing else blocks', () => {
+    expect(resolveBlockReason({ ...ok, paymentUnselected: false })).toBeNull();
   });
 });
 

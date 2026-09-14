@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**180 TypeScript test files declaring 2786 test blocks, plus 76 SQL suites.**
+**180 TypeScript test files declaring 2793 test blocks, plus 76 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -121,7 +121,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-65 files, 933 declared test blocks.
+65 files, 936 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 39 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
-| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 28 | decideQuantityChange |
+| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentFlow.test.ts` | 3 | chooseCheckoutTransport |
@@ -193,7 +193,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-91 files, 1256 declared test blocks.
+91 files, 1260 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -280,7 +280,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/opsApiResilience.test.ts` | 5 | opsApi.branchReference — missing-table resilience |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
-| `src/lib/payment.test.ts` | 13 | checkout payment availability |
+| `src/lib/payment.test.ts` | 17 | checkout payment availability |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
 | `src/lib/productImages.test.ts` | 15 | product image type gate |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
