@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**177 TypeScript test files declaring 2750 test blocks, plus 74 SQL suites.**
+**178 TypeScript test files declaring 2755 test blocks, plus 74 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -190,7 +190,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-90 files, 1247 declared test blocks.
+91 files, 1252 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -274,6 +274,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/operationsAlertsCapability.test.ts` | 6 | classifyOperationsAlertsProbe |
 | `src/lib/operationsHealthApi.test.ts` | 10 | pushFailureMetrics |
 | `src/lib/operationsHealthCapability.test.ts` | 12 | classifyOperationsHealthProbe |
+| `src/lib/opsApiResilience.test.ts` | 5 | opsApi.branchReference — missing-table resilience |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 13 | checkout payment availability |

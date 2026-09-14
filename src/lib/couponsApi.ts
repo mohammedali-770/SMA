@@ -284,10 +284,22 @@ export const couponsApi = {
    * database will refuse; the trigger remains the guard.
    */
   async listReferencedCodes(): Promise<Set<string>> {
-    const rows = unwrap<{ coupon_code: string | null }[]>(
-      await supabase.from('orders').select('coupon_code').not('coupon_code', 'is', null),
+    // Reads through an admin RPC rather than selecting orders.coupon_code
+    // directly. `orders` exposes a deliberate COLUMN ALLOWLIST to
+    // `authenticated` — customer_id, customer_name and customer_phone are held
+    // outside it — and coupon_code was never in that list, so this query failed
+    // outright against Production and the Promo Codes panel could not load
+    // (2026-09-13 audit, finding 2.7).
+    //
+    // Granting the column would have fixed the panel and simultaneously widened
+    // what every CUSTOMER can read; `order_read_contracts_test` CASE 1 pins that
+    // contract and rejected exactly that shortcut. The aggregate is computed in
+    // the database instead, which also stops shipping every order's coupon code
+    // to the browser merely to count them there.
+    const counts = unwrap<Record<string, number>>(
+      await supabase.rpc('admin_coupon_usage_counts'),
     );
-    return new Set(rows.map((r) => (r.coupon_code ?? '').trim().toUpperCase()).filter(Boolean));
+    return new Set(Object.keys(counts ?? {}).map((c) => c.trim().toUpperCase()).filter(Boolean));
   },
 
   /**
