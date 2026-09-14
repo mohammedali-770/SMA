@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails,
   computeBackoffMs, computePosNextAttempt, DEFAULT_BASE_URL, extractOrderRef, hmacSha256Hex,
+  LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED,
   LAZYWAIT_BASE_URL_INVALID, LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
   MAX_SYNC_ATTEMPTS, normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN,
   resolveLazywaitBaseUrl, round2, mapOrderItemRows, ORDER_ITEM_SELECT, posLineName, shouldResendCreateOrder,
@@ -1074,17 +1075,34 @@ describe('resolveLazywaitBaseUrl (fail closed)', () => {
     expect(JSON.stringify(r)).not.toContain('apiv2.lazywait.com');
   });
 
-  it('does NOT reject a legitimately reconfigured POS — the check is shape only', () => {
-    // The guard must not become a reason a real host change fails. It asks only
-    // "would fetch accept this?", never anything about host, path or vendor.
+  /*
+   * REVISED 2026-09-14, deliberately, and recorded rather than quietly edited.
+   *
+   * This case used to assert the guard was "shape only" and listed
+   * `https://some-new-pos.example.com/api/v3`, `http://localhost:54321/v1` and
+   * `https://10.0.0.4:8443/v1` as values that MUST resolve. That was a real
+   * contract — the intent was that a POS host change should never be blocked by
+   * a validator — and it is now wrong: the 2026-09-13 audit showed the same
+   * permissiveness let a browser-writable DB column send the live POS Bearer
+   * token to any host on the internet, or to link-local metadata.
+   *
+   * This is #332's lesson in reverse. A test that pins a deliberate limitation
+   * must be revisited when the limitation is lifted; equally, a test that pins
+   * deliberate permissiveness must be revisited when that permissiveness turns
+   * out to be the vulnerability. Left alone, it would have stood as an argument
+   * against the fix.
+   *
+   * The original intent is still honoured: every legitimate Lazywait host, dev
+   * and production, still resolves. What no longer resolves is everything else.
+   */
+  it('does NOT reject a legitimately reconfigured POS — any lazywait.com host', () => {
     for (const good of [
       'https://apiv2-dev.lazywait.com/v1',   // the live value, pinned
       'https://apiv2.lazywait.com/v1',
-      'https://some-new-pos.example.com/api/v3',
-      'http://localhost:54321/v1',
-      'https://10.0.0.4:8443/v1',
+      'https://some-new-pos.lazywait.com/api/v3',
+      'https://lazywait.com/v1',
     ]) {
-      expect(resolveLazywaitBaseUrl(good).ok).toBe(true);
+      expect(resolveLazywaitBaseUrl(good).ok, good).toBe(true);
     }
   });
 
@@ -1203,5 +1221,57 @@ describe('the config fault does NOT disturb the existing classifiers', () => {
     expect(MAX_POS_ATTEMPTS).toBe(5);
     expect(POS_DEADLINE_MINUTES).toBe(10);
     expect([...POS_RETRY_OFFSETS_MIN]).toEqual([0, 1, 3, 6, 9]);
+  });
+});
+
+
+/*
+ * SSRF allowlist — added 2026-09-14 for audit finding 2.2.
+ *
+ * `base_url` is a browser-writable DB column and `lazywaitFetch` attaches the
+ * live POS Bearer token to every request built from it, so "is this a valid
+ * URL" was never the right question. These pin the answer to "is this a host we
+ * are allowed to send the token to".
+ */
+describe('resolveLazywaitBaseUrl — host allowlist (SSRF)', () => {
+  it('accepts the host in use today and the production host', () => {
+    expect(resolveLazywaitBaseUrl('https://apiv2-dev.lazywait.com/v1').ok).toBe(true);
+    expect(resolveLazywaitBaseUrl('https://apiv2.lazywait.com/v1').ok).toBe(true);
+    expect(resolveLazywaitBaseUrl('https://lazywait.com/v1').ok).toBe(true);
+  });
+
+  it('REFUSES an attacker-controlled host — the token-exfiltration case', () => {
+    const r = resolveLazywaitBaseUrl('https://collector.attacker.example/v1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe(LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED);
+  });
+
+  it('REFUSES suffix confusion — a host that merely CONTAINS the brand', () => {
+    expect(resolveLazywaitBaseUrl('https://lazywait.com.attacker.example/v1').ok).toBe(false);
+    expect(resolveLazywaitBaseUrl('https://notlazywait.com/v1').ok).toBe(false);
+  });
+
+  it('REFUSES internal and metadata destinations in every notation', () => {
+    for (const h of [
+      'https://169.254.169.254/v1',
+      'https://127.0.0.1/v1',
+      'https://localhost/v1',
+      'https://2130706433/v1',
+      'https://0x7f000001/v1',
+      'https://[::1]/v1',
+    ]) {
+      expect(resolveLazywaitBaseUrl(h).ok, h).toBe(false);
+    }
+  });
+
+  it('REFUSES cleartext http even on an allowed host', () => {
+    const r = resolveLazywaitBaseUrl('http://apiv2.lazywait.com/v1');
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe(LAZYWAIT_BASE_URL_INVALID);
+  });
+
+  it('is case-insensitive and tolerates a trailing dot on the host', () => {
+    expect(resolveLazywaitBaseUrl('https://APIV2.LAZYWAIT.COM/v1').ok).toBe(true);
+    expect(resolveLazywaitBaseUrl('https://apiv2.lazywait.com./v1').ok).toBe(true);
   });
 });

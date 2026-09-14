@@ -1161,3 +1161,42 @@ Next, in order:
    would create real kitchen tickets for food nobody is waiting for if
    re-driven. Leaving them parked is the current decision.
 3. **Widen to all branches** once Q8 is closed.
+
+## The POS base URL is allowlisted (2026-09-14)
+
+`integration_settings.public_config.base_url` decides where every Lazywait
+request goes, and `lazywaitFetch` attaches the live POS **Bearer token** to it.
+Until 2026-09-14 `resolveLazywaitBaseUrl` validated only *shape* — deliberately,
+so that "a real host change is never blocked by a validator".
+
+The 2026-09-13 audit showed the cost. That column is edited in a browser by an
+administrator. Any well-formed URL was accepted, so a single save plus one
+"Pull catalog" would send the live token to an arbitrary host; the same field
+could reach `169.254.169.254` or anything else inside the function's network.
+
+`resolveLazywaitBaseUrl` now additionally requires:
+
+- **https only** — `http:` used to be accepted, putting the token in cleartext;
+- **the host on an allowlist** — `lazywait.com` and its subdomains by default,
+  extendable via the `LAZYWAIT_ALLOWED_HOSTS` Edge Function environment
+  variable. An env var, not another DB column, so changing it needs a deploy and
+  cannot be done from the console by the actor in the attack above;
+- **no IP literals** — dotted-quad, bare decimal (`2130706433`), hex
+  (`0x7f000001`) and IPv6 are all refused.
+
+It is an **allowlist, not a blocklist**, on purpose: blocklists of "bad" hosts
+are evadable by construction (alternate notations, redirects, DNS rebinding).
+
+A new reason, `LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED`, is distinct from
+`..._INVALID` so an operator who mistyped a hostname is told something different
+from one who pointed the integration somewhere it may not go.
+
+**Nothing legitimate breaks.** The host in use today
+(`apiv2-dev.lazywait.com`) and the production host a move would use
+(`apiv2.lazywait.com`) are both `lazywait.com` subdomains.
+
+**One existing test was revised rather than deleted.** `lazywait.test.ts` had a
+case asserting the guard was "shape only", listing `some-new-pos.example.com`,
+`localhost:54321` and `10.0.0.4:8443` as values that MUST resolve. That was a
+genuine contract and it is now wrong; it is rewritten in place with the reason
+recorded, because left alone it would have stood as an argument against the fix.
