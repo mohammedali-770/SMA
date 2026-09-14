@@ -60,15 +60,26 @@ Because the live POS is the **dev** host, an implicit fallback to
 customer orders to the **production** POS. A cleared, blank, whitespace-only or
 **malformed** `public_config.base_url` now **fails closed** instead:
 
-- `resolveLazywaitBaseUrl()` (`_shared/lazywait.ts`) is the single resolution
-  point, and it reports **two distinct terminal reasons**, because the operator
-  response differs — one means nobody filled the field in, the other means
-  somebody filled it in wrongly:
-  - absent / empty / whitespace-only → **`lazywait_base_url_not_configured`**;
-  - present but not an absolute `http(s)` URL →
-    **`lazywait_base_url_invalid`**.
+> **SUPERSEDED IN PART, 2026-09-14 — read "The base URL is now allowlisted"
+> below before configuring anything from this section.** The shape check
+> described here is still the first gate, but it is no longer the only one: the
+> scheme is now **https only**, the host must be on an allowlist, and there is a
+> **third** terminal reason. This section is kept because the fail-closed
+> reasoning is still why the guard exists at all; its *permissiveness* is not
+> current. Review caught the contradiction on #371 — an operator following this
+> section alone would configure values the implementation now rejects.
 
-  There is no fallback in either case.
+- `resolveLazywaitBaseUrl()` (`_shared/lazywait.ts`) is the single resolution
+  point, and it reports **three distinct terminal reasons**, because the
+  operator response differs in each case — nobody filled the field in, somebody
+  filled it in wrongly, or somebody pointed it somewhere it may not go:
+  - absent / empty / whitespace-only → **`lazywait_base_url_not_configured`**;
+  - present but not an absolute `https` URL →
+    **`lazywait_base_url_invalid`**;
+  - well-formed `https` but the host is not allowlisted →
+    **`lazywait_base_url_host_not_allowed`** (added 2026-09-14).
+
+  There is no fallback in any case.
 
 **Why the shape check is not optional.** Rejecting only blanks would have left
 this PR's own failure mode open one keystroke away. `lazywaitFetch` builds
@@ -82,13 +93,25 @@ instead of a blank. The admin card **used** to make that concrete by offering th
 pinned by `IntegrationCard.test.ts`. The guard still matters — it is what catches
 a hand-typed malformed value — but the card no longer suggests a wrong one.
 
-The check is deliberately **narrow**: it asks only "would `fetch` accept this?",
-via the same `URL` parse the platform performs plus an `http`/`https` protocol
-requirement. It does not check host, path or reachability, so it cannot reject a
-legitimately reconfigured POS. `lazywait.test.ts` pins both directions — the
-live value and four other plausible hosts resolve; no-scheme, misspelled-scheme,
-free text, bare path and non-http schemes are rejected as
-`lazywait_base_url_invalid`.
+The shape check asks "would `fetch` accept this?", via the same `URL` parse the
+platform performs, plus a protocol requirement. **That protocol requirement is
+now `https` alone**, where it used to admit `http` as well: a plaintext base URL
+put the POS token on the wire in the clear.
+
+**This check used to be deliberately narrow — "it does not check host, path or
+reachability, so it cannot reject a legitimately reconfigured POS" — and that is
+no longer true of the host.** A separate allowlist now applies, for the reason
+given in "The base URL is now allowlisted" below: the field is edited in a
+browser, so "cannot reject a reconfigured POS" also meant "cannot reject a POS
+reconfigured to an attacker's host". Path and reachability are still unchecked.
+
+`lazywait.test.ts` pins every direction — the live value resolves; no-scheme,
+misspelled-scheme, free text, bare path and non-https schemes are rejected as
+`lazywait_base_url_invalid`; and a well-formed https URL on an unlisted host is
+rejected as `lazywait_base_url_host_not_allowed`. The cases that used to assert
+`some-new-pos.example.com`, `localhost:54321` and `10.0.0.4:8443` MUST resolve
+were revised rather than deleted — see below for why that revision is recorded
+rather than quiet.
 
 **One deliberate loosening.** `resolveLazywaitBaseUrl` trims before validating,
 which the pre-2026-08-24 transport did not: `'  https://host  '` used to be
@@ -1161,3 +1184,42 @@ Next, in order:
    would create real kitchen tickets for food nobody is waiting for if
    re-driven. Leaving them parked is the current decision.
 3. **Widen to all branches** once Q8 is closed.
+
+## The POS base URL is allowlisted (2026-09-14)
+
+`integration_settings.public_config.base_url` decides where every Lazywait
+request goes, and `lazywaitFetch` attaches the live POS **Bearer token** to it.
+Until 2026-09-14 `resolveLazywaitBaseUrl` validated only *shape* — deliberately,
+so that "a real host change is never blocked by a validator".
+
+The 2026-09-13 audit showed the cost. That column is edited in a browser by an
+administrator. Any well-formed URL was accepted, so a single save plus one
+"Pull catalog" would send the live token to an arbitrary host; the same field
+could reach `169.254.169.254` or anything else inside the function's network.
+
+`resolveLazywaitBaseUrl` now additionally requires:
+
+- **https only** — `http:` used to be accepted, putting the token in cleartext;
+- **the host on an allowlist** — `lazywait.com` and its subdomains by default,
+  extendable via the `LAZYWAIT_ALLOWED_HOSTS` Edge Function environment
+  variable. An env var, not another DB column, so changing it needs a deploy and
+  cannot be done from the console by the actor in the attack above;
+- **no IP literals** — dotted-quad, bare decimal (`2130706433`), hex
+  (`0x7f000001`) and IPv6 are all refused.
+
+It is an **allowlist, not a blocklist**, on purpose: blocklists of "bad" hosts
+are evadable by construction (alternate notations, redirects, DNS rebinding).
+
+A new reason, `LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED`, is distinct from
+`..._INVALID` so an operator who mistyped a hostname is told something different
+from one who pointed the integration somewhere it may not go.
+
+**Nothing legitimate breaks.** The host in use today
+(`apiv2-dev.lazywait.com`) and the production host a move would use
+(`apiv2.lazywait.com`) are both `lazywait.com` subdomains.
+
+**One existing test was revised rather than deleted.** `lazywait.test.ts` had a
+case asserting the guard was "shape only", listing `some-new-pos.example.com`,
+`localhost:54321` and `10.0.0.4:8443` as values that MUST resolve. That was a
+genuine contract and it is now wrong; it is rewritten in place with the reason
+recorded, because left alone it would have stood as an argument against the fix.

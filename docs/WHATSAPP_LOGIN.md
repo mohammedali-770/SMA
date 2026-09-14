@@ -666,3 +666,33 @@ Do it **server-side** for a *signed-in* user via GoTrue admin
 
 Because there is no email fallback, steps 1–6 are a hard prerequisite for
 customers being able to log in at all — not an enhancement.
+
+## The login send limiter now fails CLOSED (2026-09-14)
+
+`auth-send-sms-whatsapp` reserves against the shared per-phone budget before it
+asks Meta to deliver. Until 2026-09-14 an **error** from `otp_reserve_send` was
+swallowed and the send proceeded with **no budget check at all**, on the stated
+reasoning that "a limiter that cannot be reached must not become an outage of
+the entire login system".
+
+That reasoning does not survive looking at where the call sits.
+`resolveWhatsAppConfig`, one step earlier, reads `integration_settings` through
+the *same* admin client and already returns 503 if it cannot. So by the time
+control reaches the reservation, Postgres is known reachable — the
+general-outage case the comment feared was already handled upstream, and failing
+open bought availability that was not at risk.
+
+What an RPC error actually means here is that something specific is wrong with
+the limiter: a missing function, a revoked grant, a changed signature. In that
+state the right answer is to stop, because this reservation is the **only**
+per-phone throttle on a live, billable Meta channel. An attacker able to induce
+one RPC error would otherwise have removed rate limiting from customer login
+entirely — a worse outage than a login pause, and an invisible one.
+
+The customer sees a generic "temporarily unavailable"; the function logs the
+limiter's own error code distinctly, so an operator can tell "the limiter is
+broken" apart from "WhatsApp login is switched off".
+
+**The verification path was already correct.** `_shared/whatsappSend.ts` does
+`if (beginErr) return 'error'` and sends nothing. Only the login hook was the
+outlier, which is why this went unnoticed.

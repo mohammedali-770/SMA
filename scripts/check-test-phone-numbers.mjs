@@ -1,0 +1,119 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
+ * Every Saudi mobile number in the tree must be on an explicit allowlist.
+ *
+ * WHY THIS EXISTS. This repository is PUBLIC. On 2026-09-13 a security audit
+ * found a real customer's number committed across seven files — docs, two
+ * migration comments, a component test and three SQL suites. It was verified
+ * live: the number belonged to an actual `comp_members` row, so the repository
+ * publicly identified a named individual as somebody who eats free. Nobody put
+ * it there maliciously; it arrived as a realistic-looking fixture and was then
+ * copied onward, because a plausible number is indistinguishable from an
+ * invented one once it is sitting in a test file.
+ *
+ * THE GUARD IS AN ALLOWLIST, NOT A PATTERN, and that is the whole point. No
+ * regex can tell a real Saudi mobile from a fake one — they have identical
+ * shape. What CAN be enforced is that every number in the tree was put there
+ * deliberately: adding one means editing `scripts/test-phone-allowlist.json`,
+ * which turns an invisible paste into a reviewable diff and creates the one
+ * moment where somebody is asked "is this a real person?".
+ *
+ * Run: `npm run phones:check`
+ */
+import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const allowPath = join(root, 'scripts', 'test-phone-allowlist.json');
+
+/*
+ * Saudi mobile, in every shape this codebase writes them — including punctuated
+ * ones, but NOT at the cost of matching SVG path data.
+ *
+ * Two lessons are baked into this pattern, both learned on 2026-09-14.
+ *
+ * First, the original required CONTIGUOUS digits, and so missed the SPACED and
+ * HYPHENATED forms of the leaked number in a SQL suite (`+966 55 ... ....` and
+ * `055-...-....`). The scrub left them behind and this guard still reported
+ * clean — the SQL suite caught it instead. A guard whose null result is
+ * worthless on the files that most need it is worse than no guard, because it
+ * gets counted as evidence.
+ *
+ * The examples above are deliberately elided. Writing them out in full is how
+ * this very file became the ONLY offender on its first strengthened run: a
+ * comment explaining the leak had reproduced the leak. The guard caught its own
+ * author, which is the best evidence it works.
+ *
+ * Second, tolerating `.` as a separator immediately produced six false
+ * positives in `SocialIcons.tsx`, whose SVG path data is dense with
+ * dot-separated decimals (`M7.0301.084c-1.2768…`). So separators are SPACE and
+ * HYPHEN only — how a human writes a phone number — and a match must be bounded
+ * by something that is neither a digit nor a dot, which is what keeps it out of
+ * decimal runs.
+ */
+const PHONE = /(?<![\d.])(?:\+?9[ -]?6[ -]?6[ -]?|00[ -]?9[ -]?6[ -]?6[ -]?|0)5(?:[ -]?\d){8}(?![\d.])/g;
+
+/** Reduce any accepted shape to bare national form `5XXXXXXXX` for comparison. */
+function canonical(raw) {
+  const d = raw.replace(/[^\d]/g, '');
+  if (d.startsWith('00966')) return d.slice(5);
+  if (d.startsWith('966')) return d.slice(3);
+  if (d.startsWith('05')) return d.slice(1);
+  return d;
+}
+
+const allow = JSON.parse(readFileSync(allowPath, 'utf8'));
+const allowed = new Set(allow.allowed.map((e) => canonical(e.number)));
+
+// Only tracked files: an untracked scratch file is never published.
+const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+  .toString('utf8')
+  .split('\0')
+  .filter(Boolean);
+
+// The allowlist itself necessarily contains every allowed number.
+const SKIP = new Set(['scripts/test-phone-allowlist.json']);
+
+const offenders = [];
+for (const rel of tracked) {
+  if (SKIP.has(rel)) continue;
+  let text;
+  try {
+    text = readFileSync(join(root, rel), 'utf8');
+  } catch {
+    continue;
+  }
+  // Skip binaries rather than matching digit runs inside them.
+  if (text.indexOf('\0') !== -1) continue;
+
+  for (const m of text.matchAll(PHONE)) {
+    const c = canonical(m[0]);
+    if (c.length !== 9) continue;
+    if (allowed.has(c)) continue;
+    const line = text.slice(0, m.index).split('\n').length;
+    // Never print the number itself — that would reproduce the leak in CI logs.
+    offenders.push(`${rel}:${line}  ${c.slice(0, 3)}****${c.slice(-2)}`);
+  }
+}
+
+if (offenders.length > 0) {
+  console.error('Saudi mobile number(s) not on the allowlist:\n');
+  for (const o of offenders) console.error('  ' + o);
+  console.error(
+    '\nThis repository is PUBLIC. If the number is invented, add it to' +
+      '\nscripts/test-phone-allowlist.json with a note saying where it is used.' +
+      '\nIf it belongs to a real person, remove it — and remember that removing' +
+      '\nit from the tree does not remove it from merged history.\n',
+  );
+  process.exit(1);
+}
+
+console.log(
+  `phone allowlist: ${tracked.length} tracked file(s) scanned, ` + `${allowed.size} number(s) allowed, clean`,
+);
