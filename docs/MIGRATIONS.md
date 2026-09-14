@@ -24,6 +24,53 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-14 — `20260918120000_loyalty_earn_on_settlement` is written,
+> validated and NOT applied. The count is now FOUR.** Outstanding: Moyasar
+> (frozen), `20260916120000`, `20260917120000` and this one. Moyasar still sorts
+> ahead of everything — **name the target by version**.
+>
+> Security audit finding 1.1. `place_order` credited earned points to the
+> spendable balance at order CREATION, on an order inserted with
+> `payment_status = 'pending'`. The cancellation reversal can only claw back
+> points STILL IN THE BALANCE and logs a *shortfall* when it cannot — so the
+> attack was: place a large cash order, never collect it, spend the points
+> immediately, let it be cancelled. The reversal recovers nothing. Measured
+> before writing: **65 of 65** orders that ever earned did so while unpaid, all
+> 8 654 points.
+>
+> Earning is now `earn_pending` at creation, promoted to a real `earn` on
+> DELIVERY. Redemption still debits at creation. Cancellation reverses what was
+> actually CREDITED (the ledger) rather than what the order PROMISED
+> (`orders.loyalty_points_earned`).
+>
+> sha256 `b6f9d48b0ec5821f7903a64fbe5d4670346416fd1fb083347e225798dbb2c0ef`,
+> 864 lines / 40820 bytes — re-hash the MERGED copy before applying, per §15.
+> **It redefines BOTH money-path functions**, so their hashes change. Derived
+> from `20260910120000` (place_order) and `20260810100000`
+> (admin_set_order_status) by anchored substitution, each anchor asserted to
+> match exactly once; nothing retyped. **No deploy implied** — both signatures
+> unchanged. Applying it credits nobody and rewrites no existing row.
+>
+> Cold chain: 132 migrations, 73 suites, 71 passed, 2 quarantined, **0 new
+> failures**. Mutation-tested two ways, both killed — reintroducing the
+> credit-at-creation is caught by the migration's own block; removing the
+> promotion is caught by the paired test's POSITIVE assertion (added precisely
+> so the suite cannot pass against a change that broke earning altogether).
+>
+> **The harness caught a design error in the verification block itself.** Its
+> first draft required the ledger to be NON-EMPTY before claiming rows were
+> preserved — true in Production, false on a fresh database — so it encoded an
+> environment assumption as an invariant and failed the chain immediately. A
+> migration must apply to both. What is actually guaranteed needs no count:
+> neither statement touches a row, and `add constraint` validates every existing
+> row as it runs.
+>
+> **A stale-base trap was avoided by checking.** The repository's latest
+> definition of `admin_set_order_status` does NOT hash-match live — live carries
+> the same logic with **0 comment lines** (103 vs 124). Functionally identical,
+> comments stripped. `place_order` matched live exactly. Deriving without
+> checking would have been deriving from a picture rather than the artifact.
+
 > **Updated 2026-09-13 — the count is THREE, and TWO of the three are not
 > frozen.** Outstanding: `20260824100000_moyasar_payment_provider.sql` (frozen
 > under §6, unapplied on purpose), `20260916120000_branch_delivery_requests.sql`

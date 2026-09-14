@@ -732,3 +732,64 @@ per-order redemption cap.
 - [Order confirmation flow](ORDER_CONFIRMATION_FLOW.md) — where an order goes
   after it is placed
 - [Migration workflow](MIGRATIONS.md) — how a migration in this area is applied
+
+## Points are earned at DELIVERY, not at order creation (2026-09-14)
+
+Until `20260918120000`, `place_order` added the earned points to
+`profiles.loyalty_points` in the same transaction that created the order — an
+order inserted with `payment_status = 'pending'`. Nothing conditioned the credit
+on payment.
+
+There **is** a reversal when an order is cancelled, and that is exactly where it
+broke:
+
+```sql
+v_earn_reversed := least(greatest(v_balance, 0), v_earn_requested);
+```
+
+It can only claw back points **still in the balance**, and it logs a *shortfall*
+when it cannot. So the attack was: place a large cash order, never collect it,
+**spend the points immediately** on a real order, and let the fake one be
+cancelled. The reversal recovers nothing. Repeat with a fresh idempotency key.
+
+Measured before the fix: of the **65** orders that had ever earned points, **65
+were unpaid at the time** — every one of the 8 654 points ever granted.
+
+### How it works now
+
+| Moment | What happens |
+| --- | --- |
+| Order created | An `earn_pending` ledger row records the points. The balance does **not** move. |
+| Order delivered | `admin_set_order_status` promotes it: credits the balance and writes a real `earn` row. Idempotent — a repeated transition cannot credit twice. |
+| Order cancelled | Reversal now reads what was **actually credited** (the `earn` rows), not what the order promised (`orders.loyalty_points_earned`). A never-delivered order has nothing to reverse, so there is no shortfall to log. |
+
+**Redemption still debits at creation**, deliberately: the customer is spending
+points for a discount on *that* order, and deferring it would let the same
+points be spent twice.
+
+**Delivery is the settlement signal this system actually has.** A cash order
+handed over has been paid for; an online order that was never paid never reaches
+`delivered`. Wiring this into payment confirmation instead would mean editing
+the payment path, which is frozen under CLAUDE.md §6 — this change touches no
+payment code.
+
+**Comped orders are unaffected** — they earn 0, because earning is clamped to
+the payable total (verified live: 4 comped orders, 0 earned).
+
+**No existing row is rewritten.** The 65 historical `earn` rows and the points
+already in customer balances stay exactly as they are; retroactively voiding
+them would take points that real accounts hold.
+
+### Four existing suites were revised, deliberately
+
+Three asserted an `earn` row at creation; they now assert `earn_pending`, and
+`loyalty_reason_no_order_number_test` additionally proves the **positive**
+direction — the balance moves on delivery — because asserting only "it does not
+move at creation" would pass against a change that broke earning entirely.
+
+`order_cancellation_integrity_test` needed a different fix. Its fixtures
+hand-build a placed order and set `orders.loyalty_points_earned` **without** the
+`earn` ledger row that `place_order` always writes alongside it. That
+incompleteness was invisible while cancellation reversed the column; now that it
+reverses the ledger, the fixture described an order that earned nothing. The
+missing rows were added, and CASE 7's shortfall proof still holds.
