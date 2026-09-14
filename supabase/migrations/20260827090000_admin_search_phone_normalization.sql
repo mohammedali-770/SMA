@@ -4,7 +4,7 @@
 -- ===========================================================================
 --
 -- Found on 2026-08-27, from the Comped Customers panel: an admin searched
--- `+966555820667` and got "No matching customers".
+-- `+966555000667` and got "No matching customers".
 --
 -- The search matched `phone_number ilike '%' || query || '%'` — a raw substring
 -- over whatever string happens to be stored. `profiles.phone_number` is NOT
@@ -17,9 +17,9 @@
 --
 -- So, against live data:
 --
---   typed `+966555820667`  matched 1 of 5   (only the one row carrying a '+')
---   typed `0555820667`     matched 0 of 5   (no stored row starts with a 0)
---   typed `555820667`      matched 5 of 5
+--   typed `+966555000667`  matched 1 of 5   (only the one row carrying a '+')
+--   typed `0555000667`     matched 0 of 5   (no stored row starts with a 0)
+--   typed `555000667`      matched 5 of 5
 --
 -- The failure mode is what makes this worth a migration rather than a note. A
 -- customer who exists and a customer who does not both render as "No matching

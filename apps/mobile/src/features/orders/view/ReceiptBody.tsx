@@ -25,6 +25,7 @@ import { useI18n } from '../../../i18n/I18nProvider';
 import { orderDisplayNumber } from '../../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../../lib/payment';
 import { formatRiyadhDateTime, orderLineLabel } from '../../../utils/format';
+import { loyaltyEarnState } from '../loyaltyEarnState';
 import { ReceiptRow } from './ReceiptRow';
 import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
@@ -36,6 +37,7 @@ export function ReceiptBody({ order }: { order: Order }) {
   const { t, pick, rtlRow } = useI18n();
 
   const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
+  const earnState = loyaltyEarnState(order);
   const methodText =
     methodKey === 'online' ? t('payOnline')
     : methodKey === 'cash_delivery' ? t('cashOnDelivery')
@@ -140,11 +142,21 @@ export function ReceiptBody({ order }: { order: Order }) {
           <View style={styles.divider} />
           <ReceiptRow label={t('total')} amount={order.total} strong big />
 
-          {order.loyaltyPointsEarned > 0 ? (
+          {/* POINTS ARE A PROMISE UNTIL THE ORDER SETTLES, and this row has to
+              say which it is. `order.loyaltyPointsEarned` is written at
+              creation and stays positive for the order's whole life, so
+              rendering any positive value as "+64 Loyalty points" told a
+              customer they had been awarded points a cancellation would take
+              back — and, on an unpaid online order, points the server will
+              never credit at all. `loyaltyEarnState` mirrors the server's
+              promotion gate; see that module for why the duplication is
+              deliberate and where the matching test lives. */}
+          {earnState !== 'forfeited' ? (
             <View style={[styles.earned, rtlRow]}>
               <AwardIcon size={18} color={colors.saffron} />
               <Text variant="label" style={{ color: colors.amberInk }}>
-                +{order.loyaltyPointsEarned} {t('loyaltyPoints')}
+                +{order.loyaltyPointsEarned}{' '}
+                {earnState === 'credited' ? t('loyaltyPoints') : t('loyaltyPointsOnDelivery')}
               </Text>
             </View>
           ) : null}

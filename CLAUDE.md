@@ -226,9 +226,54 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-13, after `20260915120000_digest_external_delivery_line`
-was APPLIED: 129 repository files / 134 live history rows / exactly ONE unapplied —
-Moyasar, unapplied on purpose.** Latest live version `20260913054610`, applied
+**Current position 2026-09-13, after `20260916120000_branch_delivery_requests` was
+APPLIED: 131 repository files / 135 live history rows / TWO unapplied — Moyasar
+(frozen on purpose) and `20260917120000_branch_reference_entries` (merged,
+validated, awaiting approval).** Latest live version `20260913124039`, applied
+12:40:39 UTC on explicit owner approval naming the target by version; ledger
+row 90.
+
+**THE COUNT LEFT THE DANGEROUS SHAPE, AND THAT MAKES A BULK APPLY NO SAFER.**
+`20260824100000` still sorts ahead of everything, so "apply the outstanding
+migrations" would sweep the frozen payment file in FIRST. **Name the target by
+version.**
+
+**IT CLOSED NOTHING, measured rather than asserted.** The request table was
+created empty, **0 of 40** branches have `delivery_temporarily_closed` set, 72
+orders and 40 branches are unchanged, and no `delivery_request` signal row
+exists. Money-path pair unchanged (`e54caa33…` / `ca276a84…`) — this is a
+new-objects-only migration that redefines nothing. Moyasar re-verified absent.
+
+**THE 2026-08-20 DELIVERY BOUNDARY DID NOT MOVE, asserted as properties rather
+than assumed:** live `set_branch_delivery_pause` still carries `is_call_center()`
+and still references `is_branch_operator` nowhere, and **zero** functions in
+`public` write `branches.delivery_temporarily_closed` while mentioning
+`is_branch_operator`.
+
+**A PRE-APPLY CHECK RETURNED NULL AND WAS NOT COUNTED AS “UNCHANGED”.** The
+money-path baseline was first read through a guessed `to_regprocedure`
+signature; the signature was wrong, so the hash came back **null** — which,
+compared against the ledger value, would have looked like a clean check while
+proving nothing. **NULL is how a check usually fails to be able to fail.**
+
+**A VERIFICATION PROBE THAT REPORTED THROUGH `raise notice` PROVED NOTHING.**
+The MCP SQL tool surfaces no notices, so the block returned an empty result
+indistinguishable from every branch silently taking its `UNEXPECTED` path. It
+was rewritten to return the observed `SQLSTATE` as a row. **If an assertion's
+outcome is not a value you can read, it is not evidence.**
+
+**WHAT COULD NOT BE PROVEN LIVE IS STATED RATHER THAN GLOSSED.**
+`cancel_branch_delivery_request` reads its row before authorizing, so a random
+id resolved the table and columns and raised `P0002` — real name-resolution
+evidence. The other two gate first, so from a service-role connection they are
+proven only as far as their gate (`42501` each). Driving deeper would file a
+real request and, on accept, close delivery to real customers. The full paths are
+proven on the local harness, 19 cases. The one deeper risk — `resolve` calling
+`set_branch_delivery_pause(uuid,integer,text,text)` — was checked by signature
+instead, along with all six helpers the new bodies call.
+
+**Superseded, kept because the count is the point: 129 repository files / 134
+live history rows / exactly ONE unapplied — Moyasar, unapplied on purpose.** Latest live version `20260913054610`, applied
 05:46:10 UTC on explicit owner approval naming the target by version; ledger
 row 89.
 

@@ -9,7 +9,7 @@
 -- have an account before they could be comped. That is backwards for how the
 -- decision is actually made: the owner knows the NUMBER of the person they want
 -- to host, usually before that person has ever opened the app. The panel proved
--- it on the day it went live — a search for +966555820667 returned "No matching
+-- it on the day it went live — a search for +966555000667 returned "No matching
 -- customers", correctly, because nobody with that number had signed up yet, and
 -- there was no way to say "comp them anyway, from the moment they do".
 --
