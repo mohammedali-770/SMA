@@ -43,8 +43,40 @@ to Production.**
 > actually CREDITED (the ledger) rather than what the order PROMISED
 > (`orders.loyalty_points_earned`).
 >
-> sha256 `b6f9d48b0ec5821f7903a64fbe5d4670346416fd1fb083347e225798dbb2c0ef`,
-> 864 lines / 40820 bytes — re-hash the MERGED copy before applying, per §15.
+> **REVIEW FOUND THE FIX INCOMPLETE, AND THE CORRECTION IS THE POINT OF THIS
+> ROW.** The first version promoted ANY delivered order. It justified that with
+> "an online order that was never paid never reaches `delivered`" — which is
+> false: `LiveOrdersPanel` deliberately lets staff advance an unpaid ONLINE order
+> past a `window.confirm()` (a warning, not a block), and this RPC read neither
+> payment field. So an unpaid online order could be marked delivered and mint
+> spendable points — the very defect this file exists to close, moved rather than
+> removed — and `delivered` is terminal, so the cancellation reversal can never
+> run. **Not theoretical: all three online orders in Production are `pending`,
+> and no online order has ever been paid.** Online now additionally requires
+> `payment_status = 'paid'`; cash keeps delivery-as-settlement. #372.
+>
+> **`is distinct from 'online'`, not `= 'cash'`** — the column is nullable with
+> no default and one legacy order carries NULL, which must keep behaving like
+> cash rather than be silently denied.
+>
+> **Paying after delivery is too late**, and that is asserted rather than
+> glossed: `admin_set_order_status` returns early on an unchanged status, so
+> there is no second `delivered` transition to carry the promotion. Accepted —
+> promoting from the payment path would mean editing code frozen under §6.
+>
+> **A NEW SUITE, because the behaviour had none of its own.** The change was
+> covered only by edits to neighbouring suites, which is how the online case got
+> through authoring. `loyalty_earn_on_settlement_test.sql` now covers it in 8
+> cases, and **writing it found two further things by running rather than by
+> reasoning**: the original idempotence case was VACUOUS (the early return fires
+> before the promotion, so it proved the wrong guard — the promotion's own
+> `not exists ... type = 'earn'` is now asserted at source level instead), and
+> the paid-after-delivery consequence above. Mutation-tested three ways, all
+> three killed by BOTH the migration's own block and the suite: dropping the
+> gate (CASE 4), gating online out entirely (CASE 5), and `= 'cash'` (CASE 6).
+>
+> sha256 `19a2fb4978c5488e235653275200188260d6dfe98f99d791500d2470e0a7b38a`,
+> 906 lines / 43355 bytes — re-hash the MERGED copy before applying, per §15.
 > **It redefines BOTH money-path functions**, so their hashes change. Derived
 > from `20260910120000` (place_order) and `20260810100000`
 > (admin_set_order_status) by anchored substitution, each anchor asserted to

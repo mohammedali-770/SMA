@@ -767,11 +767,43 @@ were unpaid at the time** — every one of the 8 654 points ever granted.
 points for a discount on *that* order, and deferring it would let the same
 points be spent twice.
 
-**Delivery is the settlement signal this system actually has.** A cash order
-handed over has been paid for; an online order that was never paid never reaches
-`delivered`. Wiring this into payment confirmation instead would mean editing
-the payment path, which is frozen under CLAUDE.md §6 — this change touches no
-payment code.
+**Delivery is the settlement signal for CASH.** An order handed to a customer has
+been paid for.
+
+**It is NOT the settlement signal for ONLINE, and the first version of this
+change said it was.** It claimed "an online order that was never paid never
+reaches `delivered`". That is false: `LiveOrdersPanel` deliberately lets staff
+advance an unpaid online order past a `window.confirm()` — a warning, not a
+block, and correct for a kitchen that should not be held up by a payment
+gateway — and `admin_set_order_status` looked at neither payment field. So an
+online order nobody had paid for could be marked delivered and mint spendable
+points: the exact defect this change exists to close, moved rather than removed.
+Review caught it on #372.
+
+**It was not theoretical.** At the time of writing, all three online orders in
+Production carried `payment_status = 'pending'`, and no online order had ever
+been paid.
+
+An online order therefore additionally requires `payment_status = 'paid'`. The
+gate reads `payment_method is distinct from 'online'` rather than `= 'cash'`,
+because the column is nullable with no default and one legacy order from
+2026-07-08 carries NULL — treating that as "not online" keeps its behaviour
+unchanged instead of silently denying points on an order whose method was never
+recorded.
+
+**Paying AFTER delivery is too late, and that is a real consequence rather than
+an oversight.** `admin_set_order_status` returns early when the status is
+unchanged, so once an order has been delivered there is no second `delivered`
+transition to carry the promotion. An order that staff force-delivered while
+unpaid forfeits its points permanently, even if payment is recorded a minute
+later. That is accepted here: the alternative is to promote from the
+payment-confirmation path, which is frozen under CLAUDE.md §6. It is the
+conservative direction — the customer had not paid at the moment of delivery —
+and `loyalty_earn_on_settlement_test` CASE 5b asserts it so a future change to
+the payment path finds it rather than discovering it.
+
+This change reads payment state and alters none of it: no initiation, no
+verification, no webhook, no provider behaviour.
 
 **Comped orders are unaffected** — they earn 0, because earning is clamped to
 the payable total (verified live: 4 comped orders, 0 earned).
@@ -779,6 +811,25 @@ the payable total (verified live: 4 comped orders, 0 earned).
 **No existing row is rewritten.** The 65 historical `earn` rows and the points
 already in customer balances stay exactly as they are; retroactively voiding
 them would take points that real accounts hold.
+
+### The receipt no longer claims points the customer has not been given
+
+`orders.loyalty_points_earned` is written at creation and stays positive for the
+order's whole life, so the mobile receipt rendered every order as
+`+64 Loyalty points` — including one that had not been delivered, one that was
+cancelled, and an unpaid online order the server will never credit. Review
+caught that too.
+
+`loyaltyEarnState` (`apps/mobile/src/features/orders/`) mirrors the server's
+promotion gate and the receipt reads it: **credited** shows "Loyalty points",
+**pending** shows "Loyalty points once delivered", and **forfeited** — a
+cancelled order, or one that earned nothing — shows no row at all.
+
+**The duplication is the risk, and it is deliberate.** If the gate in
+`admin_set_order_status` changes, this must change with it or the receipt starts
+misleading in the other direction. The two halves are written to the same cases
+— `loyalty_earn_on_settlement_test.sql` and `loyaltyEarnState.test.ts` — so a
+divergence shows up as a disagreement rather than as silence.
 
 ### Four existing suites were revised, deliberately
 

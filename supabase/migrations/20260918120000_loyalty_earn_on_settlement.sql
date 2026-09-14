@@ -22,8 +22,11 @@
 -- 65 were unpaid at the time -- every one of the 8 654 points ever granted.
 --
 -- WHY DELIVERY IS THE SIGNAL. It is the settlement event this system actually
--- has. A cash order handed to a customer has been paid for; an online order that
--- was never paid never reaches `delivered`. Wiring this into payment
+-- has for CASH: an order handed to a customer has been paid for. An ONLINE order
+-- is different and this file's first version got it wrong — staff can advance an
+-- unpaid online order past a confirm dialog, so `delivered` alone would have let
+-- it mint points. Online therefore requires `payment_status = 'paid'` as well.
+-- Wiring this into payment
 -- confirmation instead would mean editing the payment path, which is FROZEN
 -- under CLAUDE.md §6. This migration touches no payment code.
 --
@@ -728,11 +731,36 @@ begin
     end if;
   end if;
 
-  -- PROMOTION. Delivery is the settlement signal this system actually has: a
-  -- cash order that is handed over has been paid for, and an online order that
-  -- was never paid never reaches here. Deliberately NOT wired into the payment
-  -- confirmation path, which is frozen under CLAUDE.md §6.
-  if p_status = 'delivered' and v_order.customer_id is not null then
+  -- PROMOTION. Delivery is the settlement signal this system has for CASH: an
+  -- order handed to a customer has been paid for.
+  --
+  -- IT IS NOT THE SETTLEMENT SIGNAL FOR ONLINE, and the first version of this
+  -- file claimed it was — "an online order that was never paid never reaches
+  -- here". That was false, and review caught it (#372). `LiveOrdersPanel`
+  -- deliberately lets staff advance an unpaid ONLINE order past a
+  -- `window.confirm()` — a warning, not a block, and correct for the kitchen —
+  -- and this RPC never looked at either payment field. So an online order that
+  -- was never paid could be marked delivered and mint spendable points, which
+  -- is the exact defect this migration exists to close, moved rather than
+  -- removed. It was not theoretical: at the time of writing ALL THREE online
+  -- orders in Production were `pending`, and no online order had ever been paid.
+  --
+  -- `delivered` is terminal, so the cancellation reversal below is unreachable
+  -- afterwards; there is no second chance to take the points back.
+  --
+  -- `is distinct from 'online'` rather than `= 'cash'` on purpose. The column is
+  -- nullable text with no default; one legacy row from 2026-07-08 carries NULL,
+  -- and treating that as "not online" keeps its behaviour exactly as it is today
+  -- rather than silently denying points on a cash order whose method was never
+  -- recorded. Every order `place_order` writes carries an explicit method.
+  --
+  -- This READS payment state and changes none of it: no initiation, no
+  -- verification, no webhook, no provider behaviour. The payment confirmation
+  -- path stays untouched, per CLAUDE.md §6.
+  if p_status = 'delivered'
+     and v_order.customer_id is not null
+     and (v_order.payment_method is distinct from 'online'
+          or v_order.payment_status = 'paid') then
     select greatest(0, coalesce(sum(points), 0)) into v_earn_requested
       from public.loyalty_transactions
      where order_id = v_order.id and type = 'earn_pending';
@@ -831,6 +859,20 @@ begin
   end if;
   if v_src like '%coalesce(v_order.loyalty_points_earned, 0))%' then
     raise exception 'cancellation still reverses the PROMISE rather than the credit';
+  end if;
+
+  -- (d2) DELIVERY ALONE MUST NOT BE ENOUGH FOR AN ONLINE ORDER. This is the
+  --      review finding on #372: staff can advance an unpaid online order past
+  --      a confirm dialog, so without this gate `delivered` mints spendable
+  --      points on an order nobody paid for — and `delivered` is terminal, so
+  --      the reversal above can never run. Both halves are asserted because
+  --      either alone is satisfiable by the wrong thing: the first without the
+  --      second is a gate that never credits online at all.
+  if v_src not like '%payment_method is distinct from ''online''%' then
+    raise exception 'the promotion does not exempt non-online orders explicitly';
+  end if;
+  if v_src not like '%payment_status = ''paid''%' then
+    raise exception 'the promotion does not require payment for an online order';
   end if;
 
   -- (e) Neither function may become client-reachable as a side effect.
