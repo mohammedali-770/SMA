@@ -119,6 +119,9 @@ jobs:
       - name: Play store icon matches its generator
         run: npm run play-icon:check
 
+      - name: Play feature graphic matches its generator
+        run: npm run play-feature-graphic:check
+
       # Two narrow rules on this branch's diff: a file ADDED here must be
       # Prettier-clean, and a file CHANGED here must not be machine-compressed.
       # NOT "Prettier must pass on everything" — 318 of 400 tracked TypeScript
