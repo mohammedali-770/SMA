@@ -2555,11 +2555,16 @@ This file is a current decision register, not an incident diary.
 
 ---
 
-## 38. Google Play first release (Android) — the submission pack, and the four steps that are yours
+## 38. Google Play first release (Android) — the submission pack, and the five steps that are yours
 
 **Status 2026-09-15:** the artefact is ready and verified; **nothing has been
-submitted**. Four actions are open and all four are yours, because each needs a
-Google account, a payment method or an identity check that no agent holds.
+submitted**. Five actions are open and all five are yours. Each needs a Google
+identity this session does not hold — a developer account, a payment method, an
+identity verification, or a signed-in Play Console upload. That is a statement
+about credentials, not a claim that some control blocks automation: step 3 is
+unautomatable for everyone, owner included, because the Play API itself refuses
+a package's first binary (§28's lesson — check the path before saying nobody can
+take it).
 
 `eas submit --platform android --profile production --latest` was run and
 **refused**, which is where this section starts:
@@ -2585,7 +2590,7 @@ Developer API.
 
 The AAB was downloaded from EAS (`v1.0.0`, versionCode 2, commit `f82cecbe`,
 84,044,112 bytes) and its manifest decoded from aapt2 protobuf. Everything Play
-checks mechanically passes: `targetSdkVersion 36` (floor is 35),
+checks mechanically passes: `targetSdkVersion 36` (which is the 2026 requirement for a new app, met exactly — see C1),
 `minSdkVersion 24`, no `android:debuggable`, no `android:usesCleartextTraffic`
 (so targetSdk 36's secure-by-default holds), `android:allowBackup="false"`, four
 ABIs. Detail and the permission surface: `docs/GO_LIVE_READINESS.md` C1 and C7.
@@ -2642,20 +2647,20 @@ tedious to answer honestly under time pressure. These answers are derived from t
 live `public` schema and the client code; the evidence column is what to re-check
 if anything changes.
 
-| Play data type | Collected | Shared | Purpose | Evidence |
+| Play data type | Collected | Leaves our systems to | Purpose | Evidence |
 | --- | --- | --- | --- | --- |
-| Name | Yes, **required** | **Yes — POS** | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; shared at `supabase/functions/lazywait-sync/index.ts:323` |
-| Phone number | Yes, **required** | **Yes — POS and Meta** | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
-| Email address | Yes, **optional** | No | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
-| Address | Yes, optional (delivery only) | **Yes — POS** | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
-| Precise location | Yes, optional | No | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2) |
-| Approximate location | Yes, optional | No | App functionality | `ACCESS_COARSE_LOCATION` |
-| Purchase history | Yes | **Yes — POS** | App functionality | `orders`, `order_items` |
-| User IDs | Yes | No | App functionality, Account management | `profiles.id` |
-| Other user-generated content | Yes, optional | **Yes — POS** | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
-| Crash logs | Yes | **Yes — Sentry** | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94` |
-| Diagnostics | Yes | **Yes — Sentry** | Diagnostics | same, with `tracesSampleRate` sampled |
-| Device or other IDs | Yes | **Yes — Expo/FCM/APNs** | App functionality (notifications) | `push_devices.expo_push_token` |
+| Name | Yes, **required** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:323` |
+| Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
+| Email address | Yes, **optional** | — | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
+| Address | Yes, optional (delivery only) | POS | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
+| Precise location | Yes, optional | — | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2) |
+| Approximate location | Yes, optional | — | App functionality | `ACCESS_COARSE_LOCATION` |
+| Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
+| User IDs | Yes | — | App functionality, Account management | `profiles.id` |
+| Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
+| Crash logs | Yes | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94` |
+| Diagnostics | Yes | Sentry | Diagnostics | same, with `tracesSampleRate` sampled |
+| Device or other IDs | Yes | Expo, then FCM/APNs | App functionality (notifications) | `push_devices.expo_push_token` |
 | **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
 
@@ -2663,15 +2668,35 @@ if anything changes.
 `sendDefaultPii: false` with a `beforeSend` scrubber, on native
 (`observability/index.ts:106,116`) and on web (`webCore.ts:125,145`).
 
-**Four disclosures that are easy to miss and all four are "shared":** the POS
-(Lazywait) receives name, phone, address snapshot and order contents; Meta
-receives the phone number to deliver the OTP; Expo and then FCM/APNs receive the
-push token; Sentry receives crash and performance data. Play defines "shared" as
-transfer to a third party, so each is a Yes.
+**The "Shared" column is deliberately NOT answered here, and that is a
+correction rather than an omission.** This table's first version marked all four
+vendor transfers as **"Yes — shared"**, reasoning that Play defines sharing as
+transfer to a third party. That reasoning is incomplete and review caught it
+(#380).
 
-The two remaining boxes are the standard ones: **encrypted in transit** — yes,
-everything is HTTPS to Supabase; **users can request data deletion** — yes, and
-the URL is below.
+**Play's Data Safety guidance excludes transfers to a service provider that
+processes the data on the developer's behalf.** Four vendors receive customer
+data — the POS (Lazywait) gets name, phone, address snapshot and order contents;
+Meta gets the phone number to deliver the OTP template; Expo and then FCM/APNs
+get the push token; Sentry gets crash and performance data — and **every one of
+them is plausibly a processor rather than a recipient**, which is how this
+repository already describes them elsewhere. Answering "shared: yes" for all four
+would have contradicted our own privacy documentation inside the form that Play
+cross-checks against it.
+
+**So the transfer is the measured fact and the classification is not.** The
+column above says where data goes, which is provable from the code. Whether each
+transfer is "sharing" in Play's sense depends on the processing role and the
+contract with each vendor — a determination for you and, where the DPAs are
+unclear, for counsel. **Do not answer that column from this document.**
+
+**The one thing that IS safe to say:** under-disclosing is the dangerous
+direction. If a vendor's processor status cannot be established before you
+submit, declare the transfer as shared rather than guessing it away — an
+over-disclosure is an inaccuracy, an under-disclosure is an enforcement matter.
+
+Two boxes are unambiguous: **encrypted in transit** — yes, everything is HTTPS
+to Supabase; **users can request data deletion** — yes, and the URL is below.
 
 ### The data-deletion URL, verified end to end
 
@@ -2694,7 +2719,7 @@ Profile → Account settings → Delete account
 The other listing URLs are unchanged from B7: privacy
 `https://app.spicymeal.com.sa/privacy`, support `/support`, terms `/terms`.
 
-### The four steps, in the order they unblock each other
+### The five steps, in the order they unblock each other
 
 1. **Google Play Console developer account** — US$25 one-off, plus identity and
    (for an organisation) D-U-N-S verification. Verification is the long pole; it
@@ -2703,21 +2728,53 @@ The other listing URLs are unchanged from B7: privacy
    permanent — this is the moment C6 stops being changeable, so make that a
    decision rather than a default. Android is `sa.com.spicymeal.app`, iOS is
    `com.spicymeal.app`; they may differ, but decide deliberately.
-3. **Create a Google Cloud service account, grant it Play Developer API access,
+3. **Upload the first AAB BY HAND, in Play Console.** This step is not optional
+   and cannot be automated away — see the box below.
+4. **The Auth test-OTP number** (§27 step 1-3), then paste it into App content →
+   App access.
+5. **Create a Google Cloud service account, grant it Play Developer API access,
    download the JSON key, and upload it to EAS** — `eas credentials --platform
    android`, or commit a path in `eas.json`. **Do not commit the key itself**
-   (§9). Once EAS holds it, `eas submit --platform android --profile production
-   --latest` runs unattended and I can drive every later release.
-4. **The Auth test-OTP number** (§27 step 1-3), then paste it into App access.
+   (§9). This is what makes every release *after* the first unattended.
 
 Steps 1-3 are plumbing. **Step 4 is the one that decides whether the first review
-passes**, and it is the cheapest of the four.
+passes**, and it is the cheapest of the five.
 
-### What I can do once step 3 lands
+### THE FIRST UPLOAD CANNOT BE AUTOMATED, and this section said otherwise
 
-Everything else: run the submit, watch the upload, report the Play processing
-result, and prepare the listing text in both languages. Until then the submission
-is genuinely blocked on a Google account, not on work.
+**Corrected 2026-09-15, before this document was merged (#380).** Step 3 used to
+be step 5's text alone, ending *"Once EAS holds it, `eas submit --platform
+android --profile production --latest` runs unattended and I can drive every
+later release."* For every release after the first that is true. **For the first
+it is false**, and acting on it would have meant configuring a service account,
+running `eas submit`, and watching it fail for a reason the section had just
+promised was handled.
+
+**The Google Play Developer API cannot create the initial release of a package
+that has never had a binary uploaded.** Expo's own Android submission
+documentation states the requirement directly: upload the app manually through
+Play Console at least once before using EAS Submit. So the ordering is: create
+the app record, upload
+`spicymeal-v1.0.0-2.aab` by hand into a track, and only then does the API have a
+package it can add editions to.
+
+The AAB to upload is the one this section verified — `v1.0.0`, versionCode 2,
+built from commit `f82cecbe`. Download it from the EAS build page rather than
+rebuilding; a rebuild would produce a different versionCode and a different
+artefact from the one whose manifest is recorded in C1.
+
+**The generalisable point is about where the claim came from.** Nothing was
+measured for that sentence — it was the reasonable-sounding shape of "credential
+unlocks automation", written without checking the one page that documents the
+exception. A step that has never been performed is exactly where a plausible
+assumption survives unchallenged.
+
+### What I can do once step 5 lands
+
+Every release after the first: run the submit, watch the upload, report the Play
+processing result. I can also prepare the listing text in both languages at any
+time. **The first upload is yours**, and until step 1 completes the whole
+sequence is blocked on a Google account rather than on work.
 
 ### One thing a reviewer WILL see, measured live rather than guessed
 
