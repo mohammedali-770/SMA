@@ -2552,3 +2552,177 @@ When an item is completed:
 4. avoid leaving "currently" statements that depend on an old dashboard snapshot.
 
 This file is a current decision register, not an incident diary.
+
+---
+
+## 38. Google Play first release (Android) — the submission pack, and the four steps that are yours
+
+**Status 2026-09-15:** the artefact is ready and verified; **nothing has been
+submitted**. Four actions are open and all four are yours, because each needs a
+Google account, a payment method or an identity check that no agent holds.
+
+`eas submit --platform android --profile production --latest` was run and
+**refused**, which is where this section starts:
+
+```
+Looking up credentials configuration for sa.com.spicymeal.app...
+Google Service Account Keys cannot be set up in --non-interactive mode.
+    Error: submit command failed.
+```
+
+That is not a bug and not a missing flag. `apps/mobile/eas.json`'s
+`submit.production.android` is `{ "track": "internal", "releaseStatus": "draft" }`
+with **no `serviceAccountKeyPath`**, and no `GOOGLE_APPLICATION_CREDENTIALS` or
+`EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH` exists in the environment. Note the
+asymmetry with iOS, which already carries `ascAppId: 6800210683` — the App Store
+Connect record exists; **the Play one does not yet**.
+
+`google-services.json` in `apps/mobile/app.json` is **not** this credential. It is
+the FCM client config for push delivery; it authorises nothing against the Play
+Developer API.
+
+### The artefact is fine, and that was measured rather than assumed
+
+The AAB was downloaded from EAS (`v1.0.0`, versionCode 2, commit `f82cecbe`,
+84,044,112 bytes) and its manifest decoded from aapt2 protobuf. Everything Play
+checks mechanically passes: `targetSdkVersion 36` (floor is 35),
+`minSdkVersion 24`, no `android:debuggable`, no `android:usesCleartextTraffic`
+(so targetSdk 36's secure-by-default holds), `android:allowBackup="false"`, four
+ABIs. Detail and the permission surface: `docs/GO_LIVE_READINESS.md` C1 and C7.
+
+**None of the permissions that trigger a Play Permissions Declaration Form are
+present** — checked by name, not by absence of worry: no SMS or Call Log, no
+`MANAGE_EXTERNAL_STORAGE`, no `QUERY_ALL_PACKAGES`, no
+`REQUEST_INSTALL_PACKAGES`, no `ACCESS_BACKGROUND_LOCATION`, no `CAMERA`, no
+`RECORD_AUDIO`, no `READ_CONTACTS`. There is also **no `AD_ID` permission and no
+advertising SDK** — the only Google Play Services components in the manifest are
+`cloudmessaging` and `common.api`. So the advertising-ID declaration is "no".
+
+### THE ONE THAT WILL GET YOU REJECTED IF NOTHING ELSE DOES: a reviewer cannot sign in
+
+This is the same problem §27 solved for Apple, and it applies to Google
+identically — but §27 is written entirely in App Store Connect terms, so it would
+have been easy to read it as handled and discover otherwise.
+
+**The whole app is behind the login wall.** `apps/mobile/src/app/index.tsx:21`
+redirects to `/(auth)/login` unless `status === 'signed_in'`, and
+`app/(tabs)/_layout.tsx:41` re-redirects any signed-out session that reaches the
+tabs. There is **no guest or browse-only mode** — searched for and found nothing.
+
+**And login is Saudi-mobile-only, enforced on both sides of the wire.** The
+client rejects a foreign number (`apps/mobile/src/lib/phone.test.ts:52` pins
+`toSaudiE164('+14155552671') === null`) and so does the server
+(`supabase/functions/_shared/whatsapp.ts:49`, "anything else — foreign numbers
+included — is rejected"). A reviewer in Mountain View cannot type their own
+number, and cannot receive a WhatsApp code sent to a Saudi one.
+
+A Play reviewer who cannot get past the first screen files this under **App
+functionality / broken or incomplete**, and the first submission fails.
+
+**The fix is already decided and needs no code: §27's Supabase Auth test-OTP
+number.** Do that step once and it serves both stores. Two Play-specific notes on
+top of §27:
+
+- Play's field is **App content → App access → "All or some functionality is
+  restricted"**. Add an instruction with the demo phone number and code in the
+  *Username*/*Password* fields, or in the instructions box;
+- Play keeps the credentials on the app record and reuses them for **every**
+  future review, so §27's removal step matters more here than on iOS: deleting
+  the Auth entry while Play still holds the credential means the next update is
+  reviewed against a login that no longer works.
+
+The review-notes text in §27 is written for Apple but transfers with the first
+sentence dropped. **Do not put the code in this repository** (§9) — the number
+may be recorded, the code may not.
+
+### Data Safety — answers derived from the schema and the code, not from memory
+
+Play will not let you publish without this form, and it is the one that is
+tedious to answer honestly under time pressure. These answers are derived from the
+live `public` schema and the client code; the evidence column is what to re-check
+if anything changes.
+
+| Play data type | Collected | Shared | Purpose | Evidence |
+| --- | --- | --- | --- | --- |
+| Name | Yes, **required** | **Yes — POS** | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; shared at `supabase/functions/lazywait-sync/index.ts:323` |
+| Phone number | Yes, **required** | **Yes — POS and Meta** | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
+| Email address | Yes, **optional** | No | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
+| Address | Yes, optional (delivery only) | **Yes — POS** | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
+| Precise location | Yes, optional | No | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2) |
+| Approximate location | Yes, optional | No | App functionality | `ACCESS_COARSE_LOCATION` |
+| Purchase history | Yes | **Yes — POS** | App functionality | `orders`, `order_items` |
+| User IDs | Yes | No | App functionality, Account management | `profiles.id` |
+| Other user-generated content | Yes, optional | **Yes — POS** | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
+| Crash logs | Yes | **Yes — Sentry** | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94` |
+| Diagnostics | Yes | **Yes — Sentry** | Diagnostics | same, with `tracesSampleRate` sampled |
+| Device or other IDs | Yes | **Yes — Expo/FCM/APNs** | App functionality (notifications) | `push_devices.expo_push_token` |
+| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
+| **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
+
+**Sentry does not send PII, and that is configured rather than hoped for:**
+`sendDefaultPii: false` with a `beforeSend` scrubber, on native
+(`observability/index.ts:106,116`) and on web (`webCore.ts:125,145`).
+
+**Four disclosures that are easy to miss and all four are "shared":** the POS
+(Lazywait) receives name, phone, address snapshot and order contents; Meta
+receives the phone number to deliver the OTP; Expo and then FCM/APNs receive the
+push token; Sentry receives crash and performance data. Play defines "shared" as
+transfer to a third party, so each is a Yes.
+
+The two remaining boxes are the standard ones: **encrypted in transit** — yes,
+everything is HTTPS to Supabase; **users can request data deletion** — yes, and
+the URL is below.
+
+### The data-deletion URL, verified end to end
+
+Play requires a **web** URL where a user can request account deletion without
+reinstalling the app. It exists and was checked live on 2026-09-15 rather than
+assumed from the route table:
+
+**`https://app.spicymeal.com.sa/legal/account-data-deletion`**
+
+`HTTP 200`. The page is client-rendered and reads the document over anonymous
+PostgREST; that anonymous read was exercised directly with the publishable key
+and returns `account_data_deletion` v2.0, active — one of 9 active documents. So
+both halves of the chain work, which is the part B7's route-level check could not
+by itself prove.
+
+In-app deletion also exists, which Play requires alongside the URL:
+Profile → Account settings → Delete account
+(`apps/mobile/src/features/profile/AccountSettingsScreen.tsx:115`).
+
+The other listing URLs are unchanged from B7: privacy
+`https://app.spicymeal.com.sa/privacy`, support `/support`, terms `/terms`.
+
+### The four steps, in the order they unblock each other
+
+1. **Google Play Console developer account** — US$25 one-off, plus identity and
+   (for an organisation) D-U-N-S verification. Verification is the long pole; it
+   has taken days, not hours, for others. Start it first.
+2. **Create the app record** for `sa.com.spicymeal.app`. The package name is
+   permanent — this is the moment C6 stops being changeable, so make that a
+   decision rather than a default. Android is `sa.com.spicymeal.app`, iOS is
+   `com.spicymeal.app`; they may differ, but decide deliberately.
+3. **Create a Google Cloud service account, grant it Play Developer API access,
+   download the JSON key, and upload it to EAS** — `eas credentials --platform
+   android`, or commit a path in `eas.json`. **Do not commit the key itself**
+   (§9). Once EAS holds it, `eas submit --platform android --profile production
+   --latest` runs unattended and I can drive every later release.
+4. **The Auth test-OTP number** (§27 step 1-3), then paste it into App access.
+
+Steps 1-3 are plumbing. **Step 4 is the one that decides whether the first review
+passes**, and it is the cheapest of the four.
+
+### What I can do once step 3 lands
+
+Everything else: run the submit, watch the upload, report the Play processing
+result, and prepare the listing text in both languages. Until then the submission
+is genuinely blocked on a Google account, not on work.
+
+### What this section does NOT claim
+
+The **content rating questionnaire** and the **store listing assets** (feature
+graphic, screenshots, short and full description) were not audited here and are
+not answered above. The listing text can be drafted from the app; the rating
+questionnaire is a set of declarations only you can make. Neither blocks steps
+1-3, so start those.
