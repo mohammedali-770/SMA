@@ -2911,9 +2911,12 @@ committed assets, so its passing is the proof the extraction was lossless.
 
 **The legal pages now serve their text without JavaScript.** See B7. Built
 against Production, the strip-`<script>` measurement goes **253 → 36,775 visible
-characters**. **It is source, not live** — the deployed URL keeps the old shell
-until Vercel ships this commit, so re-run the measurement before treating the
-policy URL as satisfying Play.
+characters**. **LIVE and verified 2026-09-15** — measured on the deployed page after
+Vercel shipped `71306f1`, not inferred from the merge: all four legal URLs return
+36,775 visible characters with scripts stripped, the page carries exactly one
+`<script>` and it has a `src`, and that was checked against the CSP the server
+actually sends rather than the one `vercel.json` declares. The policy URL to give
+Play is `https://app.spicymeal.com.sa/privacy`.
 
 **One thing from that work is worth carrying beyond it.** The snapshot was first
 hidden by an inline `<script>`, and `vercel.json` sets a CSP with no
