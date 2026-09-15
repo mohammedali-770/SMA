@@ -2891,6 +2891,43 @@ proves the path works end to end.
 Nothing blocks submission on this. It is worth an hour with a phone before the
 screenshots are taken, not after.
 
+### Two of these blockers are now FIXED in source (2026-09-15)
+
+**The 512×512 store icon exists.** Play takes an icon upload rather than reading
+it out of the AAB, and every icon in this repository was 1024×1024 — the largest
+inside the bundle is a 432×432 adaptive foreground — so the listing could not be
+saved at all. `scripts/build-play-icon.mjs` generates
+`assets/store/play-icon-512.png` from the same approved master by an exact 2:1
+box reduction, and `npm run play-icon:check` guards it in CI beside `logo:check`,
+so a re-exported master cannot leave the store icon showing last year's artwork.
+
+Two details worth keeping. The averaging is done in **premultiplied alpha**: the
+master is fully opaque today (the script asserts it, because Play wants an opaque
+icon and `adaptive-icon.png` — 48% transparent — is the wrong file to reach for),
+so premultiplying changes nothing now and is correct the moment a master has soft
+edges. And the PNG codec moved to `scripts/lib/png.mjs` rather than being
+duplicated; `logo:check` compares generated output byte-for-byte against the
+committed assets, so its passing is the proof the extraction was lossless.
+
+**The legal pages now serve their text without JavaScript.** See B7. Built
+against Production, the strip-`<script>` measurement goes **253 → 34,936 visible
+characters**. **It is source, not live** — the deployed URL keeps the old shell
+until Vercel ships this commit, so re-run the measurement before treating the
+policy URL as satisfying Play.
+
+### One thing measured on the bundle that nobody has decided
+
+The AAB declares **no `<supports-screens>` and no `<uses-feature>` element at
+all**, so Android treats the app as supporting every screen size and Play will
+distribute it to tablets and Chromebooks. `app.json`'s `"supportsTablet": false`
+sits under the **`ios`** key and has no Android effect whatsoever.
+
+Nothing blocks submission on this. But the listing will offer the app on devices
+whose layout nobody has looked at, and no tablet screenshot exists. Either supply
+7-inch and 10-inch screenshots, or accept the "not designed for this device"
+treatment — and if tablets are meant to be out of scope, that is a deliberate
+manifest change rather than something to leave implicit.
+
 ### What this section does NOT claim
 
 The **content rating questionnaire** and the **store listing assets** (feature

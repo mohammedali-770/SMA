@@ -122,10 +122,43 @@
           display: none;
         }
       }
+      /*
+        The build-time snapshot of the policies. It exists for clients that do
+        not run JavaScript — chiefly Play Console's and App Store Connect's
+        policy-URL checks, which fetch the page and read the markup. A browser
+        hides it before it paints (see the boot script below) and then renders
+        live rows into #app, so nobody with JavaScript ever sees it and there is
+        no flash of stale text.
+      */
+      #prerendered {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+      }
+      #prerendered article {
+        margin-top: 2rem;
+      }
+      #prerendered h2 {
+        font-size: 1.25rem;
+        margin: 1.25rem 0 0.25rem;
+      }
+      html.js #prerendered {
+        display: none;
+      }
     </style>
+    <!--
+      Sets the flag the rule above keys on. Inline and in <head> on purpose: it
+      must run before the body is parsed, so the snapshot is hidden rather than
+      painted and removed. Failing to load leaves the snapshot visible, which is
+      the correct outcome — a reader still gets the policies.
+    -->
+    <script>
+      document.documentElement.className = 'js';
+    </script>
   </head>
   <body>
     <main id="app"></main>
+    <!--prerender:legal:start-->
     <noscript>
       <div style="max-width: 44rem; margin: 0 auto; padding: 2rem 1.25rem">
         <h1>Legal &amp; Policies — Spicy Meal</h1>
@@ -136,6 +169,7 @@
         <p>Contact: info@spicymeal.com.sa · 9200 31495</p>
       </div>
     </noscript>
+    <!--prerender:legal:end-->
     <script type="module" src="/src/legal/main.ts"></script>
   </body>
 </html>

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**180 TypeScript test files declaring 2793 test blocks, plus 76 SQL suites.**
+**181 TypeScript test files declaring 2807 test blocks, plus 76 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -193,7 +193,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-91 files, 1260 declared test blocks.
+92 files, 1274 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -252,6 +252,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/design-system/ui/FieldAccessibility.test.tsx` | 12 | required indicator is excluded from the accessible name |
 | `src/design-system/ui/typographyLanguage.test.tsx` | 10 | console typography follows the active language |
 | `src/legal/legalPage.test.ts` | 26 | slugForType |
+| `src/legal/prerender.test.ts` | 14 | escapeHtml — the whole reason this module can use string concatenation |
 | `src/lib/api.test.ts` | 6 | admin.deleteBranch |
 | `src/lib/banners.test.ts` | 13 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
