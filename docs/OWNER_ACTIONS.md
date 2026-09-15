@@ -2764,37 +2764,34 @@ assumed from the route table:
 
 **`https://app.spicymeal.com.sa/legal/account-data-deletion`**
 
-`HTTP 200`. The page is client-rendered and reads the document over anonymous
-PostgREST; that anonymous read was exercised directly with the publishable key
-and returns `account_data_deletion` v2.0, active — one of 9 active documents.
+**`HTTP 200`, and it serves the policy text — USE IT.** Measured on the deployed
+page after `71306f1` shipped: **36,775 visible characters** with `<script>`
+stripped, carrying "Privacy Policy", "personal data", "Account & Data Deletion",
+«الخصوصية» and the support address. `/privacy`, `/terms`, `/support` and this URL
+all return the same figures. Paste them into Play with no caveat.
 
-**BUT "verified end to end" was too strong, and this paragraph said it.** Both
-halves I checked do work — the route resolves and the anonymous data read
-succeeds — and **neither is the half that matters to Google.** Measured
-2026-09-15: fetch the page and strip `<script>`, and **253 visible characters
-remain**, which are a notice saying the documents *"are loaded from our servers
-and need JavaScript enabled"*. The word "privacy" appears **zero** times. Every
-legal URL on this domain behaves identically, because all of them rewrite to the
-same 3,944-byte `legal.html` shell.
+### This URL was a BLOCKER for five days, and the reason is worth more than the fix
 
-**That is a blocker, and it is bigger than this section.** Play requires a
-privacy-policy URL in the listing *and* in App content, and its validation is an
-automated fetch that does not execute JavaScript. A URL that returns no policy
-text reads as a missing policy. The same is true of the deletion URL above and of
-`/terms` and `/support`.
+**Kept as history, not as instruction — nothing below this heading is still
+outstanding.** Until 2026-09-15 the page was client-rendered: the same fetch,
+with scripts stripped, returned **253 visible characters** saying the documents
+*"are loaded from our servers and need JavaScript enabled"*, in which the word
+"privacy" appeared **zero** times. Play's policy-URL validation does not execute
+JavaScript, so a required privacy policy read as missing.
 
-**`docs/GO_LIVE_READINESS.md` B7 is marked ✅ on evidence that did not cover
-this** — it verified the HTTP status, the byte count and the `<title>`, all of
-which I reproduced exactly, and then that the anonymous PostgREST request
-succeeds. Nobody read the page as a scanner would. **I repeated the mistake one
-level up:** checking two halves of a chain is not the same as checking the thing
-the chain exists to deliver.
+**`docs/GO_LIVE_READINESS.md` B7 was ✅ throughout, on evidence that did not cover
+it** — HTTP status, byte count, `<title>`, and a working anonymous PostgREST
+read. **Every one of those checks still passes today.** They were not failing;
+they were checking the wrong thing.
 
-**The fix is a code change, not an owner action:** server-render or pre-render
-the legal document text into `legal.html` at build time, so the policy is in the
-HTML before any script runs. The documents are already readable anonymously, so
-nothing about access needs to change — only when the text is put into the page.
-Until that ships, do not treat the policy URL as satisfying Play.
+**This section made the same mistake one level up, in the paragraph immediately
+above.** It called the deletion URL "verified end to end" because the route
+resolved *and* the anonymous data read succeeded — two halves of a chain, neither
+of them the half Google looks at. Checking more of the wrong thing is not
+checking the right thing.
+
+Fixed by pre-rendering the documents into `legal.html` at build time (#381), and
+closed against the deployed response rather than the merge (#382).
 
 
 
@@ -2891,7 +2888,7 @@ proves the path works end to end.
 Nothing blocks submission on this. It is worth an hour with a phone before the
 screenshots are taken, not after.
 
-### Two of these blockers are now FIXED in source (2026-09-15)
+### Two of these blockers are now FIXED — the legal pages LIVE, the icon committed (2026-09-15)
 
 **The 512×512 store icon exists.** Play takes an icon upload rather than reading
 it out of the AAB, and every icon in this repository was 1024×1024 — the largest
