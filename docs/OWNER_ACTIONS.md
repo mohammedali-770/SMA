@@ -2766,9 +2766,37 @@ assumed from the route table:
 
 `HTTP 200`. The page is client-rendered and reads the document over anonymous
 PostgREST; that anonymous read was exercised directly with the publishable key
-and returns `account_data_deletion` v2.0, active — one of 9 active documents. So
-both halves of the chain work, which is the part B7's route-level check could not
-by itself prove.
+and returns `account_data_deletion` v2.0, active — one of 9 active documents.
+
+**BUT "verified end to end" was too strong, and this paragraph said it.** Both
+halves I checked do work — the route resolves and the anonymous data read
+succeeds — and **neither is the half that matters to Google.** Measured
+2026-09-15: fetch the page and strip `<script>`, and **253 visible characters
+remain**, which are a notice saying the documents *"are loaded from our servers
+and need JavaScript enabled"*. The word "privacy" appears **zero** times. Every
+legal URL on this domain behaves identically, because all of them rewrite to the
+same 3,944-byte `legal.html` shell.
+
+**That is a blocker, and it is bigger than this section.** Play requires a
+privacy-policy URL in the listing *and* in App content, and its validation is an
+automated fetch that does not execute JavaScript. A URL that returns no policy
+text reads as a missing policy. The same is true of the deletion URL above and of
+`/terms` and `/support`.
+
+**`docs/GO_LIVE_READINESS.md` B7 is marked ✅ on evidence that did not cover
+this** — it verified the HTTP status, the byte count and the `<title>`, all of
+which I reproduced exactly, and then that the anonymous PostgREST request
+succeeds. Nobody read the page as a scanner would. **I repeated the mistake one
+level up:** checking two halves of a chain is not the same as checking the thing
+the chain exists to deliver.
+
+**The fix is a code change, not an owner action:** server-render or pre-render
+the legal document text into `legal.html` at build time, so the policy is in the
+HTML before any script runs. The documents are already readable anonymously, so
+nothing about access needs to change — only when the text is put into the page.
+Until that ships, do not treat the policy URL as satisfying Play.
+
+
 
 In-app deletion also exists, which Play requires alongside the URL:
 Profile → Account settings → Delete account
