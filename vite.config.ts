@@ -1,7 +1,84 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+
+import type { PublicLegalDoc } from './src/legal/legalPage';
+import { injectPrerender, renderStaticLegal } from './src/legal/prerender';
+
+const LEGAL_SELECT = 'document_type,title_en,title_ar,content_en,content_ar,version,effective_date';
+
+/**
+ * Renders the active legal documents into `legal.html` at build time.
+ *
+ * Play Console's and App Store Connect's policy-URL checks fetch the page and
+ * read the markup; they do not run the module that populates it. Until this
+ * plugin existed, stripping `<script>` from the deployed page left 253 visible
+ * characters saying the documents need JavaScript, in which the word "privacy"
+ * did not appear — a required privacy policy that read as absent. See
+ * `docs/GO_LIVE_READINESS.md` B7.
+ *
+ * It FAILS OPEN, deliberately and in every direction: no credentials, an
+ * unreachable database, a non-200, an empty result or missing markers all warn
+ * and return the HTML untouched, which is exactly the page that ships today.
+ * Making a deploy depend on the database being reachable from CI would trade a
+ * documented gap for an outage.
+ */
+function prerenderLegal(): Plugin {
+  // Logged through `console` rather than the Rollup plugin context. Vite 6 does
+  // not bind that context as `this` in the object-form `transformIndexHtml`
+  // handler, so calling a context method there throws a TypeError — and every
+  // call in this plugin sits on a FAIL-OPEN path, so it turned "skip quietly
+  // and ship today's page" into "break the build". Caught by running the build,
+  // not by reading the types: the types say it is fine.
+  const note = (msg: string) => console.warn(`[prerender-legal] ${msg}`);
+
+  return {
+    name: 'spicy-meal:prerender-legal',
+    apply: 'build',
+    transformIndexHtml: {
+      order: 'pre',
+      async handler(html, ctx) {
+        if (!ctx.filename.endsWith('legal.html')) return html;
+
+        const url = process.env.VITE_SUPABASE_URL;
+        const key = process.env.VITE_SUPABASE_ANON_KEY;
+        if (!url || !key) {
+          note('skipped: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set');
+          return html;
+        }
+
+        let docs: PublicLegalDoc[];
+        try {
+          const res = await fetch(`${url}/rest/v1/legal_documents?select=${LEGAL_SELECT}&is_active=eq.true`, {
+            headers: { apikey: key, Authorization: `Bearer ${key}` },
+            signal: AbortSignal.timeout(20_000),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          docs = (await res.json()) as PublicLegalDoc[];
+        } catch (err) {
+          note(`skipped: ${err instanceof Error ? err.message : String(err)}`);
+          return html;
+        }
+
+        const block = renderStaticLegal(docs, new Date().toISOString().slice(0, 10));
+        if (!block) {
+          note('skipped: no active document carried any content');
+          return html;
+        }
+
+        const out = injectPrerender(html, block);
+        if (out === null) {
+          note('skipped: markers missing from legal.html');
+          return html;
+        }
+
+        note(`rendered ${docs.length} document(s), ${block.length} bytes`);
+        return out;
+      },
+    },
+  };
+}
 
 export default defineConfig(() => {
   // Source-map upload is OPT-IN and secret-gated: it activates only when the
@@ -17,6 +94,7 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
+      prerenderLegal(),
       ...(uploadSourceMaps
         ? [
             sentryVitePlugin({

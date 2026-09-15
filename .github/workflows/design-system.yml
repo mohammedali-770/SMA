@@ -112,6 +112,13 @@ jobs:
       - name: Brand mark matches its generator
         run: npm run logo:check
 
+      # Same reasoning one step further out. The Play store icon is a 512x512
+      # derivative of the same master, committed because Play Console takes an
+      # upload rather than reading the AAB. Without this, a master re-export
+      # would leave the store icon silently showing the previous artwork.
+      - name: Play store icon matches its generator
+        run: npm run play-icon:check
+
       # Two narrow rules on this branch's diff: a file ADDED here must be
       # Prettier-clean, and a file CHANGED here must not be machine-compressed.
       # NOT "Prettier must pass on everything" — 318 of 400 tracked TypeScript

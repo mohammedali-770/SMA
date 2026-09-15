@@ -122,10 +122,52 @@
           display: none;
         }
       }
+      /*
+        The build-time snapshot of the policies. It exists for clients that do
+        not run JavaScript — chiefly Play Console's and App Store Connect's
+        policy-URL checks, which fetch the page and read the markup.
+
+        HIDDEN BY DEFAULT AND REVEALED BY <noscript>, rather than hidden by a
+        script. The first version set a class from an inline <script>, and
+        `vercel.json` serves `script-src 'self' https://maps.googleapis.com` on
+        `/(.*)` with no nonce, hash or 'unsafe-inline' — so that script would
+        have been BLOCKED on every deployed legal route, the class never set,
+        and every visitor would have seen the live policy with a stale duplicate
+        underneath it. Worse than the defect this file exists to fix. Caught by
+        review on #381.
+
+        A <noscript><style> applies only when scripting is off, and `style-src`
+        does carry 'unsafe-inline', so this needs no script and no CSP change. A
+        text extractor reads the markup and never consults CSS, so `display:
+        none` costs it nothing.
+      */
+      #prerendered {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 4rem;
+      }
+      #prerendered article {
+        margin-top: 2rem;
+      }
+      #prerendered h2 {
+        font-size: 1.25rem;
+        margin: 1.25rem 0 0.25rem;
+      }
+      #prerendered {
+        display: none;
+      }
     </style>
+    <noscript>
+      <style>
+        #prerendered {
+          display: block;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
     <main id="app"></main>
+    <!--prerender:legal:start-->
     <noscript>
       <div style="max-width: 44rem; margin: 0 auto; padding: 2rem 1.25rem">
         <h1>Legal &amp; Policies — Spicy Meal</h1>
@@ -136,6 +178,7 @@
         <p>Contact: info@spicymeal.com.sa · 9200 31495</p>
       </div>
     </noscript>
+    <!--prerender:legal:end-->
     <script type="module" src="/src/legal/main.ts"></script>
   </body>
 </html>
