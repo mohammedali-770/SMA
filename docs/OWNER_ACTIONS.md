@@ -2910,10 +2910,19 @@ duplicated; `logo:check` compares generated output byte-for-byte against the
 committed assets, so its passing is the proof the extraction was lossless.
 
 **The legal pages now serve their text without JavaScript.** See B7. Built
-against Production, the strip-`<script>` measurement goes **253 → 34,936 visible
+against Production, the strip-`<script>` measurement goes **253 → 36,775 visible
 characters**. **It is source, not live** — the deployed URL keeps the old shell
 until Vercel ships this commit, so re-run the measurement before treating the
 policy URL as satisfying Play.
+
+**One thing from that work is worth carrying beyond it.** The snapshot was first
+hidden by an inline `<script>`, and `vercel.json` sets a CSP with no
+`'unsafe-inline'` for scripts — so it would have been blocked in production and
+nowhere else, leaving every visitor the live policy plus a stale duplicate. The
+rule it produced: **a CSP failure is invisible to every local check**, because
+`vite build`, `vite preview` and the test suite all serve no headers. If a change
+adds an inline script, a new script host or a new `connect-src` target, read
+`vercel.json` — nothing else in the pipeline will tell you.
 
 ### One thing measured on the bundle that nobody has decided
 

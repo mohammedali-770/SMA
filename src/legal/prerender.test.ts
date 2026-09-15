@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import type { PublicLegalDoc } from './legalPage';
@@ -101,5 +103,43 @@ describe('injectPrerender — atomic, or not at all', () => {
 
   it('returns null when the markers are inverted rather than emitting a broken page', () => {
     expect(injectPrerender(`<body>${PRERENDER_END}...${PRERENDER_START}</body>`, 'x')).toBeNull();
+  });
+});
+
+describe('legal.html must stay CSP-clean', () => {
+  // `vercel.json` serves `script-src 'self' https://maps.googleapis.com` on
+  // `/(.*)` with no nonce, hash or 'unsafe-inline'. An inline <script> here is
+  // therefore blocked in production and NOWHERE ELSE — not in `vite build`, not
+  // in `vite preview`, not in any test that does not serve the real headers. The
+  // first version of this page hid the snapshot from such a script; the failure
+  // mode was the live policy with a stale duplicate beneath it, visible to every
+  // visitor, and caught by review rather than by anything that runs here.
+  const html = readFileSync(new URL('../../legal.html', import.meta.url), 'utf8');
+
+  it('has no inline <script> — every script tag carries a src', () => {
+    // Comments AND <style> blocks are stripped first. The page explains the CSP
+    // trap in two places — an HTML comment and a CSS comment inside <style> —
+    // and both necessarily quote `<script>`. Matching those is testing a string
+    // rather than the structure, which is how the first two versions of this
+    // test failed against a file that was already correct. A script tag cannot
+    // live inside <style>, so removing it costs no coverage.
+    const code = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<style\b[\s\S]*?<\/style>/gi, '');
+    const tags = code.match(/<script\b[^>]*>/gi) ?? [];
+    expect(tags.length).toBeGreaterThan(0);
+    for (const tag of tags) expect(tag).toMatch(/\ssrc=/i);
+  });
+
+  it('hides the snapshot by default and reveals it inside <noscript>', () => {
+    // The inversion is the whole mechanism: a script cannot be relied on to
+    // hide it, so CSS hides it and only a scripting-disabled client shows it.
+    expect(html).toMatch(/#prerendered\s*\{\s*display:\s*none/);
+    const noscript = html.match(/<noscript>[\s\S]*?<\/noscript>/i)?.[0] ?? '';
+    expect(noscript).toMatch(/#prerendered\s*\{\s*display:\s*block/);
+  });
+
+  it('still carries the markers the build substitutes between', () => {
+    expect(html).toContain(PRERENDER_START);
+    expect(html).toContain(PRERENDER_END);
+    expect(html.indexOf(PRERENDER_START)).toBeLessThan(html.indexOf(PRERENDER_END));
   });
 });

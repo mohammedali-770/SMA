@@ -125,10 +125,21 @@
       /*
         The build-time snapshot of the policies. It exists for clients that do
         not run JavaScript — chiefly Play Console's and App Store Connect's
-        policy-URL checks, which fetch the page and read the markup. A browser
-        hides it before it paints (see the boot script below) and then renders
-        live rows into #app, so nobody with JavaScript ever sees it and there is
-        no flash of stale text.
+        policy-URL checks, which fetch the page and read the markup.
+
+        HIDDEN BY DEFAULT AND REVEALED BY <noscript>, rather than hidden by a
+        script. The first version set a class from an inline <script>, and
+        `vercel.json` serves `script-src 'self' https://maps.googleapis.com` on
+        `/(.*)` with no nonce, hash or 'unsafe-inline' — so that script would
+        have been BLOCKED on every deployed legal route, the class never set,
+        and every visitor would have seen the live policy with a stale duplicate
+        underneath it. Worse than the defect this file exists to fix. Caught by
+        review on #381.
+
+        A <noscript><style> applies only when scripting is off, and `style-src`
+        does carry 'unsafe-inline', so this needs no script and no CSP change. A
+        text extractor reads the markup and never consults CSS, so `display:
+        none` costs it nothing.
       */
       #prerendered {
         max-width: 44rem;
@@ -142,19 +153,17 @@
         font-size: 1.25rem;
         margin: 1.25rem 0 0.25rem;
       }
-      html.js #prerendered {
+      #prerendered {
         display: none;
       }
     </style>
-    <!--
-      Sets the flag the rule above keys on. Inline and in <head> on purpose: it
-      must run before the body is parsed, so the snapshot is hidden rather than
-      painted and removed. Failing to load leaves the snapshot visible, which is
-      the correct outcome — a reader still gets the policies.
-    -->
-    <script>
-      document.documentElement.className = 'js';
-    </script>
+    <noscript>
+      <style>
+        #prerendered {
+          display: block;
+        }
+      </style>
+    </noscript>
   </head>
   <body>
     <main id="app"></main>
