@@ -2636,9 +2636,63 @@ top of §27:
   the Auth entry while Play still holds the credential means the next update is
   reviewed against a login that no longer works.
 
+**AND ONE THING §27 ASSERTS HAS NOT BEEN VERIFIED FOR A HOSTED PROJECT.** §27
+quotes Supabase — *"When a test phone number requests an OTP, the Auth service
+skips SMS delivery and accepts only the mapped code"* — and that sentence comes
+from the **self-hosting** guide (the `SMS_TEST_OTP` / `SMS_TEST_OTP_VALID_UNTIL`
+environment variables). Whether the hosted dashboard's test-phone-numbers feature
+also short-circuits a **custom Send SMS Hook** — which is what this project uses,
+because the OTP goes out over WhatsApp rather than SMS — is not documented for
+the hosted product and is not established here.
+
+**This is the same trap §27 already fell into once.** That section recorded a
+correction on 2026-09-03 for exactly this: it had told you to set an expiry that
+turned out to be a self-hosting environment variable. This is the second sentence
+on the same page quoted as hosted behaviour.
+
+**It is cheap to settle by measurement, and it must be settled before you
+submit.** Baselines read live 2026-09-15: `whatsapp_message_logs` holds **30**
+rows (newest 2026-08-21 14:24:47Z) and `otp_send_reservations` holds **0**. After
+the single confirmation sign-in in §27 step 3, re-read both. **Unchanged means
+the hook really was bypassed and the mechanism works.** If either moved, the hook
+ran — the test number is being delivered over WhatsApp like any other, a reviewer
+still cannot receive it, and the plan needs rethinking before submission rather
+than after rejection.
+
 The review-notes text in §27 is written for Apple but transfers with the first
 sentence dropped. **Do not put the code in this repository** (§9) — the number
 may be recorded, the code may not.
+
+### A SECOND BLOCKER: the live privacy policy names the wrong map provider, and Google cross-checks
+
+Play compares the Data Safety form against the privacy policy you link, and a
+contradiction between them is a rejection reason in its own right. There is one,
+and the production AAB settles it rather than leaving it arguable.
+
+**Live `privacy_policy` v2.1 says the map is Mapbox.** The shipped binary says
+otherwise, measured on `base/assets/index.android.bundle`:
+
+- `pk.eyJ` (the Mapbox public-token prefix) — **0 occurrences**;
+- `maps.googleapis.com` — **present**, together with an `AIza…` Google key;
+- the only Mapbox strings are dead constants left in the Hermes string table
+  (`mapbox://styles/mapbox/streets-v12`, `MAPBOX_PUBLIC_TOKEN_REFRESHED`) — and
+  **with no token in the bundle, no request to Mapbox can be made**, so no
+  customer data reaches them.
+
+So the app processes delivery-pin coordinates through **Google Maps Platform**
+while telling customers it uses Mapbox. That is a live document naming the wrong
+sub-processor for precise location data — the most sensitive type this app
+collects.
+
+**This is §34, and this section upgrades its urgency rather than restating it.**
+§34 has been an open correction with the replacement text already drafted
+(`docs/legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`). It was a
+documentation-accuracy item; **for the Play submission it is a blocker**, because
+you cannot truthfully complete the Data Safety location rows while the linked
+policy names a processor the app does not use.
+
+Publishing it is a §5 live write (editing a `legal_documents` row) and needs its
+own approval. Do it **before** filling in the Data Safety form, not after.
 
 ### Data Safety — answers derived from the schema and the code, not from memory
 
@@ -2649,7 +2703,7 @@ if anything changes.
 
 | Play data type | Collected | Leaves our systems to | Purpose | Evidence |
 | --- | --- | --- | --- | --- |
-| Name | Yes, **required** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:323` |
+| Name | Yes, **OPTIONAL** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:323`. **This row said "required" and that was wrong — measured live 2026-09-15:** `profiles.full_name` is nullable and **3 of 9** profiles have none; `orders.customer_name` is nullable and **19 orders carry no name at all**. The POS payload substitutes `'Guest'` (`lazywait-sync/index.ts:323`). Declaring it required would have been a false Data Safety answer about the one field easiest to check |
 | Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
 | Email address | Yes, **optional** | — | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
 | Address | Yes, optional (delivery only) | POS | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
@@ -2658,15 +2712,19 @@ if anything changes.
 | Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
 | User IDs | Yes | — | App functionality, Account management | `profiles.id` |
 | Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
-| Crash logs | Yes | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94` |
-| Diagnostics | Yes | Sentry | Diagnostics | same, with `tracesSampleRate` sampled |
-| Device or other IDs | Yes | Expo, then FCM/APNs | App functionality (notifications) | `push_devices.expo_push_token` |
+| Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
+| Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
+| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it |
 | **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
 
-**Sentry does not send PII, and that is configured rather than hoped for:**
-`sendDefaultPii: false` with a `beforeSend` scrubber, on native
-(`observability/index.ts:106,116`) and on web (`webCore.ts:125,145`).
+**Sentry is configured not to send PII — but "no PII" is too strong, and the
+precise version matters for the form.** `sendDefaultPii: false` with a
+`beforeSend` scrubber, on native (`observability/index.ts:106,116`) and on web
+(`webCore.ts:125,145`). **What it does keep is the pseudonymous user id:**
+`sanitize.ts:223-226` reduces `event.user` to `{ id }` and drops every other
+field. So crash reports are linkable to an account, which is exactly why "User
+IDs" is declared above and why the Sentry rows say REQUIRED.
 
 **The "Shared" column is deliberately NOT answered here, and that is a
 correction rather than an omission.** This table's first version marked all four
@@ -2736,6 +2794,11 @@ The other listing URLs are unchanged from B7: privacy
    download the JSON key, and upload it to EAS** — `eas credentials --platform
    android`, or commit a path in `eas.json`. **Do not commit the key itself**
    (§9). This is what makes every release *after* the first unattended.
+
+**One prerequisite sits outside this list because it belongs to another section:
+publish the §34 privacy-policy map-processor correction before you fill in the
+Data Safety form.** It is not sequenced with the five steps — it can be done at
+any point — but it must precede the form, for the reason given above.
 
 Steps 1-3 are plumbing. **Step 4 is the one that decides whether the first review
 passes**, and it is the cheapest of the five.
