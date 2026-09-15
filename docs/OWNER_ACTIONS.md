@@ -2719,6 +2719,30 @@ Everything else: run the submit, watch the upload, report the Play processing
 result, and prepare the listing text in both languages. Until then the submission
 is genuinely blocked on a Google account, not on work.
 
+### One thing a reviewer WILL see, measured live rather than guessed
+
+**55 of 61 products are active and exactly ONE has an image.** Read live
+2026-09-15: 61 products, 55 active, 5 active categories, **1** with a non-empty
+`image_url`. One branch is active out of 40, which is correct for a single-branch
+launch.
+
+**This is not broken and not a policy problem** — it is handled deliberately.
+`apps/mobile/src/lib/mappers.ts:105-124` refuses a stock-photo fallback (an
+earlier version substituted one Unsplash burger for every product, so the same
+burger sat beside "Chicken Wings" and "Fries with cheese"), and `ProductCard`
+renders a neutral `DishIcon` when `imageUrl` is empty. The empty state is built
+and styled.
+
+**It is a store-listing problem.** Play wants at least two phone screenshots, and
+screenshots of a food-ordering app whose menu is 55 grey dish icons read as
+unfinished to a human reviewer and to every customer who sees the listing. The
+upload path already exists — `20260827140000_product_images_bucket` created a
+public bucket an administrator can upload into from the console, and one product
+proves the path works end to end.
+
+Nothing blocks submission on this. It is worth an hour with a phone before the
+screenshots are taken, not after.
+
 ### What this section does NOT claim
 
 The **content rating questionnaire** and the **store listing assets** (feature
