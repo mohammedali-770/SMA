@@ -47,6 +47,8 @@ The *job name* is what GitHub reports as a status check context. When configurin
 | `npm run phones:check` | `node scripts/check-test-phone-numbers.mjs` |
 | `npm run play-icon:build` | `node scripts/build-play-icon.mjs` |
 | `npm run play-icon:check` | `node scripts/build-play-icon.mjs --check` |
+| `npm run play-screenshots:build` | `node scripts/build-play-screenshots.mjs` |
+| `npm run play-screenshots:check` | `node scripts/check-play-screenshots.mjs` |
 | `npm run preview` | `vite preview` |
 | `npm run test` | `vitest run` |
 | `npm run test:watch` | `vitest` |
@@ -58,7 +60,9 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/branch-audit.sh`
 - `scripts/build-logo-mark.mjs` — Generates the transparent-background brand mark from the official logo master
 - `scripts/build-play-icon.mjs` — Generates the Google Play store icon from the app icon master
+- `scripts/build-play-screenshots.mjs` — Composes the Google Play phone screenshots from the owner's device captures
 - `scripts/check-design-system-hygiene.mjs` — Guards the NEW design-system code against re-introducing raw values
+- `scripts/check-play-screenshots.mjs` — Validates the Google Play phone screenshots in `assets/store/screenshots/`
 - `scripts/check-recorded-hashes.mjs` — Every sha256 recorded in prose must still describe a file in the tree
 - `scripts/check-test-phone-numbers.mjs` — @license SPDX-License-Identifier: Apache-2.0
 - `scripts/docs-check-ownership.mjs` — Enforces the documentation ownership map in docs/ownership.json
