@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **137**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260923120000_branch_variant_availability.sql`.
+Migration files in the repository: **138**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260924120000_place_order_variant_availability.sql`.
 
 ## Tables
 
@@ -139,7 +139,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
 | `clear_variant_snooze` | 1 | `20260923120000_branch_variant_availability.sql` |
 | `compute_campaign_discount` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
-| `compute_order_snapshot` | 8 | `20260910120000_loyalty_multipliers.sql` |
+| `compute_order_snapshot` | 9 | `20260924120000_place_order_variant_availability.sql` |
 | `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
@@ -251,7 +251,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
-| `place_order` | 17 | `20260918120000_loyalty_earn_on_settlement.sql` |
+| `place_order` | 18 | `20260924120000_place_order_variant_availability.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |

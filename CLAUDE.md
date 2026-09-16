@@ -226,10 +226,55 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-14, after `20260921120000`, `20260919120000` and
-`20260920120000` were all APPLIED: 135 repository files / 140 live history rows /
-exactly ONE unapplied — Moyasar, unapplied on purpose.** Latest live version
-`20260914105232`; ledger rows 93, 94 and 95.
+**Current position 2026-09-16, read live: 136 repository files on the default
+branch / 141 live history rows / exactly ONE unapplied — Moyasar, unapplied on
+purpose.** Latest live version `20260916114130`; the most recent apply is
+`20260922120000` (ledger row 96, `docs/MIGRATIONS.md` §43).
+
+**THE COUNT LEAVES THE DANGEROUS SHAPE ON THE BRANCH THAT CARRIES THIS
+SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Two files are written,
+validated and awaiting approval — `20260923120000_branch_variant_availability`
+and `20260924120000_place_order_variant_availability` — so once they merge the
+outstanding set is **THREE**. `20260824100000` still sorts ahead of both, so
+"apply the outstanding migrations" takes the frozen payment file FIRST. **Name
+the target by version.** That is what makes the count irrelevant in any shape.
+
+**THE TWO NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
+`20260923120000` first, then `20260924120000`, each on its own approval, each
+named by its own version. Each refuses to land out of order: the first asserts
+that neither money-path function mentions `branch_variant_availability`, the
+second asserts that the table, both RPCs and the sweeper arm already exist. The
+second is a **MONEY-PATH CHANGE** — it redefines `place_order` and
+`compute_order_snapshot`, so the pair
+`bfd3f1f423e61c850ab6101e37431799` / `ca276a84424e403a98d34860817f815c`
+**will move**. That is the intended effect of the work, not an anomaly; record
+the new pair deliberately at apply time. Detail: `docs/MIGRATIONS.md` §44 and
+§45.
+
+**A CHECK A COMMENT CAN SATISFY IS NOT A CHECK, and mutation testing is what
+found that.** `20260924120000`'s own verification asserted the deferred-earning
+rule with `position('earn_pending' in v_po)` — but two comment lines immediately
+above that insert also say `earn_pending`, so a mutant that changed only the
+written VALUE to `'earn'` (the exact defect audit finding 1.1 is about) applied
+cleanly. The same held for `earns_loyalty_points`. Both assertions are now
+statement-shaped. **When an assertion names a token, check whether a comment
+alone can satisfy it** — strip comments and compare the counts.
+
+**CARDINALITY MUST BE CHECKED BEFORE A BODY IS READ.** Every assertion in that
+file reads a body with `select prosrc into`, which with two overloads present
+takes an arbitrary one. The overload count sat last, so a planted stale overload
+was caught by a *different* assertion — meaning the overload check proved
+nothing and which assertion fired was luck. It now runs first.
+
+**Superseded, kept because the count is the point: 135 repository files / 140
+live history rows / exactly ONE unapplied — Moyasar, unapplied on purpose**,
+after `20260921120000`, `20260919120000` and `20260920120000` were all APPLIED
+on 2026-09-14. Latest live version then `20260914105232`; ledger rows 93, 94 and
+95. **That figure went stale on 2026-09-16 and this file did not notice** —
+`20260922120000` was applied that day and recorded in `docs/MIGRATIONS.md` §43
+(row 96) while this section still said 135/140. The ledger moved and the summary
+above it did not, which is §14's problem inside the one file whose job is to
+hold the right number.
 
 **THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
 rather than the bottom.** With a single file left, "apply the outstanding

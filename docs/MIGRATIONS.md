@@ -36,16 +36,28 @@ to Production.**
 > validated, awaiting approval). Moyasar still sorts ahead of everything.
 > **Name the target by version.**
 
-> **Updated 2026-09-16 — `20260923120000_branch_variant_availability` is
-> written, validated and NOT applied. The count is now TWO.** Outstanding:
-> `20260824100000_moyasar_payment_provider.sql` (frozen under §6) and this one.
-> Moyasar still sorts ahead of everything, so "apply the outstanding migrations"
-> would take the frozen payment file FIRST — **name the target by version.**
+> **Updated 2026-09-16 (later) — `20260924120000_place_order_variant_availability`
+> is written, validated and NOT applied. The count is now THREE.** Outstanding:
+> `20260824100000_moyasar_payment_provider.sql` (frozen under §6),
+> `20260923120000_branch_variant_availability` and this one. Moyasar still sorts
+> ahead of everything, so "apply the outstanding migrations" would take the
+> frozen payment file FIRST — **name the target by version.**
 >
-> It is the first of three files that give a branch the ability to close a
-> single PRICE TIER. This one is inert: it creates an empty table, its RPCs and
-> a sweeper arm, and deliberately does **not** touch the order path. Detail:
-> §44.
+> **This is the MONEY-PATH half, and the two have a DEPENDENCY ORDER that is not
+> optional.** Apply `20260923120000` first, then `20260924120000`, each on its
+> own approval, each named by its own version. Each refuses to land out of
+> order: the first asserts neither money-path function mentions the new table,
+> the second asserts the table, both RPCs and the sweeper arm already exist.
+>
+> **It redefines `place_order` and `compute_order_snapshot`, so the money-path
+> hash pair WILL move.** That is the intended effect of the work, not an
+> anomaly — record the new pair deliberately at apply time. Detail: §45.
+>
+> **Superseded, kept because the count is the point: `20260923120000` written,
+> the count TWO.** It is the first of three files that give a branch the ability
+> to close a single PRICE TIER. That one is inert: it creates an empty table,
+> its RPCs and a sweeper arm, and deliberately does **not** touch the order
+> path. Detail: §44.
 
 > **Updated 2026-09-14 — `20260918120000_loyalty_earn_on_settlement` is written,
 > validated and NOT applied. The count is now THREE.** Outstanding: Moyasar
@@ -5470,8 +5482,15 @@ like a no-op and is the one instruction that would break the payment freeze.
 ## 44. Per-branch variant (price tier) availability — WRITTEN, NOT APPLIED (2026-09-16)
 
 `20260923120000_branch_variant_availability.sql`. **Written 2026-09-16,
-validated, awaiting owner approval.** The first of three files; the other two
-are not yet written.
+validated, awaiting owner approval.** The first of three files.
+
+sha256 `a3440839b78c34fb4e309a32c4da842e2e3615d8fdc6dfc21789279ddca8d967`,
+622 lines / 27,922 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15. A fingerprint recorded from a pre-review draft is worse than
+none: at apply time it mismatches, and a stale record is indistinguishable from
+a tampered file, which is the one thing the fingerprint exists to tell apart
+(the lesson PR #345 paid for). `npm run docs:check` fails on any recorded
+sha256 that matches no file in the tree.
 
 **Why the level exists.** Availability is enforced at the product and the
 modifier today. Neither expresses "we are out of the Large". Measured against
@@ -5540,3 +5559,173 @@ ordering guard exercises it directly.
 **Money-path baseline recorded before any of this, and matching the ledger:**
 `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot`
 `ca276a84424e403a98d34860817f815c`. This file moves neither.
+
+---
+
+## 45. The order path refuses a closed price tier — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260924120000_place_order_variant_availability.sql`. **Written 2026-09-16,
+validated, awaiting owner approval.** The second of three files. It is the one
+that makes §44 mean anything, and it is a **MONEY-PATH CHANGE**: it redefines
+both `place_order` and `compute_order_snapshot`.
+
+sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`,
+1,110 lines / 55,033 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15.
+
+**Why it has to exist at all.** Nothing else would stop a customer ordering a
+tier a branch has closed. The client can hide a size, but the client is a
+build that reaches customers weeks after the server does, and a stale build is
+exactly the case the server check is for. This mirrors
+`20260820140500_place_order_modifier_availability` file-for-file, because the
+repository has solved this problem once already and that rollout's own header
+gives the reason the money-path half is separate: *"so it can be reviewed and
+reverted on its own."*
+
+### The money-path hashes WILL move, and that is the intended effect
+
+Baseline before, matching the ledger — `md5(pg_get_functiondef(oid))`, **not**
+`md5(prosrc)`, which is the trap ledger row 81 records:
+
+| function | before |
+| --- | --- |
+| `place_order` | `bfd3f1f423e61c850ab6101e37431799` |
+| `compute_order_snapshot` | `ca276a84424e403a98d34860817f815c` |
+
+**Record the new pair deliberately at apply time rather than treating a change
+as an anomaly.** Both move; that is what this file is for.
+
+### Derived, not retyped — and the pre-images were checked against live first
+
+Each body was extracted from the migration that currently defines it and hashed
+against the live function **before** a single character was substituted. Both
+matched exactly:
+
+| function | current definition | chars | `prosrc` md5 | live? |
+| --- | --- | --- | --- | --- |
+| `place_order` | `20260918120000_loyalty_earn_on_settlement.sql` | 24 827 | `1c854febfa239dc93ee594e704fa18f1` | identical |
+| `compute_order_snapshot` | `20260910120000_loyalty_multipliers.sql` | 15 398 | `52490fe4d9b692c4b8631a28977c3d73` | identical |
+
+The extraction span took both delimiter newlines — the one after `as $$` and the
+one before the closing `$$` — so none of the three false one-byte mismatches
+this ledger records (rows 81, 88, 89) arose.
+
+One anchored substitution per function. The anchor is the same line in both and
+occurs **exactly once** in each body:
+
+```
+    v_unit_price := coalesce(v_variant.price, v_product.price);
+```
+
+The check goes immediately above it — after tier resolution, before the price is
+computed, and above the modifier loop it is modelled on. The resulting diff is
+**one hunk per function, +26 lines, zero removed**: `@@ -221,0 +222,26 @@` and
+`@@ -160,0 +161,26 @@`.
+
+The inserted block is identical in both:
+
+```sql
+    if v_variant.id is not null and exists (
+      select 1 from public.branch_variant_availability bva
+      where bva.branch_id = p_branch_id
+        and bva.variant_id = v_variant.id
+        and bva.is_available = false
+        and (bva.snoozed_until is null or bva.snoozed_until > now())
+    ) then
+      raise exception 'A size in your cart is not available at the selected branch';
+    end if;
+```
+
+Same lazy-expiry clause as the product and modifier checks above and below it:
+an elapsed timer is not a closure, an untimed closure still blocks.
+
+### Two decisions that were argued rather than assumed
+
+**THE STALE-CLIENT FALLBACK REFUSES RATHER THAN SUBSTITUTES.** When a cart names
+no `variant_id` the server picks the cheapest active tier; if *that* tier is
+closed the order is refused, not promoted to the next cheapest. Charging a
+dearer tier would break the invariant that block's own comment states — *"the
+price charged may never exceed the price displayed"* — and that block already
+took the whole app down once, on 2026-08-25, by being stricter than the shipped
+client could satisfy. Refusing is the conservative direction; substituting is
+not. It is also not a regression against any baseline that exists: today a
+cheapest-tier closure IS a whole-product closure, because per-tier closing does
+not exist.
+
+**`compute_order_snapshot` GETS THE CHECK TOO**, although it has never carried
+the modifier one. It creates orders through `insert_order_from_snapshot`, so a
+gap there is a real gap the moment online payment is enabled — which is exactly
+how `20260921120000` came to be written, after `20260918120000` was recorded as
+having fixed "both" order-creation paths when it had fixed one. Enumerate every
+implementation of a behaviour before declaring it closed.
+
+### Ordering is pinned from both sides
+
+`20260923120000`'s assertion 8 refuses to land if either money-path function
+already mentions `branch_variant_availability`. This file opens with the
+converse guard: the table, both RPCs and the sweeper arm must exist, or it
+refuses with *"apply 20260923120000 first"*. Neither can be applied out of
+order.
+
+### Mutation testing found two real defects in the file's own checker
+
+Thirteen mutants, each aimed at one assertion, each built by mutating the
+FUNCTION BODIES ONLY so the checker is genuinely on trial. **All thirteen are
+refused; the unmutated file applies.** Two of them earned their keep:
+
+**A CHECK A COMMENT CAN SATISFY IS NOT A CHECK.** Assertion 4 read
+`position('earn_pending' in v_po)`. The two comment lines immediately above that
+insert also say `earn_pending`, so a mutant that changed only the written VALUE
+from `'earn_pending'` to `'earn'` — the exact defect audit finding 1.1 is about
+— **survived**. The same held for `earns_loyalty_points`, which appears in a
+comment above the line that uses it. Both assertions are now statement-shaped
+(`, 'earn_pending', v_points_earned,` and
+`coalesce(v_product.earns_loyalty_points, true)`), and the narrow mutants now
+die. Every asserted token was re-measured for this: comments stripped, raw count
+against code-only count, three tokens flagged, two fixed, and the third
+(`branch_variant_availability`) left alone because it is a *count* assertion,
+which a comment breaks rather than satisfies.
+
+**CARDINALITY MUST BE CHECKED BEFORE A BODY IS READ.** Every assertion reads a
+body with `select prosrc into`, which with two overloads present takes an
+arbitrary one. The overload count sat at the END, so the planted-stale-overload
+mutant was caught by the *reference count* instead — meaning the overload
+assertion proved nothing, and which assertion fired was luck. It now runs first,
+and that mutant now dies on it by name.
+
+A third mutant was killed by the plpgsql compiler rather than by the assertion
+aimed at it (renaming `v_loyalty_channel_ok` is a syntax-level error). It was
+rebuilt to remove the gate cleanly — declaration, assignment and every use — so
+the body still compiles and only assertion 4 can see it. It does.
+
+### Validation
+
+- Local chain harness: **138 migrations applied, 77 suites run, 75 passed, 2
+  quarantined, 0 new failures.**
+- New suite `supabase/tests/branch_variant_availability_test.sql`, **8 cases,
+  all passing**, which places real orders rather than reading source: baseline
+  pricing; per-tier refusal with the sibling tiers still ordering; lazy expiry
+  both ways; the fallback refusing rather than substituting; the snapshot path
+  enforcing it; the sweeper reopening and counting; RPC branch scoping; and the
+  inactive-tier close/reopen asymmetry.
+- Stored bodies verified **byte-identical** to hashes computed independently
+  from the file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288
+  chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859
+  chars.
+- **NOT called live, and that is deliberate.** `place_order` inserts a real
+  order and `orders` carries 12 triggers including POS-sync enrolment, so
+  calling it would create a kitchen ticket for food nobody ordered. Name
+  resolution is excluded structurally instead, exactly as ledger row 93 did.
+
+### One test bug worth recording, because the shape recurs
+
+The suite's first version failed CASE 1 for a reason that was mine rather than
+the migration's: inside a transaction `now()` is frozen, so two orders placed by
+the same suite share a `created_at` and `order by created_at desc limit 1` ties.
+Capture the row `place_order` returns instead of re-reading the table.
+
+### No deploy implied
+
+Both signatures are unchanged, so existing callers bind to the new bodies (the
+lesson recorded against `20260831130000`). Applying this file is a §5 action and
+must name the target by version.
