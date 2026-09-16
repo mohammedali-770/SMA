@@ -36,6 +36,17 @@ to Production.**
 > validated, awaiting approval). Moyasar still sorts ahead of everything.
 > **Name the target by version.**
 
+> **Updated 2026-09-16 — `20260923120000_branch_variant_availability` is
+> written, validated and NOT applied. The count is now TWO.** Outstanding:
+> `20260824100000_moyasar_payment_provider.sql` (frozen under §6) and this one.
+> Moyasar still sorts ahead of everything, so "apply the outstanding migrations"
+> would take the frozen payment file FIRST — **name the target by version.**
+>
+> It is the first of three files that give a branch the ability to close a
+> single PRICE TIER. This one is inert: it creates an empty table, its RPCs and
+> a sweeper arm, and deliberately does **not** touch the order path. Detail:
+> §44.
+
 > **Updated 2026-09-14 — `20260918120000_loyalty_earn_on_settlement` is written,
 > validated and NOT applied. The count is now THREE.** Outstanding: Moyasar
 > (frozen), `20260917120000` and this one. Moyasar still sorts ahead of
@@ -5452,3 +5463,80 @@ add a second history row for one change.
 dangerous shape: with one file left, "apply the outstanding migrations" reads
 like a no-op and is the one instruction that would break the payment freeze.
 **Name the target by version** (§6, and CLAUDE.md §8).
+
+
+---
+
+## 44. Per-branch variant (price tier) availability — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260923120000_branch_variant_availability.sql`. **Written 2026-09-16,
+validated, awaiting owner approval.** The first of three files; the other two
+are not yet written.
+
+**Why the level exists.** Availability is enforced at the product and the
+modifier today. Neither expresses "we are out of the Large". Measured against
+the live catalog: **59 of 61 active products carry price tiers, 144
+`product_variants` rows**, against **one** product with a modifier group. A
+cashier who runs out of one size has to close the whole item.
+
+**What it does.** Creates `public.branch_variant_availability` on the
+`branch_modifier_availability` shape (absence of a row means available;
+`is_available` authoritative), its four triggers, `set_variant_snooze` /
+`clear_variant_snooze` gated on `is_admin() or is_branch_operator(branch)` with
+the **call centre deliberately excluded**, a `variant_id` column on
+`branch_availability_events` with `bae_one_target` widened to count it, and a
+variants arm plus `variants_reopened` counter on `branch_availability_sweep`.
+
+**What it deliberately does NOT do.** It does not touch `place_order` or
+`compute_order_snapshot` — that is `20260924120000`, kept separate for the
+reason the modifier rollout gives in its own header, *"so it can be reviewed and
+reverted on its own"*. Applying this file alone changes **no customer
+behaviour**: the table is created empty and nothing reads it.
+
+**A REVIEW CAUGHT THAT COPYING THE 2026-08-20 TEMPLATE WOULD HAVE RE-OPENED A
+HOLE CLOSED TWO DAYS EARLIER.** This project carries `alter default privileges
+in schema public grant all on tables to anon, authenticated, service_role` —
+read from `pg_default_acl`, present from both `postgres` and `supabase_admin`.
+Every table created in `public` therefore starts with `arwdDxtm` for `anon`.
+The modifier template never revokes, which is precisely why
+`20260919120000_security_audit_db_hardening` (ledger row 94) had to strip those
+writes from the two sibling tables on 2026-09-14.
+
+This file uses `revoke all ... from public, anon, authenticated` **before** the
+grants, rather than the audit's three-verb form — because the narrow version is
+why `branch_modifier_availability` still shows
+`anon = REFERENCES, SELECT, TRIGGER, TRUNCATE` live today, and **RLS does not
+filter TRUNCATE**. Verified on the local chain: the new table gives `anon`
+exactly `SELECT`; the sibling reproduces the live residue exactly.
+
+**THE HARNESS COULD NOT HAVE CAUGHT IT, SO THE HARNESS WAS FIXED.**
+`.github/sql-ci/bootstrap.sql` now models Production's **table** default
+privileges. Without that, the harness was *more secure* than Production and any
+grant assertion passed vacuously — the "a check that cannot fail is worse than
+no check" trap in its purest form.
+
+**A SEPARATE FINDING, RECORDED RATHER THAN FIXED HERE.** Modelling the
+**function** default privileges as well makes
+`supabase/tests/operations_alerts_digest_test.sql` fail, and the failure is
+real: **8 of its 11 `service_role` expectations do not describe Production**,
+because those migrations write `revoke all ... from public, anon` and never name
+`service_role`. It is not a hole — the `anon` column is correct throughout, and
+`operations_alert_settings_update` is gated inside its body on `is_admin()`
+(CLAUDE.md §8, corrected 2026-09-13) — but a matrix asserting something untrue
+is not a contract. Correcting eight assertions in an alerts suite does not
+belong inside a money-path change, so the bootstrap line is deliberately
+tables-only and the reasoning is recorded in place.
+
+**Validation.** Local chain harness: **137 migrations applied, 76 suites run, 74
+passed, 2 quarantined, 0 new failures.** The file's own verification block was
+**mutation-tested: 6 of 6 meaningful mutants killed** (dropped realtime trigger,
+reverted `bae_one_target`, RPC leaked to `anon`, `anon` regaining table writes,
+RLS switched off, sweeper losing its retention prune). The audit path was proven
+end to end rather than asserted — closing a tier wrote exactly one
+`branch_availability_events` row carrying `variant_id`. The eighth assertion
+("the order path is untouched") is not mutation-tested here; `20260924120000`'s
+ordering guard exercises it directly.
+
+**Money-path baseline recorded before any of this, and matching the ledger:**
+`place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot`
+`ca276a84424e403a98d34860817f815c`. This file moves neither.
