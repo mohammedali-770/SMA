@@ -20,8 +20,13 @@
  * 2. GENEROUS MARGINS. The graphic is cropped at the edges on certain
  *    placements, so the mark occupies 76% of the height, centred, and nothing
  *    important goes near a boundary.
- * 3. FULLY OPAQUE. Play rejects transparency here. The mark is composited onto
- *    the brand red rather than left with an alpha channel.
+ * 3. NO ALPHA CHANNEL AT ALL — not merely opaque. Play's contract for this asset
+ *    is "JPEG or 24-bit PNG (no alpha)", and the store icon's is the opposite,
+ *    "32-bit PNG (with alpha)". Filling alpha with 255 does NOT satisfy it: the
+ *    IHDR still declares colour type 6, and the asset can be refused on a
+ *    channel it does not use. The mark is composited onto the backdrop and the
+ *    result written as colour type 2. Codex caught this on PR #383, after a
+ *    first version that was fully opaque and still wrong.
  *
  * The resample is area-averaged in PREMULTIPLIED alpha. `logo-mark.png` has a
  * transparent surround, and averaging straight RGBA would drag the mark's
@@ -154,7 +159,14 @@ for (let i = 3; i < canvas.length; i += 4) {
   if (canvas[i] !== 0xff) throw new Error('feature graphic must be fully opaque');
 }
 
-const graphic = encodePng({ width: WIDTH, height: HEIGHT, pixels: canvas });
+// colorType 2 — 24-bit RGB, no alpha channel. See the header.
+const graphic = encodePng({ width: WIDTH, height: HEIGHT, pixels: canvas, colorType: 2 });
+
+// Read back from the encoded bytes rather than trusting the argument: IHDR's
+// colour-type byte is at offset 25, and it is the thing Play actually reads.
+if (graphic[25] !== 2) {
+  throw new Error(`generated graphic declares colour type ${graphic[25]}, expected 2 (RGB, no alpha)`);
+}
 
 if (graphic.length > MAX_BYTES) {
   throw new Error(`generated graphic is ${graphic.length} bytes, over Play's ${MAX_BYTES} limit`);

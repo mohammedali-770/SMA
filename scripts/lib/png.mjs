@@ -122,22 +122,55 @@ function crc32(buffer) {
   return c ^ -1;
 }
 
-function encodePng({ width, height, pixels }) {
-  const stride = width * 4;
+/**
+ * Encodes RGBA pixels as a PNG.
+ *
+ * `colorType` selects the OUTPUT format and defaults to 6 (RGBA), which is what
+ * every caller wanted until 2026-09-16. Pass 2 to write a 24-bit RGB PNG with no
+ * alpha channel, dropping the fourth byte of every pixel.
+ *
+ * THE DIFFERENCE IS NOT COSMETIC, AND GOOGLE PLAY SPLITS ON IT. Play's asset
+ * contract asks for a "32-bit PNG (with alpha)" for the store icon and "JPEG or
+ * 24-bit PNG (no alpha)" for the feature graphic and every screenshot. Filling
+ * an alpha channel with 255 does not remove it: the IHDR still declares colour
+ * type 6, and the asset can be refused on a channel it does not use. Codex
+ * caught that on PR #383, and the same defect was in the screenshots.
+ *
+ * Callers writing an opaque asset should pass 2 rather than relying on full
+ * alpha, and the input is RGBA either way so nothing upstream has to change.
+ */
+function encodePng({ width, height, pixels, colorType = 6 }) {
+  if (colorType !== 2 && colorType !== 6) {
+    throw new Error(`unsupported colorType ${colorType} — this encoder writes 2 (RGB) or 6 (RGBA)`);
+  }
+
+  const samples = colorType === 6 ? 4 : 3;
+  const srcStride = width * 4;
+  const stride = width * samples;
   const raw = Buffer.alloc((stride + 1) * height);
 
   // Filter 0 (none) keeps the encoder trivial; deflate still compresses the
   // large flat transparent regions down well.
   for (let y = 0; y < height; y++) {
     raw[y * (stride + 1)] = 0;
-    pixels.copy(raw, y * (stride + 1) + 1, y * stride, (y + 1) * stride);
+    if (samples === 4) {
+      pixels.copy(raw, y * (stride + 1) + 1, y * srcStride, (y + 1) * srcStride);
+    } else {
+      let o = y * (stride + 1) + 1;
+      for (let x = 0; x < width; x++) {
+        const i = y * srcStride + x * 4;
+        raw[o++] = pixels[i];
+        raw[o++] = pixels[i + 1];
+        raw[o++] = pixels[i + 2];
+      }
+    }
   }
 
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8; // bit depth
-  ihdr[9] = 6; // RGBA
+  ihdr[9] = colorType; // 6 = RGBA, 2 = RGB
   ihdr[10] = 0; // deflate
   ihdr[11] = 0; // adaptive filtering
   ihdr[12] = 0; // no interlace
