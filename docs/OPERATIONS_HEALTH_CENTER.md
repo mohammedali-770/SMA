@@ -63,12 +63,30 @@ configuration error has the highest precedence.
 
 ### Optional/informational systems
 
-- **Branch Availability** — whether timed item, option and delivery closures
-  actually reopen. `degraded` once anything is more than 5 minutes past its
-  restore time (five missed ticks of a one-minute sweep, so a single unlucky run
-  is not a backlog) or when the most recent sweep run in
+- **Branch Availability** — whether timed item, **size**, option and delivery
+  closures actually reopen. `degraded` once anything is more than 5 minutes past
+  its restore time (five missed ticks of a one-minute sweep, so a single unlucky
+  run is not a backlog) or when the most recent sweep run in
   `branch_availability_runs` failed; `failing` past 30 minutes; `idle` on a fresh
   database with nothing closed and no sweep recorded yet.
+
+  **Sizes joined the card in `20260925120000`, and the gap before that is worth
+  stating rather than quietly closing.** `20260923120000` added a fourth
+  availability table, `branch_variant_availability`, and this card enumerates the
+  tables it reads BY NAME in three places — the counters, the overdue-restore
+  UNION and the `idle` warm-up. None of them knew about it, so a price tier whose
+  restore timer ran out and was never honoured read **`idle`**: not `healthy`,
+  but the fail-quiet warm-up, with no alert at all. The card now counts closed
+  sizes under its own `closed_sizes` key, deliberately separate from
+  `closed_options` — a size is a third level, not a kind of option, and on this
+  menu 59 of 61 products carry sizes against one carrying an option group. The
+  alert evidence carries `closed_sizes` too, so a responder is never told "0
+  products, 0 options" while the whole backlog is sizes.
+
+  `closed_products`, `closed_options` and `closed_sizes` count **timed** closures
+  only. An untimed one — an administrator delisting something indefinitely — is
+  reported under `untimed_closures` and never drives the state, because that is a
+  decision rather than a backlog.
 
   **This is not the `branch-availability-sweep` cron entry on the Scheduled Jobs
   card, and the difference is the reason the card exists.**
