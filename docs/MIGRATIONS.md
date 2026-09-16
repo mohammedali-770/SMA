@@ -5307,3 +5307,91 @@ index. **Version NOT aligned** — live carries the apply-time stamp
 `20260902123737` (§9-D); do not "repair" that.
 
 **No function deploy was implied or performed** — no code names either index.
+
+---
+
+## 43. Customer order comp columns — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260922120000_orders_comp_columns_customer_grant.sql`. **One `grant select`
+statement plus a verification block. It fixes a LIVE customer-facing outage**, so
+it is not a hygiene item waiting for a quiet moment.
+
+### What is broken right now
+
+Every "My Orders" list and every post-order receipt fails, on every channel whose
+client was built after **2026-08-26**, rendering the app's generic
+*"حدث خطأ ما."* / *"Something went wrong"* with a retry button that cannot
+succeed.
+
+**Measured live on 2026-09-16, both ways round:**
+
+```sql
+-- as authenticated
+select id, is_comped, comp_discount_amount from public.orders limit 1;
+--   42501 :: permission denied for table orders
+select id, status, total                   from public.orders limit 1;
+--   succeeds
+```
+
+### Why
+
+`authenticated` holds **COLUMN-LEVEL** select grants on `public.orders` — an
+allowlist, which is the whole reason `order_number`, `customer_name`,
+`customer_phone`, `coupon_code` and the operational sync columns are withheld
+from customers. **A column-level grant does not extend to columns added later.**
+
+`20260826100000_comp_order_totals.sql` added `orders.is_comped` and
+`orders.comp_discount_amount` and granted neither. The same day, PR #269 added
+both to the customer read contract in `apps/mobile/src/lib/orderSelect.ts`. Since
+PostgREST refuses the **whole** query when one column is unreadable, the client
+has been asking for something it cannot have ever since.
+
+### Why nobody saw it for three weeks
+
+**The only iOS build in TestFlight was 1.0.0 (22), built 2026-08-25 — ONE DAY
+before the client change.** Its bundle does not ask for the columns, so it works.
+Build 23 was refused by App Store Connect over an unrelated purpose string and
+was never installable. Build 24, 2026-09-16, is the first iOS binary anyone has
+run that contains the change, and it failed on the first order placed through it.
+
+**The web channel was not so lucky.** `/app` is the Expo web export of the same
+source; the deployed bundle was confirmed to contain
+`is_comped, comp_discount_amount` in its order select, so live web customers have
+been hitting this the whole time.
+
+**The general lesson, which is worth more than the fix:** a column-level grant
+turns *adding a column* into a two-part change, and nothing in this repository
+compared the client's column list to the grant. `orderSelect.test.ts` pinned the
+select literal to the column arrays — two source files agreeing with each other —
+while the third party to the contract, the database, was never consulted.
+`apps/mobile/src/lib/orderSelectGrantParity.test.ts` now reads this migration and
+fails CI if the contract and the grant diverge, in either direction.
+
+### Why a grant rather than a client change
+
+These two columns are the customer's own business: whether their order was comped
+and by how much. A receipt that reads *"Subtotal 64.00, Delivery 15.00, Total
+0.00"* with no explanation is worse than one that says why. A grant also reaches
+**every channel the moment it applies** — web and both binaries — whereas removing
+the columns from the client needs a new build per platform and hides information
+the customer is entitled to.
+
+### Safety
+
+- **It cannot widen row access.** RLS is enabled on `public.orders` and
+  `orders_select_own_or_staff` already scopes SELECT for `authenticated`; a
+  column grant cannot bypass a row policy. Verified live before the file was
+  written.
+- **`anon` is deliberately excluded.** It cannot select `orders.total` either —
+  anonymous callers have no business reading orders — and the file's own check
+  fails if either column reaches it.
+- **No function is redefined**, so the money-path pair is untouched and **no
+  deploy is implied**.
+- The verification block additionally re-asserts that the withheld set stays
+  withheld, so the fix cannot drift into a widening.
+
+### Applying it
+
+Name the target by version — **`20260922120000`**. Moyasar
+(`20260824100000`) still sorts ahead of everything, so an instruction that does
+not name a file must not be acted on (§6, and CLAUDE.md §8).
