@@ -113,10 +113,32 @@ declare
   -- RLS-scoped order, and the receipt shows it back to them. The read-contracts
   -- comment filed it under "staff notes", but nothing writes a staff note there:
   -- place_order fills it from the customer's own p_notes.
+  --
+  -- `is_comped` and `comp_discount_amount` were added by
+  -- 20260922120000_orders_comp_columns_customer_grant.sql, which fixed a THREE
+  -- WEEK OUTAGE that this very case was written to prevent and did not.
+  --
+  -- READ THE COMMENT ABOVE AGAIN: it describes the failure exactly — "a column
+  -- reaching the customer selector without its grant breaks every order read".
+  -- That is what happened on 2026-08-26, and this case passed throughout.
+  --
+  -- WHY IT PASSED. This list is HAND-MAINTAINED. When 20260826100000 added the
+  -- two comp columns to the table and #269 added them to the client contract in
+  -- apps/mobile/src/lib/orderSelect.ts, nobody added them here either — so the
+  -- list and the grant agreed with each other, and BOTH disagreed with the
+  -- client. The case compared the grant to a hand-written copy of the grant. It
+  -- could only ever have caught a change to the database, never a change to the
+  -- thing the database exists to serve.
+  --
+  -- THE FIX IS NOT "REMEMBER NEXT TIME". apps/mobile/src/lib/
+  -- orderSelectGrantParity.test.ts now reads THIS array and the migration's, and
+  -- fails CI unless both equal CUSTOMER_ORDER_COLUMNS. All three lists are now
+  -- pinned to the client contract rather than to each other.
   v_expected text[] := array[
     'id','status','order_type','created_at','branch_id','branch_name_en',
     'branch_name_ar','subtotal','delivery_fee','discount_amount',
     'loyalty_discount_amount','vat_amount','total','loyalty_points_earned',
+    'is_comped','comp_discount_amount',
     'payment_status','payment_method','notes','lazywait_order_number',
     'lazywait_sync_state','lazywait_ref','sync_blocked_reason',
     'sync_next_attempt_at','pos_create_attempted_at','pos_customer_retry_count',
@@ -149,7 +171,7 @@ begin
   if has_table_privilege('authenticated', 'public.orders', 'update') then
     raise exception 'CASE 1 FAILED: table-wide UPDATE on orders is still granted';
   end if;
-  raise notice 'CASE 1 ok: customer grant is exactly the 25 safe columns, no table-wide privilege';
+  raise notice 'CASE 1 ok: customer grant is exactly the % safe columns, no table-wide privilege', array_length(v_expected, 1);
 end $$;
 
 -- ---- CASE 2: excluded columns are UNREADABLE by explicit selection ----------

@@ -37,6 +37,19 @@ const MIGRATION = new URL(
   import.meta.url,
 );
 
+/**
+ * The SQL suite's own copy of the same list. It is the reason this test checks
+ * THREE lists rather than two.
+ *
+ * `order_read_contracts_test.sql` CASE 1 pins the grant to a hand-written array,
+ * and its comment describes this exact failure — "a column reaching the customer
+ * selector without its grant breaks every order read". It passed for three weeks
+ * anyway, because that array was never updated either: it agreed with the grant,
+ * and both disagreed with the client. A test comparing the database to a
+ * hand-written copy of the database can only catch a change to the database.
+ */
+const SQL_SUITE = new URL('../../../../supabase/tests/order_read_contracts_test.sql', import.meta.url);
+
 /** Pull a quoted identifier list out of a named `unnest(array[...])` block. */
 function columnsFromArrayLiteral(sql: string, afterMarker: string): string[] {
   const start = sql.indexOf(afterMarker);
@@ -95,6 +108,16 @@ describe('customer order select ↔ database grant parity', () => {
         col,
       );
     }
+  });
+
+  /**
+   * The third list. With this, every place that states what a customer may read
+   * is pinned to CUSTOMER_ORDER_COLUMNS rather than to one of the others.
+   */
+  it('the SQL suite pins the same contract', () => {
+    const suite = readFileSync(SQL_SUITE, 'utf8');
+    const expected = columnsFromArrayLiteral(suite, 'v_expected text[] :=');
+    expect([...expected].sort()).toEqual([...CUSTOMER_ORDER_COLUMNS].sort());
   });
 
   /** `anon` must gain nothing: it holds no select on `orders` at all. */
