@@ -22,6 +22,8 @@
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
 | newest iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
 | **build 24 uploaded to App Store Connect** | **YES, 2026-09-16 11:05:33 UTC** — see §3a, and note EAS reported the submission ERRORED anyway |
+| **build 24 live in TestFlight** | **YES** — installed and exercised on a real device at 11:11:40 UTC. Confirmed by USE, not by an API read; see §8 |
+| internal testers | **already configured.** Internal testing needs no Beta App Review |
 | build 23 | **SUPERSEDED, do not submit** — it is the one Apple refused. §3 |
 | previous build in TestFlight | **1.0.0 (22)**, submitted 2026-08-26 |
 
@@ -437,10 +439,28 @@ update both, and Play in particular reuses them for every future review.
    --check` found immediately before the build (three packages, the third
    recurrence), build 24 was produced from `8e4cd8a1` and uploaded at 11:05:33
    UTC. §3a covers the misleading ERRORED status.
-2. **Confirm build 24 in App Store Connect → TestFlight**, and add **internal
-   testers**. That is the only step between the uploaded build and an installable
-   one — internal testing needs no Beta App Review. Apple emails when processing
-   finishes.
+2. ~~Confirm build 24 in TestFlight and add internal testers.~~ **DONE, and
+   confirmed by USE rather than by an API read.** Internal testers were already
+   configured, and build 24 was installed and exercised on a real device: order
+   `SM-2026-000083` was placed through it at **11:11:40 UTC**, about two minutes
+   after Apple finished processing the upload.
+
+   **That is the only evidence available here, and it is better than the
+   alternative.** The EAS CLI cannot list App Store Connect builds, and this
+   submission reported ERRORED while having actually succeeded (§3a), so nothing
+   in the pipeline could answer "is it installable?" — only opening the app
+   could.
+
+   **AND IT IMMEDIATELY FOUND A THREE-WEEK OUTAGE.** The first order placed
+   through build 24 produced a truthful "Order confirmed" push and then an error
+   screen: "My Orders" and the receipt had been failing since 2026-08-26 for
+   every client built after that date, because `orders.is_comped` and
+   `orders.comp_discount_amount` were never granted to `authenticated` while the
+   client select asked for them. Fixed by `20260922120000`, applied the same day
+   — `MIGRATIONS.md` §43 and ledger row 96.
+
+   **This is the argument for a device test rather than a green pipeline, in one
+   sentence: every gate passed on a build whose main screen could not load.**
 3. **Enter the App Privacy answers** from §4 in the console.
 4. **Enter the test information** from §6.
 5. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
