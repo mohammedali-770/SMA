@@ -2407,7 +2407,128 @@ Until both are done, leave `loyalty_expiry_enabled` off. The mechanism is applie
 and proven inert (`docs/MIGRATIONS.md` ledger row 84); nothing degrades by
 waiting.
 
-## 34. Privacy policy names the wrong map sub-processor — publish the correction
+## 34. Privacy policy map sub-processor — PUBLISHED 2026-09-16; one step left
+
+**`privacy_policy` v2.3 is live**, both languages, effective 2026-09-16. The
+Mapbox line is gone, Google is named, and **Apple is named for the iPhone
+reverse-geocode** — a sub-processor no version of this policy had ever disclosed.
+
+The line now reads:
+
+> Google, with Apple on iPhone — the map you use to choose a delivery location.
+> Google draws the map and receives the coordinates of the point you pick.
+> Turning that point into a street address is done by Google on the web and on
+> Android, and by Apple on iPhone.
+
+It follows the list's existing two-party pattern (`Expo, with Apple (APNs) and
+Google (FCM) — …`) rather than inventing a shape.
+
+**v2.2 lasted about half an hour and is recorded rather than erased.** It said
+"the map **and address search** you use", which promised Google received
+something customers cannot send it — there is no address search in either
+customer channel. It also named only Google, missing Apple. v2.2 was live to the
+app and to JavaScript-enabled web readers for that window, so it is a real
+version and gets a real successor, not a silent in-place edit. Exactly one line changed in each
+language and every other byte was verified identical before and after — the
+replacement was dry-run first, with a hash of the rest of the document compared
+across the edit.
+
+**The open question this section posed is answered, and the section was wrong
+about how.** It said `EXPO_PUBLIC_MAP_PROVIDER` "is not readable from a session".
+It is: `eas-cli` is authenticated here, and `eas env:list --environment
+production` returns `EXPO_PUBLIC_MAP_PROVIDER=google` with **zero Mapbox
+variables** in that environment — so the Mapbox branch has no token and cannot
+work even if it were selected. Native and web agree, so **Option A (Google only)**
+was correct. *Recorded because the next session should reach for the CLI rather
+than treat a hosted environment variable as unknowable.*
+
+### CLOSED by v2.3 — the two wording defects v2.2 carried
+
+**Found immediately after publishing v2.2, by an exhaustive read of the map code
+that should have happened before.** Both are fixed in v2.3; they are kept here
+because the shape recurs.
+
+1. **"and address search" describes a feature the customer does not have.**
+   `places.googleapis.com/v1/places:searchText` is called from exactly one place,
+   `src/components/MapSearchBox.tsx:51`, which is the **admin console** — used for
+   drawing delivery zones and editing branch addresses. Neither customer channel
+   has an address search at all. The line promises Google receives something it
+   does not receive from customers.
+
+2. **On iPhone the reverse geocode goes to APPLE, and no version has ever said
+   so.** `LocationPickerMap.tsx:188` calls `Location.reverseGeocodeAsync`, which
+   is the **OS** geocoder — Apple's CLGeocoder on iOS, Play services on Android.
+   Only the web path uses Google's own `Geocoder`
+   (`LocationPickerMap.web.tsx:126`). So an iPhone customer's picked coordinate
+   reaches Apple, and the policy names only Google.
+
+**This was the same class of error v2.2 was published to fix** — a sub-processor
+list that does not match the software — caught one layer down. **The lesson is
+about ordering, not about maps: the code read that settles a disclosure belongs
+BEFORE the write, not after it.** v2.2 was published on a drafted sentence and a
+single decisive environment variable; the full read of the map code came
+afterwards and found two things the draft had wrong.
+
+**AN EARLIER VERSION OF THIS PARAGRAPH SAID "no customer has seen either
+sentence". THAT WAS FALSE, and review caught it on #386.** Only the
+**no-JavaScript snapshot** waits for a rebuild. Every other surface reads the
+table live: `src/legal/main.ts:122` fetches `legal_documents` on page load, and
+`apps/mobile/src/services/api.ts:238` queries the same table from the app. So
+**v2.2 was customer-visible for the nine minutes it was the active row**
+(07:40:34 → 07:49:39 UTC), to anyone who opened the legal screen in the app or
+the legal page in a browser.
+
+**The error is the same conflation this whole section is about** — treating "the
+public page" as though it were the only reader, when the rebuild gap makes the
+no-JavaScript snapshot the *only* surface that lags. Having just written that
+distinction down, the next paragraph immediately forgot it.
+
+**What is actually true.** The exposure was nine minutes, and v2.2 was still
+strictly more accurate than the v2.1 it replaced — it named the processor that
+receives the delivery pin instead of one that receives nothing. But "not urgent"
+was the wrong conclusion to draw, and it was drawn from a false premise: a
+known-inaccurate disclosure was live to real readers, not parked in a draft.
+
+**The lesson stands and gets sharper.** The code read that settles a disclosure
+belongs BEFORE the write. v2.2 went out on a drafted sentence plus one decisive
+environment variable; the full read came afterwards and found two things wrong,
+and those two things were briefly live. The rebuild gap limited the blast radius
+to one surface, not to none.
+
+**The drafted correction document has two further errors worth fixing before it
+is used again:** it cites `apps/mobile/src/lib/googleMaps.ts`, which does not
+exist (the real file is `src/lib/googleMaps.ts`, the admin loader), and it says
+"both providers are compiled into both artifacts", which is false for the web
+artifact — `LocationPickerMap.web.tsx` contains no Mapbox path at all.
+
+**One thing this does NOT change: Option A was right, and was right under every
+scenario the evidence permits.** No shipped customer artifact contains a Mapbox
+token, so on Android the flag decides whether a map appears, not whether Mapbox
+is a processor. Option B would have re-committed the exact defect being fixed.
+
+### STILL OPEN: the public page serves the OLD text until a rebuild
+
+**This is the part that matters for the store listings, and it is not a
+formality.** The database is correct, and so is every JavaScript-enabled reader —
+the app, and the web page in a browser. The **no-JavaScript snapshot is frozen at
+the last deploy**: B7's prerender plugin is `apply: 'build'` and bakes the
+documents into `legal.html` during `vite build`.
+
+Measured on the deployed page immediately after publishing: still
+`v2.1 · 2026-09-08`, still `Mapbox — the map you use to choose a delivery
+location.`, byte-identical response size. **A store policy checker is exactly a
+no-JavaScript reader**, so from Google's and Apple's point of view nothing has
+changed yet.
+
+**A Vercel production rebuild is what closes it, and that is a §13 owner action.**
+
+**The general rule, which nobody had written down:** editing a `legal_documents`
+row does not reach a no-JavaScript client until the site is rebuilt. B7 fixed
+"the legal page has no content without JavaScript" and silently replaced it with
+"the content without JavaScript is whatever was true at the last deploy". Any
+future legal correction needs a deploy in the same breath.
+
+### The original item, kept for its reasoning
 
 **Opened 2026-09-10** by the go-live re-verification. It is the only live legal
 statement found that the software does not match, and the URL it is served at is
@@ -2430,6 +2551,9 @@ artifacts, and the native build's `EXPO_PUBLIC_MAP_PROVIDER` is not readable fro
 a session. Read it in the EAS `production` environment: if it is `google`, publish
 Option A; if it is not, publish Option B, which names both.
 
+> **Superseded 2026-09-16.** That variable *was* readable — see the head of this
+> section. It is `google`, so Option A was published.
+
 The Arabic is engineering-drafted and carries the same caveat as §29 and §33a.
 The English may be published alone if the Arabic must wait — a correct English
 disclosure beside an unchanged Arabic one beats leaving both wrong.
@@ -2438,6 +2562,12 @@ disclosure beside an unchanged Arabic one beats leaving both wrong.
 
 Bump to v2.2 with the publication date (a sub-processor change is substantive,
 not a typo fix), update `docs/GO_LIVE_READINESS.md` A9, and close this item.
+
+> **Done 2026-09-16 except the last clause.** v2.2 is published and A9 is
+> updated, but A9 is ⚠️ rather than ✅ and this item stays open, because the
+> public no-JavaScript page still serves v2.1 until a Vercel rebuild. The
+> checklist above did not anticipate that step, which is exactly why it is now
+> written at the head of this section.
 
 ## 35. Native Arabic read of the corrected iOS location purpose string
 

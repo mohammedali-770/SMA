@@ -284,7 +284,35 @@ why §4a will still be checkable next year.
 
 ---
 
-## 5. The privacy-policy blocker — still open
+## 5. The privacy-policy blocker — corrected in the database, stale on the page
+
+**`privacy_policy` v2.3 is live as of 2026-09-16.** It names Google for the map
+and **Apple for the iPhone reverse-geocode**, in both languages. v2.2, half an
+hour earlier, named only Google and claimed an "address search" customers do not
+have — that phrasing described the admin console, not either customer channel. The deciding fact came from
+`eas env:list --environment production`: `EXPO_PUBLIC_MAP_PROVIDER=google`, with
+**zero Mapbox variables** in that environment, so `OWNER_ACTIONS.md` §34's
+Option A (Google only) was the right text. §34 had recorded that variable as
+"not readable from a session"; it is readable, and that claim is now corrected.
+
+**IT IS NOT FINISHED, AND THE REASON GENERALISES TO EVERY FUTURE LEGAL EDIT.**
+B7's prerender plugin is `apply: 'build'` — it fetches the documents during
+`vite build` and bakes them into `legal.html`. The database edit therefore
+reaches the app and any browser with JavaScript, and **does not reach a
+no-JavaScript client until the site is rebuilt**. Measured on the deployed page
+straight after publishing: still `v2.1 · 2026-09-08`, still the Mapbox line,
+byte-identical response size.
+
+**Play's policy checker is a no-JavaScript reader.** So the contradiction between
+your Data Safety declaration and your published policy is still live as far as
+Google is concerned, until a Vercel production rebuild — an owner action under
+§13.
+
+**The rule to carry:** a legal correction is two steps, not one. Publish the row,
+then rebuild. B7 fixed "no content without JavaScript" and quietly replaced it
+with "content without JavaScript is frozen at the last deploy".
+
+*The original framing, kept because the ordering lesson in it still stands:*
 
 *Moved verbatim from §38. This is `OWNER_ACTIONS.md` §34, and publishing the
 correction is a §5 live write needing its own approval. Do it **before** filling
