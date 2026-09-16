@@ -2469,10 +2469,31 @@ BEFORE the write, not after it.** v2.2 was published on a drafted sentence and a
 single decisive environment variable; the full read of the map code came
 afterwards and found two things the draft had wrong.
 
-**It cost nothing here only because of the rebuild gap.** The public page had not
-rebuilt, so v2.2 never reached a no-JavaScript reader, and v2.3 went out on the
-owner's instruction before any rebuild. Exactly one version will reach the public
-page. That was luck in the timing, not a property of the process.
+**AN EARLIER VERSION OF THIS PARAGRAPH SAID "no customer has seen either
+sentence". THAT WAS FALSE, and review caught it on #386.** Only the
+**no-JavaScript snapshot** waits for a rebuild. Every other surface reads the
+table live: `src/legal/main.ts:122` fetches `legal_documents` on page load, and
+`apps/mobile/src/services/api.ts:238` queries the same table from the app. So
+**v2.2 was customer-visible for the nine minutes it was the active row**
+(07:40:34 → 07:49:39 UTC), to anyone who opened the legal screen in the app or
+the legal page in a browser.
+
+**The error is the same conflation this whole section is about** — treating "the
+public page" as though it were the only reader, when the rebuild gap makes the
+no-JavaScript snapshot the *only* surface that lags. Having just written that
+distinction down, the next paragraph immediately forgot it.
+
+**What is actually true.** The exposure was nine minutes, and v2.2 was still
+strictly more accurate than the v2.1 it replaced — it named the processor that
+receives the delivery pin instead of one that receives nothing. But "not urgent"
+was the wrong conclusion to draw, and it was drawn from a false premise: a
+known-inaccurate disclosure was live to real readers, not parked in a draft.
+
+**The lesson stands and gets sharper.** The code read that settles a disclosure
+belongs BEFORE the write. v2.2 went out on a drafted sentence plus one decisive
+environment variable; the full read came afterwards and found two things wrong,
+and those two things were briefly live. The rebuild gap limited the blast radius
+to one surface, not to none.
 
 **The drafted correction document has two further errors worth fixing before it
 is used again:** it cites `apps/mobile/src/lib/googleMaps.ts`, which does not
