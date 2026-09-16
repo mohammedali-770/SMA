@@ -2407,7 +2407,46 @@ Until both are done, leave `loyalty_expiry_enabled` off. The mechanism is applie
 and proven inert (`docs/MIGRATIONS.md` ledger row 84); nothing degrades by
 waiting.
 
-## 34. Privacy policy names the wrong map sub-processor — publish the correction
+## 34. Privacy policy map sub-processor — PUBLISHED 2026-09-16; one step left
+
+**`privacy_policy` v2.2 is live**, both languages, effective 2026-09-16. The
+Mapbox line is gone and Google is named. Exactly one line changed in each
+language and every other byte was verified identical before and after — the
+replacement was dry-run first, with a hash of the rest of the document compared
+across the edit.
+
+**The open question this section posed is answered, and the section was wrong
+about how.** It said `EXPO_PUBLIC_MAP_PROVIDER` "is not readable from a session".
+It is: `eas-cli` is authenticated here, and `eas env:list --environment
+production` returns `EXPO_PUBLIC_MAP_PROVIDER=google` with **zero Mapbox
+variables** in that environment — so the Mapbox branch has no token and cannot
+work even if it were selected. Native and web agree, so **Option A (Google only)**
+was correct. *Recorded because the next session should reach for the CLI rather
+than treat a hosted environment variable as unknowable.*
+
+### STILL OPEN: the public page serves the OLD text until a rebuild
+
+**This is the part that matters for the store listings, and it is not a
+formality.** The database is correct, and so is every JavaScript-enabled reader —
+the app, and the web page in a browser. The **no-JavaScript snapshot is frozen at
+the last deploy**: B7's prerender plugin is `apply: 'build'` and bakes the
+documents into `legal.html` during `vite build`.
+
+Measured on the deployed page immediately after publishing: still
+`v2.1 · 2026-09-08`, still `Mapbox — the map you use to choose a delivery
+location.`, byte-identical response size. **A store policy checker is exactly a
+no-JavaScript reader**, so from Google's and Apple's point of view nothing has
+changed yet.
+
+**A Vercel production rebuild is what closes it, and that is a §13 owner action.**
+
+**The general rule, which nobody had written down:** editing a `legal_documents`
+row does not reach a no-JavaScript client until the site is rebuilt. B7 fixed
+"the legal page has no content without JavaScript" and silently replaced it with
+"the content without JavaScript is whatever was true at the last deploy". Any
+future legal correction needs a deploy in the same breath.
+
+### The original item, kept for its reasoning
 
 **Opened 2026-09-10** by the go-live re-verification. It is the only live legal
 statement found that the software does not match, and the URL it is served at is
@@ -2430,6 +2469,9 @@ artifacts, and the native build's `EXPO_PUBLIC_MAP_PROVIDER` is not readable fro
 a session. Read it in the EAS `production` environment: if it is `google`, publish
 Option A; if it is not, publish Option B, which names both.
 
+> **Superseded 2026-09-16.** That variable *was* readable — see the head of this
+> section. It is `google`, so Option A was published.
+
 The Arabic is engineering-drafted and carries the same caveat as §29 and §33a.
 The English may be published alone if the Arabic must wait — a correct English
 disclosure beside an unchanged Arabic one beats leaving both wrong.
@@ -2438,6 +2480,12 @@ disclosure beside an unchanged Arabic one beats leaving both wrong.
 
 Bump to v2.2 with the publication date (a sub-processor change is substantive,
 not a typo fix), update `docs/GO_LIVE_READINESS.md` A9, and close this item.
+
+> **Done 2026-09-16 except the last clause.** v2.2 is published and A9 is
+> updated, but A9 is ⚠️ rather than ✅ and this item stays open, because the
+> public no-JavaScript page still serves v2.1 until a Vercel rebuild. The
+> checklist above did not anticipate that step, which is exactly why it is now
+> written at the head of this section.
 
 ## 35. Native Arabic read of the corrected iOS location purpose string
 

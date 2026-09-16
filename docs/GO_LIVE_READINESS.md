@@ -306,7 +306,11 @@ is itself an unexamined surface.
 
 | # | Item | Status | Evidence |
 | --- | --- | --- | --- |
-| **A9** | **The privacy policy names the wrong map sub-processor** | ❌ | `privacy_policy` v2.1 says `Mapbox — the map you use to choose a delivery location` in **both languages**. The shipped web bundle carries a Google Maps key (`AIza` present) and **no Mapbox token** (`pk.` absent, 0 occurrences), and `googleMaps.ts` uses Google **Places** for address search. A named processor receives nothing while an unnamed one receives the customer's **delivery coordinates** — wrong in both directions, in the document destined for both store listings. Replacement text, evidence and its limits: [`legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`](legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md); owner action `OWNER_ACTIONS.md` §34. **Read `EXPO_PUBLIC_MAP_PROVIDER` in the EAS production environment before publishing** — the evidence proves the web channel only, and both providers are compiled into both artifacts. |
+| **A9** | **The privacy policy names the wrong map sub-processor** | ⚠️ **CORRECTED IN THE DATABASE 2026-09-16; the public page is STALE until a rebuild** | `privacy_policy` v2.1 says `Mapbox — the map you use to choose a delivery location` in **both languages**. The shipped web bundle carries a Google Maps key (`AIza` present) and **no Mapbox token** (`pk.` absent, 0 occurrences), and `googleMaps.ts` uses Google **Places** for address search. A named processor receives nothing while an unnamed one receives the customer's **delivery coordinates** — wrong in both directions, in the document destined for both store listings. Replacement text, evidence and its limits: [`legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`](legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md); owner action `OWNER_ACTIONS.md` §34. **That variable was read, and the row that said it could not be is corrected.** `eas env:list --environment production` gives `EXPO_PUBLIC_MAP_PROVIDER=google`, with **zero Mapbox variables** in that environment — so the Mapbox branch has no token and could not work even if selected. Native and web agree, which settled §34 on **Option A (Google only)**. **`privacy_policy` v2.2 was published 2026-09-16**, both languages, one line changed and every other byte verified identical.
+
+**IT IS NOT ✅, AND THE REASON IS THE MOST USEFUL THING ON THIS ROW.** The database is correct and so is every JavaScript-enabled reader — the app, and the web page in a browser. **The no-JavaScript snapshot still says Mapbox and still says v2.1**, because B7's prerender plugin runs with `apply: 'build'` and bakes the documents into `legal.html` during `vite build`. Verified on the deployed page after publication: still `v2.1 · 2026-09-08`, still `Mapbox — the map you use to choose a delivery location.`, byte-identical response size.
+
+**Play's policy checker is exactly a no-JavaScript reader**, so from Google's point of view nothing changed. A Vercel production rebuild closes this and is an owner action (§13). **Generalise it: editing a `legal_documents` row does not reach a no-JavaScript client until the site is rebuilt.** B7 fixed "no content without JavaScript" and, unremarked until now, replaced it with "content without JavaScript is frozen at the last deploy". |
 | **B8** | **The iOS binary declared three purpose strings for capabilities the app never uses** — ✅ fixed 2026-09-10 | `expo-location`'s config plugin is auto-applied and injected `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationAlwaysUsageDescription` and `NSMotionUsageDescription`, all generic `Allow $(PRODUCT_NAME) to…` placeholders. An Always-location and a Motion declaration invite an App Review question with no good answer, since neither capability is used. Fixed by declaring the plugin explicitly with `false` for those three, which makes `applyPermissions` delete them. **Verified from the resolved config, not from source**: `expo config --type introspect` now yields exactly **one** usage description — the corrected when-in-use string — and no `UIBackgroundModes`. |
 
 ### The adversarial pass found one more cash blocker, and it is the sharpest thing on this page
@@ -454,9 +458,10 @@ The 2026-09-03 list stands, with these amendments:
 
 - **A5 joins it** — no breach-notification path exists at all (it was ⬜, it is
   now ❌). Hours of writing plus a named person. **Cheapest item on the page.**
-- **A9 joins it** — the live privacy policy names the wrong map sub-processor,
-  in the document whose URL goes into both store listings. Draft ready; one
-  environment variable to read first.
+- **A9 is half closed** — the privacy policy was corrected to v2.2 on
+  2026-09-16 and names Google. The **public no-JavaScript page still serves the
+  old v2.1 text**, because the legal snapshot is baked at build time; a Vercel
+  rebuild is what finishes it. See A9.
 - **X3 shrinks to one click** — three of its four steps are done. It is now the
   cheapest *owner* item, not a project.
 - **X2 shrinks in scope but not in necessity** — the web channel already carries
