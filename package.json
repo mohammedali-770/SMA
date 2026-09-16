@@ -18,6 +18,8 @@
     "logo:check": "node scripts/build-logo-mark.mjs --check",
     "play-icon:build": "node scripts/build-play-icon.mjs",
     "play-icon:check": "node scripts/build-play-icon.mjs --check",
+    "play-feature-graphic:build": "node scripts/build-play-feature-graphic.mjs",
+    "play-feature-graphic:check": "node scripts/build-play-feature-graphic.mjs --check",
     "play-screenshots:build": "node scripts/build-play-screenshots.mjs",
     "play-screenshots:check": "node scripts/check-play-screenshots.mjs",
     "design-system:sync": "node scripts/sync-design-system.mjs",

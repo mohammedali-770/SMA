@@ -60,6 +60,8 @@ import { dirname, join } from 'node:path';
 
 import { chromium } from 'playwright';
 
+import { decodePng, encodePng } from './lib/png.mjs';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_DIR = join(ROOT, 'assets/store/screenshots/source');
 const TARGET_DIR = join(ROOT, 'assets/store/screenshots');
@@ -76,6 +78,22 @@ const RADIUS = 44;
 
 /** Source rows removed from capture-5; see the header. `end` is exclusive. */
 const BANNER = { start: 212, end: 267 };
+
+/*
+ * ── AND ONE RE-ENCODE, WHICH IS NOT COSMETIC ────────────────────────────────
+ *
+ * Play's contract for a screenshot is "JPEG or 24-bit PNG (no alpha)" — the
+ * OPPOSITE of the store icon, which must be a "32-bit PNG (with alpha)". A
+ * canvas always hands back RGBA, so `toDataURL('image/png')` writes colour type
+ * 6, and an image that is fully OPAQUE still declares a channel Play refuses.
+ * The canvas PNG is therefore decoded and re-encoded as colour type 2 through
+ * this repository's own codec, losslessly — the alpha is uniformly 255, so
+ * dropping the channel discards nothing.
+ *
+ * Codex caught this on the feature graphic (PR #383). The same defect was here,
+ * and the checker that should have caught it asserted OPACITY while its header
+ * claimed "Play does not reject an alpha channel". It does.
+ */
 
 const SHOTS = [
   { source: 'capture-1.jpg', target: 'phone-1-orders.png' },
@@ -223,7 +241,22 @@ await browser.close();
 
 mkdirSync(TARGET_DIR, { recursive: true });
 for (const result of composed) {
-  const png = Buffer.from(result.dataUrl.slice(result.dataUrl.indexOf(',') + 1), 'base64');
+  const canvasPng = Buffer.from(result.dataUrl.slice(result.dataUrl.indexOf(',') + 1), 'base64');
+
+  const decoded = decodePng(canvasPng);
+  for (let i = 3; i < decoded.pixels.length; i += 4) {
+    if (decoded.pixels[i] !== 0xff) {
+      throw new Error(
+        `${result.target}: the canvas produced a transparent pixel — the composition should cover the whole canvas`,
+      );
+    }
+  }
+  const png = encodePng({ ...decoded, colorType: 2 });
+  // Read the colour-type byte back out of the encoded buffer rather than
+  // trusting the argument just passed: offset 25 is what Play reads.
+  if (png[25] !== 2) {
+    throw new Error(`${result.target}: encoded colour type ${png[25]}, expected 2 (RGB, no alpha)`);
+  }
   writeFileSync(join(TARGET_DIR, result.target), png);
   const { cropH, innerW, innerH, x, y } = result.geometry;
   const spliceNote = result.splice

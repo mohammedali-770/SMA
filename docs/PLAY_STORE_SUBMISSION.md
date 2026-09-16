@@ -644,7 +644,7 @@ makes that rule honest.
 | --- | --- | --- |
 | App icon 512×512 | ✅ committed, CI-checked | `assets/store/play-icon-512.png` |
 | Phone screenshots ×5 | ✅ committed, CI-checked | `assets/store/screenshots/` |
-| Feature graphic 1024×500 | generated, awaiting merge | PR #383 |
+| Feature graphic 1024×500 | ✅ committed, CI-checked | `assets/store/play-feature-graphic-1024x500.png` |
 | Short + full description, ar/en | drafted, not entered | `store/LISTING_COPY.md` |
 | Release notes, ar/en | drafted, not entered | `store/LISTING_COPY.md` |
 | App category | not set — Console-only field | Play Console |
@@ -740,8 +740,36 @@ near-identically. What *would* have been a problem is a web render — a differe
 layout engine, different fonts, different metrics — which is why these are device
 captures of the real app rather than anything produced in a browser.
 
+### The colour-type contract, and the mistake it caught
+
+**Play's asset rules are not one rule but three, and the difference is a channel
+rather than a pixel:**
+
+| Asset | Play requires | PNG colour type |
+| --- | --- | --- |
+| App icon | 32-bit PNG **with** alpha | 6 |
+| Feature graphic | JPEG or 24-bit PNG, **no** alpha | 2 |
+| Screenshots | JPEG or 24-bit PNG, **no** alpha | 2 |
+
+`scripts/lib/png.mjs` hardcoded colour type 6, and a browser canvas always hands
+back RGBA, so every store asset this repository produced was 32-bit. **That is
+correct for the icon and wrong for the other two**, and being *fully opaque* does
+not fix it — the IHDR still declares a channel Play refuses.
+
+**Codex caught it on the feature graphic in PR #383, and the same defect was in
+the screenshots**, where the checker written to catch exactly this asserted
+opacity and said in its own header that "Play does not reject an alpha channel".
+It does. The encoder now takes an opt-in colour type, the two no-alpha assets
+pass 2, and the check asserts the colour type read back out of the file rather
+than the argument that was passed in.
+
+**The generalisable part:** when a contract names a *format*, assert the format,
+not a property you believe implies it. "Opaque" and "has no alpha channel" sound
+interchangeable and are not, and only one of them is what the other side reads.
+
 **What the CI check can and cannot prove.** It proves geometry and format
-(1080 × 1920, opaque, under Play's 8 MB ceiling, 2-8 images) and it proves the
+(1080 × 1920, **24-bit RGB with no alpha channel**, under Play's 8 MB ceiling,
+2-8 images) and it proves the
 composition ran — a raw capture dropped into the directory has no uniform
 backdrop border and fails, which is mutation-tested five ways. It **cannot** tell
 whether the status bar was cropped or whether the image shows this app at all.
