@@ -2789,43 +2789,85 @@ processing result. The listing text is already drafted in both languages
 ([`store/LISTING_COPY.md`](store/LISTING_COPY.md)). **The first upload was
 yours**, and the production application will be too.
 
-## 39. Privacy policy — the body's own effective date still says 8 September
+## 39. ~~Privacy policy — the body's own effective date said 8 September~~ — CORRECTED 2026-09-16
 
-**Opened 2026-09-16 by closing §34.** One statement to fix, in each language. It
-is a §5 live write, so it is yours.
+**Opened and closed on 2026-09-16**, by closing §34. One statement, both
+languages, on explicit owner approval ("fix the date and merge 387").
 
-**The defect.** `legal_documents.effective_date` for `privacy_policy` is
-`2026-09-16` and the page renders `v2.3 · 2026-09-16`. The first line of
-`content_en` is `Effective date: 8 September 2026` and of `content_ar` is
+**The defect.** `legal_documents.effective_date` for `privacy_policy` was
+`2026-09-16` and the page rendered `v2.3 · 2026-09-16`, while the first line of
+`content_en` read `Effective date: 8 September 2026` and of `content_ar`
 `تاريخ السريان: ٨ سبتمبر ٢٠٢٦`. Two dates, one document, and the earlier one
-claims the Google-and-Apple map disclosure was in force a week before it was
+claimed the Google-and-Apple map disclosure was in force a week before it was
 written.
 
-**It is the only one of the nine active documents with this mismatch**, measured
-live rather than assumed — the other eight agree.
+**It was the only one of the nine active documents with this mismatch**, measured
+live rather than assumed — the other eight agreed, and all nine agree now.
 
-**Why it exists.** v2.2 and v2.3 were each published by replacing exactly one line
-and hashing the rest of the document, masked at that line, to prove nothing else
-moved. That invariant is correct for a wording fix. For a version bump whose
-effective date moves, it actively protects the stale copy of the date — because the
-in-body date line is one of the bytes it certifies as unchanged.
+**Why it existed.** v2.2 and v2.3 were each published by replacing exactly one
+line and hashing the rest of the document, masked at that line, to prove nothing
+else moved. That invariant is correct for a wording fix. For a version bump whose
+effective date moves, it actively protects the stale copy of the date — because
+the in-body date line is one of the bytes it certifies as unchanged.
 
-**The fix.** Replace the first line of each language, and nothing else. No version
-bump: v2.3's *substance* is correct and already published, and this corrects the
-document to say what its own metadata has said since it was published. Same
-dry-run method as before — compute the replacement in a `select`, hash the
-document with the target line masked on both sides, confirm the two hashes match,
-then write.
+**No version bump.** v2.3's *substance* was correct and already published; this
+made the document say what its own metadata had said since publication. Bumping
+would have implied a substantive change and made a fourth version in one day.
+
+### What was done, in the order it has to be done
+
+**1. Dry run.** The replacement was computed in a `select`, line 1 was dropped
+from both the old and the new text, and the remainder hashed on each side:
+identical in both languages (EN `a831b0be…`, AR `e4a7efd5…`). Total length grew by
+exactly **one character** per language, which is what one digit added by one
+replacement looks like.
+
+**2. The write**, guarded on the exact pre-image hashes so it could not apply to a
+row that had moved since the dry run:
 
 ```sql
--- English: 'Effective date: 8 September 2026' -> 'Effective date: 16 September 2026'
--- Arabic:  'تاريخ السريان: ٨ سبتمبر ٢٠٢٦'      -> 'تاريخ السريان: ١٦ سبتمبر ٢٠٢٦'
+update public.legal_documents
+   set content_en = replace(content_en, 'Effective date: 8 September 2026',
+                                        'Effective date: 16 September 2026'),
+       content_ar = replace(content_ar, 'تاريخ السريان: ٨ سبتمبر ٢٠٢٦',
+                                        'تاريخ السريان: ١٦ سبتمبر ٢٠٢٦')
+ where document_type = 'privacy_policy' and is_active and version = '2.3'
+   and md5(content_en) = 'd513a4d84ebb4d261cce2ae104c814f5'
+   and md5(content_ar) = '84bf31e100317414a1a7c5819ab85536';
 ```
 
-**Generalise it rather than just fixing it:** a dated document keeps its date in
-two places and only one of them is a column. Any future `legal_documents` version
-bump must move both, and the "nothing else changed" check must be taken *around*
-the date line, not over it.
+One row. The post-write hashes matched the values pre-computed from the dry run —
+EN `d3e760c5dc2823e6115003d23bcc0798` / 4 623 chars, AR
+`d2acff9656d3afa072feddb76947d226` / 3 744 — so the stored text is the text that
+was reviewed, not something retyped into it.
+
+**3. Nothing else moved, and the evidence is a timestamp rather than a count.**
+Only `privacy_policy.updated_at` changed (08:39:10 UTC); the other eight rows
+still carry their original stamps, back to 18 August.
+
+**4. THE REBUILD — the step the first draft of this section left out.** Review
+caught it on #387, and it was right to: the procedure ended at the write, which is
+the exact two-step failure §34 exists to record. The no-JavaScript snapshot is
+baked into `legal.html` during `vite build`, so a store's policy checker keeps
+serving the old line until the site is rebuilt.
+
+It was proven **before** merging rather than hoped for afterwards: the real
+production build was run locally against the live row, and the prerendered
+`dist/legal.html` — the exact artifact Vercel serves — carried
+`v2.3 · 2026-09-16` / `Effective date: 16 September 2026` /
+`تاريخ السريان: ١٦ سبتمبر ٢٠٢٦`, with Mapbox still at zero occurrences. Merging
+#387 then ran that same build against Production, and the public page was
+re-fetched to confirm it.
+
+**Generalise it rather than just fixing it.** Both rules are now in
+[`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md) §Method, which is where
+somebody editing these documents will actually look:
+
+- a dated document keeps its date in **two** places and only one of them is a
+  column — move both, and take the "nothing else changed" hash *around* the date
+  line rather than over it;
+- publishing is **two steps**, the write and then a rebuild, because the artifact
+  a store reads is baked at build time.
 
 ---
 

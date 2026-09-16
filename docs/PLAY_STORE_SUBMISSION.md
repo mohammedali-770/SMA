@@ -317,11 +317,13 @@ and the policy now agree.**
 then rebuild. B7 fixed "no content without JavaScript" and quietly replaced it
 with "content without JavaScript is frozen at the last deploy".
 
-**One defect survives in that document and it is not a Play blocker.** Its own
-first line, in both languages, still gives an effective date of 8 September 2026
-while the metadata says 16 September — see `OWNER_ACTIONS.md` §39 and
-`GO_LIVE_READINESS.md` **A10**. It is a self-contradiction about a date, not a
-processor claim, so nothing in the Data Safety form conflicts with it.
+**One defect surfaced while verifying this, and it was fixed the same day.** The
+document's own first line, in both languages, still gave an effective date of
+8 September 2026 while the metadata said 16 September — a self-contradiction about
+a date rather than a processor claim, so it never conflicted with the Data Safety
+form. Corrected on the same approval that merged this record; record in
+`OWNER_ACTIONS.md` §39, item `GO_LIVE_READINESS.md` **A10**. **Nothing about this
+document is open.**
 
 *The original framing, kept because the ordering lesson in it still stands:*
 

@@ -147,3 +147,20 @@ Tracked in [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md).
 4. Correct with `replace()` against stored content, never a re-paste.
 5. Verify by predicate afterwards: old string absent, new string present,
    untouched sections intact — in every language.
+6. **If the version or effective date moves, move it in BOTH places.** The date
+   lives in the `effective_date` column *and* in the document's own first line,
+   and only one of them is a column. Take the "nothing else changed" hash
+   *around* that line, not over it — otherwise the check that proves the edit was
+   surgical is the same check that protects the stale copy. This is not
+   hypothetical: `privacy_policy` went to v2.2 and then v2.3 on 2026-09-16 with
+   its body still dated 8 September, and the invariant is why
+   (`OWNER_ACTIONS.md` §39).
+7. **Publishing is two steps: the write, then a rebuild.** A `legal_documents`
+   edit reaches the app and any browser running JavaScript immediately. It does
+   **not** reach a no-JavaScript client until the site is rebuilt, because
+   `vite.config.ts`'s `prerenderLegal` plugin is `apply: 'build'` and bakes the
+   documents into `legal.html`. **A store's policy checker is exactly a
+   no-JavaScript reader**, so until the rebuild it still sees the old text. Here
+   a merge to the default branch is the production rebuild; verify on
+   `https://app.spicymeal.com.sa/privacy` with `<script>` stripped, not on the
+   row you just wrote.

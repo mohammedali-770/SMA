@@ -313,7 +313,7 @@ is itself an unexamined surface.
 **The rebuild ran on 2026-09-16 and the page is confirmed.** Merging #386 to the default branch is itself the Vercel production trigger — the live deploy path, which is why no second path was added (§13). Re-fetched from `https://app.spicymeal.com.sa/privacy` with scripts stripped, which is what a policy checker reads: `v2.3 · 2026-09-16`, **zero occurrences of `Mapbox` in either language**, the Google-and-Apple sentence present in both, build stamp `Published documents as of 2026-09-16`.
 
 **Generalise it: editing a `legal_documents` row does not reach a no-JavaScript client until the site is rebuilt.** B7 fixed "no content without JavaScript" and, unremarked until now, replaced it with "content without JavaScript is frozen at the last deploy". **A legal correction is two steps, not one**, and the second one is the one a store sees. |
-| **A10** | **The privacy policy contradicts itself about its own effective date** | ❌ **found 2026-09-16, live now** | The row's `effective_date` column is `2026-09-16` and the page renders `v2.3 · 2026-09-16`. The **first line of the document body**, in both languages, still reads `Effective date: 8 September 2026` / `تاريخ السريان: ٨ سبتمبر ٢٠٢٦` — carried over from v2.1. So a reader is given two different effective dates for one document, and the earlier one asserts that the Google-and-Apple map disclosure took effect a week before it existed. **It is the only one of the nine active documents where the two disagree** — measured, not assumed: all eight others have a body date matching their column. **This is a defect the safety discipline produced.** Each publication changed exactly one line and hashed the rest of the document to prove nothing else moved; the body's own date line was one of the bytes that check was guaranteeing had *not* changed. **The invariant was right for a wording fix and wrong for a version bump whose date moves** — a dated document has two places the date lives, and only one of them is a column. Fixing it is a one-line edit per language and a §5 live write, so it is the owner's call; the repository change is this row. |
+| **A10** | ~~**The privacy policy contradicts itself about its own effective date**~~ — **CORRECTED 2026-09-16, hours after it was found** | ✅ | The row's `effective_date` column is `2026-09-16` and the page renders `v2.3 · 2026-09-16`. The **first line of the document body**, in both languages, still reads `Effective date: 8 September 2026` / `تاريخ السريان: ٨ سبتمبر ٢٠٢٦` — carried over from v2.1. So a reader is given two different effective dates for one document, and the earlier one asserts that the Google-and-Apple map disclosure took effect a week before it existed. **It is the only one of the nine active documents where the two disagree** — measured, not assumed: all eight others have a body date matching their column. **This is a defect the safety discipline produced.** Each publication changed exactly one line and hashed the rest of the document to prove nothing else moved; the body's own date line was one of the bytes that check was guaranteeing had *not* changed. **The invariant was right for a wording fix and wrong for a version bump whose date moves** — a dated document has two places the date lives, and only one of them is a column. **Corrected the same day on explicit owner approval**, one guarded statement, both languages. The dry run dropped line 1 from each side and hashed the remainder — identical — and the post-write hashes matched the values pre-computed from it, so the stored text is the reviewed text. Only `privacy_policy.updated_at` moved; the other eight rows still carry stamps going back to 18 August, which is better evidence than a row count. **And it was not called done at the write** — review caught that the draft procedure stopped there, which is §34's two-step failure exactly. The production build was run locally against the corrected row first, and the prerendered `legal.html` carried the new date in both languages before anything was merged. Full record: `OWNER_ACTIONS.md` §39; the two rules it produced are in `LEGAL_DOCUMENTS_AUDIT.md` §Method. |
 | **B8** | **The iOS binary declared three purpose strings for capabilities the app never uses** — ✅ fixed 2026-09-10 | `expo-location`'s config plugin is auto-applied and injected `NSLocationAlwaysAndWhenInUseUsageDescription`, `NSLocationAlwaysUsageDescription` and `NSMotionUsageDescription`, all generic `Allow $(PRODUCT_NAME) to…` placeholders. An Always-location and a Motion declaration invite an App Review question with no good answer, since neither capability is used. Fixed by declaring the plugin explicitly with `false` for those three, which makes `applyPermissions` delete them. **Verified from the resolved config, not from source**: `expo config --type introspect` now yields exactly **one** usage description — the corrected when-in-use string — and no `UIBackgroundModes`. |
 
 ### The adversarial pass found one more cash blocker, and it is the sharpest thing on this page
@@ -457,17 +457,18 @@ quietly retired.
     *(2026-09-16)*
 
 **Revised again 2026-09-10 — the nine become eleven, and two of them are cheap.**
-*(Amended 2026-09-16: A9 closes and A10 opens, so it is still eleven — see the
-bottom of this block.)*
+*(Amended 2026-09-16: A9 and A10 both close, A10 on the day it was found — see
+the bottom of this block.)*
 The 2026-09-03 list stands, with these amendments:
 
 - **A5 joins it** — no breach-notification path exists at all (it was ⬜, it is
   now ❌). Hours of writing plus a named person. **Cheapest item on the page.**
-- **A9 is closed** — the privacy policy went to v2.2 and then v2.3 on
-  2026-09-16, and the Vercel rebuild that the no-JavaScript snapshot needs has
-  run. The public page now serves v2.3 with Mapbox absent in both languages.
-  **A10 replaces it as this document's open privacy-policy defect**, and is a
-  different fault in the same row. See A9 and A10.
+- **A9 is closed, and so is A10** — the privacy policy went to v2.2 and then
+  v2.3 on 2026-09-16, the Vercel rebuild the no-JavaScript snapshot needs has
+  run, and the in-body effective date that closing A9 exposed was corrected the
+  same day. The public page serves v2.3 with Mapbox absent and both dates
+  agreeing. **No privacy-policy defect is open.** See A9, A10 and
+  `OWNER_ACTIONS.md` §34 and §39.
 - **X3 shrinks to one click** — three of its four steps are done. It is now the
   cheapest *owner* item, not a project.
 - **X2 shrinks in scope but not in necessity** — the web channel already carries
@@ -477,14 +478,13 @@ The 2026-09-03 list stands, with these amendments:
   roles unfilled. X3's stopgap depends on it, so it is not separable from X3.
 - **X7 stays the cheapest test**, unchanged: one real login.
 
-**Amended 2026-09-16 — A10 joins the list, and it is the cheapest item on it.**
-The live privacy policy contradicts itself about its own effective date: the
-column and the rendered meta line say 2026-09-16, the first line of the body in
-both languages still says 8 September 2026. It is one statement to fix, already
-drafted, and it is a §5 live write so it waits for approval. It is listed because
-the text is wrong and live, not because it takes time. **It is also the only
-blocker on this page that was created by closing another one** — A9's two
-publications moved the column and left the body line behind.
+**Amended 2026-09-16 — A10 opened and closed inside the same day, so the count
+is unchanged at eleven.** It is recorded rather than dropped because of what it
+was: **the only blocker on this page created by closing another one.** A9's two
+publications moved the `effective_date` column and left the document's own first
+line behind, so the live privacy policy briefly gave two different effective
+dates. One guarded statement fixed it, on the same approval that merged the
+change. Nothing on the list below moved.
 
 **Additionally, and only if taking card payment:** G1/G2 (no provider, weeks of
 onboarding), the 8-week-old payment bundles that cannot be redeployed safely one at a
