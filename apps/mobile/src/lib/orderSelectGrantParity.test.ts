@@ -70,7 +70,10 @@ describe('customer order select ↔ database grant parity', () => {
     (col) => {
       expect(CUSTOMER_ORDER_COLUMNS).toContain(col);
       expect(sql).toMatch(
-        new RegExp(`grant\\s+select\\s*\\([^)]*\\b${col}\\b[^)]*\\)\\s+on\\s+public\\.orders\\s+to\\s+authenticated`, 'i'),
+        new RegExp(
+          `grant\\s+select\\s*\\([^)]*\\b${col}\\b[^)]*\\)\\s+on\\s+public\\.orders\\s+to\\s+authenticated`,
+          'i',
+        ),
       );
     },
   );
@@ -85,10 +88,12 @@ describe('customer order select ↔ database grant parity', () => {
     const withheld = columnsFromArrayLiteral(sql, 'withheld set must stay withheld');
     expect(withheld.length).toBeGreaterThan(0);
     for (const col of withheld) {
-      expect(INTERNAL_ONLY_ORDER_COLUMNS, `${col} is asserted withheld but is not internal-only`)
-        .toContain(col);
-      expect(CUSTOMER_ORDER_COLUMNS, `${col} is both withheld and in the customer contract`)
-        .not.toContain(col);
+      expect(INTERNAL_ONLY_ORDER_COLUMNS, `${col} is asserted withheld but is not internal-only`).toContain(
+        col,
+      );
+      expect(CUSTOMER_ORDER_COLUMNS, `${col} is both withheld and in the customer contract`).not.toContain(
+        col,
+      );
     }
   });
 
