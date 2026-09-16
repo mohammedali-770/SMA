@@ -2424,6 +2424,56 @@ work even if it were selected. Native and web agree, so **Option A (Google only)
 was correct. *Recorded because the next session should reach for the CLI rather
 than treat a hosted environment variable as unknowable.*
 
+### ALSO OPEN: v2.2's wording over-claims in one place and under-claims in another
+
+**Found immediately after publishing, by an exhaustive read of the map code that
+should have happened before.** v2.2 is a large improvement on v2.1 — it names the
+processor that actually receives the delivery pin instead of one that receives
+nothing — but two details in the drafted sentence do not survive the code:
+
+1. **"and address search" describes a feature the customer does not have.**
+   `places.googleapis.com/v1/places:searchText` is called from exactly one place,
+   `src/components/MapSearchBox.tsx:51`, which is the **admin console** — used for
+   drawing delivery zones and editing branch addresses. Neither customer channel
+   has an address search at all. The line promises Google receives something it
+   does not receive from customers.
+
+2. **On iPhone the reverse geocode goes to APPLE, and no version has ever said
+   so.** `LocationPickerMap.tsx:188` calls `Location.reverseGeocodeAsync`, which
+   is the **OS** geocoder — Apple's CLGeocoder on iOS, Play services on Android.
+   Only the web path uses Google's own `Geocoder`
+   (`LocationPickerMap.web.tsx:126`). So an iPhone customer's picked coordinate
+   reaches Apple, and the policy names only Google.
+
+**This is the same class of error v2.2 was published to fix** — a sub-processor
+list that does not match the software — caught one layer down. It is not urgent:
+v2.2 is strictly more accurate than v2.1, and **the public page has not rebuilt
+yet**, so no customer has seen either sentence.
+
+**That timing is the opportunity.** Correcting the wording to v2.3 *before* the
+Vercel rebuild means exactly one version ever reaches the public page. Doing it
+after means publishing twice.
+
+**Proposed v2.3 wording, for the owner's decision** — it is a legal disclosure,
+so the wording is theirs, not mine:
+
+- Google — the map you use to choose a delivery location, and, on the web and on
+  Android, turning that point into a street address. It receives the coordinates
+  of the point you pick.
+- Apple — on iPhone only, turning the point you pick into a street address. It
+  receives those coordinates.
+
+**The drafted correction document has two further errors worth fixing before it
+is used again:** it cites `apps/mobile/src/lib/googleMaps.ts`, which does not
+exist (the real file is `src/lib/googleMaps.ts`, the admin loader), and it says
+"both providers are compiled into both artifacts", which is false for the web
+artifact — `LocationPickerMap.web.tsx` contains no Mapbox path at all.
+
+**One thing this does NOT change: Option A was right, and was right under every
+scenario the evidence permits.** No shipped customer artifact contains a Mapbox
+token, so on Android the flag decides whether a map appears, not whether Mapbox
+is a processor. Option B would have re-committed the exact defect being fixed.
+
 ### STILL OPEN: the public page serves the OLD text until a rebuild
 
 **This is the part that matters for the store listings, and it is not a
