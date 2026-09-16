@@ -20,13 +20,16 @@
 | App Store Connect app record | exists — ASC App ID **6800210683**, bundle `com.spicymeal.app` |
 | ASC API key in EAS | working — `W7LY8D9FKX` (`[Expo] EAS Submit kROBQixX90`), read and write both exercised 2026-09-16 |
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
-| newest iOS build | **1.0.0 (23)**, `fcb7d682-7b31-4d9b-ac22-9e0a86ea2493`, commit `f82cecbe`, FINISHED 2026-09-14 — **SUPERSEDED, do not submit** |
-| that build in TestFlight | **NO — Apple rejected the upload.** §3 |
-| newest build actually in TestFlight | **1.0.0 (22)**, submitted 2026-08-26 |
-| first submittable build | **1.0.0 (24)** — does not exist yet; it is what §8 step 1 produces |
+| newest iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
+| **build 24 uploaded to App Store Connect** | **YES, 2026-09-16 11:05:33 UTC** — see §3a, and note EAS reported the submission ERRORED anyway |
+| build 23 | **SUPERSEDED, do not submit** — it is the one Apple refused. §3 |
+| previous build in TestFlight | **1.0.0 (22)**, submitted 2026-08-26 |
 
-**The blocker is a purpose string, not a credential, not a policy item, and not
-the binary's contents.** It needs one config line, already fixed, and a rebuild.
+**The purpose-string blocker is fixed and build 24 carries it** — verified in the
+binary, not the config: its `Info.plist` holds **two** usage descriptions,
+when-in-use and motion, with no `UIBackgroundModes`. Build 24 is uploaded.
+**What remains is entirely App Store Connect console work** (§8), none of which
+needs another build.
 
 ---
 
@@ -172,6 +175,75 @@ caveat as `OWNER_ACTIONS.md` §29, §33a and §35. Fold it into that review.
 string non-empty, both Always props `false`, the when-in-use string present, every
 purpose string in both locales, and the Arabic file not holding the English
 sentence. Mutation-tested three ways, all three killed.
+
+---
+
+## 3a. Build 24 — it uploaded, and EAS said it failed
+
+**Build 24 is in App Store Connect.** It was built from `8e4cd8a1` (the merged
+default branch, carrying both the purpose-string fix and the SDK patch bump) and
+verified **in the binary** before submitting, not in the config that caused the
+last failure: `Info.plist` holds **two** usage descriptions — when-in-use and
+motion — and no `UIBackgroundModes`.
+
+### The submission reported ERRORED and the upload had already succeeded
+
+This is the most useful operational fact on this page, because the obvious
+response to it is wrong.
+
+| UTC | what the log says |
+| --- | --- |
+| 11:05:31-32 | all **6 chunks** uploaded |
+| 11:05:32 | `Committing upload...` |
+| 11:05:33 | **`File upload (ID: e063b258-…) completed!`** |
+| 11:05:34 → 11:08:29 | `Waiting for build upload to complete... (status = PROCESSING)`, ~3 minutes |
+| 11:09:00 | Apple returns **HTTP 500**, EAS fails the step |
+
+```
+Unexpected response (500) from App Store Connect:
+  "status": "500", "code": "UNEXPECTED_ERROR",
+  "detail": "An unexpected error occurred on the server side."
+```
+
+**The 500 hit the status-polling call, not the transfer.** The binary was already
+delivered and Apple was processing it. EAS nonetheless marks the whole submission
+`ERRORED`, with no distinction between "we could not upload" and "we uploaded and
+then lost track of it".
+
+**Proven rather than assumed, by the retry.** Resubmitting the same build returned:
+
+> `Build number 24 for app version 1.0.0 has already been used. App Store Connect
+> requires unique build numbers within each app version (version train).`
+
+That is Apple stating it holds build 24. The retry cost four minutes and was
+refused cleanly — no duplicate, no harm — but it was avoidable.
+
+### Two rules to carry
+
+1. **An EAS submission marked ERRORED does not mean the upload failed.** Read the
+   log timeline before retrying: if `File upload ... completed!` appears, the
+   binary is at Apple and the right next step is to look at App Store Connect,
+   not to resubmit. Resubmitting a delivered build can only be refused, because
+   build numbers are unique per version train.
+2. **The submission logs are Brotli-compressed, and nothing says so.**
+   `Content-Type` is unset, `file` reports "data", and gzip/zlib/bz2/lzma all
+   fail. The first read of one produced screenfuls of binary garbage.
+
+   ```bash
+   node -e "const z=require('zlib'),f=require('fs');
+     process.stdout.write(z.brotliDecompressSync(f.readFileSync('log')))"
+   ```
+
+   The decompressed file is **JSON lines**; filter on `level >= 40` to get
+   straight to the failures.
+
+**How to get the log at all** is §3's lesson and still applies: the CLI prints
+only *"Something went wrong"*, `submission.error` is null, and `submission
+.logFiles` is empty. The URL is at `submissions.byId(…) { jobRun { logFileUrls } }`,
+and the structured error — when there is one — at `jobRun { errors { errorCode
+message } }`. Note that build 23's failure produced a structured
+`EAS_UPLOAD_TO_ASC_MISSING_PURPOSE_STRING` with **no** log file, while build 24's
+produced `UNKNOWN_ERROR` **with** one. **Check both.**
 
 ---
 
@@ -360,14 +432,15 @@ update both, and Play in particular reuses them for every future review.
 
 ## 8. What is left, in order
 
-1. **Merge the purpose-string fix**, then **build** (it will be 1.0.0 (24) —
-   `appVersionSource: remote` with `autoIncrement: true`), then **submit**. Each
-   is a §5 action.
-   **Run `npx expo install --check` immediately before the build** — SDK patch
-   drift has recurred twice, most recently four days after being recorded closed
-   (`GO_LIVE_READINESS.md`).
-2. **Add internal testers** in App Store Connect. That is the only step between a
-   processed build and an installable one.
+1. ~~Merge the purpose-string fix, build, submit.~~ **DONE 2026-09-16.** #388
+   merged the fix, #389 cleared the SDK patch drift that `npx expo install
+   --check` found immediately before the build (three packages, the third
+   recurrence), build 24 was produced from `8e4cd8a1` and uploaded at 11:05:33
+   UTC. §3a covers the misleading ERRORED status.
+2. **Confirm build 24 in App Store Connect → TestFlight**, and add **internal
+   testers**. That is the only step between the uploaded build and an installable
+   one — internal testing needs no Beta App Review. Apple emails when processing
+   finishes.
 3. **Enter the App Privacy answers** from §4 in the console.
 4. **Enter the test information** from §6.
 5. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
