@@ -1,6 +1,7 @@
 {
   "ios": {
     "CFBundleDisplayName": "Spicy Meal",
-    "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your precise location while you are choosing a delivery point, so your pin lands at the right door for the driver. You can always move the pin yourself, and your location is never used in the background."
+    "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your precise location while you are choosing a delivery point, so your pin lands at the right door for the driver. You can always move the pin yourself, and your location is never used in the background.",
+    "NSMotionUsageDescription": "Spicy Meal does not request motion or fitness data. This description is required because the location library bundled in the app links Apple's motion framework, which Spicy Meal never calls."
   }
 }
