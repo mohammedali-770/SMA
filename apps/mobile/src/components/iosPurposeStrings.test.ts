@@ -34,9 +34,7 @@ import { describe, expect, it } from 'vitest';
  */
 describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
   // Read the REAL manifest — a stub would defeat the point of the tripwire.
-  const appJson = JSON.parse(
-    readFileSync(new URL('../../app.json', import.meta.url), 'utf8'),
-  ) as {
+  const appJson = JSON.parse(readFileSync(new URL('../../app.json', import.meta.url), 'utf8')) as {
     expo: {
       locales?: Record<string, string>;
       plugins?: (string | [string, Record<string, unknown>])[];
@@ -44,16 +42,12 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
     };
   };
 
-  const pluginName = (p: string | [string, Record<string, unknown>]) =>
-    Array.isArray(p) ? p[0] : p;
+  const pluginName = (p: string | [string, Record<string, unknown>]) => (Array.isArray(p) ? p[0] : p);
 
-  const locationPlugin = (appJson.expo.plugins ?? []).find(
-    (p) => pluginName(p) === 'expo-location',
-  );
+  const locationPlugin = (appJson.expo.plugins ?? []).find((p) => pluginName(p) === 'expo-location');
 
-  const locationProps = (
-    Array.isArray(locationPlugin) ? locationPlugin[1] : undefined
-  ) as Record<string, unknown> | undefined;
+  const locationProps = (Array.isArray(locationPlugin) ? locationPlugin[1] : undefined) as
+    Record<string, unknown> | undefined;
 
   it('declares the expo-location plugin explicitly, so its injections are controlled', () => {
     expect(locationPlugin).toBeDefined();
@@ -81,12 +75,12 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
    * answer, and Apple does NOT require these — its rejection of build 23 named
    * `NSMotionUsageDescription` and nothing else.
    */
-  it.each([
-    'locationAlwaysAndWhenInUsePermission',
-    'locationAlwaysPermission',
-  ])('keeps %s disabled — the app has no background location', (prop) => {
-    expect(locationProps?.[prop]).toBe(false);
-  });
+  it.each(['locationAlwaysAndWhenInUsePermission', 'locationAlwaysPermission'])(
+    'keeps %s disabled — the app has no background location',
+    (prop) => {
+      expect(locationProps?.[prop]).toBe(false);
+    },
+  );
 
   it('keeps the when-in-use string on ios.infoPlist, where it is authored', () => {
     const whenInUse = appJson.expo.ios?.infoPlist?.NSLocationWhenInUseUsageDescription;
@@ -103,11 +97,12 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
     const locales = appJson.expo.locales ?? {};
     const loaded = Object.entries(locales).map(([tag, rel]) => ({
       tag,
-      ios: (
-        JSON.parse(
-          readFileSync(new URL(`../../${rel.replace(/^\.\//, '')}`, import.meta.url), 'utf8'),
-        ) as { ios?: Record<string, string> }
-      ).ios ?? {},
+      ios:
+        (
+          JSON.parse(readFileSync(new URL(`../../${rel.replace(/^\.\//, '')}`, import.meta.url), 'utf8')) as {
+            ios?: Record<string, string>;
+          }
+        ).ios ?? {},
     }));
 
     it('maps both ar and en', () => {
@@ -119,10 +114,9 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
       (key) => {
         for (const { tag, ios } of loaded) {
           const value = ios[key];
-          expect(
-            typeof value === 'string' && value.trim().length > 0,
-            `${tag}.json is missing ${key}`,
-          ).toBe(true);
+          expect(typeof value === 'string' && value.trim().length > 0, `${tag}.json is missing ${key}`).toBe(
+            true,
+          );
         }
       },
     );
