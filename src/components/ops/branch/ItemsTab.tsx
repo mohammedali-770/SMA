@@ -12,9 +12,7 @@ import { Notice } from '../../../design-system/ui/Notice';
 import { Text } from '../../../design-system/ui/Text';
 import type { Category, Product } from '../../../types';
 import type { BranchAvailabilityRow } from '../../../lib/opsApi';
-import {
-  ClosedItem, closedProductIds, formatRemaining, searchableGroups, tileHue,
-} from '../branchConsole';
+import { ClosedItem, closedProductIds, formatRemaining, searchableGroups, tileHue } from '../branchConsole';
 import type { OpsLangValue } from '../useOpsLang';
 import { ItemTile, TileState } from './ItemTile';
 
@@ -39,25 +37,33 @@ export const ItemsTab: React.FC<{
   onPick: (product: Product) => void;
   onReopenAll: () => void;
 }> = ({
-  products, categories, rows, closed, optionBlockedIds, now,
-  loading, busy, i18n, onPick, onReopenAll,
+  products,
+  categories,
+  rows,
+  closed,
+  optionBlockedIds,
+  now,
+  loading,
+  busy,
+  i18n,
+  onPick,
+  onReopenAll,
 }) => {
   const { t, isRTL } = i18n;
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
 
   const closedIds = useMemo(() => closedProductIds(rows), [rows]);
-  const groups = useMemo(
-    () => searchableGroups(products, categories, query),
-    [products, categories, query],
-  );
+  const groups = useMemo(() => searchableGroups(products, categories, query), [products, categories, query]);
   const shown = useMemo(
     () => (category ? groups.filter((g) => g.categoryId === category) : groups),
     [groups, category],
   );
 
   const snoozedUntilById = useMemo(
-    () => new Map(closed.map((c) => [c.product.id, c.snoozedUntil])), [closed]);
+    () => new Map(closed.map((c) => [c.product.id, c.snoozedUntil])),
+    [closed],
+  );
 
   /**
    * What the badge on a closed tile says.
@@ -139,11 +145,7 @@ export const ItemsTab: React.FC<{
         {/* Category chips. Horizontal scroll rather than a wrap, so the grid
             below keeps a stable position as categories are switched. */}
         <div className="flex gap-2 overflow-x-auto pb-1">
-          <Chip
-            label={t('categoryAll')}
-            on={category === null}
-            onClick={() => setCategory(null)}
-          />
+          <Chip label={t('categoryAll')} on={category === null} onClick={() => setCategory(null)} />
           {categories.map((c) => (
             <Chip
               key={c.id}
@@ -155,19 +157,25 @@ export const ItemsTab: React.FC<{
         </div>
 
         {loading ? (
-          <Text variant="body" tone="tertiary" as="p">{t('loading')}</Text>
+          <Text variant="body" tone="tertiary" as="p">
+            {t('loading')}
+          </Text>
         ) : shown.length === 0 ? (
           <Notice title={t('noResults')} tone="info" />
         ) : (
           shown.map((g) => (
             <div key={g.categoryId ?? '__none'} className="flex flex-col gap-2">
-              <Text variant="caption" tone="tertiary" as="h3">{categoryName(g.categoryId)}</Text>
+              <Text variant="caption" tone="tertiary" as="h3">
+                {categoryName(g.categoryId)}
+              </Text>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {g.products.map((p) => {
                   const isClosed = closedIds.has(p.id);
                   const state: TileState = isClosed
                     ? 'closed'
-                    : optionBlockedIds.has(p.id) ? 'partial' : 'open';
+                    : optionBlockedIds.has(p.id)
+                      ? 'partial'
+                      : 'open';
                   return (
                     <ItemTile
                       key={p.id}
@@ -190,9 +198,7 @@ export const ItemsTab: React.FC<{
   );
 };
 
-const Chip: React.FC<{ label: string; on: boolean; onClick: () => void }> = ({
-  label, on, onClick,
-}) => (
+const Chip: React.FC<{ label: string; on: boolean; onClick: () => void }> = ({ label, on, onClick }) => (
   <button
     type="button"
     onClick={onClick}
@@ -200,9 +206,7 @@ const Chip: React.FC<{ label: string; on: boolean; onClick: () => void }> = ({
     className={[
       'min-h-[38px] whitespace-nowrap rounded-full border px-4 text-[13.5px] font-semibold',
       'focus-visible:outline-2 focus-visible:outline-offset-2',
-      on
-        ? 'border-brand-ink bg-brand-ink text-white'
-        : 'border-con-line bg-con-surface text-con-text-2',
+      on ? 'border-brand-ink bg-brand-ink text-white' : 'border-con-line bg-con-surface text-con-text-2',
     ].join(' ')}
   >
     {label}

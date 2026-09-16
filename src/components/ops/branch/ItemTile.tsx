@@ -126,7 +126,9 @@ export const ItemTile: React.FC<{
       )}
 
       <div className="flex flex-1 flex-col gap-0.5 p-3">
-        <Text variant="label" as="span">{name}</Text>
+        <Text variant="label" as="span">
+          {name}
+        </Text>
         {/* "From" only when there is something to be cheapest OF. A single-tier
             item has one price, and calling it a starting price is a small lie
             that a cashier quoting it over the counter would have to unpick. */}

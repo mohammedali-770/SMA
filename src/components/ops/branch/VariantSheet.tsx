@@ -50,8 +50,17 @@ export const VariantSheet: React.FC<{
   onReopenOption: (m: Modifier) => void;
   onDismiss: () => void;
 }> = ({
-  product, closed, optionGroups, closedOptionIds, i18n, busy,
-  onCloseWhole, onReopenWhole, onCloseOption, onReopenOption, onDismiss,
+  product,
+  closed,
+  optionGroups,
+  closedOptionIds,
+  i18n,
+  busy,
+  onCloseWhole,
+  onReopenWhole,
+  onCloseOption,
+  onReopenOption,
+  onDismiss,
 }) => {
   const { t, isRTL } = i18n;
   const name = isRTL ? product.nameAr : product.nameEn;
@@ -63,14 +72,18 @@ export const VariantSheet: React.FC<{
       role="dialog"
       aria-modal="true"
       aria-label={name}
-      onClick={(e) => { if (e.target === e.currentTarget && !busy) onDismiss(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !busy) onDismiss();
+      }}
     >
       <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-t-[20px] bg-con-surface">
         <div className="border-b border-con-line p-4">
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-con-line" aria-hidden="true" />
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Text variant="heading" as="h2">{name}</Text>
+              <Text variant="heading" as="h2">
+                {name}
+              </Text>
               <Text variant="caption" tone="tertiary" as="p">
                 {`${tiers.length} ${t(tiers.length === 1 ? 'sizesCountOne' : 'sizesCount')}`}
               </Text>
@@ -81,23 +94,25 @@ export const VariantSheet: React.FC<{
 
         <div className="flex flex-col gap-2 overflow-auto p-4">
           {tiers.length === 0 ? (
-            <Text variant="body" tone="tertiary" as="p">{t('noResults')}</Text>
+            <Text variant="body" tone="tertiary" as="p">
+              {t('noResults')}
+            </Text>
           ) : (
             tiers.map((v) => (
               <div
                 key={v.id}
                 className="flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
               >
-                <Text variant="label" as="span">{isRTL ? v.nameAr : v.nameEn}</Text>
+                <Text variant="label" as="span">
+                  {isRTL ? v.nameAr : v.nameEn}
+                </Text>
                 <Text variant="caption" tone="tertiary" as="span" numeric>
                   {`${v.price.toFixed(2)} ${t('currency')}`}
                 </Text>
               </div>
             ))
           )}
-          {tiers.length > 0 ? (
-            <Notice title={t('sizesPerSizeSoon')} tone="info" />
-          ) : null}
+          {tiers.length > 0 ? <Notice title={t('sizesPerSizeSoon')} tone="info" /> : null}
 
           {optionGroups.map((g) => (
             <div key={g.id} className="flex flex-col gap-2 border-t border-con-line pt-3">
@@ -121,7 +136,9 @@ export const VariantSheet: React.FC<{
                     ].join(' ')}
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <Text variant="body" as="span">{isRTL ? m.nameAr : m.nameEn}</Text>
+                      <Text variant="body" as="span">
+                        {isRTL ? m.nameAr : m.nameEn}
+                      </Text>
                       {/* A STATE, not the verb. The pill sits a thumb from the
                           button that performs the opposite action, and
                           labelling it with the same word the button uses reads
