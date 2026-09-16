@@ -49,17 +49,24 @@ const HEIGHT = 500;
 /** Play's ceiling for this asset. */
 const MAX_BYTES = 15 * 1024 * 1024;
 /**
- * Brand navy, #140560 — sampled from `logo-mark.png` itself, where it is the
- * mark's outline colour (3,497 px at full opacity, the third-largest area after
- * the white body and the red comb).
+ * Warm off-white, #F5F1E8 — the owner's choice from five rendered options, and
+ * deliberately NOT a colour from the mark.
  *
- * The first version used the brand red #DE1124 and it was wrong for a reason
- * worth recording: the mark's own comb and wattle are that exact red, so the
- * bird's most distinctive feature vanished into the background. A backdrop
- * drawn from the palette still has to be a colour the artwork does not already
- * use at its focal point.
+ * The mark is only three colours: a white body, a red comb (#DE1124) and a navy
+ * outline (#140560). Any of them as a backdrop erases the part of the artwork
+ * that shares it. A near-neutral ground lets all three read at once: the navy
+ * outline carries the silhouette against the cream, so the white body does not
+ * need contrast of its own, and the red comb stays the focal point.
+ *
+ * The first version used the brand red, and it was wrong for a reason worth
+ * recording rather than quietly fixing: #DE1124 was sampled from the centre of
+ * the icon master, which is a methodical way to pick a colour and still gave the
+ * worst result, because the comb and wattle are that exact red and vanished into
+ * the background. A backdrop drawn from the palette has to be a colour the
+ * artwork does not already use at its focal point — and here, that ruled out
+ * every colour in the palette.
  */
-const BACKDROP = [20, 5, 96];
+const BACKDROP = [245, 241, 232];
 /** Mark height as a fraction of the canvas — leaves margin for Play's cropping. */
 const MARK_SCALE = 0.76;
 
