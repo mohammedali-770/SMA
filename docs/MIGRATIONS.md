@@ -5310,11 +5310,53 @@ index. **Version NOT aligned** — live carries the apply-time stamp
 
 ---
 
-## 43. Customer order comp columns — WRITTEN, NOT APPLIED (2026-09-16)
+## 43. Customer order comp columns — APPLIED 2026-09-16 (row 96)
 
-`20260922120000_orders_comp_columns_customer_grant.sql`. **One `grant select`
-statement plus a verification block. It fixes a LIVE customer-facing outage**, so
-it is not a hygiene item waiting for a quiet moment.
+`20260922120000_orders_comp_columns_customer_grant.sql`. **APPLIED 2026-09-16
+11:41:30 UTC**, live version `20260916114130`, on explicit owner approval naming
+the target by version ("apply 20260922120000"), via MCP `apply_migration`, **one
+call**. One `grant select` statement plus a verification block. **It fixed a LIVE
+customer-facing outage**, so it was not a hygiene item waiting for a quiet moment.
+
+**The defect was confirmed STILL PRESENT in the live grant immediately before the
+apply**, so this was real work rather than a no-op: `authenticated` could select
+neither comp column and held **25** select grants on `orders`.
+
+**The fix is measured, not asserted.** Grants went **25 → 27**, exactly the two
+intended. Every boundary held: `anon` still refused on both columns,
+`authenticated` still refused `coupon_code`, `customer_phone` and `order_number`,
+**no table-wide SELECT** (the thing that would make RLS column-blind), RLS still
+enabled. Money-path pair unchanged — `place_order`
+`bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot`
+`ca276a84424e403a98d34860817f815c`. Data untouched: 73 orders, 5 comped, 12
+profiles. History **140 → 141**. Moyasar re-verified absent: 0 functions, 0
+history rows.
+
+**ROW 86'S LESSON APPLIED: a clean apply proves the text was stored, not that the
+query runs.** So the **exact 27-column list the app sends** was executed as
+`authenticated` — it **succeeds**. The nested `order_items` /
+`order_item_modifiers` embeds the same select pulls — **succeed**. Both leak
+checks ran in the same probe and still refuse: `coupon_code` as `authenticated` →
+**42501**, `is_comped` as `anon` → **42501**. Outcomes read back as values, not
+notices (row 90).
+
+**§15 WAS HONOURED RATHER THAN ASSUMED.** The instruction to apply arrived while
+#391 was still open and blocked on an unresolved review thread. Nothing was sent
+until the merge actually landed (`ad52d22`), the file was confirmed present on the
+default branch, and the merged copy was hashed —
+sha256 `05878e9c194490a414ce93801241a4b0a301292267bf44983c865ddedb303988`,
+125 lines / 6 004 bytes — and diffed byte-for-byte against the reviewed copy.
+
+**A CONVENTION DEVIATION WAS TESTED RATHER THAN GAMBLED ON.** This file carries
+explicit `begin;` / `commit;`, which no previously-applied migration here does.
+Rather than guess how `apply_migration` handles a nested transaction, the
+behaviour was probed harmlessly first — both statements execute cleanly — so the
+**exact merged bytes** could be sent without editing them for transport, which is
+what keeps the applied text equal to the repository text.
+
+**Version NOT aligned** — live carries the apply-time stamp `20260916114130`
+(§9-D); do not "repair" that. **No deploy implied** — no function was redefined,
+and the fix reaches every channel, web and both binaries, the moment it applies.
 
 ### What is broken right now
 
