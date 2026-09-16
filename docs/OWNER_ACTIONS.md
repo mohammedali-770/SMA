@@ -2409,8 +2409,26 @@ waiting.
 
 ## 34. Privacy policy map sub-processor — PUBLISHED 2026-09-16; one step left
 
-**`privacy_policy` v2.2 is live**, both languages, effective 2026-09-16. The
-Mapbox line is gone and Google is named. Exactly one line changed in each
+**`privacy_policy` v2.3 is live**, both languages, effective 2026-09-16. The
+Mapbox line is gone, Google is named, and **Apple is named for the iPhone
+reverse-geocode** — a sub-processor no version of this policy had ever disclosed.
+
+The line now reads:
+
+> Google, with Apple on iPhone — the map you use to choose a delivery location.
+> Google draws the map and receives the coordinates of the point you pick.
+> Turning that point into a street address is done by Google on the web and on
+> Android, and by Apple on iPhone.
+
+It follows the list's existing two-party pattern (`Expo, with Apple (APNs) and
+Google (FCM) — …`) rather than inventing a shape.
+
+**v2.2 lasted about half an hour and is recorded rather than erased.** It said
+"the map **and address search** you use", which promised Google received
+something customers cannot send it — there is no address search in either
+customer channel. It also named only Google, missing Apple. v2.2 was live to the
+app and to JavaScript-enabled web readers for that window, so it is a real
+version and gets a real successor, not a silent in-place edit. Exactly one line changed in each
 language and every other byte was verified identical before and after — the
 replacement was dry-run first, with a hash of the rest of the document compared
 across the edit.
@@ -2424,12 +2442,11 @@ work even if it were selected. Native and web agree, so **Option A (Google only)
 was correct. *Recorded because the next session should reach for the CLI rather
 than treat a hosted environment variable as unknowable.*
 
-### ALSO OPEN: v2.2's wording over-claims in one place and under-claims in another
+### CLOSED by v2.3 — the two wording defects v2.2 carried
 
-**Found immediately after publishing, by an exhaustive read of the map code that
-should have happened before.** v2.2 is a large improvement on v2.1 — it names the
-processor that actually receives the delivery pin instead of one that receives
-nothing — but two details in the drafted sentence do not survive the code:
+**Found immediately after publishing v2.2, by an exhaustive read of the map code
+that should have happened before.** Both are fixed in v2.3; they are kept here
+because the shape recurs.
 
 1. **"and address search" describes a feature the customer does not have.**
    `places.googleapis.com/v1/places:searchText` is called from exactly one place,
@@ -2445,23 +2462,17 @@ nothing — but two details in the drafted sentence do not survive the code:
    (`LocationPickerMap.web.tsx:126`). So an iPhone customer's picked coordinate
    reaches Apple, and the policy names only Google.
 
-**This is the same class of error v2.2 was published to fix** — a sub-processor
-list that does not match the software — caught one layer down. It is not urgent:
-v2.2 is strictly more accurate than v2.1, and **the public page has not rebuilt
-yet**, so no customer has seen either sentence.
+**This was the same class of error v2.2 was published to fix** — a sub-processor
+list that does not match the software — caught one layer down. **The lesson is
+about ordering, not about maps: the code read that settles a disclosure belongs
+BEFORE the write, not after it.** v2.2 was published on a drafted sentence and a
+single decisive environment variable; the full read of the map code came
+afterwards and found two things the draft had wrong.
 
-**That timing is the opportunity.** Correcting the wording to v2.3 *before* the
-Vercel rebuild means exactly one version ever reaches the public page. Doing it
-after means publishing twice.
-
-**Proposed v2.3 wording, for the owner's decision** — it is a legal disclosure,
-so the wording is theirs, not mine:
-
-- Google — the map you use to choose a delivery location, and, on the web and on
-  Android, turning that point into a street address. It receives the coordinates
-  of the point you pick.
-- Apple — on iPhone only, turning the point you pick into a street address. It
-  receives those coordinates.
+**It cost nothing here only because of the rebuild gap.** The public page had not
+rebuilt, so v2.2 never reached a no-JavaScript reader, and v2.3 went out on the
+owner's instruction before any rebuild. Exactly one version will reach the public
+page. That was luck in the timing, not a property of the process.
 
 **The drafted correction document has two further errors worth fixing before it
 is used again:** it cites `apps/mobile/src/lib/googleMaps.ts`, which does not

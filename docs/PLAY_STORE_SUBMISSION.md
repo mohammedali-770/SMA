@@ -286,8 +286,10 @@ why §4a will still be checkable next year.
 
 ## 5. The privacy-policy blocker — corrected in the database, stale on the page
 
-**`privacy_policy` v2.2 was published 2026-09-16** and names Google rather than
-Mapbox, in both languages. The deciding fact came from
+**`privacy_policy` v2.3 is live as of 2026-09-16.** It names Google for the map
+and **Apple for the iPhone reverse-geocode**, in both languages. v2.2, half an
+hour earlier, named only Google and claimed an "address search" customers do not
+have — that phrasing described the admin console, not either customer channel. The deciding fact came from
 `eas env:list --environment production`: `EXPO_PUBLIC_MAP_PROVIDER=google`, with
 **zero Mapbox variables** in that environment, so `OWNER_ACTIONS.md` §34's
 Option A (Google only) was the right text. §34 had recorded that variable as
