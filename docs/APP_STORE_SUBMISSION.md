@@ -20,24 +20,42 @@
 | App Store Connect app record | exists — ASC App ID **6800210683**, bundle `com.spicymeal.app` |
 | ASC API key in EAS | working — `W7LY8D9FKX` (`[Expo] EAS Submit kROBQixX90`), read and write both exercised 2026-09-16 |
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
-| newest iOS build | **1.0.0 (23)**, `fcb7d682-7b31-4d9b-ac22-9e0a86ea2493`, commit `f82cecbe`, FINISHED 2026-09-14 |
+| newest iOS build | **1.0.0 (23)**, `fcb7d682-7b31-4d9b-ac22-9e0a86ea2493`, commit `f82cecbe`, FINISHED 2026-09-14 — **SUPERSEDED, do not submit** |
 | that build in TestFlight | **NO — Apple rejected the upload.** §3 |
 | newest build actually in TestFlight | **1.0.0 (22)**, submitted 2026-08-26 |
+| first submittable build | **1.0.0 (24)** — does not exist yet; it is what §8 step 1 produces |
 
 **The blocker is a purpose string, not a credential, not a policy item, and not
 the binary's contents.** It needs one config line, already fixed, and a rebuild.
 
 ---
 
-## 2. Build 23 was current, which is why this matters
+## 2. Build 23 was current *until this record was written*, which is why this matters
 
-`git diff --name-only f82cecbe <default-branch> -- apps/mobile/` returns **zero
-files**. Every commit since that build touched `assets/store`, `src/legal`,
-`scripts`, `docs`, `vite.config.ts`, `legal.html`, `.github/workflows` and root
-`package.json` (npm scripts only) — none of which enters the iOS binary, and
-`src/legal` is the web legal page, not mirrored into the app.
+**Read the tense. Build 23 is SUPERSEDED and must not be submitted** — it is the
+build Apple refused, and the fix in §3 changes `apps/mobile/` to correct it. The
+next build, 1.0.0 (24), is the first submittable one.
 
-**This retires the iOS half of `GO_LIVE_READINESS.md` X2**, which said *"the
+**As measured on 2026-09-16, immediately BEFORE the purpose-string fix landed**,
+`git diff --name-only f82cecbe <default-branch> -- apps/mobile/` returned **zero
+files**. Every commit between that build and that moment touched `assets/store`,
+`src/legal`, `scripts`, `docs`, `vite.config.ts`, `legal.html`,
+`.github/workflows` and root `package.json` (npm scripts only) — none of which
+enters the iOS binary, and `src/legal` is the web legal page, not mirrored into
+the app.
+
+**Running that command today returns four files** — `app.json`, both locale files
+and `iosPurposeStrings.test.ts` — because the fix is one of them. That is the
+correct answer, not a regression: it is what "build 23 is superseded" looks like
+from the command line. **Review caught this paragraph asserting the zero-file
+result as a present-tense fact in the very change that falsified it** (#388),
+which is the same defect as a `legal_documents` row edited without its own date,
+one directory over.
+
+**The durable point survives the tense change**, and it is about the readiness
+gate rather than about build 23. For three weeks the iOS build genuinely tracked
+the Android one commit-for-commit while the gate said it did not, so this
+retires the iOS half of `GO_LIVE_READINESS.md` X2 — which said *"the
 newest iOS production build is 1.0.0 (22), commit `6265781a`, 2026-08-26 — ~54
 commits stale"* and concluded *"What survives is iOS, and it survives whole."*
 Both platforms have had a current production build at `f82cecbe` since
