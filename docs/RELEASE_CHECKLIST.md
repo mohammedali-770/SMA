@@ -148,7 +148,7 @@ Before native store submission, a real device must exercise the native bundle.
 
 PR #200 completed source retention; this physical-device validation remains a separate gate.
 
-## 8. App Store / Play submission
+## 8. App Store and Play submission
 
 **Store *policy* readiness is a separate, one-time gate:
 [`GO_LIVE_READINESS.md`](GO_LIVE_READINESS.md)** covers Apple's guidelines, Google
@@ -168,6 +168,38 @@ Re-check these live immediately before submission; do not copy old audit status 
 - [ ] Version/build numbers and signing credentials are correct.
 - [ ] Encryption/privacy declarations match the actual app.
 - [ ] Required native device validation is complete.
+
+**Each store holds its own copy of the reviewer credentials**, so §11's removal step
+has to update both, not just App Store Connect. Play in particular keeps them on the
+app record and reuses them for every future review.
+
+### Google Play only
+
+This section was titled "App Store / Play submission" and contained **no Play-specific
+item at all** until 2026-09-16 — the Android package identifier was the only Android
+line on the page. The answers behind these boxes are in
+[`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md).
+
+- [ ] **Closed-testing gate**, if the developer account is personal and was created on
+      or after 13 November 2023: **12 testers opted in, day N of 14**, and production
+      access applied for. **Internal testing does not count.** This is calendar time, so
+      check it before planning a date, not after (`GO_LIVE_READINESS.md` C8).
+- [ ] **Track and release status** in `apps/mobile/eas.json` match the track you
+      actually intend. `internal` does not advance the closed-testing clock, and a
+      `draft` release is not distributed to testers at all.
+- [ ] **Release notes in both languages**, ≤500 characters each, from
+      [`store/LISTING_COPY.md`](store/LISTING_COPY.md).
+- [ ] **Data Safety form** still matches what the app collects — re-check after any
+      change to analytics, location, push targeting or a third-party SDK.
+- [ ] **Content rating questionnaire** still describes the app. Adding user-to-user
+      content, or anything age-restricted to the menu, changes the answers.
+- [ ] **App content → App access** still carries working reviewer credentials.
+- [ ] **The listing copy's claims table** re-read against live settings — points are
+      still pickup-only, payment is still cash, prices still include VAT. A claim that
+      was true when drafted is the failure mode that table exists to prevent.
+- [ ] **Screenshots still show the shipped build.** They are one build behind as of
+      2026-09-16, and they can be replaced without a new release.
+- [ ] **Staged rollout percentage** chosen deliberately.
 
 If legal wording is incomplete, do not invent it in an engineering release. Separate factual product corrections from counsel-required language.
 
@@ -203,5 +235,5 @@ Do not release when:
 - [ ] Watch Sentry and Operations Health for the agreed observation period.
 - [ ] Confirm expected order/operational signals continue.
 - [ ] Record any release-specific manual configuration change.
-- [ ] **Remove the App Review test-phone entry** (Authentication → Phone provider), then **verify** it by attempting a sign-in with the same number and code and confirming it is refused. While it exists it is a permanent reusable login to that account, and the pair is printed in the App Store Connect review notes. Update those notes at the same time. Detail: `OWNER_ACTIONS.md` §27.
+- [ ] **Remove the App Review test-phone entry** (Authentication → Phone provider), then **verify** it by attempting a sign-in with the same number and code and confirming it is refused. While it exists it is a permanent reusable login to that account, and the pair is printed in the App Store Connect review notes. **Update BOTH stores' copies at the same time** — Play keeps the credentials on the app record and reuses them for every future review, so removing the Auth entry without updating Play means the *next* Play update is reviewed against a login that no longer works. Detail: `OWNER_ACTIONS.md` §27 and `PLAY_STORE_SUBMISSION.md` §4.
 - [ ] If mitigation is required, use `docs/ROLLBACK.md` / `docs/INCIDENT_RESPONSE.md` and prioritize safety over diagnosis.

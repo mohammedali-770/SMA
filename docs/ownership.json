@@ -236,6 +236,32 @@
         "supabase/functions/_shared/smtpTarget.ts"
       ],
       "docs": ["docs/OPERATIONS_ALERTS_DIGEST.md"]
+    },
+    {
+      "id": "play-store-assets",
+      "why": "The Play store assets and their generators changed with no documentation obligation at all. The commit that added assets/store/screenshots/ and the Play build and check scripts touched five PNGs, five source captures, three scripts, a workflow and two documents, and fired ZERO rules — store assets are not application source, so every existing rule keyed straight past them. That is how a 512x512 icon, five composed screenshots and a CI contract landed while the submission record knew nothing about any of them. eas.json and app.json are listed because they carry declarations rather than behaviour: the submit track and release status, the permanent package name, the declared Android permissions and the localised purpose strings a reviewer reads. EXACTLY ONE DOC IS LISTED, for the OR-semantics reason recorded on database-migrations: a rule is satisfied when ANY listed document is touched, so adding GO_LIVE_READINESS.md here would let the submission record be skipped by editing a readiness row instead.",
+      "sources": [
+        "assets/store/**",
+        "scripts/build-play-icon.mjs",
+        "scripts/build-play-feature-graphic.mjs",
+        "scripts/build-play-screenshots.mjs",
+        "scripts/check-play-screenshots.mjs",
+        "apps/mobile/eas.json",
+        "apps/mobile/app.json"
+      ],
+      "docs": ["docs/PLAY_STORE_SUBMISSION.md"]
+    },
+    {
+      "id": "store-listing-copy",
+      "why": "The published store listing makes factual claims about shipped behaviour — points are earned on pickup orders only, cash is the only payment method, displayed prices include VAT — and each claim is coupled to a live behaviour that can change without anybody thinking about a store listing. A false factual claim in a Play listing is a policy matter rather than a typo, and Play cross-checks the listing against the Data Safety form and the privacy policy it links. THIS RULE DELIBERATELY OVERLAPS loyalty and payments, and the overlap is the whole mechanism: docs-check-ownership.mjs evaluates every rule independently, so a loyalty change must satisfy BOTH LOYALTY.md AND the listing copy. Adding docs/store/LISTING_COPY.md to the loyalty rule instead would have the opposite effect — OR semantics within a rule would let a loyalty change be documented in the listing copy alone, weakening the rule that protects what customers are charged.",
+      "sources": [
+        "apps/mobile/src/features/checkout/previewTotals.ts",
+        "apps/mobile/src/features/checkout/view/TotalsCard.tsx",
+        "apps/mobile/src/features/checkout/view/Loyalty*.tsx",
+        "apps/mobile/src/lib/payment.ts",
+        "src/lib/loyaltyRulesSummary.ts"
+      ],
+      "docs": ["docs/store/LISTING_COPY.md"]
     }
   ]
 }

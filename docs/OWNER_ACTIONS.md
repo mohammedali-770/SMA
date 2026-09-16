@@ -231,9 +231,21 @@ Before submission verify, at minimum:
 - iOS/Android identifiers, versions and signing credentials are correct;
 - native build has completed the physical-device gate.
 
-The nine in-app legal documents are no longer placeholder text — see §13. What remains for submission is
-the **public** privacy-policy URL (the store listing cannot link to an in-app screen) and a counsel review
-of the published wording.
+The nine in-app legal documents are no longer placeholder text — see §13.
+
+**The public privacy-policy URL is no longer what remains.** It is live and
+verified — `https://app.spicymeal.com.sa/privacy`, serving its text to a client
+that runs no JavaScript, measured on the deployed page (`GO_LIVE_READINESS.md`
+B7 ✅). What remains is a **counsel review of the published wording**, and the
+§34 map-sub-processor correction, which is a factual error in live text rather
+than a drafting question.
+
+**This list predates the Play submission and is written for both stores.** For
+Android specifically, `PLAY_STORE_SUBMISSION.md` carries the answers and §38 the
+open steps; in particular "app metadata, screenshots and support contact are
+current" is now measurable rather than aspirational — the screenshots are
+committed and CI-checked, and the feature graphic, descriptions, category and app
+name are not yet entered.
 
 ## 10. Push notifications
 
@@ -2542,6 +2554,71 @@ is unapplied, no function is deployed), but §6 says choosing the provider is a
 deliberate owner action and the console currently presents it as a dropdown.
 Worth a guard rather than a redesign.
 
+## 38. Google Play first release (Android) — the five owner steps
+
+**Status 2026-09-16: the app record exists, one AAB is uploaded to internal
+testing, and the declarations are answered. Production is NOT reachable yet, and
+the reason is a gate this file never carried — see step 0.**
+
+**This section used to be 461 lines and most of it was reference, not decisions.**
+That material now lives in [`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md),
+which owns every Play Console answer, the Data Safety table, the artefact
+verification, the reviewer path and the listing inventory. What stays here is
+what this file is for: the actions that need a Google identity, a payment method
+or an owner decision. Read that document first; come back here for the steps.
+
+### Step 0 — the gate, added 2026-09-16
+
+**The developer account is personal, so Production cannot be published on
+demand.** Google requires a **closed** test with **12 testers opted in for 14
+continuous days**, then an application for production access that Google reviews.
+**Internal testing does not count**, and internal testing is the only track this
+app has. The closed track is inactive, so the clock has not started — the floor
+from here is about three weeks.
+
+Accounts created before 13 November 2023 are exempt. **Check the account creation
+date first**: if it predates that, this step does not apply and the rest of the
+list is the whole job. Detail, and the `eas.json` consequence:
+[`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md) §2.
+
+### The five steps, and where they stand
+
+1. **Google Play Console developer account** — **DONE.**
+2. **Create the app record** for `sa.com.spicymeal.app` — **DONE.** The package
+   name is now permanent, which is what closed C6.
+3. **Upload the first AAB by hand, in Play Console** — **DONE**, `v1.0.0`
+   versionCode 2, on the internal-testing track. It could not be automated and
+   still cannot be for a first release; the reasoning is in
+   [`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md) §14.
+4. **The Auth test-OTP number** (§27 steps 1-3), pasted into App content → App
+   access — **DONE, and the mechanism is now proven rather than assumed.** The
+   open question about whether the hosted feature bypasses a custom Send SMS Hook
+   is settled: it does. Evidence in
+   [`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md) §4a.
+5. **Create a Google Cloud service account, grant it Play Developer API access,
+   download the JSON key, and upload it to EAS** — **OPEN.** `eas credentials
+   --platform android`, or a path in `eas.json`. **Do not commit the key itself**
+   (§9). This is what makes every release *after* the first unattended.
+
+**One prerequisite sits outside this list because it belongs to another section:
+publish the §34 privacy-policy map-processor correction before you fill in the
+Data Safety form.** It can be done at any point, but it must precede the form —
+Play cross-checks the form against the policy you link, and the live policy names
+a map sub-processor the app does not use.
+
+**Still open beyond step 5:** the closed test in step 0, the feature graphic, the
+descriptions, the app category and the final app name
+([`GO_LIVE_READINESS.md`](GO_LIVE_READINESS.md) G4).
+
+### What I can do once step 5 lands
+
+Every release after the first: run the submit, watch the upload, report the Play
+processing result. The listing text is already drafted in both languages
+([`store/LISTING_COPY.md`](store/LISTING_COPY.md)). **The first upload was
+yours**, and the production application will be too.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:
@@ -2554,476 +2631,3 @@ When an item is completed:
 This file is a current decision register, not an incident diary.
 
 ---
-
-## 38. Google Play first release (Android) — the submission pack, and the five steps that are yours
-
-**Status 2026-09-15:** the artefact is ready and verified; **nothing has been
-submitted**. Five actions are open and all five are yours. Each needs a Google
-identity this session does not hold — a developer account, a payment method, an
-identity verification, or a signed-in Play Console upload. That is a statement
-about credentials, not a claim that some control blocks automation: step 3 is
-unautomatable for everyone, owner included, because the Play API itself refuses
-a package's first binary (§28's lesson — check the path before saying nobody can
-take it).
-
-`eas submit --platform android --profile production --latest` was run and
-**refused**, which is where this section starts:
-
-```
-Looking up credentials configuration for sa.com.spicymeal.app...
-Google Service Account Keys cannot be set up in --non-interactive mode.
-    Error: submit command failed.
-```
-
-That is not a bug and not a missing flag. `apps/mobile/eas.json`'s
-`submit.production.android` is `{ "track": "internal", "releaseStatus": "draft" }`
-with **no `serviceAccountKeyPath`**, and no `GOOGLE_APPLICATION_CREDENTIALS` or
-`EXPO_GOOGLE_SERVICE_ACCOUNT_KEY_PATH` exists in the environment. Note the
-asymmetry with iOS, which already carries `ascAppId: 6800210683` — the App Store
-Connect record exists; **the Play one does not yet**.
-
-`google-services.json` in `apps/mobile/app.json` is **not** this credential. It is
-the FCM client config for push delivery; it authorises nothing against the Play
-Developer API.
-
-### The artefact is fine, and that was measured rather than assumed
-
-The AAB was downloaded from EAS (`v1.0.0`, versionCode 2, commit `f82cecbe`,
-84,044,112 bytes) and its manifest decoded from aapt2 protobuf. Everything Play
-checks mechanically passes: `targetSdkVersion 36` (which is the 2026 requirement for a new app, met exactly — see C1),
-`minSdkVersion 24`, no `android:debuggable`, no `android:usesCleartextTraffic`
-(so targetSdk 36's secure-by-default holds), `android:allowBackup="false"`, four
-ABIs. Detail and the permission surface: `docs/GO_LIVE_READINESS.md` C1 and C7.
-
-**None of the permissions that trigger a Play Permissions Declaration Form are
-present** — checked by name, not by absence of worry: no SMS or Call Log, no
-`MANAGE_EXTERNAL_STORAGE`, no `QUERY_ALL_PACKAGES`, no
-`REQUEST_INSTALL_PACKAGES`, no `ACCESS_BACKGROUND_LOCATION`, no `CAMERA`, no
-`RECORD_AUDIO`, no `READ_CONTACTS`. There is also **no `AD_ID` permission and no
-advertising SDK** — the only Google Play Services components in the manifest are
-`cloudmessaging` and `common.api`. So the advertising-ID declaration is "no".
-
-### THE ONE THAT WILL GET YOU REJECTED IF NOTHING ELSE DOES: a reviewer cannot sign in
-
-This is the same problem §27 solved for Apple, and it applies to Google
-identically — but §27 is written entirely in App Store Connect terms, so it would
-have been easy to read it as handled and discover otherwise.
-
-**The whole app is behind the login wall.** `apps/mobile/src/app/index.tsx:21`
-redirects to `/(auth)/login` unless `status === 'signed_in'`, and
-`app/(tabs)/_layout.tsx:41` re-redirects any signed-out session that reaches the
-tabs. There is **no guest or browse-only mode** — searched for and found nothing.
-
-**And login is Saudi-mobile-only, enforced on both sides of the wire.** The
-client rejects a foreign number (`apps/mobile/src/lib/phone.test.ts:52` pins
-`toSaudiE164('+14155552671') === null`) and so does the server
-(`supabase/functions/_shared/whatsapp.ts:49`, "anything else — foreign numbers
-included — is rejected"). A reviewer in Mountain View cannot type their own
-number, and cannot receive a WhatsApp code sent to a Saudi one.
-
-A Play reviewer who cannot get past the first screen files this under **App
-functionality / broken or incomplete**, and the first submission fails.
-
-**The fix is already decided and needs no code: §27's Supabase Auth test-OTP
-number.** Do that step once and it serves both stores. Two Play-specific notes on
-top of §27:
-
-- Play's field is **App content → App access → "All or some functionality is
-  restricted"**. Add an instruction with the demo phone number and code in the
-  *Username*/*Password* fields, or in the instructions box;
-- Play keeps the credentials on the app record and reuses them for **every**
-  future review, so §27's removal step matters more here than on iOS: deleting
-  the Auth entry while Play still holds the credential means the next update is
-  reviewed against a login that no longer works.
-
-**AND ONE THING §27 ASSERTS HAS NOT BEEN VERIFIED FOR A HOSTED PROJECT.** §27
-quotes Supabase — *"When a test phone number requests an OTP, the Auth service
-skips SMS delivery and accepts only the mapped code"* — and that sentence comes
-from the **self-hosting** guide (the `SMS_TEST_OTP` / `SMS_TEST_OTP_VALID_UNTIL`
-environment variables). Whether the hosted dashboard's test-phone-numbers feature
-also short-circuits a **custom Send SMS Hook** — which is what this project uses,
-because the OTP goes out over WhatsApp rather than SMS — is not documented for
-the hosted product and is not established here.
-
-**This is the same trap §27 already fell into once.** That section recorded a
-correction on 2026-09-03 for exactly this: it had told you to set an expiry that
-turned out to be a self-hosting environment variable. This is the second sentence
-on the same page quoted as hosted behaviour.
-
-**It is cheap to settle by measurement, and it must be settled before you
-submit.** Baselines read live 2026-09-15: `whatsapp_message_logs` holds **30**
-rows (newest 2026-08-21 14:24:47Z) and `otp_send_reservations` holds **0**. After
-the single confirmation sign-in in §27 step 3, re-read both. **Unchanged means
-the hook really was bypassed and the mechanism works.** If either moved, the hook
-ran — the test number is being delivered over WhatsApp like any other, a reviewer
-still cannot receive it, and the plan needs rethinking before submission rather
-than after rejection.
-
-The review-notes text in §27 is written for Apple but transfers with the first
-sentence dropped. **Do not put the code in this repository** (§9) — the number
-may be recorded, the code may not.
-
-### A SECOND BLOCKER: the live privacy policy names the wrong map provider, and Google cross-checks
-
-Play compares the Data Safety form against the privacy policy you link, and a
-contradiction between them is a rejection reason in its own right. There is one,
-and the production AAB settles it rather than leaving it arguable.
-
-**Live `privacy_policy` v2.1 says the map is Mapbox.** The shipped binary says
-otherwise, measured on `base/assets/index.android.bundle`:
-
-- `pk.eyJ` (the Mapbox public-token prefix) — **0 occurrences**;
-- `maps.googleapis.com` — **present**, together with an `AIza…` Google key;
-- the only Mapbox strings are dead constants left in the Hermes string table
-  (`mapbox://styles/mapbox/streets-v12`, `MAPBOX_PUBLIC_TOKEN_REFRESHED`) — and
-  **with no token in the bundle, no request to Mapbox can be made**, so no
-  customer data reaches them.
-
-So the app processes delivery-pin coordinates through **Google Maps Platform**
-while telling customers it uses Mapbox. That is a live document naming the wrong
-sub-processor for precise location data — the most sensitive type this app
-collects.
-
-**This is §34, and this section upgrades its urgency rather than restating it.**
-§34 has been an open correction with the replacement text already drafted
-(`docs/legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md`). It was a
-documentation-accuracy item; **for the Play submission it is a blocker**, because
-you cannot truthfully complete the Data Safety location rows while the linked
-policy names a processor the app does not use.
-
-Publishing it is a §5 live write (editing a `legal_documents` row) and needs its
-own approval. Do it **before** filling in the Data Safety form, not after.
-
-### Data Safety — answers derived from the schema and the code, not from memory
-
-Play will not let you publish without this form, and it is the one that is
-tedious to answer honestly under time pressure. These answers are derived from the
-live `public` schema and the client code; the evidence column is what to re-check
-if anything changes.
-
-| Play data type | Collected | Leaves our systems to | Purpose | Evidence |
-| --- | --- | --- | --- | --- |
-| Name | Yes, **OPTIONAL** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:323`. **This row said "required" and that was wrong — measured live 2026-09-15:** `profiles.full_name` is nullable and **3 of 9** profiles have none; `orders.customer_name` is nullable and **19 orders carry no name at all**. The POS payload substitutes `'Guest'` (`lazywait-sync/index.ts:323`). Declaring it required would have been a false Data Safety answer about the one field easiest to check |
-| Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
-| Email address | Yes, **optional** | — | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
-| Address | Yes, optional (delivery only) | POS | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
-| Precise location | Yes, optional | — | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2) |
-| Approximate location | Yes, optional | — | App functionality | `ACCESS_COARSE_LOCATION` |
-| Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
-| User IDs | Yes | — | App functionality, Account management | `profiles.id` |
-| Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
-| Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
-| Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
-| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it |
-| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
-| **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
-
-**Sentry is configured not to send PII — but "no PII" is too strong, and the
-precise version matters for the form.** `sendDefaultPii: false` with a
-`beforeSend` scrubber, on native (`observability/index.ts:106,116`) and on web
-(`webCore.ts:125,145`). **What it does keep is the pseudonymous user id:**
-`sanitize.ts:223-226` reduces `event.user` to `{ id }` and drops every other
-field. So crash reports are linkable to an account, which is exactly why "User
-IDs" is declared above and why the Sentry rows say REQUIRED.
-
-**The "Shared" column is deliberately NOT answered here, and that is a
-correction rather than an omission.** This table's first version marked all four
-vendor transfers as **"Yes — shared"**, reasoning that Play defines sharing as
-transfer to a third party. That reasoning is incomplete and review caught it
-(#380).
-
-**Play's Data Safety guidance excludes transfers to a service provider that
-processes the data on the developer's behalf.** Four vendors receive customer
-data — the POS (Lazywait) gets name, phone, address snapshot and order contents;
-Meta gets the phone number to deliver the OTP template; Expo and then FCM/APNs
-get the push token; Sentry gets crash and performance data — and **every one of
-them is plausibly a processor rather than a recipient**, which is how this
-repository already describes them elsewhere. Answering "shared: yes" for all four
-would have contradicted our own privacy documentation inside the form that Play
-cross-checks against it.
-
-**So the transfer is the measured fact and the classification is not.** The
-column above says where data goes, which is provable from the code. Whether each
-transfer is "sharing" in Play's sense depends on the processing role and the
-contract with each vendor — a determination for you and, where the DPAs are
-unclear, for counsel. **Do not answer that column from this document.**
-
-**The one thing that IS safe to say:** under-disclosing is the dangerous
-direction. If a vendor's processor status cannot be established before you
-submit, declare the transfer as shared rather than guessing it away — an
-over-disclosure is an inaccuracy, an under-disclosure is an enforcement matter.
-
-Two boxes are unambiguous: **encrypted in transit** — yes, everything is HTTPS
-to Supabase; **users can request data deletion** — yes, and the URL is below.
-
-### The data-deletion URL, verified end to end
-
-Play requires a **web** URL where a user can request account deletion without
-reinstalling the app. It exists and was checked live on 2026-09-15 rather than
-assumed from the route table:
-
-**`https://app.spicymeal.com.sa/legal/account-data-deletion`**
-
-**`HTTP 200`, and it serves the policy text — USE IT.** Measured on the deployed
-page after `71306f1` shipped: **36,775 visible characters** with `<script>`
-stripped, carrying "Privacy Policy", "personal data", "Account & Data Deletion",
-«الخصوصية» and the support address. `/privacy`, `/terms`, `/support` and this URL
-all return the same figures. Paste them into Play with no caveat.
-
-### This URL was a BLOCKER for five days, and the reason is worth more than the fix
-
-**Kept as history, not as instruction — nothing below this heading is still
-outstanding.** Until 2026-09-15 the page was client-rendered: the same fetch,
-with scripts stripped, returned **253 visible characters** saying the documents
-*"are loaded from our servers and need JavaScript enabled"*, in which the word
-"privacy" appeared **zero** times. Play's policy-URL validation does not execute
-JavaScript, so a required privacy policy read as missing.
-
-**`docs/GO_LIVE_READINESS.md` B7 was ✅ throughout, on evidence that did not cover
-it** — HTTP status, byte count, `<title>`, and a working anonymous PostgREST
-read. **Every one of those checks still passes today.** They were not failing;
-they were checking the wrong thing.
-
-**This section made the same mistake one level up, in the paragraph immediately
-above.** It called the deletion URL "verified end to end" because the route
-resolved *and* the anonymous data read succeeded — two halves of a chain, neither
-of them the half Google looks at. Checking more of the wrong thing is not
-checking the right thing.
-
-Fixed by pre-rendering the documents into `legal.html` at build time (#381), and
-closed against the deployed response rather than the merge (#382).
-
-
-
-In-app deletion also exists, which Play requires alongside the URL:
-Profile → Account settings → Delete account
-(`apps/mobile/src/features/profile/AccountSettingsScreen.tsx:115`).
-
-The other listing URLs are unchanged from B7: privacy
-`https://app.spicymeal.com.sa/privacy`, support `/support`, terms `/terms`.
-
-### The five steps, in the order they unblock each other
-
-1. **Google Play Console developer account** — US$25 one-off, plus identity and
-   (for an organisation) D-U-N-S verification. Verification is the long pole; it
-   has taken days, not hours, for others. Start it first.
-2. **Create the app record** for `sa.com.spicymeal.app`. The package name is
-   permanent — this is the moment C6 stops being changeable, so make that a
-   decision rather than a default. Android is `sa.com.spicymeal.app`, iOS is
-   `com.spicymeal.app`; they may differ, but decide deliberately.
-3. **Upload the first AAB BY HAND, in Play Console.** This step is not optional
-   and cannot be automated away — see the box below.
-4. **The Auth test-OTP number** (§27 step 1-3), then paste it into App content →
-   App access.
-5. **Create a Google Cloud service account, grant it Play Developer API access,
-   download the JSON key, and upload it to EAS** — `eas credentials --platform
-   android`, or commit a path in `eas.json`. **Do not commit the key itself**
-   (§9). This is what makes every release *after* the first unattended.
-
-**One prerequisite sits outside this list because it belongs to another section:
-publish the §34 privacy-policy map-processor correction before you fill in the
-Data Safety form.** It is not sequenced with the five steps — it can be done at
-any point — but it must precede the form, for the reason given above.
-
-Steps 1-3 are plumbing. **Step 4 is the one that decides whether the first review
-passes**, and it is the cheapest of the five.
-
-### THE FIRST UPLOAD CANNOT BE AUTOMATED, and this section said otherwise
-
-**Corrected 2026-09-15, before this document was merged (#380).** Step 3 used to
-be step 5's text alone, ending *"Once EAS holds it, `eas submit --platform
-android --profile production --latest` runs unattended and I can drive every
-later release."* For every release after the first that is true. **For the first
-it is false**, and acting on it would have meant configuring a service account,
-running `eas submit`, and watching it fail for a reason the section had just
-promised was handled.
-
-**The Google Play Developer API cannot create the initial release of a package
-that has never had a binary uploaded.** Expo's own Android submission
-documentation states the requirement directly: upload the app manually through
-Play Console at least once before using EAS Submit. So the ordering is: create
-the app record, upload
-`spicymeal-v1.0.0-2.aab` by hand into a track, and only then does the API have a
-package it can add editions to.
-
-The AAB to upload is the one this section verified — `v1.0.0`, versionCode 2,
-built from commit `f82cecbe`. Download it from the EAS build page rather than
-rebuilding; a rebuild would produce a different versionCode and a different
-artefact from the one whose manifest is recorded in C1.
-
-**The generalisable point is about where the claim came from.** Nothing was
-measured for that sentence — it was the reasonable-sounding shape of "credential
-unlocks automation", written without checking the one page that documents the
-exception. A step that has never been performed is exactly where a plausible
-assumption survives unchallenged.
-
-### What I can do once step 5 lands
-
-Every release after the first: run the submit, watch the upload, report the Play
-processing result. I can also prepare the listing text in both languages at any
-time. **The first upload is yours**, and until step 1 completes the whole
-sequence is blocked on a Google account rather than on work.
-
-### One thing a reviewer WILL see, measured live rather than guessed
-
-**SUPERSEDED 2026-09-16 — the count moved, and the timing says why.** Re-read
-live: 61 products, 55 active, **4** with a non-empty `image_url`, all four
-active. `max(products.updated_at)` is `2026-09-16 04:52:07 UTC` — the same minute
-the owner's screenshot captures are stamped (07:52 Riyadh, UTC+3). Three product
-images were uploaded immediately before the screenshots were taken, which is why
-the menu capture shows real food photography rather than the grey icons this
-section was written about.
-
-**The point survives the correction: 51 of 55 active products still have no
-image.** Four is enough for the screenshots to look finished, because the images
-sit at the top of the `وجبات` category, which is what the menu capture shows. It
-is not enough for a customer scrolling the rest of the menu.
-
-**The superseded reading, kept because a dated count is exactly the thing that
-goes stale:** read live 2026-09-15 — 61 products, 55 active, 5 active categories,
-**1** with a non-empty `image_url`. One branch is active out of 40, which is
-correct for a single-branch launch.
-
-**This is not broken and not a policy problem** — it is handled deliberately.
-`apps/mobile/src/lib/mappers.ts:105-124` refuses a stock-photo fallback (an
-earlier version substituted one Unsplash burger for every product, so the same
-burger sat beside "Chicken Wings" and "Fries with cheese"), and `ProductCard`
-renders a neutral `DishIcon` when `imageUrl` is empty. The empty state is built
-and styled.
-
-**It is a store-listing problem.** Play wants at least two phone screenshots, and
-screenshots of a food-ordering app whose menu is 55 grey dish icons read as
-unfinished to a human reviewer and to every customer who sees the listing. The
-upload path already exists — `20260827140000_product_images_bucket` created a
-public bucket an administrator can upload into from the console, and one product
-proves the path works end to end.
-
-Nothing blocks submission on this. It is worth an hour with a phone before the
-screenshots are taken, not after.
-
-### Two of these blockers are now FIXED — the legal pages LIVE, the icon committed (2026-09-15)
-
-**The 512×512 store icon exists.** Play takes an icon upload rather than reading
-it out of the AAB, and every icon in this repository was 1024×1024 — the largest
-inside the bundle is a 432×432 adaptive foreground — so the listing could not be
-saved at all. `scripts/build-play-icon.mjs` generates
-`assets/store/play-icon-512.png` from the same approved master by an exact 2:1
-box reduction, and `npm run play-icon:check` guards it in CI beside `logo:check`,
-so a re-exported master cannot leave the store icon showing last year's artwork.
-
-Two details worth keeping. The averaging is done in **premultiplied alpha**: the
-master is fully opaque today (the script asserts it, because Play wants an opaque
-icon and `adaptive-icon.png` — 48% transparent — is the wrong file to reach for),
-so premultiplying changes nothing now and is correct the moment a master has soft
-edges. And the PNG codec moved to `scripts/lib/png.mjs` rather than being
-duplicated; `logo:check` compares generated output byte-for-byte against the
-committed assets, so its passing is the proof the extraction was lossless.
-
-**The legal pages now serve their text without JavaScript.** See B7. Built
-against Production, the strip-`<script>` measurement goes **253 → 36,775 visible
-characters**. **LIVE and verified 2026-09-15** — measured on the deployed page after
-Vercel shipped `71306f1`, not inferred from the merge: all four legal URLs return
-36,775 visible characters with scripts stripped, the page carries exactly one
-`<script>` and it has a `src`, and that was checked against the CSP the server
-actually sends rather than the one `vercel.json` declares. The policy URL to give
-Play is `https://app.spicymeal.com.sa/privacy`.
-
-**One thing from that work is worth carrying beyond it.** The snapshot was first
-hidden by an inline `<script>`, and `vercel.json` sets a CSP with no
-`'unsafe-inline'` for scripts — so it would have been blocked in production and
-nowhere else, leaving every visitor the live policy plus a stale duplicate. The
-rule it produced: **a CSP failure is invisible to every local check**, because
-`vite build`, `vite preview` and the test suite all serve no headers. If a change
-adds an inline script, a new script host or a new `connect-src` target, read
-`vercel.json` — nothing else in the pipeline will tell you.
-
-### The phone screenshots exist (2026-09-16), composed from the owner's own captures
-
-**The captures could not be uploaded as they were, and the reason is geometry
-rather than taste.** Play's phone screenshots must be 16:9 or 9:16 with each side
-between 320 and 3840 px. The owner's five captures are **736 × 1600 — ratio
-0.460**, narrower than 9:16's 0.5625, so Play rejects the shape before a human
-ever looks at the content.
-
-`scripts/build-play-screenshots.mjs` does two things, both measured rather than
-eyeballed, and `npm run play-screenshots:check` asserts the result in CI beside
-`logo:check` and `play-icon:check`:
-
-1. **Crops the top 90 rows.** A full-width dark-pixel scan puts the iOS
-   status-bar glyphs at rows **42-66 in all five captures**, and the first pixel
-   the app itself drew at row 120 at the earliest. 90 clears the status bar with
-   30 rows to spare and removes nothing the app drew. That number is a property
-   of these captures, not of iOS — re-measure it if the source device changes.
-2. **Places the 736 × 1510 remainder on a 1080 × 1920 canvas** — exactly 9:16,
-   1080 on the short side, which is Google's quality recommendation. The 140 px
-   margin is not a taste decision: it is the value for which all four margins
-   come out equal, and it puts the content scale at 800/736 = **1.087×**, an
-   upscale small enough to be invisible.
-
-**ONE PIXEL OF CONTENT WAS EDITED, AND IT IS STATED HERE RATHER THAN BURIED.**
-The checkout capture carried the *"الدفع الإلكتروني غير متاح حالياً. الدفع النقدي
-مفعل"* banner across source rows 212-266, clipped mid-sentence by where the
-customer had scrolled. **PR #377 removed that banner from the app**, so the
-capture advertises a notice the shipped build does not render. The script splices
-those rows out and refills the freed band at the bottom from the capture's own
-bottom rows — asserting first that they are a single flat colour, so the splice
-cannot leave a seam (they are pure white, deviation 0). Removing it makes the
-screenshot *more* accurate, not less. **The source captures are committed beside
-the outputs precisely so that edit is auditable rather than taken on trust.**
-
-**THEY ARE ONE BUILD BEHIND, and that is a real limitation rather than a
-quibble.** The same PR #377 also stopped auto-selecting a payment method, so the
-shipped checkout carries a selector these captures predate. Nothing about that
-risks a rejection — but the checkout screenshot is not what a customer will see
-today, and screenshots can be replaced at any time **without a new release**, so
-it is worth re-capturing once an Android build is in hand.
-
-**iOS provenance is not itself a problem, and the owner's instinct to ask was
-still the right one.** Play does not require screenshots to come from an Android
-device, and the app is React Native, so Android renders these screens
-near-identically. What *would* have been a problem is a web render — a different
-layout engine, different fonts, different metrics — which is why these are device
-captures of the real app rather than anything produced in a browser.
-
-**The screenshots carry no alpha channel, and that is not the same as being
-opaque.** Play asks for a *32-bit PNG with alpha* for the store icon and *JPEG or
-24-bit PNG with no alpha* for the feature graphic and every screenshot, so an
-image whose alpha is uniformly 255 still declares a channel Play refuses. A
-browser canvas always hands back RGBA, so the composition is decoded and
-re-encoded as PNG colour type 2 — losslessly, since there is no alpha to lose.
-Codex caught this on the feature graphic in PR #383; the same defect was here,
-and the checker meant to catch it asserted opacity while its own header claimed
-Play does not reject an alpha channel.
-
-**What the CI check can and cannot prove.** It proves geometry and format
-(1080 × 1920, **24-bit RGB with no alpha channel**, under Play's 8 MB ceiling,
-2-8 images) and it proves the
-composition ran — a raw capture dropped into the directory has no uniform
-backdrop border and fails, which is mutation-tested five ways. It **cannot** tell
-whether the status bar was cropped or whether the image shows this app at all.
-Those are review judgements, and the script's own header says so; a check whose
-limits are not written down gets read as proving more than it does.
-
-**Still outstanding on the listing:** the 1024 × 500 feature graphic, the short
-and full descriptions in both languages, and the Console-only app category.
-
-### One thing measured on the bundle that nobody has decided
-
-The AAB declares **no `<supports-screens>` and no `<uses-feature>` element at
-all**, so Android treats the app as supporting every screen size and Play will
-distribute it to tablets and Chromebooks. `app.json`'s `"supportsTablet": false`
-sits under the **`ios`** key and has no Android effect whatsoever.
-
-Nothing blocks submission on this. But the listing will offer the app on devices
-whose layout nobody has looked at, and no tablet screenshot exists. Either supply
-7-inch and 10-inch screenshots, or accept the "not designed for this device"
-treatment — and if tablets are meant to be out of scope, that is a deliberate
-manifest change rather than something to leave implicit.
-
-### What this section does NOT claim
-
-The **content rating questionnaire** and the **store listing assets** (feature
-graphic, screenshots, short and full description) were not audited here and are
-not answered above. The listing text can be drafted from the app; the rating
-questionnaire is a set of declarations only you can make. Neither blocks steps
-1-3, so start those.

@@ -80,6 +80,14 @@ jobs:
       - name: Recorded hashes still describe real files
         run: node scripts/check-recorded-hashes.mjs
 
+      # The fourth member of `npm run docs:check`, and until 2026-09-16 it ran
+      # NOWHERE in CI — this workflow invokes the scripts individually rather
+      # than the npm script, so it was reachable only from a developer's own
+      # terminal. Same shape as `logo:check`, which existed while no workflow
+      # ran it (CLAUDE.md §11). It needs no base ref: it scans the whole tree.
+      - name: No test phone numbers outside the allowlist
+        run: node scripts/check-test-phone-numbers.mjs
+
       # `github.base_ref` is set on pull_request events and empty on push. On a
       # push to the default branch the merge base is HEAD, so the check finds no
       # changed files and passes — correct, because the pull request already
