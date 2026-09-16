@@ -232,24 +232,50 @@ purpose.** Latest live version `20260916114130`; the most recent apply is
 `20260922120000` (ledger row 96, `docs/MIGRATIONS.md` §43).
 
 **THE COUNT LEAVES THE DANGEROUS SHAPE ON THE BRANCH THAT CARRIES THIS
-SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Two files are written,
-validated and awaiting approval — `20260923120000_branch_variant_availability`
-and `20260924120000_place_order_variant_availability` — so once they merge the
-outstanding set is **THREE**. `20260824100000` still sorts ahead of both, so
+SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Three files are written,
+validated and awaiting approval — `20260923120000_branch_variant_availability`,
+`20260924120000_place_order_variant_availability` and
+`20260925120000_health_card_variant_coverage` — so once they merge the
+outstanding set is **FOUR**. `20260824100000` still sorts ahead of all three, so
 "apply the outstanding migrations" takes the frozen payment file FIRST. **Name
 the target by version.** That is what makes the count irrelevant in any shape.
 
-**THE TWO NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
-`20260923120000` first, then `20260924120000`, each on its own approval, each
-named by its own version. Each refuses to land out of order: the first asserts
-that neither money-path function mentions `branch_variant_availability`, the
-second asserts that the table, both RPCs and the sweeper arm already exist. The
-second is a **MONEY-PATH CHANGE** — it redefines `place_order` and
+**THE THREE NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
+`20260923120000`, then `20260924120000`, then `20260925120000`, each on its own
+approval, each named by its own version. Every one refuses to land out of order:
+the first asserts that neither money-path function mentions
+`branch_variant_availability`; the second asserts that the table, both RPCs and
+the sweeper arm already exist; the third asserts both, and both halves of its
+guard were proven by building a database that fails exactly one of them.
+
+The second is a **MONEY-PATH CHANGE** — it redefines `place_order` and
 `compute_order_snapshot`, so the pair
 `bfd3f1f423e61c850ab6101e37431799` / `ca276a84424e403a98d34860817f815c`
 **will move**. That is the intended effect of the work, not an anomaly; record
-the new pair deliberately at apply time. Detail: `docs/MIGRATIONS.md` §44 and
-§45.
+the new pair deliberately at apply time. The third moves a different pair
+(`aefe82538f13bc2d6fbf04d3f620506b` for
+`operations_health_snapshot_internal`, `662ee646ea4ea9e89ff64203bcb542ee` for
+`operations_alerts_derive_pre_stranded`) and asserts the money-path pair is
+untouched. Detail: `docs/MIGRATIONS.md` §44, §45 and §46.
+
+**A MONITOR THAT ENUMERATES ITS SUBJECTS BY NAME IS CORRECT UNTIL A SUBJECT IS
+ADDED, AND THEN SILENTLY WRONG.** That is what `20260925120000` is for:
+`operations_health_snapshot_internal` names the availability tables in three
+places, so a tier whose restore timer ran out and was never honoured read
+**`idle`** — the fail-quiet warm-up, not even `healthy` — with no alert.
+Measured on the same data before and after: `idle` / 0 overdue / no alert,
+against `degraded` / 1 overdue / `restores_overdue`. It is the same defect class
+`20260827130000_watchdog_delivery_coverage` records, where two watchdog rules
+went blind to delivery orders the moment delivery went live. **When a change
+adds a subject, grep the monitors for the subjects they name.**
+
+**A `plpgsql` BODY IS NOT NAME-RESOLVED AT CREATION, so a source-level
+assertion cannot see a misspelled column.** Mutation 12 against
+`20260925120000` misspells one inside the new select; it stores cleanly, every
+source assertion passes, and the availability block's own `exception when
+others` would have reported the card `unavailable` for ever — the quiet failure
+the file exists to prevent. Only **calling** the function catches it, reading
+the outcome back as a value (`42703`) rather than a notice.
 
 **A CHECK A COMMENT CAN SATISFY IS NOT A CHECK, and mutation testing is what
 found that.** `20260924120000`'s own verification asserted the deferred-earning

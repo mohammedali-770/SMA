@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **138**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260924120000_place_order_variant_availability.sql`.
+Migration files in the repository: **139**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260925120000_health_card_variant_coverage.sql`.
 
 ## Tables
 
@@ -216,7 +216,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_alerts_admin_summary` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_apply_rollup_correlation` | 1 | `20260914120000_platform_rollup_suppression.sql` |
 | `operations_alerts_derive` | 5 | `20260914120000_platform_rollup_suppression.sql` |
-| `operations_alerts_derive_pre_stranded` | 1 | `20260820160000_branch_availability_health_card.sql` |
+| `operations_alerts_derive_pre_stranded` | 2 | `20260925120000_health_card_variant_coverage.sql` |
 | `operations_alerts_dispatch_recipients` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alerts_evaluate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
@@ -231,7 +231,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_digest_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_digest_preview` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_health_overall_state` | 2 | `20260807150000_order_flow_health_card.sql` |
-| `operations_health_snapshot_internal` | 5 | `20260820160000_branch_availability_health_card.sql` |
+| `operations_health_snapshot_internal` | 6 | `20260925120000_health_card_variant_coverage.sql` |
 | `operations_health_summary` | 2 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `order_integrity_acknowledge_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_admin_summary` | 1 | `20260721170000_order_integrity_watchdog.sql` |
