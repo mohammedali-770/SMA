@@ -20,6 +20,22 @@
 > had grown into a 461-line reference inside a file that describes itself as "a
 > current decision register, not an incident diary". §38 keeps the owner actions
 > and points here.
+>
+> **This file is Play's. iOS has its own, added 2026-09-16:**
+> [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md). The split matters because
+> `apps/mobile/app.json` carries **both** platforms' declarations, and until that
+> file existed an iOS declaration change — the Info.plist purpose strings — had a
+> documentation obligation pointing only at this document, which has nothing to
+> say about an Info.plist. That is how `NSMotionUsageDescription` was removed on
+> 2026-09-10 and only discovered on 2026-09-16, when App Store Connect refused
+> the upload. `docs/ownership.json` now carries **both** rules over `app.json`, so
+> a change to it must update **both** records — the rules are evaluated
+> independently, which is what makes the overlap a strengthening rather than an
+> escape hatch.
+>
+> **What stays here:** the Data Safety form, content rating, the Play tracks and
+> the closed-testing gate. **What moved there:** App Privacy labels, privacy
+> manifests, TestFlight, and the iOS purpose strings.
 
 ---
 

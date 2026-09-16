@@ -64,6 +64,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Understand how deployment works | [Deploy](DEPLOY.md) |
 | Build for a store or TestFlight | [Mobile guide](../README_MOBILE.md) |
 | Submit to Google Play, or look up a Play declaration | [Play store submission](PLAY_STORE_SUBMISSION.md) |
+| Submit to TestFlight or the App Store, or look up an Apple declaration | [App Store submission](APP_STORE_SUBMISSION.md) |
 | Write or change store listing copy | [Listing copy](store/LISTING_COPY.md) |
 | Check dependency advisories | [Dependency advisories](DEPENDENCY_ADVISORIES.md) |
 | Know the Node version | [Node version](NODE_VERSION.md) |

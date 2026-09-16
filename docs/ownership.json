@@ -252,6 +252,16 @@
       "docs": ["docs/PLAY_STORE_SUBMISSION.md"]
     },
     {
+      "id": "app-store-submission",
+      "why": "The iOS half of app.json is a set of DECLARATIONS Apple validates at upload and a reviewer reads: the bundle identifier, the encryption declaration, supportsTablet, and the Info.plist purpose strings the expo-location plugin adds or deletes. On 2026-09-16 App Store Connect refused the upload of build 23 with error 90683 because NSMotionUsageDescription had been removed six days earlier by a change whose documentation obligation pointed only at the Play record — a file with nothing to say about an iOS Info.plist. THIS RULE DELIBERATELY OVERLAPS play-store-assets on apps/mobile/app.json, and the overlap is the mechanism, exactly as recorded on store-listing-copy: docs-check-ownership.mjs evaluates every rule independently, so an app.json change must now satisfy BOTH submission records. Adding docs/APP_STORE_SUBMISSION.md to the play-store-assets rule instead would have the opposite effect, because OR semantics within a rule would let an Android declaration be documented in the iOS record alone. The locale files are listed because a purpose string missing from one language silently falls back to English on a device set to the other.",
+      "sources": [
+        "apps/mobile/app.json",
+        "apps/mobile/locales/*.json",
+        "apps/mobile/src/components/iosPurposeStrings.test.ts"
+      ],
+      "docs": ["docs/APP_STORE_SUBMISSION.md"]
+    },
+    {
       "id": "store-listing-copy",
       "why": "The published store listing makes factual claims about shipped behaviour — points are earned on pickup orders only, cash is the only payment method, displayed prices include VAT — and each claim is coupled to a live behaviour that can change without anybody thinking about a store listing. A false factual claim in a Play listing is a policy matter rather than a typo, and Play cross-checks the listing against the Data Safety form and the privacy policy it links. THIS RULE DELIBERATELY OVERLAPS loyalty and payments, and the overlap is the whole mechanism: docs-check-ownership.mjs evaluates every rule independently, so a loyalty change must satisfy BOTH LOYALTY.md AND the listing copy. Adding docs/store/LISTING_COPY.md to the loyalty rule instead would have the opposite effect — OR semantics within a rule would let a loyalty change be documented in the listing copy alone, weakening the rule that protects what customers are charged.",
       "sources": [

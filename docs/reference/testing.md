@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**181 TypeScript test files declaring 2810 test blocks, plus 76 SQL suites.**
+**182 TypeScript test files declaring 2817 test blocks, plus 76 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -121,11 +121,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-65 files, 936 declared test blocks.
+66 files, 943 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `apps/mobile/src/components/headerInset.test.ts` | 6 | header top inset — exactly one source per screen |
+| `apps/mobile/src/components/iosPurposeStrings.test.ts` | 7 | iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1) |
 | `apps/mobile/src/components/legacyButtonBehaviour.test.ts` | 5 | legacy Button — behaviour is unchanged by the consolidation |
 | `apps/mobile/src/components/locationControl.test.ts` | 25 | shouldStartLocate |
 | `apps/mobile/src/components/stateHierarchy.test.ts` | 9 | looksTechnical |
