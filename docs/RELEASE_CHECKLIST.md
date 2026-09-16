@@ -173,6 +173,42 @@ Re-check these live immediately before submission; do not copy old audit status 
 has to update both, not just App Store Connect. Play in particular keeps them on the
 app record and reuses them for every future review.
 
+### App Store / TestFlight only
+
+This section had no iOS-specific item either — the bundle identifier was the only
+Apple line on the page — until 2026-09-16, when App Store Connect **refused the
+upload** of a build that had passed every gate above. The answers behind these
+boxes are in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
+
+- [ ] **Purpose strings survive the resolved config AND the binary.**
+      `apps/mobile/src/components/iosPurposeStrings.test.ts` guards the config
+      side. The binary side only proves itself at upload: error **90683**
+      (`EAS_UPLOAD_TO_ASC_MISSING_PURPOSE_STRING`) means a **linked** framework
+      references a protected API and Apple wants the string whether the app calls
+      it or not. **Adding an Expo module can introduce this without any code
+      change of yours.**
+- [ ] **`npx expo install --check`** immediately before the build. The SDK patch
+      drift has recurred twice, most recently four days after being recorded
+      closed.
+- [ ] **Internal or external?** Internal (≤100 App Store Connect users) needs
+      **no Beta App Review**. External (≤10,000) needs review on the group's
+      first build, which pulls in the reviewer sign-in below.
+- [ ] **Test information** — beta app description, what to test, feedback email.
+      Required for both tiers. **Do not put a personal address in the feedback
+      field**; every tester sees it.
+- [ ] **App Privacy answers** still match what the app collects. Re-check after
+      any change to analytics, location, push targeting or a third-party SDK,
+      and keep them consistent with Play's Data Safety form — the two are the
+      same facts and both stores cross-check them against the privacy policy.
+- [ ] **Export compliance** — `ios.config.usesNonExemptEncryption` still matches
+      reality. It is `false` today; adding cryptography changes the answer.
+- [ ] **Reviewer credentials on the App Store Connect record**, and remember §11
+      removes the Auth test-phone entry afterwards — **each store keeps its own
+      copy**, so removal has to update both.
+- [ ] **If an EAS submission fails with no logs**, read `jobRun.errors` through
+      the GraphQL API. `submission.error` is null and `logFiles` is empty for
+      upload-validation failures, and the CLI prints only "Something went wrong".
+
 ### Google Play only
 
 This section was titled "App Store / Play submission" and contained **no Play-specific

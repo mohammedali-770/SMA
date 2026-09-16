@@ -79,7 +79,7 @@
         {
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
-          "motionUsagePermission": false
+          "motionUsagePermission": "Spicy Meal does not request motion or fitness data. This description is required because the location library bundled in the app links Apple's motion framework, which Spicy Meal never calls."
         }
       ]
     ],
