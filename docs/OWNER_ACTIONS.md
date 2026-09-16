@@ -236,9 +236,10 @@ The nine in-app legal documents are no longer placeholder text — see §13.
 **The public privacy-policy URL is no longer what remains.** It is live and
 verified — `https://app.spicymeal.com.sa/privacy`, serving its text to a client
 that runs no JavaScript, measured on the deployed page (`GO_LIVE_READINESS.md`
-B7 ✅). What remains is a **counsel review of the published wording**, and the
-§34 map-sub-processor correction, which is a factual error in live text rather
-than a drafting question.
+B7 ✅). What remains is a **counsel review of the published wording**. **§34's
+map-sub-processor correction is done** — published as v2.3 and verified on the
+no-JavaScript page on 2026-09-16 — and the one factual error left in live text is
+§39, the privacy policy's own effective-date line.
 
 **This list predates the Play submission and is written for both stores.** For
 Android specifically, `PLAY_STORE_SUBMISSION.md` carries the answers and §38 the
@@ -2407,7 +2408,7 @@ Until both are done, leave `loyalty_expiry_enabled` off. The mechanism is applie
 and proven inert (`docs/MIGRATIONS.md` ledger row 84); nothing degrades by
 waiting.
 
-## 34. Privacy policy map sub-processor — PUBLISHED 2026-09-16; one step left
+## 34. ~~Privacy policy map sub-processor~~ — CLOSED 2026-09-16 (both steps done)
 
 **`privacy_policy` v2.3 is live**, both languages, effective 2026-09-16. The
 Mapbox line is gone, Google is named, and **Apple is named for the iPhone
@@ -2506,27 +2507,64 @@ scenario the evidence permits.** No shipped customer artifact contains a Mapbox
 token, so on Android the flag decides whether a map appears, not whether Mapbox
 is a processor. Option B would have re-committed the exact defect being fixed.
 
-### STILL OPEN: the public page serves the OLD text until a rebuild
+### CLOSED: the rebuild ran, and the public page now serves v2.3
 
-**This is the part that matters for the store listings, and it is not a
-formality.** The database is correct, and so is every JavaScript-enabled reader —
-the app, and the web page in a browser. The **no-JavaScript snapshot is frozen at
-the last deploy**: B7's prerender plugin is `apply: 'build'` and bakes the
-documents into `legal.html` during `vite build`.
+**This was the part that mattered for the store listings, and it was not a
+formality.** Publishing the row corrected the database, the app and every
+JavaScript-enabled web reader. It did not correct the **no-JavaScript snapshot**,
+which is frozen at the last deploy: B7's prerender plugin is `apply: 'build'` and
+bakes the documents into `legal.html` during `vite build`.
 
 Measured on the deployed page immediately after publishing: still
 `v2.1 · 2026-09-08`, still `Mapbox — the map you use to choose a delivery
 location.`, byte-identical response size. **A store policy checker is exactly a
-no-JavaScript reader**, so from Google's and Apple's point of view nothing has
-changed yet.
+no-JavaScript reader**, so at that moment nothing had changed from Google's or
+Apple's point of view.
 
-**A Vercel production rebuild is what closes it, and that is a §13 owner action.**
+**The rebuild ran on 2026-09-16, and it needed no new deployment path.** Merging
+to the default branch *is* the Vercel production trigger — established by reading
+the checks on the three merges that day, each carrying `Vercel=success`, rather
+than by adding a second path, which §13 forbids. Merging #386 therefore both
+recorded the publication and rebuilt the site.
 
-**The general rule, which nobody had written down:** editing a `legal_documents`
-row does not reach a no-JavaScript client until the site is rebuilt. B7 fixed
-"the legal page has no content without JavaScript" and silently replaced it with
-"the content without JavaScript is whatever was true at the last deploy". Any
-future legal correction needs a deploy in the same breath.
+**Verified on the artifact a store reads, not on the row.** Re-fetched from
+`https://app.spicymeal.com.sa/privacy` with `<script>` stripped: `v2.3 ·
+2026-09-16`, **zero occurrences of `Mapbox`** in either language, the
+Google-and-Apple sentence present in both, build stamp `Published documents as of
+2026-09-16`. The snapshot is served identically at every legal URL, so one fetch
+covers them all.
+
+**The general rule, which nobody had written down, survives its own closure:**
+editing a `legal_documents` row does not reach a no-JavaScript client until the
+site is rebuilt. B7 fixed "the legal page has no content without JavaScript" and
+silently replaced it with "the content without JavaScript is whatever was true at
+the last deploy". **A legal correction is two steps, not one**, and the second one
+is the one a store sees.
+
+### What closing it exposed — the document now contradicts itself about its date
+
+**This is a new, live defect, and it is the direct residue of how the two
+publications were made safe.** See `GO_LIVE_READINESS.md` **A10**, and §39 below
+for the action.
+
+The row's `effective_date` column is `2026-09-16`, and the page renders
+`v2.3 · 2026-09-16`. The **first line of the body**, in both languages, still
+reads `Effective date: 8 September 2026` / `تاريخ السريان: ٨ سبتمبر ٢٠٢٦`,
+carried over from v2.1. A reader is given two effective dates for one document,
+and the earlier one asserts that the Google-and-Apple disclosure took effect a
+week before it was written.
+
+**It is the only one of the nine active documents where the two disagree**, which
+was measured rather than assumed — all eight others have a body date matching
+their column.
+
+**The cause is the safety discipline, which is why it is worth writing down.**
+Each publication changed exactly one line and hashed the rest of the document,
+masked at that line, to prove nothing else had moved. The body's own date line was
+one of the bytes that check was guaranteeing had *not* changed. **The invariant
+was right for a wording fix and wrong for a version bump whose date moves.** A
+dated document keeps its date in two places and only one of them is a column;
+a check that proves "nothing else changed" will defend the stale one.
 
 ### The original item, kept for its reasoning
 
@@ -2563,11 +2601,12 @@ disclosure beside an unchanged Arabic one beats leaving both wrong.
 Bump to v2.2 with the publication date (a sub-processor change is substantive,
 not a typo fix), update `docs/GO_LIVE_READINESS.md` A9, and close this item.
 
-> **Done 2026-09-16 except the last clause.** v2.2 is published and A9 is
-> updated, but A9 is ⚠️ rather than ✅ and this item stays open, because the
-> public no-JavaScript page still serves v2.1 until a Vercel rebuild. The
-> checklist above did not anticipate that step, which is exactly why it is now
-> written at the head of this section.
+> **Done 2026-09-16, and the checklist above was one step short.** v2.3 is
+> published, the rebuild has run, the public page is verified, and **A9 is ✅**.
+> The step this checklist did not anticipate was the rebuild, which is exactly
+> why it is now written at the head of this section. **The step it also did not
+> anticipate was the in-body effective date**, which a version bump moves and a
+> "nothing else changed" hash defends — that is §39, and it is still open.
 
 ## 35. Native Arabic read of the corrected iOS location purpose string
 
@@ -2730,11 +2769,14 @@ list is the whole job. Detail, and the `eas.json` consequence:
    --platform android`, or a path in `eas.json`. **Do not commit the key itself**
    (§9). This is what makes every release *after* the first unattended.
 
-**One prerequisite sits outside this list because it belongs to another section:
-publish the §34 privacy-policy map-processor correction before you fill in the
-Data Safety form.** It can be done at any point, but it must precede the form —
-Play cross-checks the form against the policy you link, and the live policy names
-a map sub-processor the app does not use.
+**That prerequisite is now satisfied, and the ordering it warned about was
+already reversed.** §34's map-processor correction is published as `privacy_policy`
+v2.3 and confirmed on the public no-JavaScript page — the artifact Play
+cross-checks the Data Safety form against. The form was completed *before* the
+correction rather than after, so for a window the declared precise-location
+handling contradicted the published policy; it no longer does, and nothing in the
+form needs revisiting. **§39 is a separate, smaller defect in the same document
+and does not block the listing.**
 
 **Still open beyond step 5:** the closed test in step 0, the feature graphic, the
 descriptions, the app category and the final app name
@@ -2746,6 +2788,88 @@ Every release after the first: run the submit, watch the upload, report the Play
 processing result. The listing text is already drafted in both languages
 ([`store/LISTING_COPY.md`](store/LISTING_COPY.md)). **The first upload was
 yours**, and the production application will be too.
+
+## 39. ~~Privacy policy — the body's own effective date said 8 September~~ — CORRECTED 2026-09-16
+
+**Opened and closed on 2026-09-16**, by closing §34. One statement, both
+languages, on explicit owner approval ("fix the date and merge 387").
+
+**The defect.** `legal_documents.effective_date` for `privacy_policy` was
+`2026-09-16` and the page rendered `v2.3 · 2026-09-16`, while the first line of
+`content_en` read `Effective date: 8 September 2026` and of `content_ar`
+`تاريخ السريان: ٨ سبتمبر ٢٠٢٦`. Two dates, one document, and the earlier one
+claimed the Google-and-Apple map disclosure was in force a week before it was
+written.
+
+**It was the only one of the nine active documents with this mismatch**, measured
+live rather than assumed — the other eight agreed, and all nine agree now.
+
+**Why it existed.** v2.2 and v2.3 were each published by replacing exactly one
+line and hashing the rest of the document, masked at that line, to prove nothing
+else moved. That invariant is correct for a wording fix. For a version bump whose
+effective date moves, it actively protects the stale copy of the date — because
+the in-body date line is one of the bytes it certifies as unchanged.
+
+**No version bump.** v2.3's *substance* was correct and already published; this
+made the document say what its own metadata had said since publication. Bumping
+would have implied a substantive change and made a fourth version in one day.
+
+### What was done, in the order it has to be done
+
+**1. Dry run.** The replacement was computed in a `select`, line 1 was dropped
+from both the old and the new text, and the remainder hashed on each side:
+identical in both languages (EN `a831b0be…`, AR `e4a7efd5…`). Total length grew by
+exactly **one character** per language, which is what one digit added by one
+replacement looks like.
+
+**2. The write**, guarded on the exact pre-image hashes so it could not apply to a
+row that had moved since the dry run:
+
+```sql
+update public.legal_documents
+   set content_en = replace(content_en, 'Effective date: 8 September 2026',
+                                        'Effective date: 16 September 2026'),
+       content_ar = replace(content_ar, 'تاريخ السريان: ٨ سبتمبر ٢٠٢٦',
+                                        'تاريخ السريان: ١٦ سبتمبر ٢٠٢٦')
+ where document_type = 'privacy_policy' and is_active and version = '2.3'
+   and md5(content_en) = 'd513a4d84ebb4d261cce2ae104c814f5'
+   and md5(content_ar) = '84bf31e100317414a1a7c5819ab85536';
+```
+
+One row. The post-write hashes matched the values pre-computed from the dry run —
+EN `d3e760c5dc2823e6115003d23bcc0798` / 4 623 chars, AR
+`d2acff9656d3afa072feddb76947d226` / 3 744 — so the stored text is the text that
+was reviewed, not something retyped into it.
+
+**3. Nothing else moved, and the evidence is a timestamp rather than a count.**
+Only `privacy_policy.updated_at` changed (08:39:10 UTC); the other eight rows
+still carry their original stamps, back to 18 August.
+
+**4. THE REBUILD — the step the first draft of this section left out.** Review
+caught it on #387, and it was right to: the procedure ended at the write, which is
+the exact two-step failure §34 exists to record. The no-JavaScript snapshot is
+baked into `legal.html` during `vite build`, so a store's policy checker keeps
+serving the old line until the site is rebuilt.
+
+It was proven **before** merging rather than hoped for afterwards: the real
+production build was run locally against the live row, and the prerendered
+`dist/legal.html` — the exact artifact Vercel serves — carried
+`v2.3 · 2026-09-16` / `Effective date: 16 September 2026` /
+`تاريخ السريان: ١٦ سبتمبر ٢٠٢٦`, with Mapbox still at zero occurrences. Merging
+#387 then ran that same build against Production, and the public page was
+re-fetched to confirm it.
+
+**Generalise it rather than just fixing it.** Both rules are now in
+[`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md) §Method, which is where
+somebody editing these documents will actually look:
+
+- a dated document keeps its date in **two** places and only one of them is a
+  column — move both, and take the "nothing else changed" hash *around* the date
+  line rather than over it;
+- publishing is **two steps**, the write and then a rebuild, because the artifact
+  a store reads is baked at build time.
+
+---
 
 ---
 

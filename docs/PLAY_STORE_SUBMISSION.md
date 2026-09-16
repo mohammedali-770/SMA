@@ -284,7 +284,7 @@ why §4a will still be checkable next year.
 
 ---
 
-## 5. The privacy-policy blocker — corrected in the database, stale on the page
+## 5. ~~The privacy-policy blocker~~ — CLOSED 2026-09-16, database and page
 
 **`privacy_policy` v2.3 is live as of 2026-09-16.** It names Google for the map
 and **Apple for the iPhone reverse-geocode**, in both languages. v2.2, half an
@@ -295,22 +295,35 @@ have — that phrasing described the admin console, not either customer channel.
 Option A (Google only) was the right text. §34 had recorded that variable as
 "not readable from a session"; it is readable, and that claim is now corrected.
 
-**IT IS NOT FINISHED, AND THE REASON GENERALISES TO EVERY FUTURE LEGAL EDIT.**
-B7's prerender plugin is `apply: 'build'` — it fetches the documents during
-`vite build` and bakes them into `legal.html`. The database edit therefore
-reaches the app and any browser with JavaScript, and **does not reach a
-no-JavaScript client until the site is rebuilt**. Measured on the deployed page
+**IT TOOK TWO STEPS, AND THE SECOND ONE GENERALISES TO EVERY FUTURE LEGAL
+EDIT.** B7's prerender plugin is `apply: 'build'` — it fetches the documents
+during `vite build` and bakes them into `legal.html`. The database edit therefore
+reached the app and any browser with JavaScript, and **did not reach a
+no-JavaScript client until the site was rebuilt**. Measured on the deployed page
 straight after publishing: still `v2.1 · 2026-09-08`, still the Mapbox line,
-byte-identical response size.
+byte-identical response size. **Play's policy checker is a no-JavaScript reader**,
+so for that window the contradiction between the Data Safety declaration and the
+published policy was still live as far as Google was concerned.
 
-**Play's policy checker is a no-JavaScript reader.** So the contradiction between
-your Data Safety declaration and your published policy is still live as far as
-Google is concerned, until a Vercel production rebuild — an owner action under
-§13.
+**The rebuild ran the same day, and no new deploy path was added.** Merging to the
+default branch *is* the Vercel production trigger; §13 forbids wiring up a second
+one. Re-fetched afterwards from `https://app.spicymeal.com.sa/privacy` with
+scripts stripped — which is what Play reads: `v2.3 · 2026-09-16`, **zero
+occurrences of `Mapbox`** in either language, the Google-and-Apple sentence
+present in both, build stamp `Published documents as of 2026-09-16`. **The form
+and the policy now agree.**
 
 **The rule to carry:** a legal correction is two steps, not one. Publish the row,
 then rebuild. B7 fixed "no content without JavaScript" and quietly replaced it
 with "content without JavaScript is frozen at the last deploy".
+
+**One defect surfaced while verifying this, and it was fixed the same day.** The
+document's own first line, in both languages, still gave an effective date of
+8 September 2026 while the metadata said 16 September — a self-contradiction about
+a date rather than a processor claim, so it never conflicted with the Data Safety
+form. Corrected on the same approval that merged this record; record in
+`OWNER_ACTIONS.md` §39, item `GO_LIVE_READINESS.md` **A10**. **Nothing about this
+document is open.**
 
 *The original framing, kept because the ordering lesson in it still stands:*
 
