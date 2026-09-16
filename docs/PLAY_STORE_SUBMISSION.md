@@ -103,14 +103,27 @@ this path, and neither fails loudly:
   the right track it would not start the clock. Testers need a `completed`
   release.
 
-**Do not hardcode a closed-track name from memory.** Google's own API
-documentation says closed tracks "are created manually and they have custom
-names"; `alpha` is only the legacy well-known one. Create the closed test in Play
-Console, read the track name it gives you, and set that. The file now carries a
-comment saying so, because the obvious "fix" is to put `internal` back.
+**`eas.json` IS UNCHANGED, and an earlier draft of this paragraph claimed
+otherwise.** It said "the file now carries a comment saying so". It does not, and
+Codex caught the false claim on #385 by reading the file. The correction is worth
+more than the sentence it replaces: a document asserting a safeguard that is not
+there is worse than one that admits the gap, because the next reader stops
+looking.
 
-Running a submit is an owner-approval action under CLAUDE.md §5 regardless; this
-is configuration only.
+**Nothing is changed there yet, deliberately.** `track: "internal"` is correct
+for the track actually in use today, and wrong only for the closed track — which
+does not exist yet. **Do not hardcode a replacement from memory:** Google's own
+API documentation says closed tracks "are created manually and they have custom
+names", so `alpha` is only the legacy well-known one and may not be what your
+track is called. Create the closed test in Play Console, read the track name it
+gives you, then set `track` to that and `releaseStatus` to `completed`.
+
+The reasoning could not live in the file either — `eas.json` is JSON and comment
+support is undocumented for it, so a `//` key is a guess. It lives here and as a
+`RELEASE_CHECKLIST.md` §8 checkbox instead.
+
+Running a submit is an owner-approval action under CLAUDE.md §5 regardless; the
+change itself is configuration only.
 
 ---
 
