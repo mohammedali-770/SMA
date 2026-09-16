@@ -2985,8 +2985,19 @@ near-identically. What *would* have been a problem is a web render — a differe
 layout engine, different fonts, different metrics — which is why these are device
 captures of the real app rather than anything produced in a browser.
 
+**The screenshots carry no alpha channel, and that is not the same as being
+opaque.** Play asks for a *32-bit PNG with alpha* for the store icon and *JPEG or
+24-bit PNG with no alpha* for the feature graphic and every screenshot, so an
+image whose alpha is uniformly 255 still declares a channel Play refuses. A
+browser canvas always hands back RGBA, so the composition is decoded and
+re-encoded as PNG colour type 2 — losslessly, since there is no alpha to lose.
+Codex caught this on the feature graphic in PR #383; the same defect was here,
+and the checker meant to catch it asserted opacity while its own header claimed
+Play does not reject an alpha channel.
+
 **What the CI check can and cannot prove.** It proves geometry and format
-(1080 × 1920, opaque, under Play's 8 MB ceiling, 2-8 images) and it proves the
+(1080 × 1920, **24-bit RGB with no alpha channel**, under Play's 8 MB ceiling,
+2-8 images) and it proves the
 composition ran — a raw capture dropped into the directory has no uniform
 backdrop border and fails, which is mutation-tested five ways. It **cannot** tell
 whether the status bar was cropped or whether the image shows this app at all.

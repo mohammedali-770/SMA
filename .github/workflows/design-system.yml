@@ -119,12 +119,15 @@ jobs:
       - name: Play store icon matches its generator
         run: npm run play-icon:check
 
+      - name: Play feature graphic matches its generator
+        run: npm run play-feature-graphic:check
+
       # The phone screenshots are NOT generated from anything in this repository
       # -- they are device captures -- so this asserts the store contract rather
-      # than a derivation: 9:16 at 1080x1920, opaque, under Play's size ceiling,
-      # and composed rather than pasted in raw. It cannot tell whether the iOS
-      # status bar was cropped; that is a review judgement, and the header of
-      # scripts/check-play-screenshots.mjs says so.
+      # than a derivation: 9:16 at 1080x1920, no alpha channel, under Play's size
+      # ceiling, and composed rather than pasted in raw. It cannot tell whether
+      # the iOS status bar was cropped; that is a review judgement, and the
+      # header of scripts/check-play-screenshots.mjs says so.
       - name: Play phone screenshots meet the store contract
         run: npm run play-screenshots:check
 

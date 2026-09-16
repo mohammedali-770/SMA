@@ -2,11 +2,12 @@
 /**
  * Validates the Google Play phone screenshots in `assets/store/screenshots/`.
  *
- * Play's phone-screenshot contract: PNG or JPEG, at most 8 MB each, a 16:9 or
- * 9:16 aspect ratio, each side between 320 and 3840 px, and between 2 and 8
- * images. The owner's device captures are 736 x 1600 — ratio 0.460, narrower
- * than 9:16 — so they cannot be uploaded raw, and the whole point of
- * `build-play-screenshots.mjs` is to conform them. This asserts the result.
+ * Play's phone-screenshot contract: **JPEG or 24-bit PNG with no alpha channel**,
+ * at most 8 MB each, a 16:9 or 9:16 aspect ratio, each side between 320 and 3840
+ * px, and between 2 and 8 images. The owner's device captures are 736 x 1600 —
+ * ratio 0.460, narrower than 9:16 — so they cannot be uploaded raw, and the
+ * whole point of `build-play-screenshots.mjs` is to conform them. This asserts
+ * the result.
  *
  * WHAT THIS CAN AND CANNOT PROVE. It proves geometry and format, and it proves
  * the composition ran: a raw capture dropped into this directory has no uniform
@@ -80,18 +81,19 @@ for (const name of files) {
     continue;
   }
 
-  // Opaque throughout. Play does not reject an alpha channel, but a screenshot
-  // with a transparent region composites against an unknown ground in the
-  // listing, so it is never what was intended.
-  let firstTransparent = null;
-  for (let i = 3; i < pixels.length; i += 4) {
-    if (pixels[i] !== 0xff) {
-      const p = (i - 3) / 4;
-      firstTransparent = `${p % width},${Math.floor(p / width)}`;
-      break;
-    }
+  // NO ALPHA CHANNEL, which is not the same as "opaque" and is the thing that
+  // was wrong here. Play wants a 24-bit PNG for a screenshot and a 32-bit PNG
+  // for the store icon, so filling alpha with 255 does not satisfy it — the
+  // IHDR still declares a channel Play refuses. An earlier version of this file
+  // asserted opacity and claimed in this very comment that "Play does not reject
+  // an alpha channel". It does. Codex caught the same defect on the feature
+  // graphic in #383.
+  if (png.colorType !== 2) {
+    failures.push(
+      `${name}: PNG colour type ${png.colorType}, expected 2 (24-bit RGB, no alpha) — ` +
+        'regenerate with build-play-screenshots.mjs',
+    );
   }
-  if (firstTransparent) failures.push(`${name}: transparent pixel at ${firstTransparent}`);
 
   // The backdrop border. Sampled on the four mid-edges rather than swept: the
   // composition fills the whole canvas before drawing, so a single row per side
@@ -124,5 +126,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `✔ ${files.length} Play phone screenshots are ${WIDTH}x${HEIGHT} (9:16), opaque, under ${MAX_BYTES} bytes`,
+  `✔ ${files.length} Play phone screenshots are ${WIDTH}x${HEIGHT} (9:16), 24-bit RGB with no alpha, under ${MAX_BYTES} bytes`,
 );
