@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Category, Modifier, ModifierGroup, Product } from '../../types';
+import type { Category, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
 import type {
   BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryReasonCode, OpsReasonCode,
 } from '../../lib/opsApi';
@@ -246,4 +246,62 @@ export const DELIVERY_REASON_OPTIONS: { code: DeliveryReasonCode; key: OpsString
 /** The copy key for one DELIVERY reason. Same purpose as `reasonKey`. */
 export function deliveryReasonKey(code: DeliveryReasonCode | null): OpsStringKey | null {
   return DELIVERY_REASON_OPTIONS.find((r) => r.code === code)?.key ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Cashier grid (2026-09-16 redesign)
+// ---------------------------------------------------------------------------
+
+/**
+ * The tile fallback when a product has no photograph.
+ *
+ * FOUR OF FIFTY-FIVE active products carry an image, so the fallback is the
+ * common case and has to be designed rather than tolerated. The first draft
+ * used the product's initial over a hash of its name; that gave four adjacent
+ * tiles the same "و", because most names here begin with "وجبة". An initial
+ * carries no information when the vocabulary is that uniform.
+ *
+ * Keying the colour to the CATEGORY instead means a cashier learns the block of
+ * colour, which is the only thing a fallback tile can usefully be at arm's
+ * length. Categories beyond the palette wrap; two categories sharing a hue is a
+ * far smaller problem than every tile sharing a letter.
+ */
+export const TILE_HUES = ['#8A5600', '#1E7FE0', '#12A150', '#AE0F20', '#6E6280', '#DE7C00'] as const;
+
+export function tileHue(categoryId: string | null, categories: Category[]): string {
+  if (!categoryId) return TILE_HUES[TILE_HUES.length - 1];
+  const i = categories.findIndex((c) => c.id === categoryId);
+  return TILE_HUES[(i < 0 ? 0 : i) % TILE_HUES.length];
+}
+
+/** Active price tiers, cheapest first — the order a cashier reads them in. */
+export function activeVariants(product: Product): ProductVariant[] {
+  return [...(product.variants ?? [])]
+    .filter((v) => v.isActive)
+    .sort((a, b) => a.price - b.price || a.nameEn.localeCompare(b.nameEn));
+}
+
+/**
+ * The "from" price shown on a tile.
+ *
+ * `product.price` is already documented as the cheapest tier, but it is a
+ * denormalised copy. Deriving it from the tiers the screen is about to show
+ * keeps the tile and the sheet from ever disagreeing, which is the kind of
+ * mismatch a cashier reads as the system being wrong about the menu.
+ */
+export function fromPrice(product: Product): number {
+  const tiers = activeVariants(product);
+  return tiers.length > 0 ? tiers[0].price : product.price;
+}
+
+/**
+ * Every closed product id at this branch, for the one-tap reopen.
+ *
+ * BRANCH-SCOPED BY CONSTRUCTION: the rows handed in are the ones
+ * `opsApi.branchAvailability(branchId)` returned for this branch, and the
+ * server re-checks the caller's branch on every `clear_product_snooze`. Nothing
+ * here can widen that, which is what makes a bulk control safe to offer.
+ */
+export function reopenAllTargets(rows: BranchAvailabilityRow[]): string[] {
+  return [...closedProductIds(rows)];
 }

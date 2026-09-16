@@ -2,17 +2,22 @@ import { describe, expect, it } from 'vitest';
 import {
   DURATION_OPTIONS,
   REASON_OPTIONS,
+  TILE_HUES,
+  activeVariants,
   closedItems,
   closedModifierIds,
   closedOptions,
   closedProductIds,
   formatRemaining,
+  fromPrice,
   groupsForProduct,
   productBlockedByOptions,
+  reopenAllTargets,
   requiredCount,
   searchableGroups,
+  tileHue,
 } from './branchConsole';
-import type { Category, Modifier, ModifierGroup, Product } from '../../types';
+import type { Category, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
 import type { BranchAvailabilityRow, BranchModifierAvailabilityRow } from '../../lib/opsApi';
 
 const product = (id: string, over: Partial<Product> = {}): Product => ({
@@ -250,5 +255,109 @@ describe('productBlockedByOptions', () => {
 
   it('a product with no groups is never blocked', () => {
     expect(productBlockedByOptions(product('p2'), [required], new Set(['m1', 'm2']))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cashier grid helpers
+// ---------------------------------------------------------------------------
+
+const variant = (
+  id: string, price: number, over: Partial<ProductVariant> = {},
+): ProductVariant => ({
+  id, productId: 'p1', nameAr: `حجم ${id}`, nameEn: `Size ${id}`,
+  price, calories: null, isActive: true, sortOrder: 0, ...over,
+});
+
+describe('tileHue', () => {
+  const cats = [category('c1', 1), category('c2', 2), category('c3', 3)];
+
+  it('gives two categories two different colours', () => {
+    // The whole point of the fallback: a cashier finds the block of colour, not
+    // the letter. Same hue for neighbouring categories would defeat it.
+    expect(tileHue('c1', cats)).not.toBe(tileHue('c2', cats));
+  });
+
+  it('is stable for the same category', () => {
+    expect(tileHue('c2', cats)).toBe(tileHue('c2', cats));
+  });
+
+  it('wraps rather than running off the end of the palette', () => {
+    const many = Array.from({ length: TILE_HUES.length + 3 }, (_, i) => category(`k${i}`, i));
+    for (const c of many) expect(TILE_HUES).toContain(tileHue(c.id, many));
+  });
+
+  it('gives an uncategorised product a real colour rather than undefined', () => {
+    expect(TILE_HUES).toContain(tileHue(null, cats));
+    expect(TILE_HUES).toContain(tileHue('gone', cats));
+  });
+});
+
+describe('activeVariants', () => {
+  it('drops inactive tiers — a retired size is not a size a cashier can sell', () => {
+    const p = product('p1', {
+      variants: [variant('v1', 10), variant('v2', 20, { isActive: false })],
+    });
+    expect(activeVariants(p).map((v) => v.id)).toEqual(['v1']);
+  });
+
+  it('sorts cheapest first, then by name so equal prices do not shuffle', () => {
+    const p = product('p1', {
+      variants: [
+        variant('v3', 30), variant('v1', 10),
+        variant('vb', 20, { nameEn: 'B' }), variant('va', 20, { nameEn: 'A' }),
+      ],
+    });
+    expect(activeVariants(p).map((v) => v.id)).toEqual(['v1', 'va', 'vb', 'v3']);
+  });
+
+  it('does not mutate the product it was handed', () => {
+    const p = product('p1', { variants: [variant('v3', 30), variant('v1', 10)] });
+    activeVariants(p);
+    expect(p.variants.map((v) => v.id)).toEqual(['v3', 'v1']);
+  });
+
+  it('a product with no tiers has none, rather than throwing', () => {
+    expect(activeVariants(product('p2'))).toEqual([]);
+  });
+});
+
+describe('fromPrice', () => {
+  it('is the cheapest ACTIVE tier, not the denormalised column', () => {
+    // `product.price` is a copy that can drift. The tile and the sheet must
+    // never disagree about what the item costs.
+    const p = product('p1', {
+      price: 99,
+      variants: [variant('v1', 25), variant('v2', 12), variant('v3', 5, { isActive: false })],
+    });
+    expect(fromPrice(p)).toBe(12);
+  });
+
+  it('falls back to the product price when there are no tiers', () => {
+    expect(fromPrice(product('p2', { price: 7 }))).toBe(7);
+  });
+});
+
+describe('reopenAllTargets', () => {
+  it('names every closed product and nothing else', () => {
+    const rows: BranchAvailabilityRow[] = [
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { productId: 'p2', isAvailable: true, snoozedUntil: null, reasonCode: null },
+      { productId: 'p3', isAvailable: false, snoozedUntil: '2026-01-01T00:00:00Z', reasonCode: 'out_of_stock' },
+    ];
+    expect(reopenAllTargets(rows).sort()).toEqual(['p1', 'p3']);
+  });
+
+  it('includes the UNTIMED closures, which is the case worth stating', () => {
+    // An admin delisting has no timer, so the sweeper will never clear it. If
+    // "reopen all" skipped those it would leave exactly the items that need it.
+    const rows: BranchAvailabilityRow[] = [
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ];
+    expect(reopenAllTargets(rows)).toEqual(['p1']);
+  });
+
+  it('is empty when nothing is closed', () => {
+    expect(reopenAllTargets([])).toEqual([]);
   });
 });

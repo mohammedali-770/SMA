@@ -4,8 +4,9 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Clock, RefreshCw, Search, Store } from 'lucide-react';
+import { Clock, Store } from 'lucide-react';
 
+import { AdminModal } from '../admin/view/shared/AdminModal';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
@@ -20,6 +21,7 @@ import type { Modifier, Product } from '../../types';
 import {
   ClosedItem,
   ClosedOption,
+  activeVariants,
   closedItems,
   closedModifierIds,
   closedOptions,
@@ -27,8 +29,12 @@ import {
   formatRemaining,
   groupsForProduct,
   productBlockedByOptions,
-  searchableGroups,
+  reopenAllTargets,
 } from './branchConsole';
+import { BranchTab, BranchTabs } from './branch/BranchTabs';
+import { ItemsTab } from './branch/ItemsTab';
+import { VariantSheet } from './branch/VariantSheet';
+import { useOpsChangeFeed } from './useOpsChangeFeed';
 import { BranchReferenceCard } from './BranchReferenceCard';
 import { CloseItemDialog } from './CloseItemDialog';
 import { DeliveryRequestCard } from './DeliveryRequestCard';
@@ -60,10 +66,12 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   const [modRows, setModRows] = useState<BranchModifierAvailabilityRow[]>([]);
   // Which product's options are open. One at a time: on a POS screen an
   // accordion that can be opened everywhere becomes a wall of text.
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [tab, setTab] = useState<BranchTab>('items');
+  // Which product's price tiers are open. One at a time by construction.
+  const [sheetFor, setSheetFor] = useState<Product | null>(null);
+  const [confirmReopenAll, setConfirmReopenAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
   // What the close dialog is aimed at. One piece of state, not two, so the two
   // flows cannot both be open at once.
   const [target, setTarget] = useState<
@@ -135,19 +143,34 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   const closed = useMemo(() => closedItems(products, rows), [products, rows]);
   const closedIds = useMemo(() => closedProductIds(rows), [rows]);
   const closedOptionIds = useMemo(() => closedModifierIds(modRows), [modRows]);
+  /**
+   * Products a cashier would read as open that customers cannot actually order,
+   * because a REQUIRED option group has been emptied. Surfaced on the tile as
+   * "partly closed" — otherwise the counter says yes to something checkout says
+   * no to.
+   */
+  const optionBlocked = useMemo(
+    () => new Set(
+      products
+        .filter((p) => productBlockedByOptions(p, modifierGroups, closedOptionIds))
+        .map((p) => p.id),
+    ),
+    [products, modifierGroups, closedOptionIds],
+  );
   const closedOpts = useMemo(
     () => closedOptions(modifierGroups, modRows), [modifierGroups, modRows]);
-  const groups = useMemo(
-    () => searchableGroups(products, categories, query),
-    [products, categories, query],
-  );
-
-  const categoryName = (id: string | null) => {
-    if (id === null) return t('uncategorized');
-    const c = categories.find((x) => x.id === id);
-    return c ? (isRTL ? c.nameAr : c.nameEn) : t('uncategorized');
-  };
   const productName = (p: Product) => (isRTL ? p.nameAr : p.nameEn);
+
+  /**
+   * Live refresh, which is what makes removing the Refresh button honest.
+   *
+   * The button was load-bearing until now: this screen re-read on mount and 15s
+   * after a countdown expired, and nothing else. `useOpsChangeFeed` is the same
+   * hook the call-centre board uses — realtime with a 12s fast poll if the
+   * channel does not connect, a 60s backstop regardless, hidden tabs skipped and
+   * caught up on return. Wired FIRST, button removed second.
+   */
+  useOpsChangeFeed(refresh, { channelKey: 'branch' });
 
   /**
    * Ask the call centre to close delivery.
@@ -216,6 +239,32 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     }
   };
 
+  /**
+   * One tap, every closed item at THIS branch.
+   *
+   * Branch-scoped twice over: the ids come from the rows this branch's own
+   * availability query returned, and `clear_product_snooze` re-checks the
+   * caller's branch server-side. Neither this component nor a tampered client
+   * can widen it to another branch.
+   *
+   * Failures are collected rather than thrown on the first one. A cashier who
+   * taps this wants everything back; stopping at the first refusal would leave
+   * an arbitrary half reopened with no indication of which half.
+   */
+  const reopenAll = async () => {
+    if (!branchId) return;
+    const ids = reopenAllTargets(rows);
+    setBusy(true); setError(null);
+    let failed = 0;
+    for (const id of ids) {
+      try { await opsApi.reopenProduct(branchId, id); } catch { failed += 1; }
+    }
+    setConfirmReopenAll(false);
+    await refresh();
+    if (failed > 0) setError(`${t('reopenAllFailed')} (${failed}/${ids.length})`);
+    setBusy(false);
+  };
+
   const reopenOption = async (modifierId: string) => {
     if (!branchId) return;
     setBusy(true); setError(null);
@@ -247,232 +296,149 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Store className="size-6 text-ember shrink-0" aria-hidden="true" />
-          <div className="min-w-0">
-            <Text variant="title" as="h1">{branch ? (isRTL ? branch.nameAr : branch.nameEn) : ''}</Text>
-            <Text variant="caption" tone="tertiary" as="p">{t('branchConsole')}</Text>
-          </div>
+      <div className="flex min-w-0 items-center gap-3">
+        <Store className="size-6 shrink-0 text-ember" aria-hidden="true" />
+        <div className="min-w-0">
+          <Text variant="title" as="h1">{branch ? (isRTL ? branch.nameAr : branch.nameEn) : ''}</Text>
+          <Text variant="caption" tone="tertiary" as="p">{t('branchConsole')}</Text>
         </div>
-        <Button
-          label={t('refresh')}
-          onClick={() => { void refresh(); }}
-          disabled={loading || busy}
-          variant="secondary"
-          leading={<RefreshCw className="size-4" />}
-        />
       </div>
+
+      <BranchTabs
+        active={tab}
+        closedCount={closed.length}
+        i18n={i18n}
+        onSelect={setTab}
+      />
 
       {branch && !branch.isActive ? <Notice title={t('branchClosed')} tone="warning" /> : null}
       {error ? <Notice title={t('loadFailed')} action={error} tone="blocking" /> : null}
 
-      {/* ---- delivery: ask the call centre, and see the answer ---- */}
-      <DeliveryRequestCard
-        requests={requests}
-        deliveryClosed={deliveryClosed}
-        now={now}
-        busy={busy || requesting}
-        error={requestError}
-        i18n={i18n}
-        onRequest={() => { setRequestError(null); setRequesting(true); }}
-        onWithdraw={(id) => { void withdrawRequest(id); }}
-      />
+      {tab === 'items' ? (
+        <>
+          <ItemsTab
+            products={products}
+            categories={categories}
+            rows={rows}
+            closed={closed}
+            optionBlockedIds={optionBlocked}
+            now={now}
+            loading={loading}
+            busy={busy}
+            i18n={i18n}
+            onPick={(p) => {
+              // A product with tiers opens the sheet; one without goes straight
+              // to the action, because a sheet listing a single price is a step
+              // that tells a cashier nothing.
+              const hasChoices = activeVariants(p).length > 1
+                || groupsForProduct(p, modifierGroups).length > 0;
+              if (hasChoices) { setSheetFor(p); return; }
+              if (closedIds.has(p.id)) { void reopen(p.id); return; }
+              setDialogError(null); setTarget({ kind: 'product', product: p });
+            }}
+            onReopenAll={() => setConfirmReopenAll(true)}
+          />
 
-      {/* ---- the reference sheet a cashier actually looks things up in ---- */}
-      <BranchReferenceCard
-        entries={reference}
-        i18n={i18n}
-        onReveal={(id) => opsApi.revealReference(id)}
-      />
-
-      {/* ---- what is off right now ---- */}
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center gap-2">
-          <Clock className="size-4 text-ember" aria-hidden="true" />
-          <Text variant="heading" as="h2">{t('closedNow')}</Text>
-          {closed.length > 0 ? <StatusPill label={String(closed.length)} tone="warning" /> : null}
-        </div>
-
-        {loading ? (
-          <Text variant="body" tone="tertiary" as="p">{t('loading')}</Text>
-        ) : closed.length === 0 ? (
-          <Notice title={t('closedNoneTitle')} action={t('closedNoneBody')} tone="success" />
-        ) : (
-          <div className="space-y-2">
-            {closed.map((item) => (
-              <div
-                key={item.product.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
-              >
-                <div className="min-w-0">
-                  <Text variant="label" as="p">{productName(item.product)}</Text>
-                  <Text variant="caption" tone="tertiary" as="p" numeric>
-                    {countdownFor(item)}
-                  </Text>
-                </div>
-                <Button
-                  label={t('reopen')}
-                  onClick={() => { void reopen(item.product.id); }}
-                  disabled={busy}
-                  variant="secondary"
-                />
+          {/* Options that are off. Kept because closing one can take a product
+              off the menu without its own row ever changing — but rendered only
+              when it applies, which today is one product in the whole catalog. */}
+          {closedOpts.length > 0 ? (
+            <Card className="space-y-3 p-4">
+              <div className="flex items-center gap-2">
+                <Clock className="size-4 text-ember" aria-hidden="true" />
+                <Text variant="heading" as="h2">{t('closedOptions')}</Text>
+                <StatusPill label={String(closedOpts.length)} tone="warning" />
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              <div className="space-y-2">
+                {closedOpts.map((opt) => (
+                  <div
+                    key={opt.modifier.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
+                  >
+                    <div className="min-w-0">
+                      <Text variant="label" as="p">{modifierName(opt.modifier)}</Text>
+                      <Text variant="caption" tone="tertiary" as="p">
+                        {isRTL ? opt.group.nameAr : opt.group.nameEn}
+                      </Text>
+                      <Text variant="caption" tone="tertiary" as="p" numeric>
+                        {countdownFor(opt)}
+                      </Text>
+                    </div>
+                    <Button
+                      label={t('reopen')}
+                      onClick={() => { void reopenOption(opt.modifier.id); }}
+                      disabled={busy}
+                      variant="secondary"
+                    />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
+        </>
+      ) : null}
 
-      {/* ---- options that are off ---- */}
-      {closedOpts.length > 0 ? (
+      {tab === 'general' ? (
         <Card className="space-y-3 p-4">
-          <div className="flex items-center gap-2">
-            <Clock className="size-4 text-ember" aria-hidden="true" />
-            <Text variant="heading" as="h2">{t('closedOptions')}</Text>
-            <StatusPill label={String(closedOpts.length)} tone="warning" />
-          </div>
-          <div className="space-y-2">
-            {closedOpts.map((opt) => (
-              <div
-                key={opt.modifier.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
-              >
-                <div className="min-w-0">
-                  <Text variant="label" as="p">{modifierName(opt.modifier)}</Text>
-                  <Text variant="caption" tone="tertiary" as="p">
-                    {isRTL ? opt.group.nameAr : opt.group.nameEn}
-                  </Text>
-                  <Text variant="caption" tone="tertiary" as="p" numeric>
-                    {countdownFor(opt)}
-                  </Text>
-                </div>
-                <Button
-                  label={t('reopen')}
-                  onClick={() => { void reopenOption(opt.modifier.id); }}
-                  disabled={busy}
-                  variant="secondary"
-                />
-              </div>
-            ))}
-          </div>
+          <Text variant="heading" as="h2">{t('tabGeneral')}</Text>
+          <Notice title={t('referenceEmptyTitle')} action={t('referenceEmptyBody')} tone="info" />
         </Card>
       ) : null}
 
-      {/* ---- the menu ---- */}
-      <Card className="space-y-3 p-4">
-        <Text variant="heading" as="h2">{t('allItems')}</Text>
-        <div className="relative">
-          <Search
-            className={`pointer-events-none absolute top-1/2 size-4 -translate-y-1/2 text-con-text-3 ${isRTL ? 'right-3' : 'left-3'}`}
-            aria-hidden="true"
-          />
-          <input
-            aria-label={t('searchPlaceholder')}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('searchPlaceholder')}
-            className={`min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface text-[15px] text-con-text focus-visible:outline-2 focus-visible:outline-offset-2 ${isRTL ? 'pr-9 pl-3' : 'pl-9 pr-3'}`}
-          />
-        </div>
+      {tab === 'branch' ? (
+        <BranchReferenceCard
+          entries={reference}
+          i18n={i18n}
+          onReveal={(id) => opsApi.revealReference(id)}
+        />
+      ) : null}
 
-        {groups.length === 0 ? (
-          <Text variant="body" tone="tertiary" as="p">{t('noResults')}</Text>
-        ) : (
-          groups.map((g) => (
-            <div key={g.categoryId ?? '__none'} className="space-y-2">
-              <Text variant="caption" tone="tertiary" as="h3">{categoryName(g.categoryId)}</Text>
-              {g.products.map((p) => {
-                const isClosed = closedIds.has(p.id);
-                const optionGroups = groupsForProduct(p, modifierGroups);
-                const isOpen = expanded === p.id;
-                // Closing options can take a product off the menu without ever
-                // touching its own row. Say so on the row itself — otherwise a
-                // cashier reads "open" here while customers see "out of stock".
-                const blocked = !isClosed
-                  && productBlockedByOptions(p, modifierGroups, closedOptionIds);
-                return (
-                  <div
-                    key={p.id}
-                    className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <Text variant="label" as="span">{productName(p)}</Text>
-                        {isClosed ? <StatusPill label={t('close')} tone="danger" /> : null}
-                        {blocked ? <StatusPill label={t('blockedByOptions')} tone="warning" /> : null}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {optionGroups.length > 0 ? (
-                          <Button
-                            label={isOpen ? t('hideOptions') : t('showOptions')}
-                            onClick={() => setExpanded(isOpen ? null : p.id)}
-                            disabled={busy}
-                            variant="ghost"
-                            leading={isOpen
-                              ? <ChevronUp className="size-4" />
-                              : <ChevronDown className="size-4" />}
-                          />
-                        ) : null}
-                        <Button
-                          label={isClosed ? t('reopen') : t('close')}
-                          onClick={() => {
-                            if (isClosed) { void reopen(p.id); }
-                            else { setDialogError(null); setTarget({ kind: 'product', product: p }); }
-                          }}
-                          disabled={busy}
-                          variant="secondary"
-                        />
-                      </div>
-                    </div>
+      {tab === 'delivery' ? (
+        <DeliveryRequestCard
+          requests={requests}
+          deliveryClosed={deliveryClosed}
+          now={now}
+          busy={busy || requesting}
+          error={requestError}
+          i18n={i18n}
+          onRequest={() => { setRequestError(null); setRequesting(true); }}
+          onWithdraw={(id) => { void withdrawRequest(id); }}
+        />
+      ) : null}
 
-                    {isOpen ? (
-                      <div className="space-y-3 border-t border-con-line pt-3">
-                        {optionGroups.map((og) => (
-                          <div key={og.id} className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Text variant="caption" tone="tertiary" as="h4">
-                                {isRTL ? og.nameAr : og.nameEn}
-                              </Text>
-                              <StatusPill
-                                label={og.isRequired ? t('requiredGroup') : t('optionalGroup')}
-                                tone={og.isRequired ? 'danger' : 'neutral'}
-                              />
-                            </div>
-                            {og.modifiers.map((m) => {
-                              const optClosed = closedOptionIds.has(m.id);
-                              return (
-                                <div
-                                  key={m.id}
-                                  className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line p-2"
-                                >
-                                  <div className="flex min-w-0 items-center gap-2">
-                                    <Text variant="body" as="span">{modifierName(m)}</Text>
-                                    {optClosed ? <StatusPill label={t('close')} tone="danger" /> : null}
-                                  </div>
-                                  <Button
-                                    label={optClosed ? t('reopen') : t('close')}
-                                    data-testid={`option-${m.id}`}
-                                    onClick={() => {
-                                      if (optClosed) { void reopenOption(m.id); }
-                                      else { setDialogError(null); setTarget({ kind: 'option', modifier: m }); }
-                                    }}
-                                    disabled={busy}
-                                    variant="secondary"
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          ))
-        )}
-      </Card>
+      {sheetFor ? (
+        <VariantSheet
+          product={sheetFor}
+          closed={closedIds.has(sheetFor.id)}
+          optionGroups={groupsForProduct(sheetFor, modifierGroups)}
+          closedOptionIds={closedOptionIds}
+          i18n={i18n}
+          busy={busy}
+          onCloseOption={(m) => {
+            setSheetFor(null); setDialogError(null);
+            setTarget({ kind: 'option', modifier: m });
+          }}
+          onReopenOption={(m) => { setSheetFor(null); void reopenOption(m.id); }}
+          onCloseWhole={() => {
+            const p = sheetFor;
+            setSheetFor(null);
+            setDialogError(null);
+            setTarget({ kind: 'product', product: p });
+          }}
+          onReopenWhole={() => { const id = sheetFor.id; setSheetFor(null); void reopen(id); }}
+          onDismiss={() => { if (!busy) setSheetFor(null); }}
+        />
+      ) : null}
+
+      {confirmReopenAll ? (
+        <ConfirmReopenAll
+          count={closed.length}
+          i18n={i18n}
+          busy={busy}
+          onCancel={() => { if (!busy) setConfirmReopenAll(false); }}
+          onConfirm={() => { void reopenAll(); }}
+        />
+      ) : null}
 
       {requesting ? (
         <PauseDeliveryDialog
@@ -503,5 +469,47 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
         />
       ) : null}
     </div>
+  );
+};
+
+/**
+ * The confirm in front of "reopen all".
+ *
+ * A bulk action a cashier can reach in one tap needs one, because the mistake it
+ * prevents is silent: reopening everything looks exactly like a screen that has
+ * finished loading. The count is in the title so the confirm carries the size of
+ * what is about to happen, and the body says the word BRANCH, because "all" on a
+ * forty-branch estate is the frightening reading.
+ */
+const ConfirmReopenAll: React.FC<{
+  count: number;
+  i18n: OpsLangValue;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}> = ({ count, i18n, busy, onCancel, onConfirm }) => {
+  const { t, isRTL } = i18n;
+  return (
+    <AdminModal
+      title={t('reopenAllTitle')}
+      subtitle={`${count} ${t(count === 1 ? 'closedCountOne' : 'closedCount')}`}
+      isRTL={isRTL}
+      onClose={onCancel}
+      footer={(
+        <div className="flex gap-3">
+          <Button label={t('cancel')} onClick={onCancel} disabled={busy} variant="secondary" />
+          <Button
+            label={t('reopenAllConfirm')}
+            onClick={onConfirm}
+            loading={busy}
+            disabled={busy}
+            variant="primary"
+            data-testid="reopen-all-confirm"
+          />
+        </div>
+      )}
+    >
+      <Notice title={t('reopenAllBody')} tone="warning" />
+    </AdminModal>
   );
 };
