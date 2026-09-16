@@ -81,6 +81,40 @@ export function ModalShell({
     openerRef.current = document.activeElement as HTMLElement | null;
   }
 
+  /**
+   * --- background inert ---------------------------------------------------
+   *
+   * DECLARED BEFORE THE FOCUS EFFECT, AND THE ORDER IS LOAD-BEARING. React runs
+   * an unmounting component's cleanups in the order the effects were declared,
+   * so whichever of these two comes first is undone first. With the focus
+   * effect first, the restore ran while `#root` was STILL inert — and an inert
+   * element silently refuses `focus()`. The dialog closed and focus fell to
+   * `<body>`, which for a keyboard or screen-reader user means losing their
+   * place on the page entirely.
+   *
+   * This was live for every dialog in the console and the suite below was green
+   * throughout, because jsdom does not enforce `inert` against `.focus()`: the
+   * call succeeded there and does nothing in Chromium. Found by driving the
+   * branch console in a real browser while wiring the item sheet into this shell
+   * (#393). The test that now guards it asserts the ATTRIBUTE is gone at the
+   * moment focus is restored, rather than trusting the environment to model it.
+   *
+   * Applying inert before the dialog is focused is harmless: the dialog is
+   * portaled to `document.body`, a sibling of `#root` rather than a descendant.
+   */
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!root) return;
+    // `inert` removes the subtree from the tab order AND from the accessibility
+    // tree, which is the pair `aria-hidden` alone does not give.
+    root.setAttribute('inert', '');
+    root.setAttribute('aria-hidden', 'true');
+    return () => {
+      root.removeAttribute('inert');
+      root.removeAttribute('aria-hidden');
+    };
+  }, []);
+
   // --- initial focus + restore -------------------------------------------
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -101,20 +135,6 @@ export function ModalShell({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // --- background inert ---------------------------------------------------
-  useEffect(() => {
-    const root = document.getElementById('root');
-    if (!root) return;
-    // `inert` removes the subtree from the tab order AND from the accessibility
-    // tree, which is the pair `aria-hidden` alone does not give.
-    root.setAttribute('inert', '');
-    root.setAttribute('aria-hidden', 'true');
-    return () => {
-      root.removeAttribute('inert');
-      root.removeAttribute('aria-hidden');
-    };
   }, []);
 
   // --- Escape -------------------------------------------------------------

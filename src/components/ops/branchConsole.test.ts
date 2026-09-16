@@ -339,13 +339,17 @@ describe('fromPrice', () => {
 });
 
 describe('reopenAllTargets', () => {
+  // The helper takes the DISPLAYED items, so every case here goes through
+  // `closedItems` first — that composition is the property under test.
+  const catalog = [product('p1'), product('p2'), product('p3')];
+
   it('names every closed product and nothing else', () => {
     const rows: BranchAvailabilityRow[] = [
       { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
       { productId: 'p2', isAvailable: true, snoozedUntil: null, reasonCode: null },
       { productId: 'p3', isAvailable: false, snoozedUntil: '2026-01-01T00:00:00Z', reasonCode: 'out_of_stock' },
     ];
-    expect(reopenAllTargets(rows).sort()).toEqual(['p1', 'p3']);
+    expect(reopenAllTargets(closedItems(catalog, rows)).sort()).toEqual(['p1', 'p3']);
   });
 
   it('includes the UNTIMED closures, which is the case worth stating', () => {
@@ -354,10 +358,39 @@ describe('reopenAllTargets', () => {
     const rows: BranchAvailabilityRow[] = [
       { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
     ];
-    expect(reopenAllTargets(rows)).toEqual(['p1']);
+    expect(reopenAllTargets(closedItems(catalog, rows))).toEqual(['p1']);
   });
 
   it('is empty when nothing is closed', () => {
     expect(reopenAllTargets([])).toEqual([]);
+  });
+
+  it('never clears a row the cashier was not shown', () => {
+    // THE REGRESSION THIS SIGNATURE EXISTS FOR (#393 review). A closed
+    // availability row can name a product the client catalog does not carry —
+    // deactivated, or unreadable by this role. `closedItems` drops it from the
+    // count; the first version of this helper read the raw rows and kept it, so
+    // the confirm said one number and the action did another.
+    const rows: BranchAvailabilityRow[] = [
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { productId: 'ghost', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ];
+    const shown = closedItems(catalog, rows);
+    expect(shown).toHaveLength(1);
+    expect(reopenAllTargets(shown)).toEqual(['p1']);
+  });
+
+  it('returns exactly as many ids as the confirm counts, for any catalog', () => {
+    // Stated as the invariant rather than as a case: the number a cashier
+    // agrees to and the number of RPCs fired are the same list.
+    const rows: BranchAvailabilityRow[] = [
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { productId: 'p3', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { productId: 'ghost', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ];
+    for (const cat of [catalog, [product('p1')], []]) {
+      const shown = closedItems(cat, rows);
+      expect(reopenAllTargets(shown)).toHaveLength(shown.length);
+    }
   });
 });

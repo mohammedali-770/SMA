@@ -297,11 +297,25 @@ export function fromPrice(product: Product): number {
 /**
  * Every closed product id at this branch, for the one-tap reopen.
  *
- * BRANCH-SCOPED BY CONSTRUCTION: the rows handed in are the ones
- * `opsApi.branchAvailability(branchId)` returned for this branch, and the
- * server re-checks the caller's branch on every `clear_product_snooze`. Nothing
- * here can widen that, which is what makes a bulk control safe to offer.
+ * BRANCH-SCOPED BY CONSTRUCTION: the items handed in come from
+ * `opsApi.branchAvailability(branchId)`, which returns this branch's rows only,
+ * and the server re-checks the caller's branch on every `clear_product_snooze`.
+ * Nothing here can widen that, which is what makes a bulk control safe to offer.
+ *
+ * IT TAKES THE DISPLAYED ITEMS, NOT THE RAW ROWS, AND THAT IS THE WHOLE POINT.
+ * The first version read `closedProductIds(rows)`. `closedItems` joins against
+ * the client catalog (`byId.has(r.productId)`) and `closedProductIds` does not,
+ * so a closed availability row naming a product the catalog does not carry — a
+ * deactivated one, or one this role cannot read — was invisible in the count
+ * and present in the action. The confirm said "2 items" and three rows were
+ * cleared. Caught in review on #393.
+ *
+ * Deriving both from the same list makes them equal by construction rather than
+ * by agreement: the number a cashier confirms IS the number of ids returned
+ * here. A row the cashier was never shown is now unreachable from this control,
+ * which is the correct answer — you cannot reopen what you cannot see, and an
+ * administrator's delisting is an administrator's business.
  */
-export function reopenAllTargets(rows: BranchAvailabilityRow[]): string[] {
-  return [...closedProductIds(rows)];
+export function reopenAllTargets(closed: ClosedItem[]): string[] {
+  return closed.map((c) => c.product.id);
 }

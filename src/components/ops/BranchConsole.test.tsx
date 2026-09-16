@@ -203,6 +203,36 @@ describe('BranchConsole', () => {
     expect(await screen.findByText(/Not authorized/i)).toBeTruthy();
   });
 
+  it('makes the page behind the item sheet genuinely unreachable', async () => {
+    // `aria-modal="true"` is a PROMISE to assistive technology that the rest of
+    // the page is gone. The first version of this sheet made that promise while
+    // hand-rolling its own scrim — no focus trap, no focus restore, no Escape,
+    // nothing inert — so Tab still reached the tiles underneath. Caught in
+    // review on #393; the sheet now goes through `AdminModal`/`ModalShell` like
+    // every other dialog in the console.
+    //
+    // `#root` is what ModalShell inerts, so the test has to supply one; the
+    // effect early-returns without it and the assertion would pass vacuously.
+    const root = document.createElement('div');
+    root.id = 'root';
+    document.body.appendChild(root);
+    try {
+      render(<BranchConsole branchId="b1" i18n={i18n} />, { container: root });
+      fireEvent.click(await screen.findByTestId('tile-p3'));
+      await screen.findByRole('dialog');
+
+      expect(root.hasAttribute('inert')).toBe(true);
+      expect(root.getAttribute('aria-hidden')).toBe('true');
+
+      // And Escape closes it, which the hand-rolled version never answered.
+      fireEvent.keyDown(document, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      expect(root.hasAttribute('inert')).toBe(false);
+    } finally {
+      root.remove();
+    }
+  });
+
   it('closes ONE option without touching the product', async () => {
     render(<BranchConsole branchId="b1" i18n={i18n} />);
     // The accordion became the item sheet. Options live there now, beside the
@@ -315,6 +345,28 @@ describe('BranchConsole', () => {
     // Every call carries THIS branch, and only products this branch reported.
     for (const call of mocks.reopenProduct.mock.calls) expect(call[0]).toBe('b1');
     expect(mocks.reopenProduct.mock.calls.map((c) => c[1]).sort()).toEqual(['p1', 'p2']);
+  });
+
+  it('clears exactly as many rows as the confirm said it would', async () => {
+    // Caught in review on #393. A closed availability row can name a product
+    // the client catalog does not carry — deactivated, or unreadable by this
+    // role. It is absent from the count the cashier agrees to, so it must be
+    // absent from the action too; the first version read the raw rows and
+    // cleared it silently.
+    mocks.branchAvailability.mockResolvedValue([
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { productId: 'not-in-catalog', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('reopen-all'));
+
+    // The confirm promises one, so the action must do one. Singular, because
+    // one of the two closed rows is not a product this cashier can see.
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('1 item closed now')).toBeTruthy();
+    fireEvent.click(await screen.findByTestId('reopen-all-confirm'));
+    await waitFor(() => expect(mocks.reopenProduct).toHaveBeenCalledTimes(1));
+    expect(mocks.reopenProduct).toHaveBeenCalledWith('b1', 'p1');
   });
 
   it('offers no reopen-all when nothing is closed', async () => {

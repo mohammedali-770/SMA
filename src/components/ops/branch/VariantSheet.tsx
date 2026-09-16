@@ -5,6 +5,7 @@
 
 import React from 'react';
 
+import { AdminModal } from '../../admin/view/shared/AdminModal';
 import { Button } from '../../../design-system/ui/Button';
 import { Notice } from '../../../design-system/ui/Notice';
 import { Text } from '../../../design-system/ui/Text';
@@ -36,6 +37,20 @@ import type { OpsLangValue } from '../useOpsLang';
  * `20260820140500_place_order_modifier_availability`. The existing suite caught
  * it. Options are sub-selections just as tiers are, so they belong in the same
  * sheet; the difference is that closing one of these actually works today.
+ *
+ * IT GOES THROUGH `AdminModal`, AND THE FIRST VERSION DID NOT — that is the
+ * second correction, caught in review on #393. It hand-rolled a `fixed inset-0`
+ * div carrying `role="dialog" aria-modal="true"` while moving no focus, trapping
+ * none, restoring none, inerting nothing behind it and answering no Escape key.
+ * `aria-modal` is a promise to assistive technology that the rest of the page is
+ * unreachable, and Tab reached every tile underneath. `ModalShell` — which
+ * `AdminModal` wraps, and which `CloseItemDialog`, `PauseDeliveryDialog` and the
+ * reopen-all confirm already use — exists so there is exactly one place that
+ * behaviour can be right; this was the only dialog in the console outside it.
+ *
+ * The visible cost is that it is a centred dialog rather than a sheet rising
+ * from the bottom edge. That matches every other dialog here, which is worth
+ * more than the animation was.
  */
 export const VariantSheet: React.FC<{
   product: Product;
@@ -67,115 +82,92 @@ export const VariantSheet: React.FC<{
   const tiers = activeVariants(product);
 
   return (
-    <div
-      className="fixed inset-0 z-40 grid items-end justify-items-center bg-brand-ink/45"
-      role="dialog"
-      aria-modal="true"
-      aria-label={name}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !busy) onDismiss();
-      }}
-    >
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col rounded-t-[20px] bg-con-surface">
-        <div className="border-b border-con-line p-4">
-          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-con-line" aria-hidden="true" />
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <Text variant="heading" as="h2">
-                {name}
-              </Text>
-              <Text variant="caption" tone="tertiary" as="p">
-                {`${tiers.length} ${t(tiers.length === 1 ? 'sizesCountOne' : 'sizesCount')}`}
-              </Text>
-            </div>
-            <Button label={t('cancel')} onClick={onDismiss} disabled={busy} variant="ghost" />
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 overflow-auto p-4">
-          {tiers.length === 0 ? (
-            <Text variant="body" tone="tertiary" as="p">
-              {t('noResults')}
-            </Text>
-          ) : (
-            tiers.map((v) => (
-              <div
-                key={v.id}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
-              >
-                <Text variant="label" as="span">
-                  {isRTL ? v.nameAr : v.nameEn}
-                </Text>
-                <Text variant="caption" tone="tertiary" as="span" numeric>
-                  {`${v.price.toFixed(2)} ${t('currency')}`}
-                </Text>
-              </div>
-            ))
-          )}
-          {tiers.length > 0 ? <Notice title={t('sizesPerSizeSoon')} tone="info" /> : null}
-
-          {optionGroups.map((g) => (
-            <div key={g.id} className="flex flex-col gap-2 border-t border-con-line pt-3">
-              <div className="flex items-center gap-2">
-                <Text variant="caption" tone="tertiary" as="h3">
-                  {isRTL ? g.nameAr : g.nameEn}
-                </Text>
-                <StatusPill
-                  label={g.isRequired ? t('requiredGroup') : t('optionalGroup')}
-                  tone={g.isRequired ? 'danger' : 'neutral'}
-                />
-              </div>
-              {g.modifiers.map((m) => {
-                const off = closedOptionIds.has(m.id);
-                return (
-                  <div
-                    key={m.id}
-                    className={[
-                      'flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border p-3',
-                      off ? 'border-danger-line bg-danger-tint' : 'border-con-line bg-con-surface',
-                    ].join(' ')}
-                  >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Text variant="body" as="span">
-                        {isRTL ? m.nameAr : m.nameEn}
-                      </Text>
-                      {/* A STATE, not the verb. The pill sits a thumb from the
-                          button that performs the opposite action, and
-                          labelling it with the same word the button uses reads
-                          as two buttons rather than a status and a control. */}
-                      {off ? <StatusPill label={t('stateClosed')} tone="danger" /> : null}
-                    </div>
-                    <Button
-                      label={off ? t('reopen') : t('close')}
-                      data-testid={`option-${m.id}`}
-                      onClick={() => (off ? onReopenOption(m) : onCloseOption(m))}
-                      disabled={busy}
-                      variant="secondary"
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex gap-3 border-t border-con-line p-4">
+    <AdminModal
+      title={name}
+      subtitle={`${tiers.length} ${t(tiers.length === 1 ? 'sizesCountOne' : 'sizesCount')}`}
+      isRTL={isRTL}
+      size="2xl"
+      // `onDismiss` already refuses while an RPC is in flight, so Escape and the
+      // ✕ inherit that guard rather than needing a second copy of it.
+      onClose={onDismiss}
+      footer={
+        <>
           <Button
             label={closed ? t('reopen') : t('closeWholeItem')}
             onClick={closed ? onReopenWhole : onCloseWhole}
             disabled={busy}
             variant="primary"
-            className="flex-1"
           />
-          <Button
-            label={t('done')}
-            onClick={onDismiss}
-            disabled={busy}
-            variant="secondary"
-            className="flex-1"
-          />
-        </div>
+          <Button label={t('done')} onClick={onDismiss} disabled={busy} variant="secondary" />
+        </>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {tiers.length === 0 ? (
+          <Text variant="body" tone="tertiary" as="p">
+            {t('noResults')}
+          </Text>
+        ) : (
+          tiers.map((v) => (
+            <div
+              key={v.id}
+              className="flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
+            >
+              <Text variant="label" as="span">
+                {isRTL ? v.nameAr : v.nameEn}
+              </Text>
+              <Text variant="caption" tone="tertiary" as="span" numeric>
+                {`${v.price.toFixed(2)} ${t('currency')}`}
+              </Text>
+            </div>
+          ))
+        )}
+        {tiers.length > 0 ? <Notice title={t('sizesPerSizeSoon')} tone="info" /> : null}
+
+        {optionGroups.map((g) => (
+          <div key={g.id} className="flex flex-col gap-2 border-t border-con-line pt-3">
+            <div className="flex items-center gap-2">
+              <Text variant="caption" tone="tertiary" as="h3">
+                {isRTL ? g.nameAr : g.nameEn}
+              </Text>
+              <StatusPill
+                label={g.isRequired ? t('requiredGroup') : t('optionalGroup')}
+                tone={g.isRequired ? 'danger' : 'neutral'}
+              />
+            </div>
+            {g.modifiers.map((m) => {
+              const off = closedOptionIds.has(m.id);
+              return (
+                <div
+                  key={m.id}
+                  className={[
+                    'flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border p-3',
+                    off ? 'border-danger-line bg-danger-tint' : 'border-con-line bg-con-surface',
+                  ].join(' ')}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Text variant="body" as="span">
+                      {isRTL ? m.nameAr : m.nameEn}
+                    </Text>
+                    {/* A STATE, not the verb. The pill sits a thumb from the
+                          button that performs the opposite action, and
+                          labelling it with the same word the button uses reads
+                          as two buttons rather than a status and a control. */}
+                    {off ? <StatusPill label={t('stateClosed')} tone="danger" /> : null}
+                  </div>
+                  <Button
+                    label={off ? t('reopen') : t('close')}
+                    data-testid={`option-${m.id}`}
+                    onClick={() => (off ? onReopenOption(m) : onCloseOption(m))}
+                    disabled={busy}
+                    variant="secondary"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
-    </div>
+    </AdminModal>
   );
 };

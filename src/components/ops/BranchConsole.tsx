@@ -253,7 +253,7 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
    */
   const reopenAll = async () => {
     if (!branchId) return;
-    const ids = reopenAllTargets(rows);
+    const ids = reopenAllTargets(closed);
     setBusy(true); setError(null);
     let failed = 0;
     for (const id of ids) {
