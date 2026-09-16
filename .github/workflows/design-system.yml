@@ -122,6 +122,15 @@ jobs:
       - name: Play feature graphic matches its generator
         run: npm run play-feature-graphic:check
 
+      # The phone screenshots are NOT generated from anything in this repository
+      # -- they are device captures -- so this asserts the store contract rather
+      # than a derivation: 9:16 at 1080x1920, no alpha channel, under Play's size
+      # ceiling, and composed rather than pasted in raw. It cannot tell whether
+      # the iOS status bar was cropped; that is a review judgement, and the
+      # header of scripts/check-play-screenshots.mjs says so.
+      - name: Play phone screenshots meet the store contract
+        run: npm run play-screenshots:check
+
       # Two narrow rules on this branch's diff: a file ADDED here must be
       # Prettier-clean, and a file CHANGED here must not be machine-compressed.
       # NOT "Prettier must pass on everything" — 318 of 400 tracked TypeScript

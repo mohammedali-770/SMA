@@ -2866,10 +2866,23 @@ sequence is blocked on a Google account rather than on work.
 
 ### One thing a reviewer WILL see, measured live rather than guessed
 
-**55 of 61 products are active and exactly ONE has an image.** Read live
-2026-09-15: 61 products, 55 active, 5 active categories, **1** with a non-empty
-`image_url`. One branch is active out of 40, which is correct for a single-branch
-launch.
+**SUPERSEDED 2026-09-16 — the count moved, and the timing says why.** Re-read
+live: 61 products, 55 active, **4** with a non-empty `image_url`, all four
+active. `max(products.updated_at)` is `2026-09-16 04:52:07 UTC` — the same minute
+the owner's screenshot captures are stamped (07:52 Riyadh, UTC+3). Three product
+images were uploaded immediately before the screenshots were taken, which is why
+the menu capture shows real food photography rather than the grey icons this
+section was written about.
+
+**The point survives the correction: 51 of 55 active products still have no
+image.** Four is enough for the screenshots to look finished, because the images
+sit at the top of the `وجبات` category, which is what the menu capture shows. It
+is not enough for a customer scrolling the rest of the menu.
+
+**The superseded reading, kept because a dated count is exactly the thing that
+goes stale:** read live 2026-09-15 — 61 products, 55 active, 5 active categories,
+**1** with a non-empty `image_url`. One branch is active out of 40, which is
+correct for a single-branch launch.
 
 **This is not broken and not a policy problem** — it is handled deliberately.
 `apps/mobile/src/lib/mappers.ts:105-124` refuses a stock-photo fallback (an
@@ -2923,6 +2936,76 @@ rule it produced: **a CSP failure is invisible to every local check**, because
 `vite build`, `vite preview` and the test suite all serve no headers. If a change
 adds an inline script, a new script host or a new `connect-src` target, read
 `vercel.json` — nothing else in the pipeline will tell you.
+
+### The phone screenshots exist (2026-09-16), composed from the owner's own captures
+
+**The captures could not be uploaded as they were, and the reason is geometry
+rather than taste.** Play's phone screenshots must be 16:9 or 9:16 with each side
+between 320 and 3840 px. The owner's five captures are **736 × 1600 — ratio
+0.460**, narrower than 9:16's 0.5625, so Play rejects the shape before a human
+ever looks at the content.
+
+`scripts/build-play-screenshots.mjs` does two things, both measured rather than
+eyeballed, and `npm run play-screenshots:check` asserts the result in CI beside
+`logo:check` and `play-icon:check`:
+
+1. **Crops the top 90 rows.** A full-width dark-pixel scan puts the iOS
+   status-bar glyphs at rows **42-66 in all five captures**, and the first pixel
+   the app itself drew at row 120 at the earliest. 90 clears the status bar with
+   30 rows to spare and removes nothing the app drew. That number is a property
+   of these captures, not of iOS — re-measure it if the source device changes.
+2. **Places the 736 × 1510 remainder on a 1080 × 1920 canvas** — exactly 9:16,
+   1080 on the short side, which is Google's quality recommendation. The 140 px
+   margin is not a taste decision: it is the value for which all four margins
+   come out equal, and it puts the content scale at 800/736 = **1.087×**, an
+   upscale small enough to be invisible.
+
+**ONE PIXEL OF CONTENT WAS EDITED, AND IT IS STATED HERE RATHER THAN BURIED.**
+The checkout capture carried the *"الدفع الإلكتروني غير متاح حالياً. الدفع النقدي
+مفعل"* banner across source rows 212-266, clipped mid-sentence by where the
+customer had scrolled. **PR #377 removed that banner from the app**, so the
+capture advertises a notice the shipped build does not render. The script splices
+those rows out and refills the freed band at the bottom from the capture's own
+bottom rows — asserting first that they are a single flat colour, so the splice
+cannot leave a seam (they are pure white, deviation 0). Removing it makes the
+screenshot *more* accurate, not less. **The source captures are committed beside
+the outputs precisely so that edit is auditable rather than taken on trust.**
+
+**THEY ARE ONE BUILD BEHIND, and that is a real limitation rather than a
+quibble.** The same PR #377 also stopped auto-selecting a payment method, so the
+shipped checkout carries a selector these captures predate. Nothing about that
+risks a rejection — but the checkout screenshot is not what a customer will see
+today, and screenshots can be replaced at any time **without a new release**, so
+it is worth re-capturing once an Android build is in hand.
+
+**iOS provenance is not itself a problem, and the owner's instinct to ask was
+still the right one.** Play does not require screenshots to come from an Android
+device, and the app is React Native, so Android renders these screens
+near-identically. What *would* have been a problem is a web render — a different
+layout engine, different fonts, different metrics — which is why these are device
+captures of the real app rather than anything produced in a browser.
+
+**The screenshots carry no alpha channel, and that is not the same as being
+opaque.** Play asks for a *32-bit PNG with alpha* for the store icon and *JPEG or
+24-bit PNG with no alpha* for the feature graphic and every screenshot, so an
+image whose alpha is uniformly 255 still declares a channel Play refuses. A
+browser canvas always hands back RGBA, so the composition is decoded and
+re-encoded as PNG colour type 2 — losslessly, since there is no alpha to lose.
+Codex caught this on the feature graphic in PR #383; the same defect was here,
+and the checker meant to catch it asserted opacity while its own header claimed
+Play does not reject an alpha channel.
+
+**What the CI check can and cannot prove.** It proves geometry and format
+(1080 × 1920, **24-bit RGB with no alpha channel**, under Play's 8 MB ceiling,
+2-8 images) and it proves the
+composition ran — a raw capture dropped into the directory has no uniform
+backdrop border and fails, which is mutation-tested five ways. It **cannot** tell
+whether the status bar was cropped or whether the image shows this app at all.
+Those are review judgements, and the script's own header says so; a check whose
+limits are not written down gets read as proving more than it does.
+
+**Still outstanding on the listing:** the 1024 × 500 feature graphic, the short
+and full descriptions in both languages, and the Console-only app category.
 
 ### One thing measured on the bundle that nobody has decided
 

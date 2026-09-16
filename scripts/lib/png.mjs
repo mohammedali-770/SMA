@@ -22,6 +22,7 @@ function decodePng(buffer) {
 
   let width = 0;
   let height = 0;
+  let colorType = 6;
   const idat = [];
 
   for (let offset = 8; offset < buffer.length;) {
@@ -32,10 +33,11 @@ function decodePng(buffer) {
     if (type === 'IHDR') {
       width = data.readUInt32BE(0);
       height = data.readUInt32BE(4);
-      const [depth, colorType, , , interlace] = [data[8], data[9], data[10], data[11], data[12]];
-      if (depth !== 8 || colorType !== 6 || interlace !== 0) {
-        throw new Error(`unsupported PNG: depth ${depth}, colour type ${colorType}, interlace ${interlace}`);
+      const [depth, ct, , , interlace] = [data[8], data[9], data[10], data[11], data[12]];
+      if (depth !== 8 || (ct !== 6 && ct !== 2) || interlace !== 0) {
+        throw new Error(`unsupported PNG: depth ${depth}, colour type ${ct}, interlace ${interlace}`);
       }
+      colorType = ct;
     } else if (type === 'IDAT') {
       idat.push(data);
     } else if (type === 'IEND') {
@@ -46,8 +48,12 @@ function decodePng(buffer) {
   }
 
   const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * 4;
-  const pixels = Buffer.alloc(stride * height);
+  // Filtering operates on the STORED samples, so a colour-type-2 image predicts
+  // from three bytes per pixel, not four. Unfilter at the stored width and widen
+  // to RGBA afterwards, so every caller still receives four channels.
+  const samples = colorType === 6 ? 4 : 3;
+  const stride = width * samples;
+  const stored = Buffer.alloc(stride * height);
 
   // Undo the per-scanline filter. Each row is prefixed with its filter byte and
   // predicts from the pixel to the left (a), above (b) and above-left (c).
@@ -58,9 +64,9 @@ function decodePng(buffer) {
 
     for (let i = 0; i < stride; i++) {
       const x = raw[src + i];
-      const a = i >= 4 ? pixels[dst + i - 4] : 0;
-      const b = y > 0 ? pixels[dst - stride + i] : 0;
-      const c = y > 0 && i >= 4 ? pixels[dst - stride + i - 4] : 0;
+      const a = i >= samples ? stored[dst + i - samples] : 0;
+      const b = y > 0 ? stored[dst - stride + i] : 0;
+      const c = y > 0 && i >= samples ? stored[dst - stride + i - samples] : 0;
 
       let value;
       switch (filter) {
@@ -87,11 +93,23 @@ function decodePng(buffer) {
         default:
           throw new Error(`unknown PNG filter ${filter}`);
       }
-      pixels[dst + i] = value & 0xff;
+      stored[dst + i] = value & 0xff;
     }
   }
 
-  return { width, height, pixels };
+  if (samples === 4) return { width, height, pixels: stored, colorType };
+
+  // Widen RGB to RGBA so every caller sees the same shape. Opaque by
+  // definition: colour type 2 has no alpha to preserve.
+  const pixels = Buffer.alloc(width * height * 4);
+  for (let i = 0, o = 0; i < stored.length; i += 3, o += 4) {
+    pixels[o] = stored[i];
+    pixels[o + 1] = stored[i + 1];
+    pixels[o + 2] = stored[i + 2];
+    pixels[o + 3] = 0xff;
+  }
+
+  return { width, height, pixels, colorType };
 }
 
 function chunk(type, data) {
