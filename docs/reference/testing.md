@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**182 TypeScript test files declaring 2817 test blocks, plus 76 SQL suites.**
+**183 TypeScript test files declaring 2823 test blocks, plus 76 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -121,7 +121,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-66 files, 943 declared test blocks.
+67 files, 949 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -181,6 +181,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
 | `apps/mobile/src/lib/orderability.test.ts` | 15 | requiredCount |
 | `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
+| `apps/mobile/src/lib/orderSelectGrantParity.test.ts` | 6 | customer order select ↔ database grant parity |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
