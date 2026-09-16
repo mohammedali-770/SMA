@@ -190,6 +190,36 @@ export const OPS_STRINGS = {
     requestNowExpired: 'انتهت صلاحية الطلب قبل الرد عليه',
     requestAskedFor: 'المدة المطلوبة',
     reasonLabelShort: 'السبب',
+
+    // ---- tabs (2026-09-16 redesign) ----
+    tabItems: 'الأصناف',
+    tabGeneral: 'معلومات عامة',
+    tabBranch: 'معلومات الفرع',
+    tabDelivery: 'إيقاف التوصيل',
+
+    // ---- items tab ----
+    closedCount: 'أصناف موقوفة الآن',
+    closedCountOne: 'صنف موقوف الآن',
+    autoReopenNote: 'تُتاح تلقائياً عند انتهاء المؤقت',
+    reopenAll: 'إتاحة الكل في هذا الفرع',
+    reopenAllTitle: 'إتاحة كل الأصناف الموقوفة؟',
+    reopenAllBody: 'سيعود كل صنف موقوف في فرعك إلى القائمة فوراً. لا يؤثر هذا على الفروع الأخرى.',
+    reopenAllConfirm: 'نعم، أتِح الكل',
+    reopenAllFailed: 'تعذّرت إتاحة بعض الأصناف',
+    categoryAll: 'الكل',
+    stateClosed: 'موقوف',
+    partiallyClosed: 'موقوف جزئياً',
+    sizesCount: 'أحجام',
+    sizesCountOne: 'حجم',
+    fromPrice: 'من',
+    currency: 'ر.س',
+
+    // ---- variant sheet ----
+    sizesTitle: 'الأحجام والأسعار',
+    sizesClosedOf: 'موقوف منها',
+    closeWholeItem: 'إيقاف الصنف بالكامل',
+    done: 'تم',
+    sizesPerSizeSoon: 'إيقاف حجم بمفرده غير متاح بعد — إيقاف الصنف يوقف كل أحجامه.',
   },
   en: {
     branchConsole: 'Branch Console',
@@ -352,6 +382,36 @@ export const OPS_STRINGS = {
     requestNowExpired: 'That request expired before it was answered',
     requestAskedFor: 'Asked for',
     reasonLabelShort: 'Reason',
+
+    // ---- tabs (2026-09-16 redesign) ----
+    tabItems: 'Items',
+    tabGeneral: 'General',
+    tabBranch: 'Branch info',
+    tabDelivery: 'Delivery',
+
+    // ---- items tab ----
+    closedCount: 'items closed now',
+    closedCountOne: 'item closed now',
+    autoReopenNote: 'They reopen by themselves when the timer runs out',
+    reopenAll: 'Reopen all at this branch',
+    reopenAllTitle: 'Reopen every closed item?',
+    reopenAllBody: 'Every closed item at your branch returns to the menu immediately. Other branches are not affected.',
+    reopenAllConfirm: 'Yes, reopen all',
+    reopenAllFailed: 'Some items could not be reopened',
+    categoryAll: 'All',
+    stateClosed: 'Closed',
+    partiallyClosed: 'Partly closed',
+    sizesCount: 'sizes',
+    sizesCountOne: 'size',
+    fromPrice: 'from',
+    currency: 'SAR',
+
+    // ---- variant sheet ----
+    sizesTitle: 'Sizes and prices',
+    sizesClosedOf: 'closed of',
+    closeWholeItem: 'Close the whole item',
+    done: 'Done',
+    sizesPerSizeSoon: 'Closing a single size is not available yet — closing the item closes every size.',
   },
 } as const;
 

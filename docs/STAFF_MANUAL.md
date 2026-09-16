@@ -85,23 +85,59 @@ Use the supported Menu/branch-availability control to mark an item unavailable f
 Restore availability when the branch can sell it again and verify the correct branch was changed.
 
 Branch staff do this from the **branch console**, which opens automatically on
-sign-in: find the item (search or scroll its category), tap Close, pick how long
-and why, confirm. Closed items are listed at the top of the screen with a
-countdown and a one-tap Reopen. The branch is fixed to the one your account is
-linked to, so there is no wrong branch to pick.
+sign-in. The branch is fixed to the one your account is linked to, so there is
+no wrong branch to pick.
+
+**Rearranged 2026-09-16.** The console now has four tabs, and it opens on the
+one you use: **Items**. The other three — general information, this branch's
+reference sheet, and the delivery-closure request — are reference material you
+look up once a shift, and they no longer sit between you and the menu.
+
+The Items tab is laid out like a till. The strip along the top says what is off
+right now; below it the menu is a grid of tiles with a photograph where there is
+one and a coloured block where there is not, filtered by the search box and the
+category chips.
+
+**To close an item, tap its tile.** If the item has one price and no choices
+that takes you straight to the close dialog: pick how long and why, confirm. If
+it has several sizes or an options group, tapping opens the item's sheet first —
+see below.
+
+**One tap puts everything back.** When anything is closed the top strip carries
+a **Reopen all** button. It asks you to confirm, then reopens every closed item
+**at your branch only** — it cannot touch another branch, and it never touches
+delivery. Individual items still reopen on their own when their timer runs out.
+
+**There is no Refresh button any more, and nothing is missing.** The screen
+watches for changes and updates itself, including after the tablet has been
+asleep or the tab has been in the background.
+
+**The item sheet: sizes and options.** Tapping a tiered item — most of the menu —
+opens a sheet listing every size with its price, so you can see what you are
+about to take off sale. Closing a *single size* is not possible yet; the sheet
+says so, and the button at the bottom closes the whole item, which is what the
+old screen did.
 
 **One option, not the whole item.** If only a choice is out — one sauce, one
-size, one add-on — close that option instead of the product. The item stays on
-the menu and customers can still order it with anything else in the group.
+add-on — close that option instead of the product. The item stays on the menu
+and customers can still order it with anything else in the group. Options live
+in the same sheet as the sizes: tap the item, then close the option you mean.
 Closing an option works exactly like closing an item: a duration, a reason, an
-automatic reopen. If every option in a *required* group is closed, the product
-becomes unorderable on its own — the app shows it as out of stock and the
-server refuses it — so closing the last option in a required group is the same
-decision as closing the item.
+automatic reopen.
 
-Options you have closed are listed above the menu with their own countdowns and
-a one-tap Reopen, the same as closed items. To close one, find the product, tap
-**Show options**, and close the option you mean.
+If every option in a *required* group is closed, the product becomes unorderable
+on its own — the app shows it as out of stock and the server refuses it — so
+closing the last option in a required group is the same decision as closing the
+item. Its tile is marked **Partly closed** so the counter never reads as open
+for something checkout will refuse.
+
+Options you have closed are listed below the grid with their own countdowns and
+a one-tap Reopen, the same as closed items.
+
+**The console is in Arabic unless you change it.** It always was meant to be;
+until 2026-09-16 merely opening the sign-in page saved English as if you had
+chosen it, so everybody got English. Use the language toggle if you want
+English — that choice is remembered on that device.
 
 ### Pausing delivery
 
@@ -131,9 +167,9 @@ named area.
 
 ### A branch can now ASK for delivery to be closed
 
-Added 2026-09-13. A branch still cannot close delivery — that has not changed
-and is not going to. What it can now do is **send a request**: a duration, a
-reason, and an optional note. The request appears on the call-centre board, and
+Added 2026-09-13; moved onto its own **Delivery** tab on 2026-09-16. A branch
+still cannot close delivery — that has not changed and is not going to. What it
+can now do is **send a request**: a duration, a reason, and an optional note. The request appears on the call-centre board, and
 an operator **accepts** (which closes delivery, for the requested time or a time
 the operator chooses) or **declines** (which changes nothing and records why).
 
@@ -158,10 +194,10 @@ a parallel one.
 
 ### The branch reference sheet
 
-Added 2026-09-13. The branch console gains a second section: the reference
-material a cashier actually needs at the counter — telephone numbers, links,
-free-text notes, and **credentials**. Before this, a branch account could not
-see so much as its own branch's telephone number.
+Added 2026-09-13; moved onto its own **Branch information** tab on 2026-09-16.
+It holds the reference material a cashier actually needs at the counter —
+telephone numbers, links, free-text notes, and **credentials**. Before this, a
+branch account could not see so much as its own branch's telephone number.
 
 **Who can see what.** A branch sees **its own** branch's entries and no other's.
 The call centre can read every branch's entries, because it needs branch
