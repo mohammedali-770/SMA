@@ -45,6 +45,8 @@ The *job name* is what GitHub reports as a status check context. When configurin
 | `npm run logo:build` | `node scripts/build-logo-mark.mjs` |
 | `npm run logo:check` | `node scripts/build-logo-mark.mjs --check` |
 | `npm run phones:check` | `node scripts/check-test-phone-numbers.mjs` |
+| `npm run play-feature-graphic:build` | `node scripts/build-play-feature-graphic.mjs` |
+| `npm run play-feature-graphic:check` | `node scripts/build-play-feature-graphic.mjs --check` |
 | `npm run play-icon:build` | `node scripts/build-play-icon.mjs` |
 | `npm run play-icon:check` | `node scripts/build-play-icon.mjs --check` |
 | `npm run preview` | `vite preview` |
@@ -57,6 +59,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/audit-web-high.mjs` — Fail-closed web/admin npm audit gate
 - `scripts/branch-audit.sh`
 - `scripts/build-logo-mark.mjs` — Generates the transparent-background brand mark from the official logo master
+- `scripts/build-play-feature-graphic.mjs` — Generates the Google Play feature graphic from the brand mark
 - `scripts/build-play-icon.mjs` — Generates the Google Play store icon from the app icon master
 - `scripts/check-design-system-hygiene.mjs` — Guards the NEW design-system code against re-introducing raw values
 - `scripts/check-recorded-hashes.mjs` — Every sha256 recorded in prose must still describe a file in the tree
