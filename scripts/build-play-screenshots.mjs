@@ -58,9 +58,35 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { chromium } from 'playwright';
-
 import { decodePng, encodePng } from './lib/png.mjs';
+
+/**
+ * Playwright is NOT a dependency of this repository, on purpose — it is a
+ * ~300 MB install that exists here only to re-compose four asset files by hand
+ * a few times a year, and CI never runs this script (it checks the committed
+ * output instead, with `check-play-screenshots.mjs`, which is pure Node).
+ *
+ * So the import is dynamic, and its failure is caught and explained. A static
+ * import gives `ERR_MODULE_NOT_FOUND` on a clean checkout, which tells the
+ * reader nothing about what to install or why it was not installed for them.
+ * Codex raised exactly that on #384.
+ */
+async function loadChromium() {
+  try {
+    const { chromium } = await import('playwright');
+    return chromium;
+  } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+    throw new Error(
+      'This script needs Playwright, which is deliberately not a dependency of this ' +
+        'repository — see the note above this function.\n\n' +
+        '  npm i --no-save playwright\n' +
+        '  PLAYWRIGHT_CHROMIUM=/path/to/chrome node scripts/build-play-screenshots.mjs\n\n' +
+        'CI does not run this script. It validates the committed output with ' +
+        '`npm run play-screenshots:check`, which is pure Node.',
+    );
+  }
+}
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_DIR = join(ROOT, 'assets/store/screenshots/source');
@@ -112,6 +138,7 @@ const urls = SHOTS.map(
   (s) => `data:image/jpeg;base64,${readFileSync(join(SOURCE_DIR, s.source)).toString('base64')}`,
 );
 
+const chromium = await loadChromium();
 const browser = await chromium.launch(
   process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {},
 );
