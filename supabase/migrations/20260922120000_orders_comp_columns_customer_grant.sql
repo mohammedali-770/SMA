@@ -66,9 +66,18 @@ declare
   v_anon_leak text;
 begin
   -- 1. Every column of the customer read contract must be selectable by
-  --    `authenticated`. The list is the one in apps/mobile/src/lib/orderSelect.ts
-  --    (CUSTOMER_ORDER_COLUMNS); supabase/tests/orders_customer_select_grant_test.sql
-  --    and orderSelect.test.ts keep the two in step.
+  --    `authenticated`. This list is a SNAPSHOT of
+  --    apps/mobile/src/lib/orderSelect.ts (CUSTOMER_ORDER_COLUMNS) as it stood
+  --    when this file was written, and it stays frozen: a migration is history.
+  --    A column the customer legitimately gains later must be granted by a NEW
+  --    forward migration, never by editing this one.
+  --
+  --    THE LIVING CONTRACT IS supabase/tests/order_read_contracts_test.sql
+  --    CASE 1, which reads information_schema.column_privileges after the whole
+  --    chain has replayed and therefore sees the CUMULATIVE grant.
+  --    apps/mobile/src/lib/orderSelectGrantParity.test.ts ties that suite's
+  --    expectation to CUSTOMER_ORDER_COLUMNS, and holds this file only to the
+  --    weaker rule that it may not grant a column the contract does not carry.
   select string_agg(c, ', ')
     into v_missing
   from unnest(array[

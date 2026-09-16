@@ -65,14 +65,30 @@ describe('customer order select ↔ database grant parity', () => {
   const sql = readFileSync(MIGRATION, 'utf8');
 
   /**
-   * The migration's first assertion block enumerates every column the customer
-   * read contract needs `authenticated` to be able to select. If somebody adds a
-   * column to CUSTOMER_ORDER_COLUMNS and does not grant it, this fails here
-   * rather than on a customer's phone.
+   * A MIGRATION IS HISTORY AND MUST NOT BE REWRITTEN, so this deliberately does
+   * NOT require the file's snapshot to equal the current contract.
+   *
+   * Review caught the first version doing exactly that (#391). The next column a
+   * customer legitimately gains must be granted by a NEW forward migration —
+   * editing this applied one would break a fresh replay and would never reach a
+   * database that had already run it. An equality assertion here would have
+   * pushed the next author into precisely that mistake.
+   *
+   * What stays true forever is the containment: a migration granting customer
+   * access may never name a column the client contract does not carry. Growth of
+   * the contract is allowed; divergence is not.
+   *
+   * The EXACT, CUMULATIVE check lives where it belongs — `order_read_contracts
+   * _test.sql` CASE 1 reads `information_schema.column_privileges` after the
+   * whole chain has replayed, so it sees the sum of every grant ever made. This
+   * file's job is to tie that suite's expectation to the client contract, below.
    */
-  it('the migration asserts exactly the customer column contract', () => {
+  it('grants only columns the client contract carries', () => {
     const asserted = columnsFromArrayLiteral(sql, 'customer read contract');
-    expect([...asserted].sort()).toEqual([...CUSTOMER_ORDER_COLUMNS].sort());
+    expect(asserted.length).toBeGreaterThan(0);
+    for (const col of asserted) {
+      expect(CUSTOMER_ORDER_COLUMNS, `${col} is granted but is not in the customer contract`).toContain(col);
+    }
   });
 
   /**
@@ -111,10 +127,17 @@ describe('customer order select ↔ database grant parity', () => {
   });
 
   /**
-   * The third list. With this, every place that states what a customer may read
-   * is pinned to CUSTOMER_ORDER_COLUMNS rather than to one of the others.
+   * THE LOAD-BEARING ASSERTION. The SQL suite is a test, not history, so it is
+   * the one place that may be updated whenever the contract changes — and CASE 1
+   * there compares its list to the CUMULATIVE grant after a full chain replay.
+   *
+   * Tying that list to CUSTOMER_ORDER_COLUMNS here completes the chain:
+   *
+   *   client contract  ==  SQL suite expectation  ==  actual grant after replay
+   *
+   * Every link is checked by something, and no link is a frozen file.
    */
-  it('the SQL suite pins the same contract', () => {
+  it('the SQL suite pins exactly the client contract', () => {
     const suite = readFileSync(SQL_SUITE, 'utf8');
     const expected = columnsFromArrayLiteral(suite, 'v_expected text[] :=');
     expect([...expected].sort()).toEqual([...CUSTOMER_ORDER_COLUMNS].sort());
