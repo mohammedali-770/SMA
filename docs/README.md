@@ -63,6 +63,8 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Ship a release | [Release checklist](RELEASE_CHECKLIST.md) |
 | Understand how deployment works | [Deploy](DEPLOY.md) |
 | Build for a store or TestFlight | [Mobile guide](../README_MOBILE.md) |
+| Submit to Google Play, or look up a Play declaration | [Play store submission](PLAY_STORE_SUBMISSION.md) |
+| Write or change store listing copy | [Listing copy](store/LISTING_COPY.md) |
 | Check dependency advisories | [Dependency advisories](DEPENDENCY_ADVISORIES.md) |
 | Know the Node version | [Node version](NODE_VERSION.md) |
 | Follow branch policy | [Git branches](GIT_BRANCHES.md) |
@@ -135,6 +137,8 @@ docs/
   reference/           GENERATED — regenerate, never edit
   decisions/           architecture decision records
   integrations/        third-party API references
+  legal/               customer-facing legal text, kept byte-accurate
+  store/               store listing copy, bilingual, with its claims table
   readiness/           dated review evidence
   *.md                 runbooks, integration contracts, operational guides
 ```

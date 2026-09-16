@@ -25,6 +25,8 @@ If you are about to add a "Background" section to a runbook, or a "How to run it
 docs/reference/     generated only — never hand-write a file here
 docs/decisions/     one file per decision, numbered, never edited after acceptance
 docs/integrations/  third-party API contracts
+docs/legal/         customer-facing legal text, kept byte-accurate
+docs/store/         store listing copy, bilingual, with its claims table
 docs/readiness/     dated review evidence, immutable
 docs/               everything else: runbooks, manuals, explanations
 ```
@@ -108,7 +110,12 @@ See [`decisions/README.md`](decisions/README.md). Copy [`decisions/0000-template
 
 ## What the automation does
 
-Three checks run as `npm run docs:check`, and all three run in CI.
+Four checks run as `npm run docs:check`. **Three of them run in CI; the fourth does
+not, and that is a defect rather than a design.** `.github/workflows/docs.yml` invokes
+the three scripts individually rather than the npm script, so
+`check-test-phone-numbers.mjs` was reachable only from a developer's own terminal —
+the same shape as `logo:check`, which existed while no workflow ran it (CLAUDE.md
+§11). It is wired in as of 2026-09-16.
 
 ### 1. Generated reference must not drift
 
@@ -127,7 +134,9 @@ Never hand-edit a file in `docs/reference/`. Your edit will be silently reverted
 
 `scripts/docs-check-ownership.mjs` reads [`ownership.json`](ownership.json). Each rule maps source paths to the document that must change alongside them. Touch the code without touching the document and the check fails, telling you which rule fired, why it exists, and which documents satisfy it.
 
-The map is narrow on purpose — ten rules covering payments, push, WhatsApp sign-in, the POS integration, account deletion, the order lifecycle, order integrity, maps, OTP entry and deployment. These are the areas where stale documentation has actually cost something. A rule that fires on every change gets routed around on every change.
+The map is narrow on purpose. [`ownership.json`](ownership.json) is the list, and it is **deliberately not re-enumerated here** — a count in prose beside a list in JSON is exactly the drift this page warns about, and this sentence proved it by saying "ten rules" while there were eighteen. These are the areas where stale documentation has actually cost something. A rule that fires on every change gets routed around on every change.
+
+**Rules are evaluated independently, and that is a tool rather than an accident.** A path matched by two rules must satisfy **both**, while a single rule is satisfied by touching **any** of its listed documents. So the way to force a second document to move with some code is a second, narrow rule pointing at it — not another entry in the first rule's `docs` array, which would weaken the rule instead of strengthening it. `store-listing-copy` overlaps `loyalty` and `payments` for exactly that reason.
 
 **Adding a rule is the correct response to finding a stale document.** Removing one needs a reason in the pull request.
 
