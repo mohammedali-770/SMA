@@ -96,8 +96,8 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
   branch_availability: {
     en: 'Branch Availability',
     ar: 'إتاحة الأصناف بالفروع',
-    descEn: 'Whether timed item, option and delivery closures actually reopen. Counts only — the call-centre console names the branch.',
-    descAr: 'هل تعود الأصناف والخيارات والتوصيل بعد انتهاء المدة فعلاً. أعداد فقط — لوحة مركز الاتصال تحدد الفرع.',
+    descEn: 'Whether timed item, size, option and delivery closures actually reopen. Counts only — the call-centre console names the branch.',
+    descAr: 'هل تعود الأصناف والأحجام والخيارات والتوصيل بعد انتهاء المدة فعلاً. أعداد فقط — لوحة مركز الاتصال تحدد الفرع.',
   },
 };
 
@@ -152,13 +152,32 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   }
 
   if (system.id === 'branch_availability') {
-    // Wire keys from 20260820160000_branch_availability_health_card.sql. An
+    // Wire keys from 20260820160000_branch_availability_health_card.sql, plus
+    // `closed_sizes` from 20260925120000_health_card_variant_coverage.sql. An
     // explicit block is required, not optional: the fall-through at the bottom
     // renders the database_jobs metrics, so without this the card would read
     // "Expected jobs / pg_cron / Read-only" — plausible and entirely wrong.
+    //
+    // A COUNTER ADDED TO THE SNAPSHOT AND NOT ADDED HERE IS INVISIBLE, AND
+    // SILENTLY SO. `numberValue` returns 0 for a key it cannot find, so the card
+    // does not render a gap — it renders a confident zero. `closed_sizes` was
+    // added to the payload and omitted here, which meant a branch with a size
+    // closed read "Closed items 0 / Closed options 0": the card saying nothing
+    // is closed while something is. Caught in review on #394.
+    //
+    // That is the same defect the migration itself exists to fix, one layer up —
+    // the snapshot enumerated availability TABLES by name and went blind to a
+    // new one; this card enumerates METRICS by name and went blind to a new one.
+    // `healthView.test.ts` now pins the set so the next counter cannot be
+    // dropped in silence.
+    //
+    // Reading 0 before 20260925120000 is applied is correct, not a placeholder:
+    // no size can be closed until the table exists and the operator controls
+    // ship (PR 3).
     return (
       <>
         <HealthMetric label={isAr ? 'أصناف موقوفة' : 'Closed items'} value={numberValue(d, 'closed_products')} />
+        <HealthMetric label={isAr ? 'أحجام موقوفة' : 'Closed sizes'} value={numberValue(d, 'closed_sizes')} />
         <HealthMetric label={isAr ? 'خيارات موقوفة' : 'Closed options'} value={numberValue(d, 'closed_options')} />
         <HealthMetric label={isAr ? 'متأخرة عن العودة' : 'Overdue restores'} value={numberValue(d, 'overdue_restores')} />
       </>

@@ -36,6 +36,46 @@ to Production.**
 > validated, awaiting approval). Moyasar still sorts ahead of everything.
 > **Name the target by version.**
 
+> **Updated 2026-09-16 (later still) — `20260925120000_health_card_variant_coverage`
+> is written, validated and NOT applied. The count is now FOUR**, and the whole
+> per-tier set is written: `20260923120000` (the table, inert),
+> `20260924120000` (the money path) and `20260925120000` (the Operations Health
+> coverage), plus Moyasar, frozen under §6 and still sorting ahead of all three.
+> **Apply in that order, each on its own approval, each named by its own
+> version.** Every one of them refuses to land out of order, and both halves of
+> the third file's guard were proven by building a database that fails exactly
+> one of them. Detail: §46.
+>
+> **The third file closes a blind spot rather than adding a feature.**
+> `operations_health_snapshot_internal` enumerates the availability tables by
+> name in three places, so a tier whose restore timer ran out and was never
+> honoured read **`idle`** — not even `healthy` — with no alert at all. Measured
+> on the same data before and after: `idle` / 0 overdue / no alert, against
+> `degraded` / 1 overdue / `restores_overdue`.
+>
+> **Superseded, kept because the count is the point: the count was THREE** when
+> `20260924120000_place_order_variant_availability` was written. Outstanding:
+> `20260824100000_moyasar_payment_provider.sql` (frozen under §6),
+> `20260923120000_branch_variant_availability` and this one. Moyasar still sorts
+> ahead of everything, so "apply the outstanding migrations" would take the
+> frozen payment file FIRST — **name the target by version.**
+>
+> **This is the MONEY-PATH half, and the two have a DEPENDENCY ORDER that is not
+> optional.** Apply `20260923120000` first, then `20260924120000`, each on its
+> own approval, each named by its own version. Each refuses to land out of
+> order: the first asserts neither money-path function mentions the new table,
+> the second asserts the table, both RPCs and the sweeper arm already exist.
+>
+> **It redefines `place_order` and `compute_order_snapshot`, so the money-path
+> hash pair WILL move.** That is the intended effect of the work, not an
+> anomaly — record the new pair deliberately at apply time. Detail: §45.
+>
+> **Superseded, kept because the count is the point: `20260923120000` written,
+> the count TWO.** It is the first of three files that give a branch the ability
+> to close a single PRICE TIER. That one is inert: it creates an empty table,
+> its RPCs and a sweeper arm, and deliberately does **not** touch the order
+> path. Detail: §44.
+
 > **Updated 2026-09-14 — `20260918120000_loyalty_earn_on_settlement` is written,
 > validated and NOT applied. The count is now THREE.** Outstanding: Moyasar
 > (frozen), `20260917120000` and this one. Moyasar still sorts ahead of
@@ -5452,3 +5492,435 @@ add a second history row for one change.
 dangerous shape: with one file left, "apply the outstanding migrations" reads
 like a no-op and is the one instruction that would break the payment freeze.
 **Name the target by version** (§6, and CLAUDE.md §8).
+
+
+---
+
+## 44. Per-branch variant (price tier) availability — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260923120000_branch_variant_availability.sql`. **Written 2026-09-16,
+validated, awaiting owner approval.** The first of three files.
+
+sha256 `a3440839b78c34fb4e309a32c4da842e2e3615d8fdc6dfc21789279ddca8d967`,
+622 lines / 27,922 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15. A fingerprint recorded from a pre-review draft is worse than
+none: at apply time it mismatches, and a stale record is indistinguishable from
+a tampered file, which is the one thing the fingerprint exists to tell apart
+(the lesson PR #345 paid for). `npm run docs:check` fails on any recorded
+sha256 that matches no file in the tree.
+
+**Why the level exists.** Availability is enforced at the product and the
+modifier today. Neither expresses "we are out of the Large". Measured against
+the live catalog: **59 of 61 active products carry price tiers, 144
+`product_variants` rows**, against **one** product with a modifier group. A
+cashier who runs out of one size has to close the whole item.
+
+**What it does.** Creates `public.branch_variant_availability` on the
+`branch_modifier_availability` shape (absence of a row means available;
+`is_available` authoritative), its four triggers, `set_variant_snooze` /
+`clear_variant_snooze` gated on `is_admin() or is_branch_operator(branch)` with
+the **call centre deliberately excluded**, a `variant_id` column on
+`branch_availability_events` with `bae_one_target` widened to count it, and a
+variants arm plus `variants_reopened` counter on `branch_availability_sweep`.
+
+**What it deliberately does NOT do.** It does not touch `place_order` or
+`compute_order_snapshot` — that is `20260924120000`, kept separate for the
+reason the modifier rollout gives in its own header, *"so it can be reviewed and
+reverted on its own"*. Applying this file alone changes **no customer
+behaviour**: the table is created empty and nothing reads it.
+
+**A REVIEW CAUGHT THAT COPYING THE 2026-08-20 TEMPLATE WOULD HAVE RE-OPENED A
+HOLE CLOSED TWO DAYS EARLIER.** This project carries `alter default privileges
+in schema public grant all on tables to anon, authenticated, service_role` —
+read from `pg_default_acl`, present from both `postgres` and `supabase_admin`.
+Every table created in `public` therefore starts with `arwdDxtm` for `anon`.
+The modifier template never revokes, which is precisely why
+`20260919120000_security_audit_db_hardening` (ledger row 94) had to strip those
+writes from the two sibling tables on 2026-09-14.
+
+This file uses `revoke all ... from public, anon, authenticated` **before** the
+grants, rather than the audit's three-verb form — because the narrow version is
+why `branch_modifier_availability` still shows
+`anon = REFERENCES, SELECT, TRIGGER, TRUNCATE` live today, and **RLS does not
+filter TRUNCATE**. Verified on the local chain: the new table gives `anon`
+exactly `SELECT`; the sibling reproduces the live residue exactly.
+
+**THE HARNESS COULD NOT HAVE CAUGHT IT, SO THE HARNESS WAS FIXED.**
+`.github/sql-ci/bootstrap.sql` now models Production's **table** default
+privileges. Without that, the harness was *more secure* than Production and any
+grant assertion passed vacuously — the "a check that cannot fail is worse than
+no check" trap in its purest form.
+
+**A SEPARATE FINDING, RECORDED RATHER THAN FIXED HERE.** Modelling the
+**function** default privileges as well makes
+`supabase/tests/operations_alerts_digest_test.sql` fail, and the failure is
+real: **8 of its 11 `service_role` expectations do not describe Production**,
+because those migrations write `revoke all ... from public, anon` and never name
+`service_role`. It is not a hole — the `anon` column is correct throughout, and
+`operations_alert_settings_update` is gated inside its body on `is_admin()`
+(CLAUDE.md §8, corrected 2026-09-13) — but a matrix asserting something untrue
+is not a contract. Correcting eight assertions in an alerts suite does not
+belong inside a money-path change, so the bootstrap line is deliberately
+tables-only and the reasoning is recorded in place.
+
+**Validation.** Local chain harness: **137 migrations applied, 76 suites run, 74
+passed, 2 quarantined, 0 new failures.** The file's own verification block was
+**mutation-tested: 6 of 6 meaningful mutants killed** (dropped realtime trigger,
+reverted `bae_one_target`, RPC leaked to `anon`, `anon` regaining table writes,
+RLS switched off, sweeper losing its retention prune). The audit path was proven
+end to end rather than asserted — closing a tier wrote exactly one
+`branch_availability_events` row carrying `variant_id`. The eighth assertion
+("the order path is untouched") is not mutation-tested here; `20260924120000`'s
+ordering guard exercises it directly.
+
+**Money-path baseline recorded before any of this, and matching the ledger:**
+`place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot`
+`ca276a84424e403a98d34860817f815c`. This file moves neither.
+
+---
+
+## 45. The order path refuses a closed price tier — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260924120000_place_order_variant_availability.sql`. **Written 2026-09-16,
+validated, awaiting owner approval.** The second of three files. It is the one
+that makes §44 mean anything, and it is a **MONEY-PATH CHANGE**: it redefines
+both `place_order` and `compute_order_snapshot`.
+
+sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`,
+1,110 lines / 55,033 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15.
+
+**Why it has to exist at all.** Nothing else would stop a customer ordering a
+tier a branch has closed. The client can hide a size, but the client is a
+build that reaches customers weeks after the server does, and a stale build is
+exactly the case the server check is for. This mirrors
+`20260820140500_place_order_modifier_availability` file-for-file, because the
+repository has solved this problem once already and that rollout's own header
+gives the reason the money-path half is separate: *"so it can be reviewed and
+reverted on its own."*
+
+### The money-path hashes WILL move, and that is the intended effect
+
+Baseline before, matching the ledger — `md5(pg_get_functiondef(oid))`, **not**
+`md5(prosrc)`, which is the trap ledger row 81 records:
+
+| function | before |
+| --- | --- |
+| `place_order` | `bfd3f1f423e61c850ab6101e37431799` |
+| `compute_order_snapshot` | `ca276a84424e403a98d34860817f815c` |
+
+**Record the new pair deliberately at apply time rather than treating a change
+as an anomaly.** Both move; that is what this file is for.
+
+### Derived, not retyped — and the pre-images were checked against live first
+
+Each body was extracted from the migration that currently defines it and hashed
+against the live function **before** a single character was substituted. Both
+matched exactly:
+
+| function | current definition | chars | `prosrc` md5 | live? |
+| --- | --- | --- | --- | --- |
+| `place_order` | `20260918120000_loyalty_earn_on_settlement.sql` | 24 827 | `1c854febfa239dc93ee594e704fa18f1` | identical |
+| `compute_order_snapshot` | `20260910120000_loyalty_multipliers.sql` | 15 398 | `52490fe4d9b692c4b8631a28977c3d73` | identical |
+
+The extraction span took both delimiter newlines — the one after `as $$` and the
+one before the closing `$$` — so none of the three false one-byte mismatches
+this ledger records (rows 81, 88, 89) arose.
+
+One anchored substitution per function. The anchor is the same line in both and
+occurs **exactly once** in each body:
+
+```
+    v_unit_price := coalesce(v_variant.price, v_product.price);
+```
+
+The check goes immediately above it — after tier resolution, before the price is
+computed, and above the modifier loop it is modelled on. The resulting diff is
+**one hunk per function, +26 lines, zero removed**: `@@ -221,0 +222,26 @@` and
+`@@ -160,0 +161,26 @@`.
+
+The inserted block is identical in both:
+
+```sql
+    if v_variant.id is not null and exists (
+      select 1 from public.branch_variant_availability bva
+      where bva.branch_id = p_branch_id
+        and bva.variant_id = v_variant.id
+        and bva.is_available = false
+        and (bva.snoozed_until is null or bva.snoozed_until > now())
+    ) then
+      raise exception 'A size in your cart is not available at the selected branch';
+    end if;
+```
+
+Same lazy-expiry clause as the product and modifier checks above and below it:
+an elapsed timer is not a closure, an untimed closure still blocks.
+
+### Two decisions that were argued rather than assumed
+
+**THE STALE-CLIENT FALLBACK REFUSES RATHER THAN SUBSTITUTES.** When a cart names
+no `variant_id` the server picks the cheapest active tier; if *that* tier is
+closed the order is refused, not promoted to the next cheapest. Charging a
+dearer tier would break the invariant that block's own comment states — *"the
+price charged may never exceed the price displayed"* — and that block already
+took the whole app down once, on 2026-08-25, by being stricter than the shipped
+client could satisfy. Refusing is the conservative direction; substituting is
+not. It is also not a regression against any baseline that exists: today a
+cheapest-tier closure IS a whole-product closure, because per-tier closing does
+not exist.
+
+**`compute_order_snapshot` GETS THE CHECK TOO**, although it has never carried
+the modifier one. It creates orders through `insert_order_from_snapshot`, so a
+gap there is a real gap the moment online payment is enabled — which is exactly
+how `20260921120000` came to be written, after `20260918120000` was recorded as
+having fixed "both" order-creation paths when it had fixed one. Enumerate every
+implementation of a behaviour before declaring it closed.
+
+### Ordering is pinned from both sides
+
+`20260923120000`'s assertion 8 refuses to land if either money-path function
+already mentions `branch_variant_availability`. This file opens with the
+converse guard: the table, both RPCs and the sweeper arm must exist, or it
+refuses with *"apply 20260923120000 first"*. Neither can be applied out of
+order.
+
+### Mutation testing found two real defects in the file's own checker
+
+Thirteen mutants, each aimed at one assertion, each built by mutating the
+FUNCTION BODIES ONLY so the checker is genuinely on trial. **All thirteen are
+refused; the unmutated file applies.** Two of them earned their keep:
+
+**A CHECK A COMMENT CAN SATISFY IS NOT A CHECK.** Assertion 4 read
+`position('earn_pending' in v_po)`. The two comment lines immediately above that
+insert also say `earn_pending`, so a mutant that changed only the written VALUE
+from `'earn_pending'` to `'earn'` — the exact defect audit finding 1.1 is about
+— **survived**. The same held for `earns_loyalty_points`, which appears in a
+comment above the line that uses it. Both assertions are now statement-shaped
+(`, 'earn_pending', v_points_earned,` and
+`coalesce(v_product.earns_loyalty_points, true)`), and the narrow mutants now
+die. Every asserted token was re-measured for this: comments stripped, raw count
+against code-only count, three tokens flagged, two fixed, and the third
+(`branch_variant_availability`) left alone because it is a *count* assertion,
+which a comment breaks rather than satisfies.
+
+**CARDINALITY MUST BE CHECKED BEFORE A BODY IS READ.** Every assertion reads a
+body with `select prosrc into`, which with two overloads present takes an
+arbitrary one. The overload count sat at the END, so the planted-stale-overload
+mutant was caught by the *reference count* instead — meaning the overload
+assertion proved nothing, and which assertion fired was luck. It now runs first,
+and that mutant now dies on it by name.
+
+A third mutant was killed by the plpgsql compiler rather than by the assertion
+aimed at it (renaming `v_loyalty_channel_ok` is a syntax-level error). It was
+rebuilt to remove the gate cleanly — declaration, assignment and every use — so
+the body still compiles and only assertion 4 can see it. It does.
+
+### Validation
+
+- Local chain harness: **138 migrations applied, 77 suites run, 75 passed, 2
+  quarantined, 0 new failures.**
+- New suite `supabase/tests/branch_variant_availability_test.sql`, **8 cases,
+  all passing**, which places real orders rather than reading source: baseline
+  pricing; per-tier refusal with the sibling tiers still ordering; lazy expiry
+  both ways; the fallback refusing rather than substituting; the snapshot path
+  enforcing it; the sweeper reopening and counting; RPC branch scoping; and the
+  inactive-tier close/reopen asymmetry.
+- Stored bodies verified **byte-identical** to hashes computed independently
+  from the file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288
+  chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859
+  chars.
+- **NOT called live, and that is deliberate.** `place_order` inserts a real
+  order and `orders` carries 12 triggers including POS-sync enrolment, so
+  calling it would create a kitchen ticket for food nobody ordered. Name
+  resolution is excluded structurally instead, exactly as ledger row 93 did.
+
+### One test bug worth recording, because the shape recurs
+
+The suite's first version failed CASE 1 for a reason that was mine rather than
+the migration's: inside a transaction `now()` is frozen, so two orders placed by
+the same suite share a `created_at` and `order by created_at desc limit 1` ties.
+Capture the row `place_order` returns instead of re-reading the table.
+
+### No deploy implied
+
+Both signatures are unchanged, so existing callers bind to the new bodies (the
+lesson recorded against `20260831130000`). Applying this file is a §5 action and
+must name the target by version.
+
+---
+
+## 46. Operations Health observes the new availability table — WRITTEN, NOT APPLIED (2026-09-16)
+
+`20260925120000_health_card_variant_coverage.sql`. **Written 2026-09-16,
+validated, awaiting owner approval.** The third and last file of the set.
+
+sha256 `65dabf4f5096b985b2c0130589e39eabfcce54e1cf364d348fbc2850f5a7ca3a`,
+1735 lines / 82365 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15.
+
+### It was found while reviewing, and it is why this is three files rather than two
+
+`operations_health_snapshot_internal` enumerates the availability tables **by
+name** in three places, and §44's table is a fourth that none of them knew
+about:
+
+1. the closed-item and closed-option counters;
+2. the `overdue` UNION — the only thing that detects a restore timer that ran
+   out and was never honoured, and therefore the only evidence that the sweeper
+   has died, because `branch_availability_sweep` swallows its own errors and
+   **returns normally**, so pg_cron records a failed sweep as `succeeded`;
+3. the `idle` fail-quiet warm-up condition.
+
+**THIS IS THE DEFECT CLASS `20260827130000_watchdog_delivery_coverage` EXISTS
+TO RECORD.** Two watchdog rules carried an `order_type = 'pickup'` filter and
+went blind to failed paid **delivery** orders the moment delivery went live. A
+monitor that enumerates its subjects by name is correct until the day a subject
+is added, and then silently wrong.
+
+### The blind spot was measured before and after, on the same data
+
+One tier closed, its restore timer eleven minutes past due, nothing else closed
+anywhere:
+
+| | card state | `overdue_restores` | `closed_sizes` | alert |
+| --- | --- | --- | --- | --- |
+| before | **`idle`** | 0 | absent | **none** |
+| after | `degraded` | 1 | 1 | `restores_overdue` |
+
+**Before, it does not even read `healthy` — it reads `idle`**, the fail-quiet
+warm-up, so an operator looking straight at the card is told there is nothing to
+report. That is the whole case for this file.
+
+### Derived, not retyped
+
+Both bodies come from `20260820160000_branch_availability_health_card.sql`
+under six anchored substitutions, each asserted to match exactly once. The diff
+is **five hunks in the snapshot and one in the alert arm, +23 and +1 lines, zero
+removed**.
+
+**THAT FUNCTION HAS BEEN REDEFINED FIVE TIMES, NOT ONCE.** The working note for
+this file said it was defined by exactly one migration; `20260723090000`,
+`20260723140000`, `20260807150000`, `20260820150000` and `20260820160000` all
+define it. The **last** is the live body and therefore the right pre-image — the
+same practical answer, reached for a different reason, and worth recording
+because "defined by one migration" is the kind of claim that is easy to assert
+and cheap to check.
+
+Both pre-images were hashed against the live function before a character was
+substituted, and both matched exactly:
+
+| function | chars | `prosrc` md5 | ledger basis before |
+| --- | --- | --- | --- |
+| `operations_health_snapshot_internal` | 46 688 | `3f2f145ca1283e5ff8040a0b2b01ce81` | `aefe82538f13bc2d6fbf04d3f620506b` |
+| `operations_alerts_derive_pre_stranded` | 18 002 | `19177f263090d96500a571a4bf6a1dd4` | `662ee646ea4ea9e89ff64203bcb542ee` |
+
+Both ledger-basis hashes **will move**; the money-path pair is untouched and
+this file asserts that it is.
+
+### Two design decisions, argued rather than defaulted
+
+**A SIZE IS A THIRD LEVEL, NOT A KIND OF OPTION.** Folding closed tiers into
+`closed_options` would have needed no new key and no console change. It would
+also have made the card say "options" for something that is not one, on a menu
+where 59 of 61 products carry tiers and exactly **one** carries a modifier
+group — so almost every number under that label would have been a size.
+
+**THE ALERT EVIDENCE CARRIES IT TOO**, which is why this file redefines a second
+function rather than one. Without it a responder reading a `restores_overdue`
+alert is told "0 products, 0 options" while the entire backlog is sizes — the
+same blindness one layer up. Adding a key does **not** change alert identity
+(the fingerprint is still `branch_availability:health`, asserted exactly once),
+and `operations_alerts_sanitize_evidence` keeps integers, so the value survives
+the sanitizer that silently dropped `20260914120000`'s first attempt at a jsonb
+array.
+
+### Ordering is pinned, and both halves were tested
+
+The leading guard refuses unless the table exists **and** both money-path
+functions already refuse a closed size. The second half is a judgement rather
+than a technical need: a card counting closures the order path does not enforce
+is a worse lie than a card counting nothing. Each half was proven by building a
+database that fails exactly it — *"branch_variant_availability does not exist;
+apply 20260923120000 first"* and *"the order path does not yet refuse a closed
+size; apply 20260924120000 first"*.
+
+### Mutation testing, and the one mutant that earns the design
+
+Twelve mutants, each aimed at one assertion, each mutating the function bodies
+only so the checker is genuinely on trial. **All twelve refused; the unmutated
+file applies.**
+
+**Mutant 12 is the important one.** It misspells a column inside the new select
+(`v.snooze_until`). A `plpgsql` body is **not name-resolved at creation**, so it
+stores cleanly and every source-level assertion passes — and the availability
+block's own `exception when others` would then have reported the card
+`unavailable` for ever, which is precisely the quiet failure this file exists to
+prevent. It is caught only by assertion 10, which **calls** the function and
+reads the outcome back as a value: *"the branch_availability card is unavailable
+after this migration: 42703"*. Ledger row 86's lesson, and ledger row 90's
+(an assertion whose result you cannot read is not evidence), doing real work in
+the same check.
+
+The block also applies both corrections mutation testing found on
+`20260924120000`: cardinality is checked **before** any body is read, and every
+assertion that names a token names a **statement**.
+
+### The same blindness happened one layer up, and review caught it
+
+**A counter added to the snapshot and not added to the CARD is invisible, and
+silently so.** This migration put `closed_sizes` in the payload;
+`src/components/admin/view/health/HealthSystemCard.tsx` still rendered only
+`closed_products`, `closed_options` and `overdue_restores`. Nothing failed —
+`numberValue` returns 0 for a key it cannot find, so the card did not show a gap,
+it showed a confident **zero**. A branch with a size closed read *"Closed items
+0 / Closed options 0"*: the card stating nothing is closed while something is.
+
+**That is this file's own defect, repeated one layer up.** The snapshot
+enumerated availability TABLES by name and went blind to a new one; the card
+enumerates METRICS by name and went blind to a new one. Writing the migration
+did not make its author check the consumer — which is the whole shape of the
+`20260827130000_watchdog_delivery_coverage` lesson, and it recurred inside the
+change that cites it.
+
+Found by review on #394. Fixed with the metric, the card's own description
+string (which still said "item, option and delivery" while
+`docs/OPERATIONS_HEALTH_CENTER.md` had already been corrected to name sizes),
+and **`HealthSystemCard.test.tsx`, which pins the whole set** so the next counter
+cannot be dropped in silence. The test asserts label *and value*: a label-only
+assertion passes against a metric bound to the wrong key, which was verified by
+mutation — binding `closed_sizes` to `closed_options` fails with
+*"expected 'Closed sizes5' to contain '7'"*, and deleting the metric outright
+fails three of its four cases.
+
+**When a migration adds a field to a payload, grep for the payload's consumers.**
+
+### Validation
+
+- Local chain harness: **139 migrations applied, 78 suites run, 76 passed, 2
+  quarantined, 0 new failures.**
+- New suite `supabase/tests/health_card_variant_coverage_test.sql`, **6 cases,
+  all passing**, kept separate from `branch_availability_health_card_test.sql`
+  so a failure there still means what it used to. Case B is the suite: it is the
+  assertion that fails against the pre-migration function and passes after.
+- Stored bodies verified byte-identical to values derived from the file:
+  `operations_health_snapshot_internal` `10265270ab70597cadc5e84134384051` /
+  47 919 chars, `operations_alerts_derive_pre_stranded`
+  `dabd46192e37eaa69c5cfd2a765f6cbf` / 18 094 chars.
+- **Applying it changes no reported number today.** The table is empty and
+  nothing can write to it until the operator controls ship, so every new counter
+  reads 0. That is the point: the coverage has to exist before the first
+  closure, not after the first one is missed.
+
+### One test expectation worth recording, because it was mine and not the code's
+
+The suite's first CASE D asserted `closed_products = 1` for an **untimed**
+closure. It is 0: `closed_products` / `closed_options` / `closed_sizes` count
+only **timed** closures, and an untimed one is deliberately reported under
+`untimed_closures` instead — *"an admin delisting is a decision"*, as the
+payload's own comment puts it. The new arm matches that split rather than
+inventing its own, and the case now asserts both halves.
+
+### No deploy implied
+
+Both signatures are unchanged, so existing callers bind to the new bodies.
+Applying this file is a §5 action and must name the target by version.

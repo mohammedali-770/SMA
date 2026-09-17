@@ -47,6 +47,55 @@ end $$;
 grant anon, authenticated, service_role to current_user;
 
 -- ---------------------------------------------------------------------------
+-- 1b. Supabase's project-level DEFAULT PRIVILEGES.
+--
+-- WHY THIS IS HERE, added 2026-09-16. Without it the harness is MORE SECURE
+-- than Production, which makes it unable to fail on the one class of defect it
+-- would most want to catch.
+--
+-- A live `pg_default_acl` read shows this project carries, from both `postgres`
+-- and `supabase_admin`:
+--
+--     alter default privileges in schema public
+--       grant all on tables to anon, authenticated, service_role;
+--
+-- So every table a migration creates in `public` starts life with `arwdDxtm`
+-- for `anon` — insert, update, delete, truncate, references and trigger — none
+-- of which any migration in this repository ever granted. That is why
+-- `20260919120000_security_audit_db_hardening` had to revoke those writes from
+-- `branch_product_availability` and `branch_modifier_availability`, and why a
+-- new table that does not `revoke all` first silently re-opens the same hole.
+--
+-- A harness without this line replays every such migration onto a database
+-- where the grants never existed, so a grant assertion in either the migration
+-- or a suite passes vacuously. Adding it means those assertions can fail, which
+-- is the only thing that makes them evidence.
+--
+-- RLS still default-denies, exactly as in Production, so this does not make the
+-- harness permissive in any way that matters to the other suites — it makes it
+-- FAITHFUL.
+--
+-- TABLES ONLY, DELIBERATELY. Production's default privileges also cover
+-- FUNCTIONS and SEQUENCES, and modelling those too is the honest end state —
+-- but it is not this change's to make. Adding the function default made
+-- `operations_alerts_digest_test.sql` fail, and the failure is real rather than
+-- spurious: 8 of its 11 `"svc"` expectations say `service_role` cannot execute
+-- a function that Production grants it, because those migrations write
+-- `revoke all ... from public, anon` and never name `service_role`. The suite
+-- has therefore never described Production on that column, and passed only
+-- because this harness was stricter than the real database. It is NOT a hole —
+-- the `anon` column, the one that matters, is correct throughout, and
+-- `operations_alert_settings_update` is gated inside its body on `is_admin()`
+-- rather than by its grant (CLAUDE.md §8, corrected 2026-09-13).
+--
+-- Correcting eight assertions in an alerts suite does not belong inside a
+-- money-path migration, so it is reported separately and left for its own
+-- change. Widening this line to functions is that change's first step.
+-- ---------------------------------------------------------------------------
+alter default privileges in schema public
+  grant all on tables to anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
 -- 2. Schemas the chain installs into or references.
 -- ---------------------------------------------------------------------------
 create schema if not exists auth;
