@@ -9,11 +9,16 @@
  * REQUIRED group, there is no valid selection left, so the product cannot be
  * ordered at all even though its own availability row says otherwise.
  *
+ * The same shape applies one level down, to PRICE TIERS (20260923120000): a
+ * branch can close "Large" and keep "Regular". That is invisible to the menu
+ * too — until EVERY tier is closed, at which point a tiered product has no
+ * sellable size left even though its own availability row says it is on sale.
+ *
  * The server agrees by construction rather than by a second rule: a required
- * group forces a selection, and `place_order` refuses any selection that names
- * a closed option. So there is nothing here the backend does not already
- * enforce — this exists so the customer learns it on the menu instead of at
- * the payment screen.
+ * group forces a selection, a tiered product forces a tier, and `place_order`
+ * refuses any line naming a closed option or a closed tier. So there is nothing
+ * here the backend does not already enforce — this exists so the customer learns
+ * it on the menu instead of at the payment screen.
  */
 import type { ModifierGroup } from '../types/models';
 
@@ -45,12 +50,43 @@ export function blockingGroups(
   );
 }
 
-/** The product's own availability AND every required group still satisfiable. */
+/**
+ * Every SIZE closed is the item closed.
+ *
+ * A product with no price tiers is sold at its own price and has nothing here
+ * to close, so it is never blocked by this rule — hence the length check rather
+ * than a bare `every`, which is vacuously true on an empty list and would make
+ * every untiered product unorderable.
+ *
+ * Closing SOME sizes is not this: the item stays on sale with fewer choices,
+ * exactly as for options. `place_order` agrees by construction — a tiered
+ * product forces a tier and the server refuses any line naming a closed one.
+ */
+export function allTiersClosed(
+  variants: { id: string }[],
+  isVariantAvailable: (variantId: string) => boolean,
+): boolean {
+  return variants.length > 0 && !variants.some((v) => isVariantAvailable(v.id));
+}
+
+/**
+ * The product's own availability AND every required group still satisfiable AND
+ * at least one size still on sale.
+ *
+ * The size axis is OPTIONAL so a caller that knows nothing about tiers keeps its
+ * previous answer rather than silently having every product declared closed —
+ * omitted means "no size is closed", which is the safe direction and matches the
+ * exception-only storage.
+ */
 export function productOrderable(opts: {
   productAvailable: boolean;
   groups: ModifierGroup[];
   isModifierAvailable: (modifierId: string) => boolean;
+  variants?: { id: string }[];
+  isVariantAvailable?: (variantId: string) => boolean;
 }): boolean {
   if (!opts.productAvailable) return false;
+  if (opts.variants && opts.isVariantAvailable
+      && allTiersClosed(opts.variants, opts.isVariantAvailable)) return false;
   return blockingGroups(opts.groups, opts.isModifierAvailable).length === 0;
 }

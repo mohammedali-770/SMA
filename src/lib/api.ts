@@ -97,6 +97,11 @@ export interface DbAppSettings {
   // earns nor may redeem. Optional so a pre-migration project still parses;
   // every reader defaults it TRUE, the same direction as the column default.
   loyalty_pickup_only?: boolean;
+  // Per-size closing (20260926120000). Gates the branch console's per-tier
+  // controls only; the server refuses a closed tier unconditionally. Optional
+  // because it is read through its OWN query in opsApi, which resolves a
+  // missing column to false rather than failing — see the comment there.
+  variant_closing_enabled?: boolean;
   // Points expiry (20260909120000). `loyalty_expiry_next_run_on` is written by
   // a trigger and the driver, never by the admin form.
   loyalty_expiry_enabled?: boolean;

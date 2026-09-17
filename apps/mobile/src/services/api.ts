@@ -21,7 +21,8 @@ import {
 } from './addressPayload';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone,
-  DbBranchModifierAvailability, DbCategory,
+  DbBranchModifierAvailability,
+  DbBranchVariantAvailability, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
   DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
@@ -135,6 +136,39 @@ export const catalog = {
   modifierAvailability: async () =>
     ok<DbBranchModifierAvailability[]>(
       await supabase.from('branch_modifier_availability').select('*')),
+  /**
+   * Per-branch PRICE TIER availability. Same exception-only storage again — an
+   * absent row means the size is on sale.
+   *
+   * `snoozed_until` is selected, unlike the two above, because the client has to
+   * apply the LAZY-EXPIRY rule itself: a timer that has run out is not a
+   * closure, and the sweeper may not have ticked yet. `place_order` applies the
+   * identical rule server-side, so a client that got this wrong would only ever
+   * be stricter than the server, never looser.
+   *
+   * THE ONLY CATALOG READ THAT SWALLOWS ITS ERROR, and the reason matters.
+   * `all()` is one `Promise.all` and `ok()` throws, so ANY rejection here fails
+   * the WHOLE menu load and the customer sees an error screen instead of the
+   * menu. `branch_variant_availability` arrived in `20260923120000`, and
+   * applying a migration is a separate owner action that can land after a build
+   * ships — against a project without it, PostgREST answers `404` and every
+   * customer on that build loses the menu entirely. That is the
+   * `orders.is_comped` outage wearing this feature's clothes.
+   *
+   * An empty list is not a fallback, it is the CORRECT answer here: the table
+   * stores exceptions only, so "no rows" means "no size is closed" — the same
+   * direction as `isVariantAvailable`'s `?? true`, and the same direction a
+   * missing table implies. `place_order` remains the authority either way, so
+   * the worst case is a customer meeting the refusal at checkout rather than on
+   * the menu, which is exactly where they were before this feature existed.
+   */
+  variantAvailability: async (): Promise<DbBranchVariantAvailability[]> => {
+    const { data, error } = await supabase
+      .from('branch_variant_availability')
+      .select('branch_id, variant_id, is_available, snoozed_until');
+    if (error) return [];
+    return (data ?? []) as DbBranchVariantAvailability[];
+  },
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
   /**
@@ -197,16 +231,16 @@ export const catalog = {
   /** Fetch the whole menu graph in parallel (one app-open round of requests). */
   async all() {
     const [branches, categories, products, productVariants, modifierGroups, modifiers, links, availability,
-           modifierAvailability, settings, deliveryZones] =
+           modifierAvailability, settings, deliveryZones, variantAvailability] =
       await Promise.all([
         this.branches(), this.categories(), this.products(), this.productVariants(),
         this.modifierGroups(),
         this.modifiers(), this.productModifierGroups(), this.availability(),
         this.modifierAvailability(), this.settings(),
-        this.deliveryZones(),
+        this.deliveryZones(), this.variantAvailability(),
       ]);
     return { branches, categories, products, productVariants, modifierGroups, modifiers, links, availability,
-             modifierAvailability, settings, deliveryZones };
+             modifierAvailability, settings, deliveryZones, variantAvailability };
   },
 };
 

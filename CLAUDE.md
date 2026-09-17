@@ -232,21 +232,47 @@ purpose.** Latest live version `20260916114130`; the most recent apply is
 `20260922120000` (ledger row 96, `docs/MIGRATIONS.md` §43).
 
 **THE COUNT LEAVES THE DANGEROUS SHAPE ON THE BRANCH THAT CARRIES THIS
-SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Three files are written,
+SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Four files are written,
 validated and awaiting approval — `20260923120000_branch_variant_availability`,
-`20260924120000_place_order_variant_availability` and
-`20260925120000_health_card_variant_coverage` — so once they merge the
-outstanding set is **FOUR**. `20260824100000` still sorts ahead of all three, so
+`20260924120000_place_order_variant_availability`,
+`20260925120000_health_card_variant_coverage` and
+`20260926120000_variant_closing_flag` — so once they merge the outstanding set
+is **FIVE**. `20260824100000` still sorts ahead of all four, so
 "apply the outstanding migrations" takes the frozen payment file FIRST. **Name
 the target by version.** That is what makes the count irrelevant in any shape.
 
-**THE THREE NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
-`20260923120000`, then `20260924120000`, then `20260925120000`, each on its own
-approval, each named by its own version. Every one refuses to land out of order:
-the first asserts that neither money-path function mentions
+**THE FOUR NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
+`20260923120000`, then `20260924120000`, then `20260925120000`, then
+`20260926120000`, each on its own
+approval, each named by its own version. The first three refuse to land out of
+order: the first asserts that neither money-path function mentions
 `branch_variant_availability`; the second asserts that the table, both RPCs and
 the sweeper arm already exist; the third asserts both, and both halves of its
 guard were proven by building a database that fails exactly one of them.
+
+**THE FOURTH IS A SWITCH, AND IT IS THE ONE THAT DECIDES WHEN CUSTOMERS ARE
+EXPOSED.** `20260926120000` adds `app_settings.variant_closing_enabled`,
+defaulting FALSE, which hides the branch console's per-size controls. It exists
+because the console deploys on merge while the customer app reaches a customer
+only in the next EAS build — and a build that does not know a closed size shows
+a **generic error at the payment step**, since `failureMessage` returns a
+translated KEY rather than the server's sentence
+(`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). Merging both halves
+together does not close that window; it moves its start from merge to deploy.
+Only the switch closes it. **Applying it changes nothing** (defaults false);
+**turning it on is a separate §5 decision** that must follow the build carrying
+the customer half. Steps and ordering: `docs/OWNER_ACTIONS.md` §40.
+
+**THE COLUMN-GRANT TRAP WAS CHECKED HERE AND THEN MEASURED AGAIN, and the
+measurement is worth carrying.** `app_settings` grants are TABLE-level, so a new
+column is readable by `anon` and `authenticated` automatically — which is exactly
+why this table is safe to extend where `orders` was not (row 96). The file
+asserts that outcome; mutation testing then showed that revoking SELECT on the
+TABLE makes the assertion raise while revoking the COLUMN alone does not,
+because `has_column_privilege` is satisfied by either grant. The console's own
+read of the flag is nevertheless its **own query returning false on any error**,
+so a deploy that lands before the apply cannot blank the branch console on
+`42703`.
 
 The second is a **MONEY-PATH CHANGE** — it redefines `place_order` and
 `compute_order_snapshot`, so the pair

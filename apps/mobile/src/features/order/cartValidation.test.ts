@@ -90,6 +90,51 @@ describe('validateCartForBranch — closed OPTIONS', () => {
   });
 });
 
+describe('validateCartForBranch — closed SIZES', () => {
+  const tier = (id: string) => ({ id, nameEn: id, nameAr: id, price: 12, calories: 0, sortOrder: 0 });
+  const withTier = (id: string, variantId: string): CartItem => ({
+    ...line(id),
+    variant: tier(variantId),
+  });
+
+  it('a line naming a CLOSED size is invalid even though the product is open', () => {
+    const r = validateCartForBranch(
+      [withTier('a', 'v1')], 'b1', isAvailable, undefined, (vid) => vid !== 'v1');
+    expect(r.invalid.map((i) => i.product.id)).toEqual(['a']);
+  });
+
+  it('a line naming an OPEN size stays valid', () => {
+    const r = validateCartForBranch(
+      [withTier('a', 'v2')], 'b1', isAvailable, undefined, (vid) => vid !== 'v1');
+    expect(r.allValid).toBe(true);
+  });
+
+  it('a line with NO size is unaffected — an untiered product has nothing to close', () => {
+    // A cart line naming no tier is resolved server-side to the cheapest ACTIVE
+    // one, which place_order then checks itself. Refusing here would clear a
+    // line the server would happily accept.
+    const r = validateCartForBranch([line('a')], 'b1', isAvailable, undefined, () => false);
+    expect(r.allValid).toBe(true);
+  });
+
+  it('OMITTING the size lookup preserves the old behaviour', () => {
+    const r = validateCartForBranch([withTier('a', 'v1')], 'b1', isAvailable);
+    expect(r.allValid).toBe(true);
+  });
+
+  it('a closed size is checked against the TARGET branch, not any branch', () => {
+    const r = validateCartForBranch(
+      [withTier('a', 'v1')], 'b1', isAvailable, undefined, (_vid, bid) => bid !== 'b1');
+    expect(r.allValid).toBe(false);
+  });
+
+  it('all three axes compose — the size closure alone fails the line', () => {
+    const r = validateCartForBranch(
+      [withTier('a', 'v1')], 'b1', isAvailable, () => true, (vid) => vid !== 'v1');
+    expect(r.allValid).toBe(false);
+  });
+});
+
 describe('availabilityLookup', () => {
   it('treats a missing entry as available, matching the exceptions-only table', () => {
     // Defaulting the other way would tell a customer their whole cart had sold

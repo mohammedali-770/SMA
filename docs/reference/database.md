@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **139**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260925120000_health_card_variant_coverage.sql`.
+Migration files in the repository: **140**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260926120000_variant_closing_flag.sql`.
 
 ## Tables
 
@@ -23,7 +23,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `account_deletion_requests` | `20260715120000_account_deletion.sql` | 0 | 2 |
 | `account_deletion_resolution_audit` | `20260810120000_account_deletion_manual_review_resolution.sql` | 0 | 1 |
 | `addresses` | `20260707120300_addresses.sql` | 0 | 2 |
-| `app_settings` | `20260707120600_app_settings.sql` | 4 | 2 |
+| `app_settings` | `20260707120600_app_settings.sql` | 5 | 2 |
 | `branch_availability_events` | `20260820110000_branch_availability_snooze.sql` | 1 | 1 |
 | `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 4 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |

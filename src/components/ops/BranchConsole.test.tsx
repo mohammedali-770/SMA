@@ -21,6 +21,10 @@ const mocks = vi.hoisted(() => ({
   reopenProduct: vi.fn(),
   snoozeModifier: vi.fn(),
   reopenModifier: vi.fn(),
+  branchVariantAvailability: vi.fn(),
+  variantClosingEnabled: vi.fn(),
+  snoozeVariant: vi.fn(),
+  reopenVariant: vi.fn(),
   // The console's single refresh also loads the delivery-request panel and the
   // reference sheet. They are mocked empty here because this suite is about
   // item availability; their own behaviour is covered by
@@ -95,6 +99,13 @@ beforeEach(() => {
   mocks.reopenProduct.mockResolvedValue(undefined);
   mocks.snoozeModifier.mockResolvedValue(undefined);
   mocks.reopenModifier.mockResolvedValue(undefined);
+  mocks.branchVariantAvailability.mockResolvedValue([]);
+  // The DEFAULT is off, which is the shipped state: the per-size controls stay
+  // hidden until an administrator turns them on, once a customer build that
+  // understands a closed size is live. Cases that need them on say so.
+  mocks.variantClosingEnabled.mockResolvedValue(false);
+  mocks.snoozeVariant.mockResolvedValue(undefined);
+  mocks.reopenVariant.mockResolvedValue(undefined);
   mocks.deliveryRequests.mockResolvedValue([]);
   mocks.branchReference.mockResolvedValue([]);
   mocks.branchDeliveryState.mockResolvedValue([]);
@@ -402,7 +413,7 @@ describe('BranchConsole', () => {
     expect(within(sheet).getByText(/75\.00/)).toBeTruthy();
   });
 
-  it('closes the WHOLE tiered item from the sheet, since per-tier closure does not exist yet', async () => {
+  it('closes the WHOLE tiered item from the sheet', async () => {
     render(<BranchConsole branchId="b1" i18n={i18n} />);
     fireEvent.click(await screen.findByTestId('tile-p3'));
     fireEvent.click(await screen.findByRole('button', { name: /Close the whole item/i }));
@@ -455,5 +466,144 @@ describe('BranchConsole', () => {
     fireEvent.change(box, { target: { value: 'cola' } });
     await waitFor(() => expect(screen.queryByText('Spicy Fries')).toBeNull());
     expect(screen.getByText('Cola')).toBeTruthy();
+  });
+});
+
+/**
+ * PER-SIZE CLOSING, AND THE TEST THAT USED TO PIN ITS ABSENCE.
+ *
+ * This suite previously carried `closes the WHOLE tiered item from the sheet,
+ * since per-tier closure does not exist yet`. That clause was true when it was
+ * written and is not now: `20260923120000` added the table and the RPCs, and
+ * `20260924120000` made both money-path functions refuse a closed tier. A test
+ * asserting a deliberate limitation quietly becomes the limitation once the
+ * limitation is lifted — the lesson #332 recorded, where a test pinning the
+ * alert-dispatch control to "disabled" outlived the dispatcher that made it
+ * available. So the clause is gone from the name, and BOTH states of the switch
+ * are asserted here instead.
+ */
+describe('BranchConsole — per-size closing', () => {
+  it('offers NO per-size buttons while the switch is off', async () => {
+    // The shipped state. `variantClosingEnabled` resolves false by default in
+    // this suite, which is what an unapplied migration also produces.
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('tile-p3'));
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).queryByTestId('size-v1')).toBeNull();
+    expect(within(sheet).queryByTestId('size-v2')).toBeNull();
+    // And it says why, rather than leaving a cashier hunting for a control.
+    expect(within(sheet).getByText(/not available yet/i)).toBeTruthy();
+  });
+
+  it('closes ONE size when the switch is on', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('tile-p3'));
+    fireEvent.click(await screen.findByTestId('size-v2'));
+    // The dialog names the ITEM as well as the size: "Large" alone does not
+    // tell a cashier what they are taking off the menu.
+    expect(await screen.findByText(/Family Meal — Large/)).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm closure/i }));
+    await waitFor(() => expect(mocks.snoozeVariant).toHaveBeenCalledWith({
+      branchId: 'b1', variantId: 'v2', minutes: 30, reasonCode: 'out_of_stock', note: '',
+    }));
+    // The product itself is untouched — that is the whole point of the feature.
+    expect(mocks.snoozeProduct).not.toHaveBeenCalled();
+  });
+
+  it('reopens one size without a dialog, like reopening an option', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: 'out_of_stock' },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('tile-p3'));
+    fireEvent.click(await screen.findByTestId('size-v2'));
+    await waitFor(() => expect(mocks.reopenVariant).toHaveBeenCalledWith('b1', 'v2'));
+  });
+
+  it('lists a closed size with its item and a reopen, like the closed-options card', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const card = await screen.findByTestId('closed-size-v1');
+    expect(within(card).getByText('Regular')).toBeTruthy();
+    expect(within(card).getByText('Family Meal')).toBeTruthy();
+    fireEvent.click(within(card).getByRole('button', { name: /Reopen/i }));
+    await waitFor(() => expect(mocks.reopenVariant).toHaveBeenCalledWith('b1', 'v1'));
+  });
+
+  it('closed sizes are IGNORED EVERYWHERE while the switch is off', async () => {
+    // Belt and braces against a stale row: with the controls off, no closed
+    // tier should be able to exist — and if one does, it must not grey out a
+    // size the customer app is still selling.
+    //
+    // EVERY size is closed here on purpose. An earlier version of this case
+    // closed one, which left the tile rule untouched and let a mutation that
+    // dropped the gate on `closedTierIds` survive: the closed-sizes CARD is
+    // gated separately, so its absence proved only half of this.
+    mocks.variantClosingEnabled.mockResolvedValue(false);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const tile = await screen.findByTestId('tile-p3');
+    expect(screen.queryByTestId('closed-size-v1')).toBeNull();
+    expect(within(tile).queryByText(/Partly closed/i)).toBeNull();
+    // ...and nothing inside the sheet either.
+    fireEvent.click(tile);
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).queryByText(/a customer cannot order this item/i)).toBeNull();
+    expect(within(sheet).queryByText('Closed')).toBeNull();
+  });
+
+  it('marks the tile PARTLY CLOSED when every size is closed', async () => {
+    // A customer cannot order the item at all — place_order refuses it — while
+    // its own availability row still says it is on sale. The counter must not
+    // say yes to something checkout says no to.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const tile = await screen.findByTestId('tile-p3');
+    expect(within(tile).getByText(/Partly closed/i)).toBeTruthy();
+  });
+
+  it('does NOT mark the tile when only ONE size is closed', async () => {
+    // Closing one size leaves the item sellable. Marking it here would train a
+    // cashier to ignore the badge.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const tile = await screen.findByTestId('tile-p3');
+    expect(within(tile).queryByText(/Partly closed/i)).toBeNull();
+  });
+
+  it('warns on the sheet when every size is closed', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('tile-p3'));
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByText(/a customer cannot order this item/i)).toBeTruthy();
+  });
+
+  it('an UNTIERED product is never marked partly closed by this rule', async () => {
+    // `every` on an empty list is true; without the length guard the untiered
+    // majority of the menu would be flagged unorderable.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const tile = await screen.findByTestId('tile-p2');
+    expect(within(tile).queryByText(/Partly closed/i)).toBeNull();
   });
 });

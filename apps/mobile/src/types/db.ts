@@ -92,6 +92,18 @@ export interface DbProductVariant {
 export interface DbProductModifierGroup { product_id: string; group_id: string; sort_order: number; }
 export interface DbBranchAvailability { branch_id: string; product_id: string; is_available: boolean; }
 export interface DbBranchModifierAvailability { branch_id: string; modifier_id: string; is_available: boolean; }
+/**
+ * Per-branch PRICE TIER availability (20260923120000). Exceptions only, exactly
+ * as for products and options: an absent row means the tier is on sale.
+ *
+ * `snoozed_until` is carried because a LAPSED timer is not a closure — the
+ * server applies that rule in `place_order` and the sweeper reopens on its own
+ * tick, so a client that ignored it would refuse a size that is already back.
+ */
+export interface DbBranchVariantAvailability {
+  branch_id: string; variant_id: string; is_available: boolean;
+  snoozed_until?: string | null;
+}
 export interface DbAppSettings {
   id: boolean; brand_name_en: string; brand_name_ar: string;
   primary_color: string; secondary_color: string; currency: string;

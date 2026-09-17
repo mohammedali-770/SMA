@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { blockingGroups, productOrderable, requiredCount } from './orderability';
+import { allTiersClosed, blockingGroups, productOrderable, requiredCount } from './orderability';
 import type { Modifier, ModifierGroup } from '../types/models';
 
 function mod(id: string): Modifier {
@@ -102,5 +102,76 @@ describe('productOrderable', () => {
       groups: [group({ isRequired: false })],
       isModifierAvailable: closed('m1', 'm2'),
     })).toBe(true);
+  });
+});
+
+const tier = (id: string) => ({ id });
+
+describe('allTiersClosed', () => {
+  it('a product with NO tiers is never blocked by this rule', () => {
+    // The vacuous-truth trap: `[].every(...)` is true, so a bare `every` would
+    // declare every untiered product — most of the live menu — unorderable.
+    expect(allTiersClosed([], () => false)).toBe(false);
+  });
+
+  it('one size still on sale keeps the item orderable', () => {
+    expect(allTiersClosed([tier('v1'), tier('v2')], (id) => id === 'v2')).toBe(false);
+  });
+
+  it('every size closed closes the item', () => {
+    expect(allTiersClosed([tier('v1'), tier('v2')], () => false)).toBe(true);
+  });
+
+  it('a single closed tier closes the item — there is no other size to fall back to', () => {
+    // The case with no picker on screen: one tier, closed. place_order refuses
+    // the line, so the menu has to say so or the customer meets the refusal at
+    // the payment step.
+    expect(allTiersClosed([tier('v1')], () => false)).toBe(true);
+  });
+});
+
+describe('productOrderable — the SIZE axis', () => {
+  const openGroups = { groups: [group()], isModifierAvailable: allOpen };
+
+  it('an open product whose every size is closed is NOT orderable', () => {
+    expect(productOrderable({
+      productAvailable: true, ...openGroups,
+      variants: [tier('v1'), tier('v2')], isVariantAvailable: () => false,
+    })).toBe(false);
+  });
+
+  it('one open size is enough', () => {
+    expect(productOrderable({
+      productAvailable: true, ...openGroups,
+      variants: [tier('v1'), tier('v2')], isVariantAvailable: (id) => id === 'v1',
+    })).toBe(true);
+  });
+
+  it('OMITTING the size axis preserves the previous answer', () => {
+    // A caller that knows nothing about tiers must keep deciding exactly as it
+    // did before the axis existed — omitted means "no size is closed".
+    expect(productOrderable({ productAvailable: true, ...openGroups })).toBe(true);
+  });
+
+  it('passing variants without a lookup is also inert', () => {
+    // Half the pair is not enough to start blocking; both or neither.
+    expect(productOrderable({
+      productAvailable: true, ...openGroups, variants: [tier('v1')],
+    })).toBe(true);
+  });
+
+  it('the product axis still wins: a closed product with open sizes is closed', () => {
+    expect(productOrderable({
+      productAvailable: false, ...openGroups,
+      variants: [tier('v1')], isVariantAvailable: allOpen,
+    })).toBe(false);
+  });
+
+  it('the option axis is unaffected by an open size', () => {
+    expect(productOrderable({
+      productAvailable: true,
+      groups: [group({ isRequired: true })], isModifierAvailable: closed('m1', 'm2'),
+      variants: [tier('v1')], isVariantAvailable: allOpen,
+    })).toBe(false);
   });
 });

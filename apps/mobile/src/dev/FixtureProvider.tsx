@@ -141,6 +141,7 @@ function FixtureProviderInner({
         selectBranch: noop,
         isAvailable: () => true,
         isModifierAvailable: () => true,
+        isVariantAvailable: () => true,
         isOrderable: () => true,
         // The menu and checkout screens call this on focus / before paying. The
         // cast below hides a missing key, so anything the real screens invoke

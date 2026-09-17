@@ -13,7 +13,8 @@ import { catalog } from '../services/api';
 import { failureMessage } from '../lib/errors/reportFailure';
 import { useI18n } from '../i18n/I18nProvider';
 import {
-  buildAvailabilityMatrix, buildModifierAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory,
+  buildAvailabilityMatrix, buildModifierAvailabilityMatrix, buildVariantAvailabilityMatrix,
+  mapBranch, mapBrandSettings, mapCategory,
   mapDeliveryZone, mapLoyaltySettings,
   mapModifierGroup, mapPaymentMethodSettings, mapProduct, mapSupportSettings,
 } from '../lib/mappers';
@@ -31,14 +32,21 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
 export type AvailabilityMatrix = { [productId: string]: { [branchId: string]: boolean } };
 
 /**
- * Both availability axes as of one fetch. Products and options are closed
- * independently, and a caller that acts on freshness (the checkout pre-check)
- * has to see them together or it will clear a cart line for the wrong reason.
+ * All THREE availability axes as of one fetch. Products, sizes and options are
+ * closed independently, and a caller that acts on freshness (the checkout
+ * pre-check) has to see them together or it will clear a cart line for the wrong
+ * reason.
  */
 export interface AvailabilitySnapshot {
   products: AvailabilityMatrix;
   /** modifierId -> branchId -> available. Same exception-only semantics. */
   modifiers: AvailabilityMatrix;
+  /**
+   * variantId -> branchId -> available. Exceptions only and NOT seeded, so it
+   * holds closed tiers alone; `availabilityLookup`'s `?? true` supplies the
+   * rest. Lapsed restore timers are already resolved to "open" by the builder.
+   */
+  variants: AvailabilityMatrix;
 }
 
 export interface CatalogValue {
@@ -83,6 +91,15 @@ export interface CatalogValue {
   /** One OPTION's availability at a branch. Absent row means on sale. */
   isModifierAvailable: (modifierId: string, branchId: string) => boolean;
   /**
+   * One PRICE TIER's availability at a branch. Absent row means on sale, and a
+   * closure whose restore time has passed already counts as absent.
+   *
+   * A product with no tiers has nothing to ask about; a cart line naming no tier
+   * is resolved server-side to the cheapest ACTIVE one, which `place_order`
+   * checks itself.
+   */
+  isVariantAvailable: (variantId: string, branchId: string) => boolean;
+  /**
    * `isAvailable` AND every required option group still satisfiable. This is
    * what the menu and the product screen ask; `isAvailable` alone answers only
    * "is the item itself closed", which is no longer the whole question.
@@ -114,6 +131,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [availability, setAvailability] = useState<AvailabilityMatrix>({});
   const [modifierAvailability, setModifierAvailability] = useState<AvailabilityMatrix>({});
+  const [variantAvailability, setVariantAvailability] = useState<AvailabilityMatrix>({});
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
@@ -151,6 +169,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setAvailability(buildAvailabilityMatrix(raw.products, raw.branches, raw.availability));
         setModifierAvailability(
           buildModifierAvailabilityMatrix(raw.modifiers, raw.branches, raw.modifierAvailability));
+        setVariantAvailability(buildVariantAvailabilityMatrix(raw.variantAvailability));
         setBrand(mapBrandSettings(raw.settings));
         setLoyalty(mapLoyaltySettings(raw.settings));
         setPayment(mapPaymentMethodSettings(raw.settings));
@@ -184,16 +203,22 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       // the delivery flow is offered at all (CheckoutScreen) and which branches
       // are eligible (geo.deliveryEligibleBranches). Without this the customer
       // kept the delivery option until place_order refused the order at the end.
-      const [rows, modRows, freshBranches] = await Promise.all([
-        catalog.availability(), catalog.modifierAvailability(), catalog.branches(),
+      const [rows, modRows, varRows, freshBranches] = await Promise.all([
+        catalog.availability(), catalog.modifierAvailability(), catalog.variantAvailability(),
+        catalog.branches(),
       ]);
       const next: AvailabilitySnapshot = {
         products: buildAvailabilityMatrix(seed.products, seed.branches, rows),
         modifiers: buildModifierAvailabilityMatrix(seed.modifiers, seed.branches, modRows),
+        // No seed list needed — the builder emits closed tiers only. That is
+        // also why a size closed on a product the catalog has not loaded still
+        // lands here correctly rather than being dropped for want of an id.
+        variants: buildVariantAvailabilityMatrix(varRows),
       };
       if (mounted.current) {
         setAvailability(next.products);
         setModifierAvailability(next.modifiers);
+        setVariantAvailability(next.variants);
         // Replaced wholesale rather than merged: this is the same read and the
         // same mapper the initial load uses, so it cannot drift from it.
         setBranches(freshBranches.map(mapBranch));
@@ -238,6 +263,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     [modifierAvailability],
   );
 
+  const isVariantAvailable = useCallback(
+    (variantId: string, branchId: string) => variantAvailability[variantId]?.[branchId] ?? true,
+    [variantAvailability],
+  );
+
   const isOrderable = useCallback(
     (productId: string, branchId: string) => {
       const product = products.find((p) => p.id === productId);
@@ -246,9 +276,14 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         productAvailable: isAvailable(productId, branchId),
         groups: groupsForProduct(product),
         isModifierAvailable: (mid) => isModifierAvailable(mid, branchId),
+        // Without this the menu card would offer "Add" on an item whose every
+        // size is closed, and the product screen one tap later would say it is
+        // out of stock. They read the same rule now.
+        variants: product.variants,
+        isVariantAvailable: (vid) => isVariantAvailable(vid, branchId),
       });
     },
-    [products, groupsForProduct, isAvailable, isModifierAvailable],
+    [products, groupsForProduct, isAvailable, isModifierAvailable, isVariantAvailable],
   );
 
   // "Open" == the branch is active. There is no opening-hours schema yet, and
@@ -259,11 +294,12 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     loading, error, reload, refreshAvailability,
     branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch,
-    getProduct, groupsForProduct, isAvailable, isModifierAvailable, isOrderable, branchIsOpen,
+    getProduct, groupsForProduct, isAvailable, isModifierAvailable, isVariantAvailable, isOrderable,
+    branchIsOpen,
   }), [
     loading, error, reload, refreshAvailability, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable,
-    isModifierAvailable, isOrderable, branchIsOpen,
+    isModifierAvailable, isVariantAvailable, isOrderable, branchIsOpen,
   ]);
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

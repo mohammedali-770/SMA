@@ -5,7 +5,7 @@
  */
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone,
-  DbBranchModifierAvailability, DbCategory,
+  DbBranchModifierAvailability, DbBranchVariantAvailability, DbCategory,
   DbCustomerOrderWithItems, DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup,
   DbOrderItem, DbOrderItemModifier,
   DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile,
@@ -175,6 +175,40 @@ export function buildModifierAvailabilityMatrix(
   return buildMatrix(modifiers, branches, rows.map((r) => ({
     id: r.modifier_id, branch_id: r.branch_id, is_available: r.is_available,
   })));
+}
+
+/**
+ * The same again, for one PRICE TIER at a branch (20260923120000).
+ *
+ * TWO THINGS MAKE IT DIFFERENT FROM THE OTHER TWO, and both are deliberate.
+ *
+ * It is NOT seeded. The other two builders fill every entity x branch pair with
+ * `true` before applying exceptions; every reader then defaults an absent entry
+ * to `true` anyway, so the seed changes no answer. Skipping it here means the
+ * provider does not have to carry a variant id list in `matrixSeed` purely to
+ * rebuild this — one fewer list to keep in step with the catalog.
+ *
+ * It applies LAZY EXPIRY. A closure may carry a restore time, and the sweeper
+ * reopens it on its own tick — so between the timer running out and that tick
+ * the row still reads `is_available = false` while the size is genuinely back on
+ * sale. `place_order` treats such a row as OPEN
+ * (`snoozed_until is null or snoozed_until > now()`), so this must too, or the
+ * app would refuse a customer an item the server would sell them.
+ *
+ * `now` is injected so the clock is never a source of test flake.
+ */
+export function buildVariantAvailabilityMatrix(
+  rows: DbBranchVariantAvailability[], now: number = Date.now(),
+): { [variantId: string]: { [branchId: string]: boolean } } {
+  const matrix: { [variantId: string]: { [branchId: string]: boolean } } = {};
+  for (const r of rows) {
+    if (r.is_available) continue;
+    const until = r.snoozed_until ?? null;
+    if (until !== null && Date.parse(until) <= now) continue;   // timer ran out: open
+    if (!matrix[r.variant_id]) matrix[r.variant_id] = {};
+    matrix[r.variant_id][r.branch_id] = false;
+  }
+  return matrix;
 }
 
 function buildMatrix(

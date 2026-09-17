@@ -114,9 +114,25 @@ asleep or the tab has been in the background.
 
 **The item sheet: sizes and options.** Tapping a tiered item — most of the menu —
 opens a sheet listing every size with its price, so you can see what you are
-about to take off sale. Closing a *single size* is not possible yet; the sheet
-says so, and the button at the bottom closes the whole item, which is what the
-old screen did.
+about to take off sale. The button at the bottom closes the whole item.
+
+**One size, not the whole item.** When the large is out and the regular is not,
+close the size. Each size in the sheet carries its own **Close** button, and it
+works exactly like closing an item: a duration, a reason, an automatic reopen.
+The item stays on the menu and customers can still order every other size.
+
+If **every** size is closed the item cannot be ordered at all — the app shows it
+as out of stock and the server refuses it — so closing the last open size is the
+same decision as closing the item. The sheet says so, and the tile is marked
+**Partly closed** so the counter never reads as open for something checkout will
+refuse. Closed sizes are listed below the grid with their own countdowns and a
+one-tap Reopen, the same as closed items and closed options.
+
+> **If you cannot see a Close button next to a size**, per-size closing is not
+> switched on yet for this restaurant and the sheet says so. Close the whole
+> item instead — that is what the old screen did. The control is turned on once
+> every customer's app is a version that understands a closed size; until then,
+> closing one would show a customer an unhelpful error at the payment step.
 
 **One option, not the whole item.** If only a choice is out — one sauce, one
 add-on — close that option instead of the product. The item stays on the menu
@@ -281,10 +297,24 @@ out of the delivery list.
 الموقوفة تظهر في أعلى الشاشة مع العدّاد وزر «إتاحة» بضغطة واحدة. الفرع مثبّت على
 الفرع المرتبط بحسابك، فلا يوجد فرع خاطئ يمكن اختياره.
 
-**خيار واحد وليس الصنف كله.** إذا نفد خيار واحد فقط — صلصة أو حجم أو إضافة —
-أوقف ذلك الخيار بدلاً من الصنف. يبقى الصنف في المنيو ويستطيع العميل طلبه بأي
-خيار آخر في نفس المجموعة. إيقاف الخيار يعمل تماماً مثل إيقاف الصنف: مدة وسبب
-وعودة تلقائية. لعرض الخيارات اضغط **«عرض الخيارات»** على الصنف.
+**حجم واحد وليس الصنف كله.** إذا نفد الحجم الكبير وبقي العادي، أوقف الحجم وحده.
+كل حجم في القائمة له زر **«إيقاف»** خاص به، ويعمل تماماً مثل إيقاف الصنف: مدة
+وسبب وعودة تلقائية. يبقى الصنف في المنيو ويستطيع العميل طلب باقي الأحجام.
+
+إذا أوقفت **كل** الأحجام يصبح الصنف غير قابل للطلب: يظهر للعميل «غير متوفر
+حالياً» والخادم يرفض الطلب. لذلك إيقاف آخر حجم متاح هو نفسه قرار إيقاف الصنف —
+والشاشة تنبّهك، ويُوسم الصنف بـ **«موقوف جزئياً»**. الأحجام الموقوفة تظهر أسفل
+الشبكة مع عدّادها وزر «إتاحة» بضغطة واحدة.
+
+> **إذا لم تجد زر «إيقاف» بجانب الحجم** فإن إيقاف حجم بمفرده غير مفعّل بعد في
+> هذا المطعم، والشاشة تذكر ذلك. أوقف الصنف بالكامل بدلاً من ذلك. يُفعَّل الزر بعد
+> أن يصبح تطبيق كل العملاء بإصدار يفهم الحجم الموقوف؛ قبل ذلك سيظهر للعميل خطأ
+> غير مفهوم عند الدفع.
+
+**خيار واحد وليس الصنف كله.** إذا نفد خيار واحد فقط — صلصة أو إضافة — أوقف ذلك
+الخيار بدلاً من الصنف. يبقى الصنف في المنيو ويستطيع العميل طلبه بأي خيار آخر في
+نفس المجموعة. إيقاف الخيار يعمل تماماً مثل إيقاف الصنف: مدة وسبب وعودة تلقائية.
+لعرض الخيارات اضغط على الصنف ثم اختر الخيار من نفس القائمة.
 
 إذا أوقفت **كل** خيارات مجموعة **إلزامية**، يصبح الصنف غير قابل للطلب: يظهر
 للعميل «غير متوفر حالياً» ولا يمكن الضغط عليه، والخادم يرفض الطلب. لذلك إيقاف
