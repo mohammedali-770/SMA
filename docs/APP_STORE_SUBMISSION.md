@@ -33,6 +33,23 @@ when-in-use and motion, with no `UIBackgroundModes`. Build 24 is uploaded.
 **What remains is entirely App Store Connect console work** (§8), none of which
 needs another build.
 
+**"Needs another build" means NOTHING KNOWN NEEDS ONE — it is not a promise that
+App Review will not force one**, and the distinction is worth keeping because
+this line is the one a reader acts on. Build 24 is confirmed processed by USE
+(the table above, and §8), which is stronger evidence than a console status
+read: TestFlight does not make a build installable until processing succeeds.
+So processing cannot retroactively invalidate it, and no *console* step in §8
+requires a binary.
+
+**The known exception is guideline 4.5.4.** Apple expects an explicit in-app
+opt-in before marketing push; here the opt-out toggle is the consent surface, a
+deliberate decision the owner accepted on 2026-08-20 (CLAUDE.md §7). If App
+Review rejects on it, the fix is one line — `promosEnabled: false` in
+`DEFAULT_DEVICE_PREFS` — but a one-line fix still ships as a **new build with a
+higher number**, because build numbers are unique per version train (§3a). That
+is a review risk, not a processing risk, and it is the only one currently
+identified.
+
 ---
 
 ## 2. Build 23 was current *until this record was written*, which is why this matters
