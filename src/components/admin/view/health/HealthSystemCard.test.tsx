@@ -62,16 +62,17 @@ describe('branch_availability health card', () => {
       expect(node, `${label} is missing from the card`).toBeTruthy();
       // The metric's value sits beside its label; assert the pair, so a metric
       // wired to the wrong payload key fails here rather than reading plausibly.
-      expect(node.parentElement?.textContent, `${label} is bound to the wrong key`)
-        .toContain(value);
+      expect(node.parentElement?.textContent, `${label} is bound to the wrong key`).toContain(value);
     }
   });
 
   it('a closed SIZE is visible — the exact case that read as "nothing closed"', () => {
-    render(<HealthSystemCard
-      system={system({ ...FULL, closed_products: 0, closed_options: 0, closed_sizes: 6 })}
-      lang="en"
-    />);
+    render(
+      <HealthSystemCard
+        system={system({ ...FULL, closed_products: 0, closed_options: 0, closed_sizes: 6 })}
+        lang="en"
+      />,
+    );
     expect(screen.getByText('Closed sizes').parentElement?.textContent).toContain('6');
   });
 
