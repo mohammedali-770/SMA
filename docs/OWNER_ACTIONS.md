@@ -2875,27 +2875,35 @@ somebody editing these documents will actually look:
 
 Four migrations make it possible for a branch to close **one price tier** —
 "Large is out, Regular is not" — instead of taking the whole item off the menu.
-Three are server work and are already written; the fourth is the switch that
-decides when cashiers see the buttons.
+Three are server work; the fourth is the switch that decides when cashiers see
+the buttons.
 
-### 40.1 Apply the four migrations, in order, each named by version
+**All four are APPLIED as of 2026-09-17, so 40.1 is DONE and nothing is asked of
+you there.** The two steps still outstanding are **40.2** (the EAS build) and
+then **40.3** (the switch), in that order.
 
-Each is its own §5 action and each refuses to land out of order. Full record:
-`docs/MIGRATIONS.md` §44, §45, §46, §47.
+### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
-| order | file | what applying it does |
-| --- | --- | --- |
-| 1 | `20260923120000_branch_variant_availability` | creates the table, the two RPCs and the sweeper arm. Closes nothing. |
-| 2 | `20260924120000_place_order_variant_availability` | **MONEY PATH** — both order functions refuse a closed tier. Their hashes move; that is the intended effect. |
-| 3 | `20260925120000_health_card_variant_coverage` | the health card and the overdue-restore alert learn the new table exists. |
-| 4 | `20260926120000_variant_closing_flag` | adds `app_settings.variant_closing_enabled`, **defaulting FALSE**. Changes nothing. |
+Each was its own §5 action, applied on explicit approval in dependency order,
+**one call per file, each verified before the next was sent**. Full record:
+`docs/MIGRATIONS.md` §48, and ledger rows 97-100.
 
-**Applying all four still closes no size and changes nothing a customer sees.**
-The table is created empty; nobody can write to it until step 40.3.
+| order | file | live version | what applying it did |
+| --- | --- | --- | --- |
+| 1 | `20260923120000_branch_variant_availability` | `20260917122329` | created the table, the two RPCs and the sweeper arm. Closed nothing — the table is still **empty**. |
+| 2 | `20260924120000_place_order_variant_availability` | `20260917123545` | **MONEY PATH** — both order functions now refuse a closed tier. Their hashes moved, which was the intended effect; the new pair is `12b6816d…` / `22e2d429…`. |
+| 3 | `20260925120000_health_card_variant_coverage` | `20260917124256` | the health card and the overdue-restore alert now know the new table exists. Called live afterwards: `branch_availability` reads `healthy`. |
+| 4 | `20260926120000_variant_closing_flag` | `20260917124937` | added `app_settings.variant_closing_enabled`, **defaulting FALSE**. The live value was read back as `false`. |
 
-### 40.2 Ship an EAS build carrying the customer half — BEFORE step 40.3
+**Applying all four closed no size and changed nothing a customer sees, and that
+was measured rather than assumed:** `branch_variant_availability` holds 0 rows,
+`variant_closing_enabled` is false, and orders are unchanged at 76. Nobody can
+write a closure until step 40.3.
 
-This is the ordering that matters, and it is not a nicety.
+### 40.2 Ship an EAS build carrying the customer half — BEFORE step 40.3 — OUTSTANDING
+
+This is the ordering that matters, and it is not a nicety. **It is now the next
+action in this section**, since 40.1 is done.
 
 The customer app in the store today does not know a size can be closed. A closed
 tier passes every client-side check, including the pre-submit re-read that exists
@@ -2906,7 +2914,10 @@ The build carrying the customer half greys out a closed size, blocks the item
 when every size is closed, and names the reason. Until that build is live with
 customers, per-size closing must stay switched off.
 
-### 40.3 Turn the switch on — after 40.1 and 40.2, and not before
+### 40.3 Turn the switch on — after 40.1 and 40.2, and not before — OUTSTANDING
+
+**40.1 is done; this step is still gated on 40.2.** The column exists and reads
+`false`; applying the migration deliberately did not flip it.
 
 ```
 update public.app_settings set variant_closing_enabled = true where id is true;
