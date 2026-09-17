@@ -5865,6 +5865,35 @@ The block also applies both corrections mutation testing found on
 `20260924120000`: cardinality is checked **before** any body is read, and every
 assertion that names a token names a **statement**.
 
+### The same blindness happened one layer up, and review caught it
+
+**A counter added to the snapshot and not added to the CARD is invisible, and
+silently so.** This migration put `closed_sizes` in the payload;
+`src/components/admin/view/health/HealthSystemCard.tsx` still rendered only
+`closed_products`, `closed_options` and `overdue_restores`. Nothing failed —
+`numberValue` returns 0 for a key it cannot find, so the card did not show a gap,
+it showed a confident **zero**. A branch with a size closed read *"Closed items
+0 / Closed options 0"*: the card stating nothing is closed while something is.
+
+**That is this file's own defect, repeated one layer up.** The snapshot
+enumerated availability TABLES by name and went blind to a new one; the card
+enumerates METRICS by name and went blind to a new one. Writing the migration
+did not make its author check the consumer — which is the whole shape of the
+`20260827130000_watchdog_delivery_coverage` lesson, and it recurred inside the
+change that cites it.
+
+Found by review on #394. Fixed with the metric, the card's own description
+string (which still said "item, option and delivery" while
+`docs/OPERATIONS_HEALTH_CENTER.md` had already been corrected to name sizes),
+and **`HealthSystemCard.test.tsx`, which pins the whole set** so the next counter
+cannot be dropped in silence. The test asserts label *and value*: a label-only
+assertion passes against a metric bound to the wrong key, which was verified by
+mutation — binding `closed_sizes` to `closed_options` fails with
+*"expected 'Closed sizes5' to contain '7'"*, and deleting the metric outright
+fails three of its four cases.
+
+**When a migration adds a field to a payload, grep for the payload's consumers.**
+
 ### Validation
 
 - Local chain harness: **139 migrations applied, 78 suites run, 76 passed, 2
