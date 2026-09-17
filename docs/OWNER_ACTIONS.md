@@ -2871,6 +2871,85 @@ somebody editing these documents will actually look:
 
 ---
 
+## 40. Per-size closing — the apply order, the switch, and an Arabic read
+
+Four migrations make it possible for a branch to close **one price tier** —
+"Large is out, Regular is not" — instead of taking the whole item off the menu.
+Three are server work and are already written; the fourth is the switch that
+decides when cashiers see the buttons.
+
+### 40.1 Apply the four migrations, in order, each named by version
+
+Each is its own §5 action and each refuses to land out of order. Full record:
+`docs/MIGRATIONS.md` §44, §45, §46, §47.
+
+| order | file | what applying it does |
+| --- | --- | --- |
+| 1 | `20260923120000_branch_variant_availability` | creates the table, the two RPCs and the sweeper arm. Closes nothing. |
+| 2 | `20260924120000_place_order_variant_availability` | **MONEY PATH** — both order functions refuse a closed tier. Their hashes move; that is the intended effect. |
+| 3 | `20260925120000_health_card_variant_coverage` | the health card and the overdue-restore alert learn the new table exists. |
+| 4 | `20260926120000_variant_closing_flag` | adds `app_settings.variant_closing_enabled`, **defaulting FALSE**. Changes nothing. |
+
+**Applying all four still closes no size and changes nothing a customer sees.**
+The table is created empty; nobody can write to it until step 40.3.
+
+### 40.2 Ship an EAS build carrying the customer half — BEFORE step 40.3
+
+This is the ordering that matters, and it is not a nicety.
+
+The customer app in the store today does not know a size can be closed. A closed
+tier passes every client-side check, including the pre-submit re-read that exists
+so a customer never meets a raw server refusal; `place_order` then refuses, and
+the app shows a **generic error at the payment step** on a cart that looked fine.
+
+The build carrying the customer half greys out a closed size, blocks the item
+when every size is closed, and names the reason. Until that build is live with
+customers, per-size closing must stay switched off.
+
+### 40.3 Turn the switch on — after 40.1 and 40.2, and not before
+
+```
+update public.app_settings set variant_closing_enabled = true where id is true;
+```
+
+or the equivalent in the admin settings surface. This is the step that puts a
+**Close** button beside each size in the branch console. It is reversible: set it
+back to false and the Close buttons disappear again.
+
+**Server-side enforcement does not depend on it.** The flag hides a control; it
+does not soften the rule. A tier closed while the flag was on stays refused by
+`place_order`, and stays greyed out in the customer app, after the flag is
+switched off.
+
+**Switching it back off is therefore safe, and you do not have to reopen
+anything first.** The gate is on CREATING a closure and nothing else: an
+existing closed size keeps its `Closed` pill, keeps counting toward the "every
+size closed" warning and the tile's **Partly closed** badge, keeps its row in the
+closed-sizes card, and keeps its **Reopen** button. An earlier draft of this
+section told you to reopen everything before switching off, which was
+documentation compensating for a UI defect — review caught it on #395, and the
+console was fixed instead.
+
+### 40.4 A native Arabic read — engineering-drafted copy, not reviewed
+
+Five new Arabic strings reached the branch console and the staff manual without a
+native speaker reading them. They are stated here rather than assumed adequate,
+the same way `docs/OWNER_ACTIONS.md` §26 records the delivery `ready` push copy.
+
+| where | Arabic |
+| --- | --- |
+| console, closed-sizes card heading | «الأحجام الموقوفة» |
+| console, close dialog title | «إيقاف الحجم مؤقتاً» |
+| console, close dialog hint | «سيعود الحجم تلقائياً عند انتهاء المدة.» |
+| console, sheet warning | «كل الأحجام موقوفة — لا يمكن للعميل طلب هذا الصنف.» |
+| customer app, blocked item | «جميع الأحجام غير متوفرة في هذا الفرع حالياً.» |
+
+`docs/STAFF_MANUAL.md` §4 also gained an Arabic paragraph describing the new
+buttons. None of this is customer-facing money copy, so it is not blocking — but
+it is the copy a cashier reads during a rush.
+
+---
+
 ---
 
 ## Owner-action closeout rule

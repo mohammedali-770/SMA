@@ -8,17 +8,22 @@ import {
   closedModifierIds,
   closedOptions,
   closedProductIds,
+  closedVariantIds,
+  closedVariants,
   formatRemaining,
   fromPrice,
   groupsForProduct,
   productBlockedByOptions,
+  productBlockedBySizes,
   reopenAllTargets,
   requiredCount,
   searchableGroups,
   tileHue,
 } from './branchConsole';
 import type { Category, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
-import type { BranchAvailabilityRow, BranchModifierAvailabilityRow } from '../../lib/opsApi';
+import type {
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, BranchVariantAvailabilityRow,
+} from '../../lib/opsApi';
 
 const product = (id: string, over: Partial<Product> = {}): Product => ({
   id,
@@ -392,5 +397,85 @@ describe('reopenAllTargets', () => {
       const shown = closedItems(cat, rows);
       expect(reopenAllTargets(shown)).toHaveLength(shown.length);
     }
+  });
+});
+
+const varRow = (
+  variantId: string, over: Partial<BranchVariantAvailabilityRow> = {},
+): BranchVariantAvailabilityRow => ({
+  variantId, isAvailable: false, snoozedUntil: null, reasonCode: null, ...over,
+});
+
+describe('closedVariantIds', () => {
+  it('lists only the closed tiers', () => {
+    const ids = closedVariantIds([varRow('v1'), varRow('v2', { isAvailable: true })]);
+    expect([...ids]).toEqual(['v1']);
+  });
+});
+
+describe('closedVariants', () => {
+  it('carries the owning PRODUCT, because "Large" alone names nothing', () => {
+    const p = product('p1', { variants: [variant('v1', 10)] });
+    const out = closedVariants([p], [varRow('v1')]);
+    expect(out).toHaveLength(1);
+    expect(out[0].variant.id).toBe('v1');
+    expect(out[0].product.id).toBe('p1');
+  });
+
+  it('sorts soonest-returning first and puts untimed closures last', () => {
+    const soon = new Date(Date.now() + 60_000).toISOString();
+    const later = new Date(Date.now() + 600_000).toISOString();
+    const p = product('p1', {
+      variants: [variant('v1', 10), variant('v2', 20), variant('v3', 30)],
+    });
+    const out = closedVariants([p], [
+      varRow('v1', { snoozedUntil: null }),
+      varRow('v2', { snoozedUntil: later }),
+      varRow('v3', { snoozedUntil: soon }),
+    ]);
+    expect(out.map((o) => o.variant.id)).toEqual(['v3', 'v2', 'v1']);
+  });
+
+  it('ignores rows for tiers this catalog no longer has', () => {
+    expect(closedVariants([product('p1')], [varRow('gone')])).toEqual([]);
+  });
+
+  it('ignores an INACTIVE tier — the sheet cannot show it and nobody can reopen it', () => {
+    // The Lazywait importer deactivates a tier it stops seeing rather than
+    // deleting it, so a stale closed row can outlive the size it names.
+    const p = product('p1', { variants: [variant('v1', 10, { isActive: false })] });
+    expect(closedVariants([p], [varRow('v1')])).toEqual([]);
+  });
+});
+
+describe('productBlockedBySizes', () => {
+  it('EVERY size closed blocks the product', () => {
+    const p = product('p1', { variants: [variant('v1', 10), variant('v2', 20)] });
+    expect(productBlockedBySizes(p, new Set(['v1', 'v2']))).toBe(true);
+  });
+
+  it('one size still open does not', () => {
+    const p = product('p1', { variants: [variant('v1', 10), variant('v2', 20)] });
+    expect(productBlockedBySizes(p, new Set(['v1']))).toBe(false);
+  });
+
+  it('a product with NO tiers is never blocked by this rule', () => {
+    // `every` on an empty list is true, so without the length guard the
+    // untiered majority of the menu would be marked unorderable.
+    expect(productBlockedBySizes(product('p1'), new Set(['v1']))).toBe(false);
+  });
+
+  it('an INACTIVE tier does not keep a product alive', () => {
+    // A retired size is not something a customer can order, so a product whose
+    // only ACTIVE tier is closed is blocked even though an inactive one is not.
+    const p = product('p1', {
+      variants: [variant('v1', 10), variant('v2', 20, { isActive: false })],
+    });
+    expect(productBlockedBySizes(p, new Set(['v1']))).toBe(true);
+  });
+
+  it('closing nothing blocks nothing', () => {
+    const p = product('p1', { variants: [variant('v1', 10)] });
+    expect(productBlockedBySizes(p, new Set())).toBe(false);
   });
 });

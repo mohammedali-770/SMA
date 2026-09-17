@@ -26,8 +26,8 @@ export const CloseItemDialog: React.FC<{
   productName: string;
   i18n: OpsLangValue;
   /** Overridden when the target is one OPTION rather than a whole product. */
-  titleKey?: 'closeTitle' | 'closeOptionTitle';
-  hintKey?: 'autoReopenHint' | 'optionAutoReopenHint';
+  titleKey?: 'closeTitle' | 'closeOptionTitle' | 'closeSizeTitle';
+  hintKey?: 'autoReopenHint' | 'optionAutoReopenHint' | 'sizeAutoReopenHint';
   busy: boolean;
   error: string | null;
   onCancel: () => void;

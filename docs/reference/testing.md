@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**186 TypeScript test files declaring 2866 test blocks, plus 78 SQL suites.**
+**189 TypeScript test files declaring 2939 test blocks, plus 78 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -123,7 +123,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-67 files, 949 declared test blocks.
+69 files, 990 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -137,7 +137,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 7 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
-| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 39 | classifyAddability |
+| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
@@ -153,7 +153,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 13 | shouldRequestFirstRunPermissions |
-| `apps/mobile/src/features/order/cartValidation.test.ts` | 15 | validateCartForBranch |
+| `apps/mobile/src/features/order/cartValidation.test.ts` | 21 | validateCartForBranch |
 | `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
@@ -181,12 +181,14 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
-| `apps/mobile/src/lib/orderability.test.ts` | 15 | requiredCount |
+| `apps/mobile/src/lib/orderability.test.ts` | 25 | requiredCount |
 | `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
 | `apps/mobile/src/lib/orderSelectGrantParity.test.ts` | 6 | customer order select ↔ database grant parity |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
+| `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
+| `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
@@ -197,7 +199,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-95 files, 1320 declared test blocks.
+96 files, 1352 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -233,8 +235,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
-| `src/components/ops/branchConsole.test.ts` | 46 | duration and reason vocabularies |
-| `src/components/ops/BranchConsole.test.tsx` | 28 | BranchConsole |
+| `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
+| `src/components/ops/BranchConsole.test.tsx` | 39 | BranchConsole |
 | `src/components/ops/branchReference.test.ts` | 20 | delivery request state |
 | `src/components/ops/BranchReferenceCard.test.tsx` | 9 | BranchReferenceCard |
 | `src/components/ops/callCentre.test.ts` | 56 | buildClosureSummaries |
@@ -285,6 +287,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/operationsHealthApi.test.ts` | 10 | pushFailureMetrics |
 | `src/lib/operationsHealthCapability.test.ts` | 12 | classifyOperationsHealthProbe |
 | `src/lib/opsApiResilience.test.ts` | 5 | opsApi.branchReference — missing-table resilience |
+| `src/lib/opsVariantClosing.test.ts` | 11 | branchVariantAvailability |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 17 | checkout payment availability |

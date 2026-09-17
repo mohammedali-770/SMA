@@ -10,7 +10,7 @@ import { Button } from '../../../design-system/ui/Button';
 import { Notice } from '../../../design-system/ui/Notice';
 import { Text } from '../../../design-system/ui/Text';
 import { StatusPill } from '../../../design-system/ui/StatusPill';
-import type { Modifier, ModifierGroup, Product } from '../../../types';
+import type { Modifier, ModifierGroup, Product, ProductVariant } from '../../../types';
 import { activeVariants } from '../branchConsole';
 import type { OpsLangValue } from '../useOpsLang';
 
@@ -22,13 +22,29 @@ import type { OpsLangValue } from '../useOpsLang';
  * modifier groups — was invisible on all but one item. A cashier closing
  * "وجبة عائلية دنر" could not see that it means nine different prices.
  *
- * WHAT IT CANNOT DO YET, SAID ON THE SHEET RATHER THAN DISCOVERED. Closing a
- * single TIER needs a `branch_variant_availability` table, a `set_variant_snooze`
- * RPC and a `place_order` that refuses a closed tier — none of which exist. The
- * per-tier buttons are therefore absent, not disabled: a disabled control that
- * never becomes enabled is a worse lie than an explanation. The footer closes
- * the whole product, which is exactly what the old row did, and the notice says
- * that is what will happen.
+ * PER-TIER CLOSING IS REAL NOW, AND IT IS BEHIND A SWITCH. The server half
+ * shipped in `20260923120000` (table + `set_variant_snooze`) and
+ * `20260924120000` (both money-path functions refuse a closed tier). This sheet
+ * is the operator half.
+ *
+ * `perSizeEnabled` comes from `app_settings.variant_closing_enabled`, and the
+ * reason it exists is a clock, not a doubt about the feature. This console
+ * deploys the moment the change merges; the customer app reaches a customer only
+ * in the next EAS build. A build that does not know the refusal shows a generic
+ * error at the payment step, because `failureMessage` returns a translated KEY
+ * rather than the server's sentence. While the switch is off the Close buttons
+ * are ABSENT — not disabled — and a notice explains what closing the item will
+ * do instead. A disabled control the cashier cannot enable is a worse lie than
+ * an explanation.
+ *
+ * IT GATES CLOSING ONLY, NEVER THE CLOSED STATE — a correction from review on
+ * #395. A tier closed while the switch was on stays refused by `place_order`
+ * and stays greyed out in the customer app after it is switched off again, so a
+ * console that hid the closure would be the one component lying about it, and
+ * would take away the only per-size Reopen there is. The switch also reads false
+ * when its own query fails, which must not be able to strand stock. So a closed
+ * tier always shows its pill, always counts toward "every size closed", and
+ * always keeps its Reopen.
  *
  * OPTION GROUPS ARE HERE TOO, AND THAT IS A CORRECTION RATHER THAN A FLOURISH.
  * The first draft of this redesign replaced the per-product "Show options"
@@ -57,29 +73,41 @@ export const VariantSheet: React.FC<{
   closed: boolean;
   optionGroups: ModifierGroup[];
   closedOptionIds: Set<string>;
+  closedVariantIds: Set<string>;
+  /** `app_settings.variant_closing_enabled` — see the note above. */
+  perSizeEnabled: boolean;
   i18n: OpsLangValue;
   busy?: boolean;
   onCloseWhole: () => void;
   onReopenWhole: () => void;
   onCloseOption: (m: Modifier) => void;
   onReopenOption: (m: Modifier) => void;
+  onCloseVariant: (v: ProductVariant) => void;
+  onReopenVariant: (v: ProductVariant) => void;
   onDismiss: () => void;
 }> = ({
   product,
   closed,
   optionGroups,
   closedOptionIds,
+  closedVariantIds,
+  perSizeEnabled,
   i18n,
   busy,
   onCloseWhole,
   onReopenWhole,
   onCloseOption,
   onReopenOption,
+  onCloseVariant,
+  onReopenVariant,
   onDismiss,
 }) => {
   const { t, isRTL } = i18n;
   const name = isRTL ? product.nameAr : product.nameEn;
   const tiers = activeVariants(product);
+  // Not gated on the switch: a closed tier is refused by `place_order` whatever
+  // the switch says, so the warning has to be true whenever the rows are.
+  const everySizeClosed = tiers.length > 0 && tiers.every((v) => closedVariantIds.has(v.id));
 
   return (
     <AdminModal
@@ -108,21 +136,62 @@ export const VariantSheet: React.FC<{
             {t('noResults')}
           </Text>
         ) : (
-          tiers.map((v) => (
-            <div
-              key={v.id}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
-            >
-              <Text variant="label" as="span">
-                {isRTL ? v.nameAr : v.nameEn}
-              </Text>
-              <Text variant="caption" tone="tertiary" as="span" numeric>
-                {`${v.price.toFixed(2)} ${t('currency')}`}
-              </Text>
-            </div>
-          ))
+          tiers.map((v) => {
+            const off = closedVariantIds.has(v.id);
+            return (
+              <div
+                key={v.id}
+                className={[
+                  'flex items-center justify-between gap-3 rounded-[var(--radius-ds-md)] border p-3',
+                  off ? 'border-danger-line bg-danger-tint' : 'border-con-line bg-con-surface',
+                ].join(' ')}
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Text variant="label" as="span">
+                    {isRTL ? v.nameAr : v.nameEn}
+                  </Text>
+                  {/* A STATE, not the verb — the same distinction the option
+                        rows below make, and for the same reason: the pill sits a
+                        thumb from a button performing the opposite action. */}
+                  {off ? <StatusPill label={t('stateClosed')} tone="danger" /> : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Text variant="caption" tone="tertiary" as="span" numeric>
+                    {`${v.price.toFixed(2)} ${t('currency')}`}
+                  </Text>
+                  {/* REOPEN IS ALWAYS OFFERED; only CLOSE is switched. A tier
+                        closed before the switch was turned off is still refused
+                        by the server, so taking away the control that undoes it
+                        would strand it with no way back from this console. */}
+                  {off || perSizeEnabled ? (
+                    <Button
+                      label={off ? t('reopen') : t('close')}
+                      data-testid={`size-${v.id}`}
+                      onClick={() => (off ? onReopenVariant(v) : onCloseVariant(v))}
+                      disabled={busy}
+                      variant="secondary"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
         )}
-        {tiers.length > 0 ? <Notice title={t('sizesPerSizeSoon')} tone="info" /> : null}
+        {/* Closing every size takes the item off the menu as surely as closing
+            the item does, and `place_order` refuses it — so say so here rather
+            than leaving the cashier to infer it from four red rows. */}
+        {everySizeClosed ? <Notice title={t('sizesAllClosed')} tone="warning" /> : null}
+        {/* Two different things to say when the switch is off, because a
+            cashier looking at a Reopen button needs to know why there is no
+            Close beside it. */}
+        {!perSizeEnabled && tiers.length > 0 ? (
+          <Notice
+            title={tiers.some((v) => closedVariantIds.has(v.id))
+              ? t('sizesPerSizeOffReopenOnly')
+              : t('sizesPerSizeSoon')}
+            tone="info"
+          />
+        ) : null}
 
         {optionGroups.map((g) => (
           <div key={g.id} className="flex flex-col gap-2 border-t border-con-line pt-3">

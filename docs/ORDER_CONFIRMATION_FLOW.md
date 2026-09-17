@@ -1497,14 +1497,14 @@ once per mount.
 
 Three things changed, all on the client, none of them a new rule:
 
-1. `CatalogProvider` re-reads branch availability — products **and** options — on
-   app foreground and on returning to the menu. Prices, categories and modifiers
-   still need a full `reload()`.
+1. `CatalogProvider` re-reads branch availability — products, **sizes** and
+   options — on app foreground and on returning to the menu. Prices, categories
+   and modifiers still need a full `reload()`.
 2. `CheckoutScreen.placeOrder` re-reads availability **before anything
    expensive** and names any line that has just sold out, including a line whose
-   chosen *option* was closed. A failed refresh returns null and the order
-   proceeds: the server stays the authority, and a flaky network must not block
-   a valid order.
+   chosen *option* or chosen *size* was closed. A failed refresh returns null and
+   the order proceeds: the server stays the authority, and a flaky network must
+   not block a valid order.
 3. Snoozed items stay on the menu rendered as out of stock rather than
    disappearing. A customer who cannot find yesterday's item assumes the app is
    broken; a greyed row with a reason is an answer.
@@ -1516,6 +1516,56 @@ finalize: re-checking an authorized online snapshot against mutable menu data
 could leave a charged customer without an order. The pre-check above runs before
 payment is initiated, which is the same side of that boundary as the guard
 inside `place_order`.
+
+### The third axis: a closed SIZE (2026-09-17)
+
+`branch_variant_availability` (`20260923120000`) lets a branch close one price
+tier and keep the others, and `20260924120000` made both money-path functions
+refuse a line naming a closed tier. The pre-check covers it on exactly the same
+terms as the other two axes, with two details worth stating because getting
+either wrong changes what a customer is told:
+
+- **A line naming NO tier is never refused here.** A cart line without a tier is
+  resolved server-side to the cheapest ACTIVE one, which `place_order` then
+  checks itself. Clearing such a line would refuse an order the server would
+  accept.
+- **A LAPSED restore timer is not a closure.** The sweeper reopens a timed
+  closure on its own tick, so between the timer running out and that tick the
+  row still reads `is_available = false` while the size is genuinely back.
+  `place_order` treats such a row as open
+  (`snoozed_until is null or snoozed_until > now()`) and the client applies the
+  identical rule, pinned by
+  `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts`, which reads the
+  predicate out of the migration rather than restating it.
+
+**The read itself is fail-soft, and deliberately the only catalog read that is.**
+`catalog.all()` is one `Promise.all` whose helper throws, so a failing read of
+`branch_variant_availability` would replace the menu with an error screen — which
+is what a build shipping ahead of the migration would have done to every
+customer. It returns `[]` instead, which is not a fallback but the correct
+answer: the table stores exceptions only, so no rows means no size is closed.
+
+When **every** size of a tiered item is closed the item is unorderable, so the
+menu card and the product screen show it as out of stock — the same treatment a
+fully closed *required* option group already receives, and the same rule the
+server enforces by construction.
+
+**Cart suggestions ask the same question.** The suggestion strip generated and
+re-checked its candidates with the product-only predicate, so a product whose
+every size was closed could still be suggested — and a single-tier one is a
+one-tap card, which adds the closed tier straight to the cart and leaves the
+customer to meet the refusal at checkout. It now asks `isOrderable`, which
+answers all three axes. Caught in review on #395; the same change closes an
+older hole of the same shape, where a product with a fully closed *required*
+option group could be suggested.
+
+**The operator controls are behind `app_settings.variant_closing_enabled`
+(`20260926120000`), which defaults FALSE.** The branch console deploys on merge
+while the customer app reaches a customer only in the next EAS build, and a build
+that does not know this refusal shows a generic error at the payment step —
+`failureMessage` returns a translated key, never the server's sentence. Until the
+flag is on, no closed-tier row can exist and none of the above is reachable.
+`docs/OWNER_ACTIONS.md` §40 holds the ordering.
 
 Details of the availability model itself — the keystone that keeps
 `is_available` authoritative, and why `begin_checkout_session` and

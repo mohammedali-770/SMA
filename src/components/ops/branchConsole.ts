@@ -5,7 +5,8 @@
 
 import type { Category, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
 import type {
-  BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryReasonCode, OpsReasonCode,
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, BranchVariantAvailabilityRow,
+  DeliveryReasonCode, OpsReasonCode,
 } from '../../lib/opsApi';
 import type { OpsStringKey } from './opsStrings';
 
@@ -187,6 +188,63 @@ export function closedOptions(
     if (!b.snoozedUntil) return -1;
     return Date.parse(a.snoozedUntil) - Date.parse(b.snoozedUntil);
   });
+}
+
+/** Ids of price tiers closed at this branch (20260923120000). */
+export function closedVariantIds(rows: BranchVariantAvailabilityRow[]): Set<string> {
+  return new Set(rows.filter((r) => !r.isAvailable).map((r) => r.variantId));
+}
+
+export interface ClosedVariant {
+  variant: ProductVariant;
+  product: Product;
+  snoozedUntil: string | null;
+}
+
+/**
+ * Price tiers currently closed at this branch, soonest-returning first — the
+ * same ordering rule as `closedItems` and `closedOptions`, so all three lists
+ * read alike.
+ *
+ * Scoped to the products the console holds: a row naming a tier of a product
+ * this console cannot see is dropped rather than rendered nameless.
+ */
+export function closedVariants(
+  products: Product[],
+  rows: BranchVariantAvailabilityRow[],
+): ClosedVariant[] {
+  const closed = closedVariantIds(rows);
+  const until = new Map(rows.map((r) => [r.variantId, r.snoozedUntil]));
+  const out: ClosedVariant[] = [];
+  for (const product of products) {
+    for (const variant of activeVariants(product)) {
+      if (closed.has(variant.id)) {
+        out.push({ variant, product, snoozedUntil: until.get(variant.id) ?? null });
+      }
+    }
+  }
+  return out.sort((a, b) => {
+    if (!a.snoozedUntil && !b.snoozedUntil) return 0;
+    if (!a.snoozedUntil) return 1;
+    if (!b.snoozedUntil) return -1;
+    return Date.parse(a.snoozedUntil) - Date.parse(b.snoozedUntil);
+  });
+}
+
+/**
+ * True when every SIZE of a tiered product is closed, so nobody can order it
+ * even though its own availability row says it is on sale — the exact twin of
+ * `productBlockedByOptions`, and the same reason: `place_order` refuses such a
+ * line, so the tile must not read as open.
+ *
+ * A product with no tiers is never blocked by this: it is sold at its own price
+ * and has no size to close. The length check is load-bearing — `every` on an
+ * empty list is true, which would mark the untiered majority of the menu as
+ * unorderable.
+ */
+export function productBlockedBySizes(product: Product, closed: Set<string>): boolean {
+  const tiers = activeVariants(product);
+  return tiers.length > 0 && tiers.every((v) => closed.has(v.id));
 }
 
 /** The option groups attached to a product, in the product's own order. */

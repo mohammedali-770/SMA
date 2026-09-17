@@ -29,7 +29,13 @@ export const ItemsTab: React.FC<{
   categories: Category[];
   rows: BranchAvailabilityRow[];
   closed: ClosedItem[];
-  optionBlockedIds: Set<string>;
+  /**
+   * Products a cashier would read as open that a customer cannot order —
+   * because a REQUIRED option group has been emptied, or because every SIZE is
+   * closed. Both render as `partial`, because to the cashier they are the same
+   * fact: the tile says yes and checkout says no.
+   */
+  blockedIds: Set<string>;
   now: number;
   loading: boolean;
   busy: boolean;
@@ -41,7 +47,7 @@ export const ItemsTab: React.FC<{
   categories,
   rows,
   closed,
-  optionBlockedIds,
+  blockedIds,
   now,
   loading,
   busy,
@@ -173,7 +179,7 @@ export const ItemsTab: React.FC<{
                   const isClosed = closedIds.has(p.id);
                   const state: TileState = isClosed
                     ? 'closed'
-                    : optionBlockedIds.has(p.id)
+                    : blockedIds.has(p.id)
                       ? 'partial'
                       : 'open';
                   return (

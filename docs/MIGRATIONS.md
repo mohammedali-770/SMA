@@ -5924,3 +5924,164 @@ inventing its own, and the case now asserts both halves.
 
 Both signatures are unchanged, so existing callers bind to the new bodies.
 Applying this file is a §5 action and must name the target by version.
+
+---
+
+## 47. The switch that lets the operator controls ship first — WRITTEN, NOT APPLIED (2026-09-17)
+
+`20260926120000_variant_closing_flag.sql`. **Written 2026-09-17, validated,
+awaiting owner approval.** The fourth and last file of the per-size-closing set,
+and by far the smallest: one boolean column on `app_settings`, defaulting FALSE.
+
+sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`,
+135 lines / 7 622 bytes — **re-hash the MERGED copy before applying**, per
+CLAUDE.md §15.
+
+### It exists because two halves of one feature ship on different clocks
+
+§44 and §45 gave the server per-tier availability. §46 gave the monitor sight of
+it. This file is about the part that is not a database problem at all.
+
+The branch console is a Vercel deploy: it reaches every cashier the moment a
+change merges. The customer app is an EAS build: it reaches a customer in the
+next release, and then only once they update. So an operator could close a size
+on a day when most customers are running an app that does not know a size can
+be closed.
+
+**That app fails badly rather than harmlessly, and it was verified rather than
+assumed.** A closed tier passes `isOrderable`, `validateCartForBranch` and the
+pre-submit re-read in `CheckoutScreen.placeOrder` — the check that exists
+precisely so a customer never meets a raw server refusal. `place_order` then
+raises, and `failureMessage` returns `t(messageKey)`: a **translated key**, never
+the server's sentence (`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). The
+customer sees a generic error at the payment step, on a cart that looked fine.
+
+Merging both halves together does **not** close that window — it moves its start
+from merge to deploy. Only a switch closes it. While the flag is false the
+operator controls are absent, so no closed-tier row can be written, so the
+refusal is unreachable on any build. Turning it on is a deliberate act performed
+once a build carrying the customer half is live.
+
+### Why a setting rather than a client constant
+
+A constant would need a code change and a deploy to flip, which is the thing
+being avoided. `app_settings` is already read in full by both clients, so this
+costs no new query in the app. It is the same shape as `loyalty_pickup_only`
+(`20260907120000`), which exists for the same reason: a behaviour that must be
+switchable without shipping software.
+
+**It defaults FALSE, so applying it changes nothing.** That is the deliberate
+contrast with `loyalty_pickup_only`, which defaults TRUE and where applying the
+migration *was* the behaviour change (ledger row 82). This one cannot be.
+
+### The console read is the part that could have caused an outage, and it does not
+
+The web console does **not** read this column through the settings object the
+rest of the app uses. It reads it in `opsApi.variantClosingEnabled()`, which is
+its own query and **returns false on any error at all**.
+
+That is not defensiveness for its own sake. This change merges and deploys; the
+migration is a separate owner action that may come later. PostgREST answers a
+select naming a column that does not exist with `42703`, and every other reader
+in `opsApi` turns an error into a throw — inside the console's single
+`refresh()`, that would blank the whole screen for every cashier over a feature
+none of them can use yet. **That is the `orders.is_comped` outage in a new
+costume** (ledger row 96): PostgREST refuses the WHOLE query when one column is
+unreadable. Hence its own query, and hence failing to the pre-migration
+behaviour. `src/lib/opsVariantClosing.test.ts` pins all seven cases.
+
+**The same trap exists on the CUSTOMER side, one migration earlier, and it was
+found while preparing to push this change rather than after.**
+`catalog.all()` is one `Promise.all` and `ok()` throws, so its new read of
+`branch_variant_availability` (§44) would have failed the WHOLE menu load
+against a project where that table does not exist — an error screen instead of a
+menu, for every customer on a build that shipped ahead of the apply. It now
+returns `[]` on any error. That is not a fallback: the table stores exceptions
+only, so no rows means no size is closed, which is also what a missing table
+implies, and `place_order` remains the authority either way.
+`apps/mobile/src/services/catalogVariantAvailability.test.ts` pins it.
+
+**AND IT EXISTED A THIRD TIME, IN THE CONSOLE'S OWN READ OF THE SAME TABLE —
+which is worth recording because two of the three were fixed while the third was
+left throwing.** `opsApi.branchVariantAvailability()` sits inside the branch
+console's single `refresh()` `Promise.all`, so before the apply it would have
+rejected the whole thing and shown every cashier a blocking "could not load"
+notice in place of their availability, delivery and reference controls. Review
+caught it on #395. Fixed the same way, and pinned by
+`src/lib/opsVariantClosing.test.ts`.
+
+**The generalisable form: when a change adds a read of a new table or column,
+enumerate EVERY caller that batches it with reads the screen cannot do without.**
+Fixing the one you happen to be looking at is not fixing the class — the
+`orders.is_comped` outage (ledger row 96) was one query, and this feature had
+three.
+
+### The column-grant trap was checked rather than assumed — and then measured again
+
+`app_settings` appears in `information_schema.table_privileges` for `anon` and
+`authenticated`, so its SELECT is TABLE-level and a new column is covered
+automatically. Verified live on 2026-09-17, before the file was written.
+
+The migration asserts the outcome anyway. Mutation testing then established
+something worth writing down: **revoking SELECT on the TABLE from `anon` does
+make assertion 3 raise; revoking the COLUMN alone does not.**
+`has_column_privilege` is satisfied by either grant and the table-level one
+survives. That is the correct answer to the question being asked — *can the
+client read this column* — and it is precisely why this table is safe to extend
+where `orders` was not. The file now records the measurement next to the
+assertion, so the next reader does not mistake it for a check that cannot fail.
+
+### The flag gates CREATING a closure, never the closed state
+
+Recorded here because the first version of the console got it wrong and review
+caught it on #395. Both `closedVariantIds` and the closed-sizes list were gated
+on the flag, on the reasoning that no closed row can exist while it is false.
+
+That reasoning has two holes, and both are reachable: the flag is switched OFF
+after a size was closed, and the flag's own read fails and defaults safe. In
+either state the rows exist, `place_order` still refuses those tiers, and the
+customer app still greys them out — so a console that hid them would be the only
+component lying about it, and would take away the single per-size **Reopen**
+there is, stranding stock closed with no way back.
+
+So a closed tier always shows its pill, always counts toward "every size closed"
+and the tile's **Partly closed** badge, always appears in the closed-sizes card,
+and always keeps its Reopen. Only the **Close** button is switched. The symptom
+of the old design was visible in the documentation before it was visible in the
+code: `docs/OWNER_ACTIONS.md` §40 carried an instruction to reopen everything
+before switching the flag off, which is prose compensating for a defect.
+
+### Self-verification, and the six state mutants that prove each assertion can fail
+
+Five assertions, each a value that can be false: the column exists, is NOT NULL
+and defaults FALSE; the live singleton row is OFF; **both** `anon` and
+`authenticated` can SELECT it; `authenticated` can UPDATE it (or the toggle
+would be unreachable and the feature could never be enabled); and **no
+money-path function mentions it** — server-side refusal of a closed tier is
+unconditional, and the day one of them reads this flag, the guarantee that the
+server is the authority has been quietly traded away.
+
+Each was mutated against a database cloned from the 140-migration chain
+template, with the column dropped first so the file's `if not exists` did not
+skip its own work:
+
+| mutant | result |
+| --- | --- |
+| baseline, unmutated | applies cleanly |
+| column pre-added defaulting TRUE | killed — assertion 1 |
+| column pre-added NULLABLE | killed — assertion 1 |
+| live row switched ON | killed — assertion 2 |
+| `anon` loses SELECT on the table | killed — assertion 3 |
+| `authenticated` loses UPDATE | killed — assertion 4 |
+| a money-path function mentions the flag | killed — assertion 5 |
+
+Chain harness: **140 migrations applied, 78 suites run, 76 passed, 2
+quarantined, 0 new failures.**
+
+### No deploy implied by the migration, but the feature needs two more steps
+
+Applying this file is a §5 action and must name the target by version. Applying
+it alone does nothing: `20260923120000`, `20260924120000` and `20260925120000`
+are its prerequisites, and turning the flag on is a further, separate decision
+that should follow the EAS build carrying the customer half. Recorded as an
+owner action in `docs/OWNER_ACTIONS.md`.

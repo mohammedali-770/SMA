@@ -18,6 +18,7 @@ import {
   MIN_RENDER,
   eligibleCandidates,
   pickSuggestions,
+  stillEligible,
   type ScoredSuggestion,
 } from './suggestionScoring';
 import { hydrateSuggestions, noteImpressions, readSuggestions } from './suggestionStore';
@@ -70,7 +71,7 @@ export function useCartSuggestions(): {
     setRemovedTick((n) => n + 1);
   }, []);
 
-  const { products, selectedBranchId, isAvailable, groupsForProduct } = catalog;
+  const { products, selectedBranchId, isOrderable, groupsForProduct } = catalog;
 
   // Read the cart through refs: the slate is generated from a snapshot, and
   // neither a quantity tap nor an add should trigger a regeneration.
@@ -97,7 +98,7 @@ export function useCartSuggestions(): {
       branchId: selectedBranchId,
       cartProductIds: new Set(cartRef.current.map((it) => it.product.id)),
       excludedProductIds: removedRef.current,
-      isAvailable,
+      isOrderable,
       groupsFor: groupsForProduct,
     });
     const picked = pickSuggestions(candidates, {
@@ -110,7 +111,7 @@ export function useCartSuggestions(): {
     // A strip that opens with one lone card reads as broken. Shrinking DOWN to
     // one is fine — that is the customer working through the row.
     setSlate(picked.length >= MIN_RENDER ? picked : []);
-  }, [ready, catalog.loading, catalog.error, selectedBranchId, orderCtx.valid, products, isAvailable, groupsForProduct]);
+  }, [ready, catalog.loading, catalog.error, selectedBranchId, orderCtx.valid, products, isOrderable, groupsForProduct]);
 
   // Rendering only ever removes from the pinned slate. Accepting a card puts it
   // in the cart, which drops it here and leaves the rest untouched.
@@ -119,17 +120,18 @@ export function useCartSuggestions(): {
     [cart.items],
   );
   const suggestions = useMemo<ScoredSuggestion[]>(() => {
-    if (cart.items.length === 0 || !selectedBranchId) return [];
-    const inCart = new Set(cartProductKey ? cartProductKey.split('|') : []);
-    return slate.filter((s) => {
-      if (inCart.has(s.product.id) || removedRef.current.has(s.product.id)) return false;
-      // Cheap re-check: the catalog can drop a product's availability while the
-      // screen is open, and a pinned card must not outlive its eligibility.
-      return s.product.isActive && isAvailable(s.product.id, selectedBranchId);
+    // The decision itself lives in suggestionScoring, where it can be tested.
+    return stillEligible({
+      slate,
+      branchId: selectedBranchId,
+      cartIsEmpty: cart.items.length === 0,
+      inCartProductIds: new Set(cartProductKey ? cartProductKey.split('|') : []),
+      removedProductIds: removedRef.current,
+      isOrderable,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- removedRef is read
     // through removedTick; cart.items only matters via cartProductKey.
-  }, [slate, cartProductKey, removedTick, selectedBranchId, isAvailable, cart.items.length]);
+  }, [slate, cartProductKey, removedTick, selectedBranchId, isOrderable, cart.items.length]);
 
   // Keyed on the PINNED slate, not the shrinking rendered subset: the three
   // cards were shown once, so they are charged once. Sorted so a re-pick that

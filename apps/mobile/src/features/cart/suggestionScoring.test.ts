@@ -9,8 +9,10 @@ import {
   eligibleCandidates,
   pickSuggestions,
   scoreCandidate,
+  stillEligible,
   suggestionFeatures,
   type ScoreContext,
+  type ScoredSuggestion,
   type SuggestionCandidate,
 } from './suggestionScoring';
 import { EMPTY_STATE, recordAdd, recordImpressions, type SuggestionState } from './suggestionState';
@@ -84,7 +86,7 @@ describe('classifyAddability', () => {
 describe('eligibleCandidates', () => {
   const base = {
     cartProductIds: new Set<string>(), excludedProductIds: new Set<string>(),
-    isAvailable: () => true, groupsFor: () => [],
+    isOrderable: () => true, groupsFor: () => [],
   };
 
   it('no selected branch yields no suggestions', () => {
@@ -99,9 +101,30 @@ describe('eligibleCandidates', () => {
   it('a product unavailable at the selected branch is never suggested', () => {
     const out = eligibleCandidates({
       ...base, products: [product({ id: 'a' }), product({ id: 'b' })], branchId: 'b1',
-      isAvailable: (id) => id !== 'a',
+      isOrderable: (id) => id !== 'a',
     });
     expect(out.map((c) => c.product.id)).toEqual(['b']);
+  });
+
+  it('asks ORDERABILITY, not the product row — so a fully size-closed item is out', () => {
+    // The predicate is the catalog's `isOrderable`, which answers false when
+    // every SIZE is closed or a required option group has been emptied, even
+    // though the product's own availability row still says it is on sale.
+    // Suggesting such a product one-taps a closed tier into the cart, and the
+    // customer meets place_order's refusal at checkout. Caught on #395.
+    const out = eligibleCandidates({
+      ...base, products: [product({ id: 'a' }), product({ id: 'b' })], branchId: 'b1',
+      isOrderable: (id) => id !== 'a',
+    });
+    expect(out.map((c) => c.product.id)).toEqual(['b']);
+  });
+
+  it('the predicate is asked about the SELECTED branch', () => {
+    const out = eligibleCandidates({
+      ...base, products: [product({ id: 'a' })], branchId: 'b1',
+      isOrderable: (_id, branchId) => branchId !== 'b1',
+    });
+    expect(out).toEqual([]);
   });
 
   it('a product already in the cart is excluded by product id, not cart-line id', () => {
@@ -403,5 +426,70 @@ describe('learning', () => {
     const dessert = suggestionFeatures(candidate(product({ id: 'cake', categoryId: 'desserts' })), ctx).complement;
     expect(drink).toBeGreaterThan(COLD_DIFFERENT);
     expect(drink).toBeGreaterThan(dessert);
+  });
+});
+
+/**
+ * THE PINNED SLATE'S RE-CHECK.
+ *
+ * This used to live inline in `useCartSuggestions` where nothing could reach
+ * it, and a mutation that deleted the orderability test entirely passed the
+ * whole suite (#395). It is out here so that mutation dies.
+ */
+describe('stillEligible', () => {
+  const scored = (id: string, isActive = true): ScoredSuggestion => ({
+    ...candidate(product({ id, isActive })),
+    features: {} as ScoredSuggestion['features'],
+    score: 1, jitter: 0, ranked: 1,
+  });
+  const base = {
+    branchId: 'b1' as string | null,
+    cartIsEmpty: false,
+    inCartProductIds: new Set<string>(),
+    removedProductIds: new Set<string>(),
+    isOrderable: () => true,
+  };
+
+  it('keeps a card that is still orderable', () => {
+    expect(stillEligible({ ...base, slate: [scored('a')] }).map((s) => s.product.id)).toEqual(['a']);
+  });
+
+  it('DROPS a card that has stopped being orderable under the customer', () => {
+    // A size or a required option can close while the cart screen sits open,
+    // exactly as the product row can. Without this the card stays, one-taps a
+    // closed tier into the cart, and the refusal arrives at checkout.
+    const out = stillEligible({
+      ...base, slate: [scored('a'), scored('b')], isOrderable: (id) => id !== 'a',
+    });
+    expect(out.map((s) => s.product.id)).toEqual(['b']);
+  });
+
+  it('asks about the SELECTED branch', () => {
+    const out = stillEligible({
+      ...base, slate: [scored('a')], isOrderable: (_id, branchId) => branchId !== 'b1',
+    });
+    expect(out).toEqual([]);
+  });
+
+  it('drops a card the customer has since put in the cart', () => {
+    const out = stillEligible({ ...base, slate: [scored('a')], inCartProductIds: new Set(['a']) });
+    expect(out).toEqual([]);
+  });
+
+  it('drops a card the customer dismissed this session', () => {
+    const out = stillEligible({ ...base, slate: [scored('a')], removedProductIds: new Set(['a']) });
+    expect(out).toEqual([]);
+  });
+
+  it('drops a product that has gone inactive', () => {
+    expect(stillEligible({ ...base, slate: [scored('a', false)] })).toEqual([]);
+  });
+
+  it('shows nothing once the cart is empty', () => {
+    expect(stillEligible({ ...base, slate: [scored('a')], cartIsEmpty: true })).toEqual([]);
+  });
+
+  it('shows nothing with no branch resolved', () => {
+    expect(stillEligible({ ...base, slate: [scored('a')], branchId: null })).toEqual([]);
   });
 });

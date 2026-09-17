@@ -159,16 +159,27 @@ export function eligibleCandidates(input: {
   /** Matched on `product.id` — never `cartItemId`, which carries a `::modA,modB` suffix. */
   cartProductIds: ReadonlySet<string>;
   excludedProductIds: ReadonlySet<string>;
-  isAvailable: (productId: string, branchId: string) => boolean;
+  /**
+   * The catalog's `isOrderable`, NOT its `isAvailable`.
+   *
+   * The product's own availability row is only one of three reasons a customer
+   * cannot order it. A product every one of whose SIZES is closed, or whose
+   * required option group has been emptied, still reads `is_available = true` —
+   * and `place_order` refuses it. Suggesting such a product one-taps a closed
+   * tier straight into the cart (`addItem` with no tier resolves to the cheapest
+   * ACTIVE one, which is the closed one), leaving the customer to meet the
+   * refusal at checkout. Caught in review on #395.
+   */
+  isOrderable: (productId: string, branchId: string) => boolean;
   groupsFor: (product: Product) => readonly ModifierGroup[];
 }): SuggestionCandidate[] {
-  const { products, branchId, cartProductIds, excludedProductIds, isAvailable, groupsFor } = input;
+  const { products, branchId, cartProductIds, excludedProductIds, isOrderable, groupsFor } = input;
   if (!branchId) return [];
 
   const out: SuggestionCandidate[] = [];
   products.forEach((product, rank) => {
     if (!product.isActive) return;
-    if (!isAvailable(product.id, branchId)) return;
+    if (!isOrderable(product.id, branchId)) return;
     if (cartProductIds.has(product.id)) return;
     if (excludedProductIds.has(product.id)) return;
     // Always the RESOLVED groups: `groupsForProduct` filters out unresolved ids,
@@ -183,6 +194,38 @@ export function eligibleCandidates(input: {
     out.push({ product, addability, rank });
   });
   return out;
+}
+
+/**
+ * Which of a PINNED slate is still worth showing.
+ *
+ * Lives here rather than in the hook because this module owns the decisions and
+ * the hook owns the wiring — and because the version that lived in the hook was
+ * untestable and therefore untested. A mutation that dropped the orderability
+ * re-check entirely survived the whole suite (#395); extracting it is what makes
+ * that mutation die.
+ *
+ * The slate only ever SHRINKS: it is generated once per cart visit, and this is
+ * the filter that removes a card the customer has since accepted, dismissed, or
+ * that has stopped being orderable while the screen sat open — a size or a
+ * required option can close under a pinned card exactly as the product can.
+ */
+export function stillEligible(input: {
+  slate: readonly ScoredSuggestion[];
+  branchId: string | null;
+  cartIsEmpty: boolean;
+  inCartProductIds: ReadonlySet<string>;
+  removedProductIds: ReadonlySet<string>;
+  isOrderable: (productId: string, branchId: string) => boolean;
+}): ScoredSuggestion[] {
+  const { slate, branchId, cartIsEmpty, inCartProductIds, removedProductIds, isOrderable } = input;
+  // No cart, no branch: the strip is a cart-screen feature and has nothing to
+  // be relevant to.
+  if (cartIsEmpty || !branchId) return [];
+  return slate.filter((s) => {
+    if (inCartProductIds.has(s.product.id) || removedProductIds.has(s.product.id)) return false;
+    return s.product.isActive && isOrderable(s.product.id, branchId);
+  });
 }
 
 /** Default curation: earlier in the admin's sort order scores higher. */

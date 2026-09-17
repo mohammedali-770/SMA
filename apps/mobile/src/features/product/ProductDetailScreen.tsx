@@ -19,13 +19,13 @@ import { cheapestVariant } from '../../store/CartProvider';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Modifier, ModifierGroup, ProductVariant } from '../../types/models';
-import { blockingGroups, requiredCount } from '../../lib/orderability';
+import { allTiersClosed, blockingGroups, requiredCount } from '../../lib/orderability';
 import { computeUnitPrice } from '../../utils/format';
 
 export function ProductDetailScreen({ productId, cartItemId }: { productId: string; cartItemId?: string }) {
   const styles = useStyles(); const colors = useThemeColors(); const insets = useSafeAreaInsets();
   const { t, pick, rtlRow } = useI18n();
-  const { loading, getProduct, groupsForProduct, selectedBranchId, isAvailable, isModifierAvailable } = useCatalog();
+  const { loading, getProduct, groupsForProduct, selectedBranchId, isAvailable, isModifierAvailable, isVariantAvailable } = useCatalog();
   const cart = useCart();
   const product = getProduct(productId);
   const groups = useMemo(() => product ? groupsForProduct(product) : [], [product, groupsForProduct]);
@@ -34,6 +34,13 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   const modAvailable = useCallback(
     (modifierId: string) => !selectedBranchId || isModifierAvailable(modifierId, selectedBranchId),
     [selectedBranchId, isModifierAvailable],
+  );
+  // Same rule one level down: a branch can close a single PRICE TIER, leaving
+  // the item and its other sizes on sale. Absent branch → assume open, for the
+  // same reason as above.
+  const tierAvailable = useCallback(
+    (variantId: string) => !selectedBranchId || isVariantAvailable(variantId, selectedBranchId),
+    [selectedBranchId, isVariantAvailable],
   );
   const editingLine = useMemo(() => cartItemId ? cart.items.find((it) => it.cartItemId === cartItemId) ?? null : null, [cart.items, cartItemId]);
   // A line being edited can name an option the branch has since closed. Drop it
@@ -89,13 +96,25 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   // order. Say so here instead of at the payment screen.
   const blocked = blockingGroups(groups, modAvailable);
   const productClosed = Boolean(selectedBranchId) && !isAvailable(product.id, selectedBranchId as string);
-  const orderable = !productClosed && blocked.length === 0;
-  const canSave = orderable && missingGroups.length === 0;
   // A single unnamed tier is just the item's price (most sauces are like this),
   // so only offer a choice when there is genuinely more than one.
   const tiers = product.variants;
   const showTierPicker = tiers.length > 1;
-  const activeTier = variant ?? cheapestVariant(tiers);
+  const openTiers = tiers.filter((v) => tierAvailable(v.id));
+  // EVERY size closed is the item closed, and it has to be said here even when
+  // there is only ONE tier and therefore no picker to show it in. place_order
+  // refuses such a line, so without this the customer would meet the refusal at
+  // the payment step with nothing on this screen having hinted at it.
+  const tiersAllClosed = allTiersClosed(tiers, tierAvailable);
+  // A closed tier is never the active one while an open tier exists. That
+  // matters for a line being EDITED whose size the branch has since closed:
+  // dropping the selection outright would leave the screen with no price at
+  // all, so fall back to the cheapest size still on sale — which the picker
+  // then shows selected, beside the closed one marked as closed.
+  const activeTier = (variant && tierAvailable(variant.id) ? variant : null)
+    ?? cheapestVariant(openTiers) ?? cheapestVariant(tiers);
+  const orderable = !productClosed && blocked.length === 0 && !tiersAllClosed;
+  const canSave = orderable && missingGroups.length === 0;
   const total = Number((computeUnitPrice(product, selected, activeTier) * qty).toFixed(2));
   const isEditing = Boolean(cartItemId && editingLine);
   const save = () => {
@@ -116,7 +135,13 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
           <View style={[styles.metaRow, rtlRow]}><Price amount={activeTier?.price ?? product.price} size={typeScale.title.size} color={colors.appText} weight="700" />{(activeTier?.calories ?? product.calories) ? <Text variant="caption" tone="tertiary">{activeTier?.calories ?? product.calories} {t('kcal')}</Text> : null}</View>
           {!orderable ? <View style={styles.blockedNotice}>
             <Text variant="label" tone="danger">{t('outOfStock')}</Text>
-            {productClosed ? null : <Text variant="caption" tone="secondary" style={{ marginTop: space.s1 }}>{t('productBlockedByOptions')}</Text>}
+            {/* The item being closed outright needs no explanation. The other
+                two reasons do, because the item still LOOKS on sale. */}
+            {productClosed ? null : (
+              <Text variant="caption" tone="secondary" style={{ marginTop: space.s1 }}>
+                {tiersAllClosed ? t('productBlockedBySizes') : t('productBlockedByOptions')}
+              </Text>
+            )}
           </View> : null}
           {showTierPicker ? (
             <View style={styles.group}>
@@ -126,6 +151,24 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
               </View>
               <View style={{ gap: space.s2 }}>{tiers.map((v) => {
                 const checked = activeTier?.id === v.id;
+                // A closed size renders as a plain View, not a disabled
+                // Pressable — the same choice the option rows below make, and
+                // for the same reason: there is no press to swallow, so it
+                // cannot be tapped by accident or reached by the accessibility
+                // focus order as something actionable.
+                if (!tierAvailable(v.id)) {
+                  return (
+                    <View
+                      key={v.id}
+                      style={[styles.modRow, rtlRow, styles.modRowOff]}
+                      accessibilityLabel={`${pick(v.nameEn, v.nameAr)} — ${t('sizeOutOfStock')}`}
+                    >
+                      <View style={[styles.check, styles.radio]} />
+                      <Text variant="body" tone="tertiary" style={{ flex: 1 }}>{pick(v.nameEn, v.nameAr)}</Text>
+                      <StatusPill label={t('sizeOutOfStock')} tone="neutral" />
+                    </View>
+                  );
+                }
                 return (
                   <Pressable
                     key={v.id}

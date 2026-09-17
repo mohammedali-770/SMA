@@ -32,6 +32,17 @@ export function validateCartForBranch(
    * than letting the server give the final answer.
    */
   isModifierAvailable?: (modifierId: string, branchId: string) => boolean,
+  /**
+   * Optional for the same reason as `isModifierAvailable`: the branch-switch
+   * screen asks only about products, and omitting it means "no size is closed" —
+   * the pre-existing behaviour and the safe direction. Over-reporting a sold-out
+   * cart is worse than letting the server give the final answer.
+   *
+   * A line with no `variant` is unaffected: a product without tiers has no size
+   * to close, and a cart naming no tier is resolved server-side to the cheapest
+   * ACTIVE one, which `place_order` then checks itself.
+   */
+  isVariantAvailable?: (variantId: string, branchId: string) => boolean,
 ): CartValidation {
   if (!branchId) {
     // No branch resolved yet → nothing is orderable; an empty cart is trivially ok.
@@ -42,7 +53,12 @@ export function validateCartForBranch(
   for (const it of items) {
     const optionsOk = !isModifierAvailable || Object.values(it.selectedModifiers)
       .every((mods) => mods.every((m) => isModifierAvailable(m.id, branchId)));
-    const ok = it.product.isActive && isAvailable(it.product.id, branchId) && optionsOk;
+    // A line naming a closed SIZE is as unorderable as one naming a closed
+    // option — the cart line carries a specific tier, so closing it invalidates
+    // the line even though the product is still on sale.
+    const sizeOk = !isVariantAvailable || !it.variant
+      || isVariantAvailable(it.variant.id, branchId);
+    const ok = it.product.isActive && isAvailable(it.product.id, branchId) && optionsOk && sizeOk;
     (ok ? valid : invalid).push(it);
   }
   return { valid, invalid, allValid: invalid.length === 0 };

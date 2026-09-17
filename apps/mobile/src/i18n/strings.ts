@@ -55,6 +55,12 @@ export const STRINGS = {
     outOfStock: 'Out of stock',
     optionOutOfStock: 'Unavailable',
     productBlockedByOptions: 'A required choice is out of stock at this branch right now.',
+    // Deliberately its own key rather than a reuse of `optionOutOfStock`, even
+    // though the two read alike today: a size and an option are closed by
+    // different controls, and a future rewording of one must not silently
+    // reword the other.
+    sizeOutOfStock: 'Unavailable',
+    productBlockedBySizes: 'Every size is out of stock at this branch right now.',
     soldOutNow: 'Sold out just now',
     soldOutBody: 'These items sold out while you were ordering. Remove them to continue.',
     customizeAdd: 'Customize & Add',
@@ -404,6 +410,8 @@ export const STRINGS = {
     outOfStock: 'غير متوفر حالياً',
     optionOutOfStock: 'غير متوفر',
     productBlockedByOptions: 'أحد الخيارات المطلوبة غير متوفر في هذا الفرع حالياً.',
+    sizeOutOfStock: 'غير متوفر',
+    productBlockedBySizes: 'جميع الأحجام غير متوفرة في هذا الفرع حالياً.',
     soldOutNow: 'نفد الصنف للتو',
     soldOutBody: 'نفدت هذه الأصناف أثناء إتمام طلبك. احذفها للمتابعة.',
     customizeAdd: 'تخصيص وإضافة',

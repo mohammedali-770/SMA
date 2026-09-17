@@ -93,6 +93,17 @@ export interface BranchModifierAvailabilityRow {
   reasonCode: OpsReasonCode | null;
 }
 
+/**
+ * One PRICE TIER's availability at one branch (20260923120000). Same
+ * exceptions-only storage as the two above: an absent row means on sale.
+ */
+export interface BranchVariantAvailabilityRow {
+  variantId: string;
+  isAvailable: boolean;
+  snoozedUntil: string | null;
+  reasonCode: OpsReasonCode | null;
+}
+
 function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
@@ -186,6 +197,64 @@ export const opsApi = {
   },
 
   /**
+   * Whether the per-SIZE closing controls are switched on
+   * (`app_settings.variant_closing_enabled`, 20260926120000).
+   *
+   * THE ONLY FUNCTION HERE THAT SWALLOWS ITS ERROR, and the reason is the whole
+   * point of the flag. The branch console deploys the moment this merges, while
+   * applying the migration is a separate owner action that may come later or
+   * not at all. PostgREST answers a select naming a column that does not exist
+   * with `42703` — and `fail()` would turn that into a thrown error inside the
+   * console's single `refresh()`, taking down the whole screen for every cashier
+   * over a feature none of them can use yet. That is the `orders.is_comped`
+   * outage in a new costume.
+   *
+   * So: its own query, never folded into a select that fetches anything needed
+   * (one unreadable column fails the WHOLE select), and any error at all resolves
+   * to FALSE — controls hidden, which is exactly the pre-migration behaviour.
+   */
+  async variantClosingEnabled(): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('variant_closing_enabled')
+      .eq('id', true)
+      .maybeSingle();
+    if (error) return false;
+    return Boolean((data as { variant_closing_enabled?: boolean } | null)?.variant_closing_enabled);
+  },
+
+  /**
+   * Price-tier availability exceptions for one branch. Exceptions only, exactly
+   * as for products and options.
+   *
+   * IT DEGRADES TO `[]` RATHER THAN THROWING, for the same reason
+   * `variantClosingEnabled` does — and leaving it throwing was a real defect
+   * caught in review on #395, not a hypothetical. The console's `refresh()` is
+   * one `Promise.all`, so in the documented window where this deploys before
+   * `20260923120000` is applied, PostgREST's missing-relation error would reject
+   * the whole thing: every cashier would get a blocking "could not load" notice
+   * instead of their availability, delivery and reference controls, over a table
+   * that holds nothing they can use yet.
+   *
+   * `[]` is the correct answer rather than a fallback: the table stores
+   * exceptions only, so no rows means no size is closed — which is exactly what
+   * a table that does not exist implies.
+   */
+  async branchVariantAvailability(branchId: string): Promise<BranchVariantAvailabilityRow[]> {
+    const { data, error } = await supabase
+      .from('branch_variant_availability')
+      .select('variant_id, is_available, snoozed_until, reason_code')
+      .eq('branch_id', branchId);
+    if (error) return [];
+    return (data ?? []).map((r) => ({
+      variantId: r.variant_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
+  /**
    * Live delivery state for every branch.
    *
    * The consoles otherwise read `branches` from the app context, which is
@@ -256,6 +325,39 @@ export const opsApi = {
     const { error } = await supabase.rpc('clear_modifier_snooze', {
       p_branch_id: branchId,
       p_modifier_id: modifierId,
+    });
+    fail(error);
+  },
+
+  /**
+   * Close one PRICE TIER at this branch for a bounded number of minutes.
+   *
+   * `set_variant_snooze` refuses an INACTIVE tier, which is not a detail the
+   * console has to reproduce: the sheet lists `activeVariants` only, so the
+   * refusal is a backstop against a stale screen rather than a routine path.
+   */
+  async snoozeVariant(input: {
+    branchId: string;
+    variantId: string;
+    minutes: number;
+    reasonCode: OpsReasonCode;
+    note?: string | null;
+  }): Promise<void> {
+    const { error } = await supabase.rpc('set_variant_snooze', {
+      p_branch_id: input.branchId,
+      p_variant_id: input.variantId,
+      p_minutes: input.minutes,
+      p_reason_code: input.reasonCode,
+      p_note: input.note?.trim() ? input.note.trim() : null,
+    });
+    fail(error);
+  },
+
+  /** Reopen one price tier at this branch immediately. Idempotent server-side. */
+  async reopenVariant(branchId: string, variantId: string): Promise<void> {
+    const { error } = await supabase.rpc('clear_variant_snooze', {
+      p_branch_id: branchId,
+      p_variant_id: variantId,
     });
     fail(error);
   },
