@@ -535,15 +535,57 @@ describe('BranchConsole — per-size closing', () => {
     await waitFor(() => expect(mocks.reopenVariant).toHaveBeenCalledWith('b1', 'v1'));
   });
 
-  it('closed sizes are IGNORED EVERYWHERE while the switch is off', async () => {
-    // Belt and braces against a stale row: with the controls off, no closed
-    // tier should be able to exist — and if one does, it must not grey out a
-    // size the customer app is still selling.
-    //
-    // EVERY size is closed here on purpose. An earlier version of this case
-    // closed one, which left the tile rule untouched and let a mutation that
-    // dropped the gate on `closedTierIds` survive: the closed-sizes CARD is
-    // gated separately, so its absence proved only half of this.
+  /**
+   * THE SWITCH GATES CLOSING, NOT THE CLOSED STATE — and the three cases below
+   * replace one that asserted the opposite.
+   *
+   * That earlier case ("closed sizes are IGNORED EVERYWHERE while the switch is
+   * off") pinned a design review found to be wrong on #395: the flag reads false
+   * in two states where closed rows genuinely exist — it was switched off after
+   * a closure, or its own query failed and defaulted safe — and in both the
+   * server still refuses those tiers and the customer app still greys them out.
+   * A console that hid them would be the only component lying, and would take
+   * away the single per-size Reopen there is, stranding stock closed.
+   *
+   * It is recorded here rather than silently rewritten, because a test that
+   * pinned a behaviour now deliberately changed is otherwise an argument against
+   * the change (#332's lesson, in reverse).
+   */
+  it('shows an existing closure while the switch is OFF, and still offers Reopen', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(false);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    // The closed-sizes card is present, with its item named.
+    const card = await screen.findByTestId('closed-size-v1');
+    expect(within(card).getByText('Regular')).toBeTruthy();
+    // And so is the per-size Reopen, inside the sheet.
+    fireEvent.click(screen.getByTestId('tile-p3'));
+    const sheet = await screen.findByRole('dialog');
+    fireEvent.click(within(sheet).getByTestId('size-v1'));
+    await waitFor(() => expect(mocks.reopenVariant).toHaveBeenCalledWith('b1', 'v1'));
+  });
+
+  it('offers NO Close on an OPEN size while the switch is off, even beside a closed one', async () => {
+    // The gate is on creating a closure and nothing else, so the open tier in
+    // the same sheet carries no button at all.
+    mocks.variantClosingEnabled.mockResolvedValue(false);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click(await screen.findByTestId('tile-p3'));
+    const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByTestId('size-v1')).toBeTruthy();   // closed → Reopen
+    expect(within(sheet).queryByTestId('size-v2')).toBeNull();   // open   → nothing
+    // And it says why there is a Reopen but no Close.
+    expect(within(sheet).getByText(/already closed can still be reopened/i)).toBeTruthy();
+  });
+
+  it('still marks the tile PARTLY CLOSED when every size is closed and the switch is off', async () => {
+    // place_order refuses the item either way, so the counter must not read it
+    // as open just because the control that created the closure is hidden.
     mocks.variantClosingEnabled.mockResolvedValue(false);
     mocks.branchVariantAvailability.mockResolvedValue([
       { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
@@ -551,13 +593,10 @@ describe('BranchConsole — per-size closing', () => {
     ]);
     render(<BranchConsole branchId="b1" i18n={i18n} />);
     const tile = await screen.findByTestId('tile-p3');
-    expect(screen.queryByTestId('closed-size-v1')).toBeNull();
-    expect(within(tile).queryByText(/Partly closed/i)).toBeNull();
-    // ...and nothing inside the sheet either.
+    expect(within(tile).getByText(/Partly closed/i)).toBeTruthy();
     fireEvent.click(tile);
     const sheet = await screen.findByRole('dialog');
-    expect(within(sheet).queryByText(/a customer cannot order this item/i)).toBeNull();
-    expect(within(sheet).queryByText('Closed')).toBeNull();
+    expect(within(sheet).getByText(/a customer cannot order this item/i)).toBeTruthy();
   });
 
   it('marks the tile PARTLY CLOSED when every size is closed', async () => {

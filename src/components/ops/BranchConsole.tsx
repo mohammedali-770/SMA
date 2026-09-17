@@ -161,12 +161,15 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   const closed = useMemo(() => closedItems(products, rows), [products, rows]);
   const closedIds = useMemo(() => closedProductIds(rows), [rows]);
   const closedOptionIds = useMemo(() => closedModifierIds(modRows), [modRows]);
-  // Empty while the per-size controls are off — no closed tier can exist then,
-  // and pretending otherwise would let a stale row grey out a live size.
-  const closedTierIds = useMemo(
-    () => (perSizeEnabled ? closedVariantIds(varRows) : new Set<string>()),
-    [varRows, perSizeEnabled],
-  );
+  // NEVER gated on the switch, and that is a correction rather than an
+  // oversight (#395 review). A closed tier is enforced unconditionally by
+  // `place_order` and shown as closed by the customer app, so hiding it here
+  // when the flag reads false would strand stock: the console would call the
+  // item open, drop the closed-sizes card, and take away the only per-size
+  // reopen there is. The flag reads false in two states where rows can exist —
+  // it was switched off after a closure, or its own read failed and defaulted
+  // safe. Only CREATING a closure is gated; existing state and reopen are not.
+  const closedTierIds = useMemo(() => closedVariantIds(varRows), [varRows]);
   /**
    * Products a cashier would read as open that customers cannot actually order,
    * because a REQUIRED option group has been emptied. Surfaced on the tile as
@@ -185,9 +188,7 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   const closedOpts = useMemo(
     () => closedOptions(modifierGroups, modRows), [modifierGroups, modRows]);
   const closedTiers = useMemo<ClosedVariant[]>(
-    () => (perSizeEnabled ? closedVariants(products, varRows) : []),
-    [products, varRows, perSizeEnabled],
-  );
+    () => closedVariants(products, varRows), [products, varRows]);
   const productName = (p: Product) => (isRTL ? p.nameAr : p.nameEn);
 
   /**

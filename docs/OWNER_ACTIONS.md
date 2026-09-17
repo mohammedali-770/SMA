@@ -2914,12 +2914,21 @@ update public.app_settings set variant_closing_enabled = true where id is true;
 
 or the equivalent in the admin settings surface. This is the step that puts a
 **Close** button beside each size in the branch console. It is reversible: set it
-back to false and the buttons disappear again.
+back to false and the Close buttons disappear again.
 
 **Server-side enforcement does not depend on it.** The flag hides a control; it
-does not soften the rule. A tier closed while the flag was on stays refused if
-the flag is later switched off — so if you do turn it back off, reopen anything
-that is closed first.
+does not soften the rule. A tier closed while the flag was on stays refused by
+`place_order`, and stays greyed out in the customer app, after the flag is
+switched off.
+
+**Switching it back off is therefore safe, and you do not have to reopen
+anything first.** The gate is on CREATING a closure and nothing else: an
+existing closed size keeps its `Closed` pill, keeps counting toward the "every
+size closed" warning and the tile's **Partly closed** badge, keeps its row in the
+closed-sizes card, and keeps its **Reopen** button. An earlier draft of this
+section told you to reopen everything before switching off, which was
+documentation compensating for a UI defect — review caught it on #395, and the
+console was fixed instead.
 
 ### 40.4 A native Arabic read — engineering-drafted copy, not reviewed
 

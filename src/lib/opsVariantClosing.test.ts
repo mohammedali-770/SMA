@@ -39,6 +39,43 @@ function answer(result: { data: unknown; error: unknown }) {
 
 beforeEach(() => vi.clearAllMocks());
 
+/** A chainable stand-in for `from(...).select(...).eq(...)` — resolves at `.eq`. */
+function rowsAnswer(result: { data: unknown; error: unknown }) {
+  const chain = { select: () => chain, eq: () => Promise.resolve(result) };
+  (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue(chain);
+}
+
+describe('branchVariantAvailability', () => {
+  it('maps the exception rows when the read succeeds', async () => {
+    rowsAnswer({
+      data: [{ variant_id: 'v1', is_available: false, snoozed_until: null, reason_code: 'out_of_stock' }],
+      error: null,
+    });
+    await expect(opsApi.branchVariantAvailability('b1')).resolves.toEqual([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: 'out_of_stock' },
+    ]);
+  });
+
+  it('returns [] — NOT a rejection — when the table does not exist yet', async () => {
+    // THE DEFECT REVIEW CAUGHT ON #395. The console's refresh() is one
+    // Promise.all, so a rejection here blanks the whole screen with a blocking
+    // "could not load" notice — taking availability, delivery and the reference
+    // sheet away from every cashier, over a table holding nothing they can use.
+    rowsAnswer({ data: null, error: { code: '42P01', message: 'relation does not exist' } });
+    await expect(opsApi.branchVariantAvailability('b1')).resolves.toEqual([]);
+  });
+
+  it('returns [] when the read is refused', async () => {
+    rowsAnswer({ data: null, error: { code: '42501', message: 'permission denied' } });
+    await expect(opsApi.branchVariantAvailability('b1')).resolves.toEqual([]);
+  });
+
+  it('returns [] rather than null on an empty success', async () => {
+    rowsAnswer({ data: null, error: null });
+    await expect(opsApi.branchVariantAvailability('b1')).resolves.toEqual([]);
+  });
+});
+
 describe('variantClosingEnabled', () => {
   it('is TRUE only when the live row says so', async () => {
     answer({ data: { variant_closing_enabled: true }, error: null });

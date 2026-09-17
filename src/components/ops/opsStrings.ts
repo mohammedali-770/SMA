@@ -224,6 +224,7 @@ export const OPS_STRINGS = {
     done: 'تم',
     sizesPerSizeSoon: 'إيقاف حجم بمفرده غير متاح بعد — إيقاف الصنف يوقف كل أحجامه.',
     sizesAllClosed: 'كل الأحجام موقوفة — لا يمكن للعميل طلب هذا الصنف.',
+    sizesPerSizeOffReopenOnly: 'إيقاف حجم بمفرده غير مفعّل هنا، لكن يمكنك إتاحة الأحجام الموقوفة مسبقاً.',
   },
   en: {
     branchConsole: 'Branch Console',
@@ -420,6 +421,7 @@ export const OPS_STRINGS = {
     done: 'Done',
     sizesPerSizeSoon: 'Closing a single size is not available yet — closing the item closes every size.',
     sizesAllClosed: 'Every size is closed — a customer cannot order this item.',
+    sizesPerSizeOffReopenOnly: 'Closing a single size is switched off here, but sizes already closed can still be reopened.',
   },
 } as const;
 

@@ -32,10 +32,19 @@ import type { OpsLangValue } from '../useOpsLang';
  * deploys the moment the change merges; the customer app reaches a customer only
  * in the next EAS build. A build that does not know the refusal shows a generic
  * error at the payment step, because `failureMessage` returns a translated KEY
- * rather than the server's sentence. While the switch is off the buttons are
- * ABSENT — not disabled — and the old notice explains what closing the item will
- * do instead, exactly as it did before. A disabled control the cashier cannot
- * enable is a worse lie than an explanation.
+ * rather than the server's sentence. While the switch is off the Close buttons
+ * are ABSENT — not disabled — and a notice explains what closing the item will
+ * do instead. A disabled control the cashier cannot enable is a worse lie than
+ * an explanation.
+ *
+ * IT GATES CLOSING ONLY, NEVER THE CLOSED STATE — a correction from review on
+ * #395. A tier closed while the switch was on stays refused by `place_order`
+ * and stays greyed out in the customer app after it is switched off again, so a
+ * console that hid the closure would be the one component lying about it, and
+ * would take away the only per-size Reopen there is. The switch also reads false
+ * when its own query fails, which must not be able to strand stock. So a closed
+ * tier always shows its pill, always counts toward "every size closed", and
+ * always keeps its Reopen.
  *
  * OPTION GROUPS ARE HERE TOO, AND THAT IS A CORRECTION RATHER THAN A FLOURISH.
  * The first draft of this redesign replaced the per-product "Show options"
@@ -96,10 +105,9 @@ export const VariantSheet: React.FC<{
   const { t, isRTL } = i18n;
   const name = isRTL ? product.nameAr : product.nameEn;
   const tiers = activeVariants(product);
-  // Only meaningful while the per-size controls are on; with them off no closed
-  // tier can exist, so this is false for every product.
-  const everySizeClosed = perSizeEnabled
-    && tiers.length > 0 && tiers.every((v) => closedVariantIds.has(v.id));
+  // Not gated on the switch: a closed tier is refused by `place_order` whatever
+  // the switch says, so the warning has to be true whenever the rows are.
+  const everySizeClosed = tiers.length > 0 && tiers.every((v) => closedVariantIds.has(v.id));
 
   return (
     <AdminModal
@@ -129,7 +137,7 @@ export const VariantSheet: React.FC<{
           </Text>
         ) : (
           tiers.map((v) => {
-            const off = perSizeEnabled && closedVariantIds.has(v.id);
+            const off = closedVariantIds.has(v.id);
             return (
               <div
                 key={v.id}
@@ -151,7 +159,11 @@ export const VariantSheet: React.FC<{
                   <Text variant="caption" tone="tertiary" as="span" numeric>
                     {`${v.price.toFixed(2)} ${t('currency')}`}
                   </Text>
-                  {perSizeEnabled ? (
+                  {/* REOPEN IS ALWAYS OFFERED; only CLOSE is switched. A tier
+                        closed before the switch was turned off is still refused
+                        by the server, so taking away the control that undoes it
+                        would strand it with no way back from this console. */}
+                  {off || perSizeEnabled ? (
                     <Button
                       label={off ? t('reopen') : t('close')}
                       data-testid={`size-${v.id}`}
@@ -169,9 +181,17 @@ export const VariantSheet: React.FC<{
             the item does, and `place_order` refuses it — so say so here rather
             than leaving the cashier to infer it from four red rows. */}
         {everySizeClosed ? <Notice title={t('sizesAllClosed')} tone="warning" /> : null}
-        {!perSizeEnabled && tiers.length > 0
-          ? <Notice title={t('sizesPerSizeSoon')} tone="info" />
-          : null}
+        {/* Two different things to say when the switch is off, because a
+            cashier looking at a Reopen button needs to know why there is no
+            Close beside it. */}
+        {!perSizeEnabled && tiers.length > 0 ? (
+          <Notice
+            title={tiers.some((v) => closedVariantIds.has(v.id))
+              ? t('sizesPerSizeOffReopenOnly')
+              : t('sizesPerSizeSoon')}
+            tone="info"
+          />
+        ) : null}
 
         {optionGroups.map((g) => (
           <div key={g.id} className="flex flex-col gap-2 border-t border-con-line pt-3">

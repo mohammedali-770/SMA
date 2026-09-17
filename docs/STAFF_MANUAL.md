@@ -133,6 +133,10 @@ one-tap Reopen, the same as closed items and closed options.
 > item instead — that is what the old screen did. The control is turned on once
 > every customer's app is a version that understands a closed size; until then,
 > closing one would show a customer an unhelpful error at the payment step.
+>
+> A size that is **already** closed still shows as closed, still counts toward
+> "partly closed", and still has its **Reopen** button, whether or not per-size
+> closing is switched on. Only the Close button is affected.
 
 **One option, not the whole item.** If only a choice is out — one sauce, one
 add-on — close that option instead of the product. The item stays on the menu
@@ -310,6 +314,9 @@ out of the delivery list.
 > هذا المطعم، والشاشة تذكر ذلك. أوقف الصنف بالكامل بدلاً من ذلك. يُفعَّل الزر بعد
 > أن يصبح تطبيق كل العملاء بإصدار يفهم الحجم الموقوف؛ قبل ذلك سيظهر للعميل خطأ
 > غير مفهوم عند الدفع.
+>
+> أما الحجم **الموقوف مسبقاً** فيبقى ظاهراً كموقوف، ويبقى زر «إتاحة» الخاص به
+> متاحاً، سواء كان إيقاف الحجم المفرد مفعّلاً أو لا. الزر المتأثر هو «إيقاف» فقط.
 
 **خيار واحد وليس الصنف كله.** إذا نفد خيار واحد فقط — صلصة أو إضافة — أوقف ذلك
 الخيار بدلاً من الصنف. يبقى الصنف في المنيو ويستطيع العميل طلبه بأي خيار آخر في

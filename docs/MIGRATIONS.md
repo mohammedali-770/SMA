@@ -6001,6 +6001,21 @@ only, so no rows means no size is closed, which is also what a missing table
 implies, and `place_order` remains the authority either way.
 `apps/mobile/src/services/catalogVariantAvailability.test.ts` pins it.
 
+**AND IT EXISTED A THIRD TIME, IN THE CONSOLE'S OWN READ OF THE SAME TABLE —
+which is worth recording because two of the three were fixed while the third was
+left throwing.** `opsApi.branchVariantAvailability()` sits inside the branch
+console's single `refresh()` `Promise.all`, so before the apply it would have
+rejected the whole thing and shown every cashier a blocking "could not load"
+notice in place of their availability, delivery and reference controls. Review
+caught it on #395. Fixed the same way, and pinned by
+`src/lib/opsVariantClosing.test.ts`.
+
+**The generalisable form: when a change adds a read of a new table or column,
+enumerate EVERY caller that batches it with reads the screen cannot do without.**
+Fixing the one you happen to be looking at is not fixing the class — the
+`orders.is_comped` outage (ledger row 96) was one query, and this feature had
+three.
+
 ### The column-grant trap was checked rather than assumed — and then measured again
 
 `app_settings` appears in `information_schema.table_privileges` for `anon` and
@@ -6015,6 +6030,26 @@ survives. That is the correct answer to the question being asked — *can the
 client read this column* — and it is precisely why this table is safe to extend
 where `orders` was not. The file now records the measurement next to the
 assertion, so the next reader does not mistake it for a check that cannot fail.
+
+### The flag gates CREATING a closure, never the closed state
+
+Recorded here because the first version of the console got it wrong and review
+caught it on #395. Both `closedVariantIds` and the closed-sizes list were gated
+on the flag, on the reasoning that no closed row can exist while it is false.
+
+That reasoning has two holes, and both are reachable: the flag is switched OFF
+after a size was closed, and the flag's own read fails and defaults safe. In
+either state the rows exist, `place_order` still refuses those tiers, and the
+customer app still greys them out — so a console that hid them would be the only
+component lying about it, and would take away the single per-size **Reopen**
+there is, stranding stock closed with no way back.
+
+So a closed tier always shows its pill, always counts toward "every size closed"
+and the tile's **Partly closed** badge, always appears in the closed-sizes card,
+and always keeps its Reopen. Only the **Close** button is switched. The symptom
+of the old design was visible in the documentation before it was visible in the
+code: `docs/OWNER_ACTIONS.md` §40 carried an instruction to reopen everything
+before switching the flag off, which is prose compensating for a defect.
 
 ### Self-verification, and the six state mutants that prove each assertion can fail
 

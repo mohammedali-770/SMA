@@ -1550,6 +1550,15 @@ menu card and the product screen show it as out of stock — the same treatment 
 fully closed *required* option group already receives, and the same rule the
 server enforces by construction.
 
+**Cart suggestions ask the same question.** The suggestion strip generated and
+re-checked its candidates with the product-only predicate, so a product whose
+every size was closed could still be suggested — and a single-tier one is a
+one-tap card, which adds the closed tier straight to the cart and leaves the
+customer to meet the refusal at checkout. It now asks `isOrderable`, which
+answers all three axes. Caught in review on #395; the same change closes an
+older hole of the same shape, where a product with a fully closed *required*
+option group could be suggested.
+
 **The operator controls are behind `app_settings.variant_closing_enabled`
 (`20260926120000`), which defaults FALSE.** The branch console deploys on merge
 while the customer app reaches a customer only in the next EAS build, and a build

@@ -226,13 +226,26 @@ export const opsApi = {
   /**
    * Price-tier availability exceptions for one branch. Exceptions only, exactly
    * as for products and options.
+   *
+   * IT DEGRADES TO `[]` RATHER THAN THROWING, for the same reason
+   * `variantClosingEnabled` does — and leaving it throwing was a real defect
+   * caught in review on #395, not a hypothetical. The console's `refresh()` is
+   * one `Promise.all`, so in the documented window where this deploys before
+   * `20260923120000` is applied, PostgREST's missing-relation error would reject
+   * the whole thing: every cashier would get a blocking "could not load" notice
+   * instead of their availability, delivery and reference controls, over a table
+   * that holds nothing they can use yet.
+   *
+   * `[]` is the correct answer rather than a fallback: the table stores
+   * exceptions only, so no rows means no size is closed — which is exactly what
+   * a table that does not exist implies.
    */
   async branchVariantAvailability(branchId: string): Promise<BranchVariantAvailabilityRow[]> {
     const { data, error } = await supabase
       .from('branch_variant_availability')
       .select('variant_id, is_available, snoozed_until, reason_code')
       .eq('branch_id', branchId);
-    fail(error);
+    if (error) return [];
     return (data ?? []).map((r) => ({
       variantId: r.variant_id as string,
       isAvailable: r.is_available as boolean,

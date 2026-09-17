@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**189 TypeScript test files declaring 2923 test blocks, plus 78 SQL suites.**
+**189 TypeScript test files declaring 2939 test blocks, plus 78 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -123,7 +123,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-69 files, 980 declared test blocks.
+69 files, 990 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -137,7 +137,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 7 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
-| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 39 | classifyAddability |
+| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
@@ -199,7 +199,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-96 files, 1346 declared test blocks.
+96 files, 1352 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -236,7 +236,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
-| `src/components/ops/BranchConsole.test.tsx` | 37 | BranchConsole |
+| `src/components/ops/BranchConsole.test.tsx` | 39 | BranchConsole |
 | `src/components/ops/branchReference.test.ts` | 20 | delivery request state |
 | `src/components/ops/BranchReferenceCard.test.tsx` | 9 | BranchReferenceCard |
 | `src/components/ops/callCentre.test.ts` | 56 | buildClosureSummaries |
@@ -287,7 +287,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/operationsHealthApi.test.ts` | 10 | pushFailureMetrics |
 | `src/lib/operationsHealthCapability.test.ts` | 12 | classifyOperationsHealthProbe |
 | `src/lib/opsApiResilience.test.ts` | 5 | opsApi.branchReference — missing-table resilience |
-| `src/lib/opsVariantClosing.test.ts` | 7 | variantClosingEnabled |
+| `src/lib/opsVariantClosing.test.ts` | 11 | branchVariantAvailability |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 17 | checkout payment availability |
