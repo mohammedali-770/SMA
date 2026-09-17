@@ -205,9 +205,19 @@ boxes are in [`APP_STORE_SUBMISSION.md`](APP_STORE_SUBMISSION.md).
 - [ ] **Reviewer credentials on the App Store Connect record**, and remember §11
       removes the Auth test-phone entry afterwards — **each store keeps its own
       copy**, so removal has to update both.
-- [ ] **If an EAS submission fails with no logs**, read `jobRun.errors` through
-      the GraphQL API. `submission.error` is null and `logFiles` is empty for
-      upload-validation failures, and the CLI prints only "Something went wrong".
+- [ ] **If an EAS submission reports failure, do not retry before reading the
+      log.** `ERRORED` does not mean the upload failed — on 2026-09-16 Apple
+      returned a 500 on the *status poll* after the binary had already been
+      delivered, and the resubmit was refused with "build number has already been
+      used". If the log contains `File upload ... completed!`, go and look at App
+      Store Connect instead.
+- [ ] **Finding the log at all**: the CLI prints only "Something went wrong",
+      `submission.error` is often null and `submission.logFiles` often empty. The
+      URL lives at `submissions.byId(…) { jobRun { logFileUrls } }` and the
+      structured error at `jobRun { errors { … } }` — check both, because a given
+      failure may produce one without the other. **The log is Brotli-compressed
+      with nothing declaring it**; decompress with
+      `zlib.brotliDecompressSync`, then filter the JSON lines on `level >= 40`.
 
 ### Google Play only
 
