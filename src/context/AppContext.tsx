@@ -28,6 +28,7 @@ import {
 } from '../lib/payment';
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 import { isOpsConsoleRole } from '../lib/roles';
+import { addSafeWebBreadcrumb } from '../lib/observability';
 
 // Patch keys whose write changes the trigger-computed expiry date. Listed
 // rather than "any loyalty key" so an unrelated edit -- the points rate, the
@@ -550,14 +551,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [loadEverything]);
 
-  // Wire the Supabase auth listener once. INITIAL_SESSION fires on mount with
-  // any persisted session, and SIGNED_IN / SIGNED_OUT drive subsequent changes.
+  /**
+   * Wire the Supabase auth listener once. INITIAL_SESSION fires on mount with
+   * any persisted session, and SIGNED_IN / SIGNED_OUT drive subsequent changes.
+   *
+   * THERE IS NO INACTIVITY TIMEOUT HERE OR ANYWHERE ELSE, and that was checked
+   * rather than assumed after branch staff reported being signed out: the
+   * client is created with `persistSession` and `autoRefreshToken` both on
+   * (`src/lib/supabase.ts`, pinned by `sessionPersistence.test.ts`), `bootstrap`
+   * is idempotent per user so a TOKEN_REFRESHED cannot reload the screen, and
+   * the ONLY route to the guest state is an auth event carrying no session.
+   *
+   * SO THE CAUSE IS OUTSIDE THIS FILE, AND UNTIL NOW IT WAS ALSO UNRECORDED.
+   * GoTrue emits SIGNED_OUT when a refresh token is rejected — a rotation race
+   * between two devices, a token already expired while an iPad slept, a browser
+   * evicting site storage — and every one of those looked identical from here:
+   * the console simply became the sign-in screen. The breadcrumb below names
+   * the event, so the next report is diagnosable instead of re-argued. It
+   * carries the event NAME only: no identity, no token, no payload, per the
+   * admin privacy contract in `src/lib/observability/index.ts`.
+   */
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setAuthReady(true);
       if (session?.user) {
         void bootstrap(session.user.id);
       } else {
+        // INITIAL_SESSION with no session is just an unauthenticated visitor.
+        // Anything else means a session that existed has gone.
+        if (event !== 'INITIAL_SESSION') {
+          addSafeWebBreadcrumb({
+            category: 'auth',
+            message: 'session ended',
+            data: { event },
+            level: 'warning',
+          });
+        }
         resetToGuest();
       }
     });

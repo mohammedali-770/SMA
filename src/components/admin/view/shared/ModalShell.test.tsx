@@ -212,6 +212,39 @@ describe('focus returns to whatever opened the dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(document.activeElement).toBe(trigger);
   });
+
+  it('un-inerts the page BEFORE restoring, or the restore silently does nothing', () => {
+    // THE TWO TESTS ABOVE PASSED WHILE THIS BEHAVIOUR WAS BROKEN IN EVERY REAL
+    // BROWSER, and that is the whole reason this one is written the way it is.
+    //
+    // React undoes an unmounting component's effects in the order they were
+    // declared. The focus effect used to come first, so the restore ran while
+    // `#root` still carried `inert` — and an inert element refuses `focus()`.
+    // Focus fell to `<body>`. jsdom does not model that refusal, so `.focus()`
+    // succeeded here and the assertions above were satisfied by an environment
+    // difference rather than by the code.
+    //
+    // So this asserts the ATTRIBUTE rather than the outcome: at the instant the
+    // opener is focused, the page behind must already be reachable. That is a
+    // claim jsdom can falsify.
+    withRoot(<Harness />);
+    const trigger = screen.getByRole('button', { name: 'Open editor' });
+    trigger.focus();
+    openIt();
+
+    const root = document.getElementById('root');
+    let inertWhenRestored: boolean | null = null;
+    const original = trigger.focus.bind(trigger);
+    trigger.focus = ((opts?: FocusOptions) => {
+      inertWhenRestored = root?.hasAttribute('inert') ?? null;
+      original(opts);
+    }) as typeof trigger.focus;
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(inertWhenRestored).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+  });
 });
 
 describe('existing behaviour is preserved', () => {
