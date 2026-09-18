@@ -1,9 +1,10 @@
 # Admin push notifications — closures on the phone
 
-**Status: step 1 of 4 is built. Nothing sends yet.** The console is installable
-and a service worker is registered; there is no subscription store, no sender
-and no trigger. An admin cannot receive a notification today, and no code path
-attempts to send one.
+**Status: steps 1 and 2 are built. Nothing sends yet.** The console is
+installable, a service worker is registered, and an admin can subscribe from the
+header once the step 2 migration is applied and a VAPID key is configured. There
+is still no sender and no trigger, so **no code path attempts to send anything**
+— subscribing stores a row and produces no notification.
 
 ## What this is for
 
@@ -96,12 +97,33 @@ branch of the `push` handler ends in `showNotification` — including the
 malformed-payload path, which falls back to the brand name. A silent push is not
 a smaller bug than a wrong one; it is how a subscription quietly dies.
 
-## 4. What is still to build
+## 3b. What step 2 added
 
-**Step 2 — subscriptions.** A migration adding `admin_push_subscriptions`
-(endpoint, keys, admin id, language) gated on `is_admin()`, plus save/delete
-RPCs, plus a control in the console header that requests permission. Permission
-must be requested from a real tap; Apple requires the user gesture.
+| File | Role |
+| --- | --- |
+| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **Written, not applied.** Detail: `docs/MIGRATIONS.md` §49. |
+| `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases / 23 assertions pinning the closed table, the refusals and the endpoint-reassignment rule. |
+| `src/lib/adminPushApi.ts` | The console's side. Reads fail soft; writes throw, because the admin pressed a button and is owed a truthful answer. |
+| `src/lib/pwa/adminPushState.ts` | The seven-state resolver. |
+| `src/lib/pwa/pushSubscription.ts` | base64url → key bytes, and subscription serialisation that returns null rather than a half-record. |
+| `src/components/admin/useAdminPush.ts` | The hook. Every browser call wrapped; never throws, never blocks a render. |
+| `src/components/admin/view/PushBell.tsx` | The header control. |
+
+**Seven states, and only two of them are a button.** `unsupported`,
+`needs-install`, `needs-reinstall`, `denied` and `not-configured` render as a
+static chip carrying the remedy, because none of them can be fixed by tapping.
+Offering a tappable bell to someone on an iPhone in Safari — where no amount of
+tapping can ever work — is how a feature earns a reputation for being broken.
+
+**The permission prompt comes from the tap, not from mount.** Browsers refuse
+`Notification.requestPermission()` outside a user gesture, which is why the hook
+exposes a toggle rather than doing this on load.
+
+**A subscription missing either key is discarded, not stored.** It can never be
+pushed to, so storing it would show the admin a "subscribed" device that
+silently never notifies.
+
+## 4. What is still to build
 
 **Step 3 — the sender.** An Edge Function that signs a VAPID token, encrypts the
 payload and POSTs to the push endpoint. Expo cannot do this — it is not the

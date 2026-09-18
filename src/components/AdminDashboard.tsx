@@ -8,6 +8,8 @@ import { ShieldAlert } from 'lucide-react';
 
 import { Notice } from '../design-system/ui/Notice';
 import { AdminHeader } from './admin/view/AdminHeader';
+import { PushBell } from './admin/view/PushBell';
+import { useAdminPush } from './admin/useAdminPush';
 import { AdminSidebar } from './admin/view/AdminSidebar';
 import { NewOrderAlertBar } from './admin/view/NewOrderAlertBar';
 import { parseTabFromHash, tabToHash, type AdminTab } from './admin/view/adminNav';
@@ -94,6 +96,13 @@ export const AdminDashboard: React.FC = () => {
   const online = useOnline();
   const isAccountant = currentUser.role === 'accountant';
   const canTriage = canTriageRole(currentUser.role);
+
+  // Closure alerts are an ADMIN control. The hook is called unconditionally, as
+  // hooks must be, and does nothing at all when `enabled` is false — so a
+  // branch-staff or call-centre session neither renders the bell nor asks the
+  // server about subscriptions.
+  const isAdmin = currentUser.role === 'admin';
+  const adminPush = useAdminPush(adminLang, isAdmin);
 
   // Capability-gate the Order Integrity tab: it must stay hidden until the
   // watchdog migration/RPCs exist (the web app may deploy before the Production
@@ -223,6 +232,27 @@ export const AdminDashboard: React.FC = () => {
         soundOffLabel={t.sound_alert_off}
         liveMode={ordersLiveMode}
         lastUpdated={ordersLastUpdated}
+        pushBell={
+          isAdmin ? (
+            <PushBell
+              state={adminPush.state}
+              busy={adminPush.busy}
+              error={adminPush.error}
+              onToggle={adminPush.toggle}
+              labels={{
+                on: t.push_on,
+                off: t.push_off,
+                busy: t.push_busy,
+                denied: t.push_denied,
+                notConfigured: t.push_not_configured,
+                needsInstall: t.push_needs_install,
+                needsReinstall: t.push_needs_reinstall,
+                unsupported: t.push_unsupported,
+                failed: t.push_failed,
+              }}
+            />
+          ) : undefined
+        }
       />
 
       {/* Offline: the most useful thing the console can say when the branch wifi

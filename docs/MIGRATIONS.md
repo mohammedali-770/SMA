@@ -6085,3 +6085,79 @@ it alone does nothing: `20260923120000`, `20260924120000` and `20260925120000`
 are its prerequisites, and turning the flag on is a further, separate decision
 that should follow the EAS build carrying the customer half. Recorded as an
 owner action in `docs/OWNER_ACTIONS.md`.
+
+## 49. Admin web-push subscriptions — WRITTEN, NOT APPLIED (2026-09-18)
+
+`20260927120000_admin_push_subscriptions.sql`. **Written 2026-09-18, validated,
+awaiting owner approval.** Step 2 of the four-step admin closure-notification
+work; the whole feature is described in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+
+sha256 `9861df2186a21aa7b06e1758449af0982b6b37d425da5ad44941c97db24eb9d0`,
+365 lines / 16 369 bytes — **re-hash the MERGED copy before applying**, per §15.
+
+**APPLYING IT SENDS NOTHING AND SUBSCRIBES NOBODY.** It creates one empty table,
+one nullable `app_settings` column, and three RPCs. The sender (step 3) and the
+trigger (step 4) do not exist, so the only reachable effect is an admin choosing
+to subscribe — which stores a row and still delivers nothing.
+
+**MONEY PATH UNTOUCHED, and the file asserts it rather than claiming it.** This
+is a new-objects-only migration; its closing block refuses to apply unless
+`place_order` still hashes `12b6816d256c29b76edf947ae1a7ea77` and
+`compute_order_snapshot` still hashes `22e2d42935459e7bf93abb2941b56325`.
+**No deploy implied** — nothing existing changes signature or behaviour.
+
+### The separation is the safety property, not a detail
+
+`push_devices` is keyed by `customer_id` and every row in it belongs to a
+customer (measured 2026-09-18: 5 active devices, all customers; admin, branch
+staff and call centre hold **zero**). Admin web push therefore gets its own
+table, its own RPCs and its own client module. Nothing in this migration may
+reference `push_devices`, and **assertion 5.9 fails the apply if it ever does** —
+because the moment the two channels share a code path, a predicate error in a
+staff feature can put a branch closure on a real customer's lock screen.
+
+### The table is CLOSED, and both halves of that are asserted
+
+RLS is enabled with **zero policies**, and the grants are revoked from `anon`
+and `authenticated`. A subscription's `endpoint` + `p256dh` + `auth` together
+are a capability to push to that device, so a policy added later "for
+convenience" would hand every signed-in customer a list of the admin's phones.
+The block asserts RLS is on (5.2), that there are no policies (5.2), and that
+neither client role holds **any** privilege (5.3) — the outcome, not the
+`revoke` statement, because a default-privilege grant elsewhere could hand one
+back without this file changing.
+
+`service_role` bypasses RLS, which is how the step 3 sender will read
+subscriptions. Same shape as `operations_alert_settings`.
+
+### The VAPID public key is in `app_settings`, and that is deliberate
+
+The **public** key identifies the sender and cannot sign a push, so exposing it
+to every client is harmless; the **private** key is a function secret and must
+never appear in any table. Putting the public half in `app_settings` means
+rotating it needs no redeploy.
+
+`app_settings` grants are TABLE-level (verified 2026-09-17), so the new column is
+readable automatically — the same reasoning that made `20260926120000` safe, and
+the opposite of the `orders.is_comped` defect that broke My Orders for three
+weeks (row 96). Assertion 5.8 checks the outcome for both client roles rather
+than trusting the mechanism.
+
+### Validation
+
+Local chain harness: **141 migrations applied, 79 suites run, 77 passed, 2
+quarantined, 0 new failures.** The file's own verification block ran as part of
+that apply. A paired suite,
+`supabase/tests/admin_push_subscriptions_test.sql`, adds 8 cases and 23
+assertions covering the closed table, anon execute, a customer refused by all
+three RPCs with the SQLSTATE read back as a value, the upsert reassigning a
+shared endpoint between two admins, delete being scoped to the caller,
+`admin_push_state` answering "is this device MINE" rather than "does it exist",
+and the two channels never meeting.
+
+**A fixture bug was caught by running it rather than by reading it.**
+`profiles.id` references `auth.users`, so inserting a profile directly fails the
+foreign key; identities have to start in `auth.users` and let
+`handle_new_user()` create the profile. The first version of the suite failed
+exactly there, which is the value of running a suite against a real chain
+instead of reasoning about it.
