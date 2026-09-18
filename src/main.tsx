@@ -3,6 +3,7 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import {ObservabilityErrorBoundary} from './components/ObservabilityErrorBoundary.tsx';
 import {initAdminObservability} from './lib/observability/index.ts';
+import {registerConsoleServiceWorker} from './lib/pwa/registerServiceWorker.ts';
 import './index.css';
 import './theme-dark.css';
 
@@ -16,6 +17,11 @@ if (import.meta.env.DEV) {
   // keeps the module out of production bundles entirely.
   void import('./lib/observability/devTest.ts').then(m => m.registerDevSentryTest());
 }
+
+// The service worker receives push notifications and caches nothing, so its
+// registration is deliberately fire-and-forget: it resolves to null on any
+// failure and can never stop the console rendering.
+void registerConsoleServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
