@@ -19,6 +19,7 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `account-delete-process` | service-role processor for the account-deletion queue (verify_jwt=false; authenticated by the service-role bearer or a Vault-backed shared secret… | by hand | service role |
 | `account-delete-request` | authenticated customer requests deletion of their OWN account (verify_jwt=true). Two actions: | by hand | service role |
 | `account-delete-scheduler` | Vault-authenticated scheduler gateway | by hand | service role |
+| `admin-push-dispatch` | web push to the staff console installed on an admin's phone | by hand | service role |
 | `auth-send-sms-whatsapp` | Supabase Auth **Send SMS Hook** (verify_jwt=false) | by hand | service role |
 | `email-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |
 | `lazywait-catalog` | admin-initiated, SERVER-SIDE catalog pull | by hand | service role |
@@ -49,6 +50,9 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/adminAuth.test.ts`
 - `_shared/adminAuth.ts`
 - `_shared/adminAuthWiring.test.ts`
+- `_shared/adminPush.test.ts`
+- `_shared/adminPush.ts`
+- `_shared/adminPushWiring.test.ts`
 - `_shared/alertDispatchWiring.test.ts`
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
@@ -68,6 +72,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/moyasarVerify.ts`
 - `_shared/orderIntakeSyncWiring.test.ts`
 - `_shared/paymentSync.ts`
+- `_shared/publicHost.ts`
 - `_shared/pushReadyCopyWiring.test.ts`
 - `_shared/rest.test.ts`
 - `_shared/rest.ts`
@@ -83,6 +88,8 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/tapRefund.test.ts`
 - `_shared/tapRefund.ts`
 - `_shared/tapVerify.ts`
+- `_shared/webPush.test.ts`
+- `_shared/webPush.ts`
 - `_shared/webhookReliabilityWiring.test.ts`
 - `_shared/whatsapp.test.ts`
 - `_shared/whatsapp.ts`

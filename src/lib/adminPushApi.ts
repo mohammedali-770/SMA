@@ -88,3 +88,48 @@ export async function deleteAdminPushSubscription(endpoint: string): Promise<voi
   });
   if (error) throw error;
 }
+
+/**
+ * Send this admin a confirmation notification through `admin-push-dispatch`.
+ *
+ * WHY THIS EXISTS AT ALL. Turning the control on stores a subscription, and
+ * nothing about that tells the admin whether a notification can actually reach
+ * their phone: the sender has to be deployed, a VAPID key pair has to be
+ * configured, and the public half has to match the one they just subscribed
+ * with. Every one of those is a separate owner action, and each fails silently.
+ * A notification arriving seconds after the toggle is the only end-to-end
+ * evidence, and it costs one request.
+ *
+ * It reaches THIS ADMIN'S DEVICES ONLY, and that is enforced by the sender
+ * rather than requested here: an authenticated caller is scoped to their own
+ * subscriptions (`scopeFor` in `supabase/functions/_shared/adminPush.ts`). No
+ * caller of this function can address anybody else.
+ *
+ * **AND ONLY THE DEVICE JUST ENABLED.** The endpoint is passed so the sender
+ * narrows to that one row. Without it, an admin who already had a subscribed
+ * phone would get the confirmation THERE — which looks exactly like proof that
+ * the browser they are sitting in front of now works, and is not. Review caught
+ * that on #398. The narrowing is ANDed with the scope filter server-side, so it
+ * cannot be used to reach anybody else's device.
+ *
+ * Both languages are sent because the sender chooses per device, from the
+ * `lang` recorded when that device subscribed — which may not be the language
+ * of the browser doing the subscribing.
+ */
+export async function sendAdminPushConfirmation(endpoint: string): Promise<void> {
+  const { error } = await supabase.functions.invoke('admin-push-dispatch', {
+    body: {
+      endpoint,
+      title: 'تم تفعيل الإشعارات',
+      body: 'سيصلك إشعار عند إغلاق صنف أو حجم أو التوصيل في أي فرع.',
+      titleEn: 'Notifications are on',
+      bodyEn: 'You will be told when a branch closes an item, a size or delivery.',
+      url: '/',
+      tag: 'admin-push-confirmation',
+      // Short on purpose: a confirmation that arrives tomorrow is confusing
+      // rather than reassuring.
+      ttl: 120,
+    },
+  });
+  if (error) throw error;
+}
