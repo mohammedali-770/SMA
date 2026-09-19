@@ -7,6 +7,8 @@ import {
   buildPayload,
   classifyDelivery,
   parseNotificationRequest,
+  parseTargetEndpoint,
+  refusePushEndpoint,
   scopeFor,
   shouldPruneAfterFailure,
 } from './adminPush';
@@ -120,6 +122,52 @@ describe('parseNotificationRequest', () => {
   it('accepts copy that fits', () => {
     expect(parseNotificationRequest({ title: 'a', body: 'x'.repeat(3000) }).ok).toBe(true);
   });
+
+  /*
+   * THE VARIANT THAT IS NOT MEASURED IS THE ONE THAT THROWS. A bilingual
+   * request may carry a longer ENGLISH body that only an English-registered
+   * device ever sees; sizing on Arabic alone lets it through, and
+   * `encryptPayload` then throws for those devices only — which reads as a
+   * flaky push service. Review caught it on #398.
+   */
+  it('refuses when only the English variant is over the limit', () => {
+    const result = parseNotificationRequest({
+      title: 'a',
+      body: 'b',
+      titleEn: 'A',
+      bodyEn: 'x'.repeat(MAX_PLAINTEXT_BYTES),
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  /*
+   * `at` is a 13-digit epoch at delivery and was measured as `0` — one
+   * character — so a request within twelve bytes of the ceiling passed here and
+   * threw at encryption time.
+   */
+  it('leaves room for the runtime timestamp rather than a zero', () => {
+    const sizeAtZero = (body: string) =>
+      new TextEncoder().encode(
+        JSON.stringify(
+          buildPayload(
+            { title: 'a', body, titleEn: null, bodyEn: null, url: null, tag: null, ttlSeconds: 60 },
+            'ar',
+            0,
+          ),
+        ),
+      ).length;
+
+    // The LARGEST body that fits exactly when `at` is a single character.
+    const body = 'x'.repeat(MAX_PLAINTEXT_BYTES - sizeAtZero(''));
+    // Self-check: this really is at the ceiling for at=0, so a checker that
+    // measured there would admit it. Without this line the case could pass by
+    // being over the limit for an unrelated reason.
+    expect(sizeAtZero(body)).toBe(MAX_PLAINTEXT_BYTES);
+
+    // And it must still be refused, because at delivery `at` is twelve
+    // characters wider than the zero the first version measured.
+    expect(parseNotificationRequest({ title: 'a', body }).ok).toBe(false);
+  });
 });
 
 describe('buildPayload', () => {
@@ -182,6 +230,83 @@ describe('buildPayload', () => {
   it.each([['ar'], ['en'], ['fr'], ['']])('never emits a null title for lang %s', (lang) => {
     expect(typeof buildPayload(arabicOnly, lang, 0).title).toBe('string');
   });
+});
+
+describe('refusePushEndpoint', () => {
+  /*
+   * WHAT THIS CONTAINS. `save_admin_push_subscription` checks only that the
+   * endpoint is non-empty, so the stored value is whatever the caller sent —
+   * and an admin at AAL2 is all it takes to store one. Without this check, one
+   * row edit turns the sender into a connector to any address the Edge runtime
+   * can reach. Same reasoning and same host rules as `smtpTarget.ts`. Review
+   * caught the absence on #398.
+   */
+  it.each([
+    ['the real Apple endpoint', 'https://web.push.apple.com/abc123'],
+    ['the real FCM endpoint', 'https://fcm.googleapis.com/fcm/send/xyz'],
+    ['Mozilla with a port', 'https://updates.push.services.mozilla.com:443/wpush/v2/x'],
+  ])('admits %s', (_label, endpoint) => {
+    expect(refusePushEndpoint(endpoint)).toBeNull();
+  });
+
+  it.each([
+    ['the cloud metadata endpoint', 'https://169.254.169.254/latest/meta-data/'],
+    ['loopback by name', 'https://localhost/push'],
+    ['loopback by address', 'https://127.0.0.1/push'],
+    ['loopback in decimal', 'https://2130706433/push'],
+    ['loopback in hex', 'https://0x7f000001/push'],
+    ['a short-form IPv4', 'https://127.1/push'],
+    ['IPv6 loopback', 'https://[::1]/push'],
+    ['private space', 'https://10.0.0.5/push'],
+    ['a container name', 'https://redis/push'],
+    ['an internal suffix', 'https://push.internal/x'],
+    ['an mDNS name', 'https://printer.local/x'],
+  ])('refuses %s', (_label, endpoint) => {
+    expect(refusePushEndpoint(endpoint)).not.toBeNull();
+  });
+
+  it('refuses plain HTTP and other schemes', () => {
+    expect(refusePushEndpoint('http://web.push.apple.com/x')).toBe('endpoint_not_https');
+    expect(refusePushEndpoint('file:///etc/passwd')).toBe('endpoint_not_https');
+    expect(refusePushEndpoint('gopher://example.com/x')).toBe('endpoint_not_https');
+  });
+
+  it('refuses an endpoint carrying credentials this process would transmit', () => {
+    expect(refusePushEndpoint('https://user:pass@web.push.apple.com/x')).toBe('endpoint_has_credentials');
+  });
+
+  it('refuses something that is not a URL at all', () => {
+    expect(refusePushEndpoint('web.push.apple.com/x')).toBe('endpoint_not_a_url');
+    expect(refusePushEndpoint('')).toBe('endpoint_not_a_url');
+  });
+
+  it('honours an optional operator allowlist, and only narrows', () => {
+    const apple = 'https://web.push.apple.com/x';
+    expect(refusePushEndpoint(apple, null)).toBeNull();
+    expect(refusePushEndpoint(apple, '')).toBeNull();
+    expect(refusePushEndpoint(apple, 'push.apple.com')).toBeNull();
+    expect(refusePushEndpoint(apple, 'fcm.googleapis.com')).toBe('endpoint_not_allowed');
+  });
+
+  it('is not fooled by a trailing dot on the hostname', () => {
+    // `web.push.apple.com.` is the fully-qualified spelling of the same name.
+    expect(refusePushEndpoint('https://web.push.apple.com./x', 'fcm.googleapis.com')).toBe(
+      'endpoint_not_allowed',
+    );
+  });
+});
+
+describe('parseTargetEndpoint', () => {
+  it('returns the endpoint when one is named', () => {
+    expect(parseTargetEndpoint({ endpoint: ' https://a.example/x ' })).toBe('https://a.example/x');
+  });
+
+  it.each([[{}], [{ endpoint: '' }], [{ endpoint: 7 }], [null], ['x'], [['a']]])(
+    'returns null for %s',
+    (raw) => {
+      expect(parseTargetEndpoint(raw)).toBeNull();
+    },
+  );
 });
 
 describe('classifyDelivery', () => {

@@ -17,6 +17,8 @@ beforeEach(() => {
   rpc.mockReset();
 });
 
+const ENDPOINT = 'https://web.push.apple.com/abc123';
+
 describe('sendAdminPushConfirmation', () => {
   function body(): Record<string, unknown> {
     return (invoke.mock.calls[0][1] as { body: Record<string, unknown> }).body;
@@ -24,7 +26,7 @@ describe('sendAdminPushConfirmation', () => {
 
   it('invokes the admin sender and nothing else', async () => {
     invoke.mockResolvedValue({ data: { status: 'ok' }, error: null });
-    await sendAdminPushConfirmation();
+    await sendAdminPushConfirmation(ENDPOINT);
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke.mock.calls[0][0]).toBe('admin-push-dispatch');
     // Mutation killed: reaching for the CUSTOMER sender, which would put a
@@ -39,18 +41,34 @@ describe('sendAdminPushConfirmation', () => {
    * anything else, so a future change to the sender's parsing cannot quietly
    * turn this into a broadcast.
    */
+  /*
+   * WITHOUT THIS, THE CONFIRMATION PROVES THE WRONG THING. An admin who already
+   * has a subscribed phone would receive it there, which looks exactly like
+   * evidence that the browser they just enabled works. Review caught it on
+   * #398. The sender ANDs this with the scope filter, so it can only ever
+   * narrow the caller's own set.
+   */
+  it('names the device that was just enabled', async () => {
+    invoke.mockResolvedValue({ data: null, error: null });
+    await sendAdminPushConfirmation(ENDPOINT);
+    expect(body().endpoint).toBe(ENDPOINT);
+  });
+
   it('never asks for a scope or an audience', async () => {
     invoke.mockResolvedValue({ data: null, error: null });
-    await sendAdminPushConfirmation();
+    await sendAdminPushConfirmation(ENDPOINT);
     const sent = body();
     expect('scope' in sent).toBe(false);
     expect('adminId' in sent).toBe(false);
     expect('all' in sent).toBe(false);
+    // `endpoint` is a narrowing filter, not an audience: the server still
+    // scopes to the caller, so this cannot address another admin's device.
+    expect(sent.endpoint).toBe(ENDPOINT);
   });
 
   it('sends copy in both languages so the sender can pick per device', async () => {
     invoke.mockResolvedValue({ data: null, error: null });
-    await sendAdminPushConfirmation();
+    await sendAdminPushConfirmation(ENDPOINT);
     const sent = body();
     for (const key of ['title', 'body', 'titleEn', 'bodyEn']) {
       expect(typeof sent[key]).toBe('string');
@@ -63,7 +81,7 @@ describe('sendAdminPushConfirmation', () => {
 
   it('expires quickly and links into the console rather than the customer app', async () => {
     invoke.mockResolvedValue({ data: null, error: null });
-    await sendAdminPushConfirmation();
+    await sendAdminPushConfirmation(ENDPOINT);
     const sent = body();
     expect(sent.ttl).toBe(120);
     expect(sent.url).toBe('/');
@@ -72,7 +90,7 @@ describe('sendAdminPushConfirmation', () => {
 
   it('throws when the sender refuses', async () => {
     invoke.mockResolvedValue({ data: null, error: new Error('not deployed') });
-    await expect(sendAdminPushConfirmation()).rejects.toThrow('not deployed');
+    await expect(sendAdminPushConfirmation(ENDPOINT)).rejects.toThrow('not deployed');
   });
 });
 

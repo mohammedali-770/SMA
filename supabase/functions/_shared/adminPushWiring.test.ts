@@ -132,6 +132,39 @@ describe('the VAPID configuration is checked before anything is sent', () => {
   });
 });
 
+describe('the endpoint is treated as untrusted input', () => {
+  /*
+   * Storing an endpoint needs only an admin at AAL2, and the SQL checks only
+   * that it is non-empty — so what this function POSTs to is caller-controlled.
+   * Both halves matter and neither implies the other: the check stops the
+   * request, and `redirect: 'manual'` stops a checked host handing it on.
+   */
+  it('refuses a non-push endpoint before any request is made', () => {
+    const c = code();
+    expect(c).toContain('refusePushEndpoint(row.endpoint, ADMIN_PUSH_ALLOWED_HOSTS)');
+    // Before the fetch, not after it.
+    expect(c.indexOf('refusePushEndpoint')).toBeLessThan(c.indexOf('await fetch('));
+  });
+
+  it('does not follow a redirect out of the checked host', () => {
+    const c = code();
+    expect(c).toContain("redirect: 'manual'");
+    // Mutation killed: `redirect: 'follow'`, which is also the default, so the
+    // absence of the option is the defect — assert the value, not the key.
+    expect(c).not.toContain("redirect: 'follow'");
+  });
+
+  it('narrows to one device only in addition to the scope filter', () => {
+    const c = code();
+    expect(c).toContain("query.eq('endpoint', targetEndpoint)");
+    // The scope filter must still be applied: an endpoint filter that REPLACED
+    // it would let any admin name another admin's device.
+    expect(c.indexOf("query.eq('admin_id', callerId)")).toBeLessThan(
+      c.indexOf("query.eq('endpoint', targetEndpoint)"),
+    );
+  });
+});
+
 describe('failure handling', () => {
   it('deletes a subscription only through classifyDelivery', () => {
     const c = code();

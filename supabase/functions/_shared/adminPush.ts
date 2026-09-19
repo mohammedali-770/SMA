@@ -9,6 +9,7 @@
  */
 
 import { MAX_PLAINTEXT_BYTES, isGoneStatus } from './webPush.ts';
+import { isAllowedHost, isPublicHostname, normalizeHost } from './publicHost.ts';
 
 /** How a caller proved who they are. Decided in the handler, used here. */
 export type CallerKind = 'service_role' | 'admin';
@@ -48,6 +49,19 @@ export interface NotificationRequest {
   /** Collapses an earlier notification about the same subject, if set. */
   tag: string | null;
   ttlSeconds: number;
+}
+
+/** Both languages the sender can select between, so the largest is measured. */
+const PAYLOAD_SIZE_PROBES = ['ar', 'en'] as const;
+
+/**
+ * The widest `at` value this can ever carry: epoch milliseconds stays 13 digits
+ * until November 2286, so sizing on it is exact rather than approximate.
+ */
+const WIDEST_TIMESTAMP = 9_999_999_999_999;
+
+function payloadBytes(request: NotificationRequest, lang: string): number {
+  return new TextEncoder().encode(JSON.stringify(buildPayload(request, lang, WIDEST_TIMESTAMP))).length;
 }
 
 export type ParseResult = { ok: true; request: NotificationRequest } | { ok: false; reason: string };
@@ -96,7 +110,15 @@ export function parseNotificationRequest(raw: unknown): ParseResult {
   // Measured against the encrypted-payload ceiling rather than a guess, so a
   // request that would fail at encryption time is refused with a sentence that
   // says why. Arabic is multi-byte, so the character count is not the size.
-  const encoded = new TextEncoder().encode(JSON.stringify(buildPayload(request, 'ar', 0))).length;
+  //
+  // EVERY VARIANT, AT A REALISTIC TIMESTAMP. The first version measured only
+  // the Arabic payload with `at: 0`, which understates the real thing twice
+  // over: a bilingual request may carry a LONGER English body that only an
+  // English-registered device ever sees, and `at` is a 13-digit epoch at
+  // delivery rather than one character. A request could therefore pass here and
+  // throw inside `encryptPayload` for some devices and not others — counted as
+  // a failure, and looking like a flaky push service. Review caught it on #398.
+  const encoded = Math.max(...PAYLOAD_SIZE_PROBES.map((lang) => payloadBytes(request, lang)));
   if (encoded > MAX_PLAINTEXT_BYTES) {
     return { ok: false, reason: `payload is ${encoded} bytes, over ${MAX_PLAINTEXT_BYTES}` };
   }
@@ -127,6 +149,66 @@ export function buildPayload(
   if (request.url !== null) payload.url = request.url;
   if (request.tag !== null) payload.tag = request.tag;
   return payload;
+}
+
+/**
+ * An OPTIONAL `endpoint` in the request body: send to this device only.
+ *
+ * Returned verbatim for an exact-match filter, never parsed into a URL — this
+ * is an identity to compare, not an address to reach, and the address is
+ * validated separately by `refusePushEndpoint` against what is STORED. A
+ * caller naming an endpoint they do not own narrows their own set to nothing,
+ * because the filter is ANDed with the scope.
+ */
+export function parseTargetEndpoint(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const value = (raw as Record<string, unknown>).endpoint;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+export const ENDPOINT_NOT_A_URL = 'endpoint_not_a_url';
+export const ENDPOINT_NOT_HTTPS = 'endpoint_not_https';
+export const ENDPOINT_HAS_CREDENTIALS = 'endpoint_has_credentials';
+export const ENDPOINT_NOT_PUBLIC = 'endpoint_not_public';
+export const ENDPOINT_NOT_ALLOWED = 'endpoint_not_allowed';
+
+/**
+ * Why this endpoint must not be POSTed to, or null if it may be.
+ *
+ * WHAT IT CONTAINS. `save_admin_push_subscription` checks only that the
+ * endpoint is non-empty, so the stored value is whatever the caller sent — and
+ * an authenticated ADMIN AT AAL2 is what it takes to store one. This is
+ * therefore not an anonymous SSRF; it is containment for a compromised admin
+ * session or a leaked service key, which bypasses RLS entirely. Exactly the
+ * same reasoning, and exactly the same host rules, as `smtpTarget.ts`: without
+ * it, one row edit turns this function into a connector to any address the Edge
+ * runtime can reach, the cloud metadata endpoint included.
+ *
+ * **IT IS NOT THE WHOLE GUARD.** A refusal here only stops the request; the
+ * matching `redirect: 'manual'` in the handler is what stops a legitimate host
+ * redirecting the POST somewhere else after the check has passed. Both are
+ * needed, and neither implies the other.
+ *
+ * Found by review on #398 — the first version validated nothing and fetched
+ * whatever was in the row.
+ */
+export function refusePushEndpoint(endpoint: string, allowlist?: string | null): string | null {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return ENDPOINT_NOT_A_URL;
+  }
+  if (url.protocol !== 'https:') return ENDPOINT_NOT_HTTPS;
+  // `https://user:pass@host/` is a credential this process would transmit, and
+  // no push service uses one.
+  if (url.username !== '' || url.password !== '') return ENDPOINT_HAS_CREDENTIALS;
+  const host = normalizeHost(url.hostname);
+  if (!isPublicHostname(host)) return ENDPOINT_NOT_PUBLIC;
+  if (!isAllowedHost(host, allowlist)) return ENDPOINT_NOT_ALLOWED;
+  return null;
 }
 
 export type DeliveryOutcome = 'sent' | 'gone' | 'failed';

@@ -6,6 +6,8 @@ import {
   buildPayload,
   classifyDelivery,
   parseNotificationRequest,
+  parseTargetEndpoint,
+  refusePushEndpoint,
   scopeFor,
   shouldPruneAfterFailure,
 } from '../_shared/adminPush.ts';
@@ -59,6 +61,14 @@ const SEND_TIMEOUT_MS = 10_000;
 
 /** Concurrent sends. Small deliberately: the audience is a handful of phones. */
 const SEND_CONCURRENCY = 6;
+
+/**
+ * OPTIONAL pin for the push endpoints this deployment will POST to,
+ * comma-separated. Unset — which is how every deployment stands today — means
+ * "any public hostname", so setting it narrows the guard in
+ * `refusePushEndpoint` and never widens it. Same shape as `SMTP_ALLOWED_HOSTS`.
+ */
+const ADMIN_PUSH_ALLOWED_HOSTS = Deno.env.get('ADMIN_PUSH_ALLOWED_HOSTS') ?? null;
 
 interface SubscriptionRow {
   id: string;
@@ -140,6 +150,12 @@ Deno.serve(async (req: Request) => {
   const parsed = parseNotificationRequest(rawBody);
   if (!parsed.ok) return json({ error: parsed.reason, code: 'bad_request' }, 400);
   const request = parsed.request;
+  // OPTIONAL: narrow the send to ONE of the caller's devices. The console uses
+  // it so its confirmation reaches the browser that was just enabled rather
+  // than every device that admin owns — otherwise a notification arriving on an
+  // older phone looks like proof that the NEW subscription works. Review caught
+  // that on #398. It only ever narrows: the scope filter below still applies.
+  const targetEndpoint = parseTargetEndpoint(rawBody);
 
   // ---- the keys -------------------------------------------------------------
   //
@@ -188,6 +204,9 @@ Deno.serve(async (req: Request) => {
     if (callerId === null) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     query = query.eq('admin_id', callerId);
   }
+  // ANDed with the scope filter, never instead of it, so naming somebody else's
+  // endpoint narrows a caller's own set to nothing rather than reaching it.
+  if (targetEndpoint !== null) query = query.eq('endpoint', targetEndpoint);
   const { data: rows, error: rowsError } = await query;
   if (rowsError) return json({ status: 'error', reason: 'subscription read failed' }, 500);
   const subscriptions = (rows as SubscriptionRow[] | null) ?? [];
@@ -202,6 +221,28 @@ Deno.serve(async (req: Request) => {
   let pruned = 0;
 
   async function deliver(row: SubscriptionRow): Promise<void> {
+    // VALIDATED BEFORE ANYTHING IS SENT. The endpoint is whatever was stored,
+    // and storing one needs only an admin at AAL2 — so this is containment for
+    // a compromised admin session or a leaked service key, the same reasoning
+    // as `smtpTarget.ts`. A refusal is terminal for the row: no host check is
+    // going to pass on a later tick, so retrying would only repeat it.
+    const refusal = refusePushEndpoint(row.endpoint, ADMIN_PUSH_ALLOWED_HOSTS);
+    if (refusal !== null) {
+      failed += 1;
+      console.error('admin push: endpoint refused', {
+        origin: endpointOrigin(row.endpoint),
+        reason: refusal,
+      });
+      await admin
+        .from('admin_push_subscriptions')
+        .update({
+          last_failure_at: new Date(at).toISOString(),
+          failure_count: row.failure_count + 1,
+        })
+        .eq('id', row.id);
+      return;
+    }
+
     let status: number;
     try {
       const push = await buildPushRequest({
@@ -215,6 +256,12 @@ Deno.serve(async (req: Request) => {
         method: 'POST',
         headers: push.headers,
         body: push.body,
+        // A CHECKED HOST MUST NOT BE ABLE TO HAND THE REQUEST ON. Following a
+        // 3xx would re-point this POST at an address `refusePushEndpoint` never
+        // saw, which is the whole guard undone by one Location header. Manual
+        // redirects surface as a 3xx status, which `classifyDelivery` reads as
+        // a retryable failure rather than a dead subscription.
+        redirect: 'manual',
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
       status = response.status;

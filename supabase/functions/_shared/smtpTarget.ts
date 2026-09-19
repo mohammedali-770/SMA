@@ -28,6 +28,8 @@
  * actually regress.
  */
 
+import { isAllowedHost, isIpLiteral, isPrivateName, isValidHostname, normalizeHost } from './publicHost.ts';
+
 export const SMTP_NOT_CONFIGURED = 'smtp_not_configured';
 export const SMTP_HOST_INVALID = 'smtp_host_invalid';
 export const SMTP_HOST_NOT_ROUTABLE = 'smtp_host_not_routable';
@@ -56,54 +58,14 @@ function refuse(reason: string): SmtpTarget {
   return { host: '', port: 0, tls: false, username: '', fromEmail: '', fromName: '', reason };
 }
 
-/** Every spelling of an IPv4 literal a resolver would still accept. */
-function isIpLiteral(host: string): boolean {
-  if (host.includes(':')) return true; // IPv6, bare or bracketed
-  if (/^\d+$/.test(host)) return true; // 2130706433
-  if (/^0[xX][0-9a-fA-F]+$/.test(host)) return true; // 0x7f000001
-  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) return true; // 127.0.0.1
-  // Mixed and short forms: 127.1, 0177.0.0.1, 0x7f.1
-  if (/^(0[xX][0-9a-fA-F]+|\d+)(\.(0[xX][0-9a-fA-F]+|\d+))*$/.test(host)) return true;
-  return false;
-}
-
-/** Names that resolve only inside a network, never to a public relay. */
-function isPrivateName(host: string): boolean {
-  if (host === 'localhost') return true;
-  return (
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host.endsWith('.internal') ||
-    host.endsWith('.home.arpa')
-  );
-}
-
-function isValidHostname(host: string): boolean {
-  if (host.length === 0 || host.length > 253) return false;
-  const labels = host.split('.');
-  if (labels.length < 2) return false; // a relay is never a bare label
-  for (const label of labels) {
-    if (label.length === 0 || label.length > 63) return false;
-    if (!/^[a-z0-9-]+$/.test(label)) return false;
-    if (label.startsWith('-') || label.endsWith('-')) return false;
-  }
-  // A real TLD, so `mail.spicymeal` or a typo'd suffix cannot be reached.
-  return /^[a-z]{2,}$/.test(labels[labels.length - 1]);
-}
-
 /**
- * An OPTIONAL operator allowlist, for an installation that wants the endpoint
- * pinned rather than merely public. Unset means "any public hostname", which is
- * the behaviour every existing deployment already has.
+ * The host rules moved to `publicHost.ts` on 2026-09-19, when the admin push
+ * sender needed the same question answered about a push endpoint. They are
+ * identical; this file keeps its own reason codes and its own port and
+ * credential handling.
  */
 export function isAllowedSmtpHost(host: string, allowlist: string | null | undefined): boolean {
-  const raw = (allowlist ?? '').trim();
-  if (raw === '') return true;
-  return raw
-    .split(',')
-    .map((h) => h.trim().toLowerCase().replace(/\.$/, ''))
-    .filter((h) => h !== '')
-    .some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  return isAllowedHost(host, allowlist);
 }
 
 export function parseSmtpTarget(
@@ -112,10 +74,7 @@ export function parseSmtpTarget(
 ): SmtpTarget {
   // Trailing dot is the fully-qualified spelling of the same name; strip it so
   // `evil.com.` cannot slip past an allowlist that holds `evil.com`.
-  const host = String(publicConfig.host ?? '')
-    .trim()
-    .toLowerCase()
-    .replace(/\.$/, '');
+  const host = normalizeHost(String(publicConfig.host ?? ''));
   const fromEmail = String(publicConfig.from_email ?? '').trim();
   const fromName = String(publicConfig.from_name ?? '').trim() || 'Spicy Meal';
   const username = String(publicConfig.username ?? '').trim();

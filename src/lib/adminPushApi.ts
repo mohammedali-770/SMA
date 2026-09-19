@@ -105,13 +105,21 @@ export async function deleteAdminPushSubscription(endpoint: string): Promise<voi
  * subscriptions (`scopeFor` in `supabase/functions/_shared/adminPush.ts`). No
  * caller of this function can address anybody else.
  *
+ * **AND ONLY THE DEVICE JUST ENABLED.** The endpoint is passed so the sender
+ * narrows to that one row. Without it, an admin who already had a subscribed
+ * phone would get the confirmation THERE — which looks exactly like proof that
+ * the browser they are sitting in front of now works, and is not. Review caught
+ * that on #398. The narrowing is ANDed with the scope filter server-side, so it
+ * cannot be used to reach anybody else's device.
+ *
  * Both languages are sent because the sender chooses per device, from the
  * `lang` recorded when that device subscribed — which may not be the language
  * of the browser doing the subscribing.
  */
-export async function sendAdminPushConfirmation(): Promise<void> {
+export async function sendAdminPushConfirmation(endpoint: string): Promise<void> {
   const { error } = await supabase.functions.invoke('admin-push-dispatch', {
     body: {
+      endpoint,
       title: 'تم تفعيل الإشعارات',
       body: 'سيصلك إشعار عند إغلاق صنف أو حجم أو التوصيل في أي فرع.',
       titleEn: 'Notifications are on',
