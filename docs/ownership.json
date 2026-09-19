@@ -67,11 +67,15 @@
     },
     {
       "id": "admin-push",
-      "why": "Web push to the staff console is a SEPARATE channel from the customer Expo push, and the separation is the safety property. A change to the manifest, the service worker or the readiness check can silently stop an admin receiving closure alerts, or — far worse — blur the line between the staff channel and the live customer one.",
+      "why": "Web push to the staff console is a SEPARATE channel from the customer Expo push, and the separation is the safety property. A change to the manifest, the service worker, the readiness check or the sender can silently stop an admin receiving closure alerts, or — far worse — blur the line between the staff channel and the live customer one. The sender also holds the VAPID signing key and decides who a send may reach.",
       "sources": [
         "public/sw.js",
         "public/manifest.webmanifest",
-        "src/lib/pwa/**"
+        "src/lib/pwa/**",
+        "src/lib/adminPushApi.ts",
+        "supabase/functions/admin-push-dispatch/**",
+        "supabase/functions/_shared/webPush.ts",
+        "supabase/functions/_shared/adminPush.ts"
       ],
       "docs": [
         "docs/ADMIN_PUSH_NOTIFICATIONS.md"

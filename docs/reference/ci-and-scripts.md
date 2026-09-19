@@ -71,6 +71,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/docs-check-ownership.mjs` — Enforces the documentation ownership map in docs/ownership.json
 - `scripts/docs-generate.mjs` — Generates the machine-derived half of the documentation set
 - `scripts/format-check.mjs` — Two formatting rules, deliberately narrow, both scoped to this branch's diff
+- `scripts/generate-vapid-keys.mjs` — Generate the VAPID key pair for admin web push (docs/ADMIN_PUSH_NOTIFICATIONS.md)
 - `scripts/lib`
 - `scripts/sync-design-system.mjs` — Mirrors the canonical design-system modules into each app
 - `scripts/test-phone-allowlist.json`

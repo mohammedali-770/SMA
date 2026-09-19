@@ -14,6 +14,7 @@ import {
   deleteAdminPushSubscription,
   fetchAdminPushState,
   saveAdminPushSubscription,
+  sendAdminPushConfirmation,
 } from '../../lib/adminPushApi';
 import { resolveAdminPushState, type AdminPushState } from '../../lib/pwa/adminPushState';
 import { pushReadiness, readPushEnvironment } from '../../lib/pwa/pushSupport';
@@ -142,6 +143,17 @@ export function useAdminPush(lang: 'en' | 'ar', enabled: boolean): AdminPushCont
             lang,
             userAgent: navigator.userAgent,
           });
+
+          /*
+           * Prove the whole chain right now, while the admin is looking at it.
+           * The subscription is stored either way — this only asks the sender
+           * to deliver one notification to this device — so a failure here must
+           * NOT undo the toggle or report an error: the sender may simply not
+           * be deployed yet, and the control's state is already truthful. What
+           * the admin gets instead is the diagnostic: a notification arrives,
+           * or the sending half is not configured.
+           */
+          await sendAdminPushConfirmation().catch(() => undefined);
         }
 
         await refresh();

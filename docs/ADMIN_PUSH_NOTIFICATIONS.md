@@ -1,10 +1,12 @@
 # Admin push notifications — closures on the phone
 
-**Status: steps 1 and 2 are built. Nothing sends yet.** The console is
-installable, a service worker is registered, and an admin can subscribe from the
-header once the step 2 migration is applied and a VAPID key is configured. There
-is still no sender and no trigger, so **no code path attempts to send anything**
-— subscribing stores a row and produces no notification.
+**Status: steps 1, 2 and 3 are built. Nothing sends yet, and that is now a
+statement about CONFIGURATION rather than about missing code.** The console is
+installable, a service worker is registered, an admin can subscribe from the
+header, and the sender exists. What does not exist is a deployed function, a
+VAPID key pair, an applied migration or a trigger — so today there is still no
+path by which a notification is produced. Every one of those is a separate owner
+action under CLAUDE.md §5, listed in §5 below.
 
 ## What this is for
 
@@ -155,12 +157,92 @@ exposes a toggle rather than doing this on load.
 pushed to, so storing it would show the admin a "subscribed" device that
 silently never notifies.
 
-## 4. What is still to build
+## 3c. What step 3 added — the sender
 
-**Step 3 — the sender.** An Edge Function that signs a VAPID token, encrypts the
-payload and POSTs to the push endpoint. Expo cannot do this — it is not the
-mobile app. It must delete a subscription on `410 Gone`, so a reinstalled phone
-cleans itself up rather than accumulating dead rows.
+| File | Role |
+| --- | --- |
+| `supabase/functions/_shared/webPush.ts` | VAPID signing (RFC 8292) and `aes128gcm` payload encryption (RFC 8291). Pure Web Crypto; no Deno APIs, so CI executes it. |
+| `supabase/functions/_shared/webPush.test.ts` | 54 cases, including the RFC's own encryption vector. |
+| `supabase/functions/_shared/adminPush.ts` | The decisions: who a send may reach, what the worker receives, what a status code means. |
+| `supabase/functions/_shared/adminPush.test.ts` | 47 cases over those decisions. |
+| `supabase/functions/_shared/adminPushWiring.test.ts` | Source-shape tripwires for the handler, plus the executed payload contract against `public/sw.js`. |
+| `supabase/functions/admin-push-dispatch/index.ts` | The handler. **Written, not deployed.** |
+| `scripts/generate-vapid-keys.mjs` | Produces the key pair and prints where each half goes. |
+| `src/lib/adminPushApi.ts` | Gained `sendAdminPushConfirmation()`. |
+
+### It is written by hand, and the RFC's test vector is why that is defensible
+
+Every mature web-push library is a Node package that wants `node:crypto`,
+`node:http` and a bundler; the Deno ports are thin and unmaintained. Everything
+the protocol needs — ECDH on P-256, HKDF-SHA256, AES-128-GCM and ECDSA P-256 —
+is already in the Web Crypto API that Deno and Node both ship, so this is about
+150 lines of standard-library calls instead of a supply-chain edge for staff
+notifications.
+
+That trade only holds if the implementation is checked against something other
+than itself. **`webPush.test.ts` encrypts RFC 8291 §5's plaintext with RFC 8291
+§5's keys and salt and asserts the body matches RFC 8291 §5's published
+ciphertext byte for byte.** A round-trip test — encrypt, decrypt, compare —
+passes just as happily with the two HKDF info strings swapped, the record size
+written little-endian, or the last-record delimiter set to `0x01`. None of those
+would ever display a notification on a real phone, and all of them are
+self-consistent. **Thirteen of fourteen deliberate mutations were killed by that
+suite**, including swapped info strings, a little-endian record size, a
+non-final delimiter, a transposed key-info operand order, a truncated ECDH
+secret and a VAPID token signed over the wrong bytes. The fourteenth survives
+and is recorded in the test file rather than hidden: it removes a fallback whose
+only purpose is a runtime Node cannot emulate.
+
+A second suite of twelve mutations against the handler — hard-coding the scope
+to `all`, reading the scope from the request body, judging an admin on their
+role alone, deleting a subscription on 403, logging a whole endpoint, reaching
+for `push_devices` — is killed in full by `adminPushWiring.test.ts`. **Two of
+those twelve initially survived, and both survivals were instructive.** One was
+a regex that a longer mutant walked past; the other was an assertion satisfied
+by the `import` line that *names* a helper rather than by the call that uses it.
+That second one is the repository's "a check a comment can satisfy is not a
+check" wearing a new costume, and the fix — stripping the import block as well
+as the comments — protects every future assertion in that file.
+
+### An admin can only ever push to their own devices
+
+`scopeFor` gives `all` to the service role and `self` to an authenticated admin,
+and that is not a setting. The console's confirmation send runs as the signed-in
+admin, so without the rule any administrator at AAL2 could put arbitrary text on
+every other administrator's lock screen — the same class of capability as
+`push-dispatch`'s broadcast, which is fenced for exactly this reason. Only the
+database, through the service role, fans out.
+
+### Turning the control on sends one notification, deliberately
+
+Storing a subscription tells the admin nothing about whether a notification can
+reach their phone: the sender has to be deployed, a key pair configured, and the
+public half has to match the one they just subscribed with. Each of those is a
+separate owner action and each fails silently. So enabling the control asks the
+sender for one confirmation notification to that device. **A failure there does
+not undo the toggle or raise an error** — the subscription is stored either way
+and the control's state is already truthful. The notification arriving is the
+end-to-end evidence; its absence is the diagnostic.
+
+### A subscription is deleted on 404 and 410, and on nothing else
+
+A 401 means our VAPID token is wrong; a 403 that our key does not match the
+subscription; a 413 that the payload is too big; a 429 that we are sending too
+fast. Every one of those is our problem, and treating any of them as "the
+subscription is gone" would wipe every admin's registration the first time a key
+was mistyped — silently, and recoverable only by each admin noticing and
+re-enabling. Repeated non-gone failures still prune, but only after 20 of them.
+
+### The two halves of the key pair are checked before anything is sent
+
+The public half lives in `app_settings.admin_push_vapid_public_key` because the
+browser needs it to subscribe; the private half is an Edge Function secret. They
+are typed into two different places, so the sender refuses to send unless they
+are a real key pair **and** the public half matches the one clients subscribed
+with. Without that check a transposed character produces an opaque 401 from
+every endpoint, which reads like a dead feature rather than a typo.
+
+## 4. What is still to build
 
 **Step 4 — the trigger.** `branch_availability_events` and
 `branch_delivery_events` **already record every closure**, with `branch_id`,
@@ -175,14 +257,29 @@ add-ons; the close action drops reopens.
 Each is separate under CLAUDE.md §5; approval for one is not approval for the
 next.
 
-1. Apply the step 2 migration.
-2. Apply the step 4 migration.
-3. Deploy the sender Edge Function.
-4. Add the VAPID private key as a secret. Generate it so the private half never
-   crosses the wire, the way the alert-dispatch trigger secret was handled
-   (`docs/OWNER_ACTIONS.md` §28).
+Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
+
+1. Apply `20260927120000_admin_push_subscriptions` (step 2).
+2. Generate a VAPID key pair — `node scripts/generate-vapid-keys.mjs`.
+3. Store both halves as Edge Function secrets, and the **public** half in
+   `app_settings.admin_push_vapid_public_key` (a live write, so its own §5
+   action).
+4. Deploy `admin-push-dispatch`.
 5. **Delete the Home Screen icon and re-add it** after step 1 reaches
    Production. See §1 — this cannot be skipped.
+6. Apply the step 4 migration, once it is written.
+
+**CORRECTION, 2026-09-19.** An earlier revision of this list said to generate the
+key "so the private half never crosses the wire, the way the alert-dispatch
+trigger secret was handled (`docs/OWNER_ACTIONS.md` §28)". **That is not
+achievable here, and repeating it would have sent somebody looking for a method
+that does not exist.** §28's trick works because Postgres both generates the
+secret and performs the HMAC, so the value never has to leave the database.
+Signing a VAPID token is ECDSA on P-256, which `pgcrypto` cannot do — the Edge
+Function must hold the private key to sign, so the key has to be created
+somewhere and pasted into the secret store. What is achievable, and what §41
+does, is keeping it to exactly one place: not the repository, not
+`app_settings`, not a pull request.
 
 ## 6. The limitation, stated rather than buried
 

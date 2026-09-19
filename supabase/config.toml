@@ -133,3 +133,14 @@ verify_jwt = false
 # so this is the only gate on the path — the same shape as push-dispatch.
 [functions.operations-alert-dispatch]
 verify_jwt = false
+
+# ---- Admin web push (staff console PWA) ----------------------------------
+# WEB push to administrators' installed consoles, entirely separate from the
+# Expo channel `push-dispatch` uses for customers: different table, different
+# provider, different function. Callers are the service role (the closure
+# driver, which fans out) or an authenticated ADMIN at AAL2 (the console's test
+# button, which reaches that admin's own devices only). verify_jwt=false because
+# the service-role path carries no user JWT, so the function's own check is the
+# only gate — the same shape as operations-alert-dispatch.
+[functions.admin-push-dispatch]
+verify_jwt = false

@@ -2978,6 +2978,120 @@ it is the copy a cashier reads during a rush.
 
 ---
 
+## 41. Admin push notifications — the five steps that turn it on
+
+You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
+size or delivery. The code is written; none of it is live. Behaviour, design and
+evidence: `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+
+**Nothing below sends anything by itself.** Steps 41.1-41.4 make a notification
+*possible*; until the step 4 trigger exists (41.6) the only notification anyone
+receives is the single confirmation the console sends when an admin turns the
+control on. Each step is its own §5 action — approval for one is not approval for
+the next.
+
+### The order matters, and here is the one way to get it wrong
+
+**Do not delete and re-add the Home Screen icon (41.5) before 41.1-41.4 are
+done.** iOS fixes an installed web app's capabilities at install time, so an icon
+re-added while the VAPID key is still missing installs an app that *can* receive
+push but has nothing to subscribe to — and you would have to delete and re-add it
+again. Do it last.
+
+### 41.1 Apply `20260927120000_admin_push_subscriptions`
+
+Name it by version, as always. It creates one empty table, one nullable
+`app_settings` column and three `is_admin()`-gated RPCs. **Applying it subscribes
+nobody and sends nothing.** It asserts the money-path pair is unmoved
+(`12b6816d…` / `22e2d429…`) and refuses to apply otherwise. Detail:
+`docs/MIGRATIONS.md` §49.
+
+### 41.2 Generate the VAPID key pair
+
+```
+node scripts/generate-vapid-keys.mjs
+```
+
+It prints two values and where each goes. **It writes nothing** — not to the
+repository, not to the database, not to Supabase.
+
+**The private key goes to exactly one place: the Edge Function secret store.**
+Not the repository, not `app_settings`, not a pull request, not a chat message
+you would not delete (CLAUDE.md §9). The public key is public by design — it
+identifies the sender and cannot sign anything — so it is safe in the database
+where every client can read it.
+
+This cannot be done the way the alert-dispatch trigger secret was (§28, generated
+inside Postgres so it never crossed the wire). That works because Postgres both
+makes the secret and performs the HMAC. Signing a VAPID token is ECDSA on P-256,
+which `pgcrypto` cannot do, so the function must hold the key and the key must be
+created somewhere. Keeping it to one place is the achievable version.
+
+### 41.3 Store the two secrets and the public key
+
+In the Supabase dashboard, **Edge Functions → Secrets**, add both lines the
+script printed:
+
+```
+ADMIN_PUSH_VAPID_PUBLIC_KEY=…
+ADMIN_PUSH_VAPID_PRIVATE_KEY=…
+```
+
+Optionally also `ADMIN_PUSH_VAPID_SUBJECT` — a `mailto:` or `https:` contact for
+the push service operators. Left unset it is `https://app.spicymeal.com.sa`,
+which is valid.
+
+Then the **public** key into the database, which is a live write and therefore
+its own action:
+
+```sql
+update public.app_settings
+   set admin_push_vapid_public_key = '<the public key>'
+ where id is true;
+```
+
+**The two must match.** The browser binds a subscription to the key it was given,
+so if the table advertises one key and the function signs with another, every
+send is refused with a 403. The sender checks this itself and answers
+`misconfigured` rather than sending — but it is cheaper to paste the same value
+twice than to debug it.
+
+### 41.4 Deploy `admin-push-dispatch`
+
+`verify_jwt = false` (it is already in `supabase/config.toml`), because the
+service-role path carries no user JWT and the function's own caller check is the
+gate — role **and** AAL2 for an admin, exact key match for the service role.
+
+**Deploying it sends nothing.** With no key configured it answers
+`not_configured`; with a key and nobody subscribed, `no_subscriptions`.
+
+**Deploy it AFTER 41.1, not before.** It reads `admin_push_subscriptions` and
+`app_settings.admin_push_vapid_public_key`, neither of which exists until that
+migration applies — so a deploy that lands first answers 500 on every call. It
+breaks nothing else (no other function or client touches this path), but it
+wastes a round trip and looks like a fault in the code rather than the order.
+
+### 41.5 Delete the Home Screen icon and re-add it — LAST
+
+The console is already on your Home Screen as **تقفيل المنتجات**, and it was added
+before any of this existed. iOS will not grant that entry push capability
+retroactively. Delete it, open `app.spicymeal.com.sa` in Safari, and add it to
+the Home Screen again.
+
+Then open it and tap the bell in the header. You should get **one notification
+within a few seconds** confirming notifications are on. If it does not arrive,
+one of 41.2-41.4 is incomplete — the subscription itself will still have been
+stored, so the control showing "on" is not evidence that sending works.
+
+### 41.6 Apply the step 4 trigger migration — not written yet
+
+The piece that turns a real branch closure into a notification. It hangs off
+`branch_availability_events` and `branch_delivery_events`, which already record
+every closure, so **no closure RPC is modified** — nothing about how a branch
+takes an item off the menu changes. It will be offered for approval when written.
+
+---
+
 ---
 
 ## Owner-action closeout rule

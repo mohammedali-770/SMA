@@ -42,6 +42,9 @@ Every environment variable the code reads, split by whether its value is visible
 
 Read by Edge Functions from the Deno environment. These are secrets. They live in the Supabase dashboard and in EAS, never in the repository, and they must not appear in logs, tests, fixtures or pull-request descriptions.
 
+- `ADMIN_PUSH_VAPID_PRIVATE_KEY`
+- `ADMIN_PUSH_VAPID_PUBLIC_KEY`
+- `ADMIN_PUSH_VAPID_SUBJECT`
 - `SEND_SMS_HOOK_SECRET`
 - `SMTP_ALLOWED_HOSTS`
 - `SUPABASE_ANON_KEY`
