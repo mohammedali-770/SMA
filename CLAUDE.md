@@ -94,6 +94,8 @@ Push is an **active production customer channel**. Both gates are open:
 
 Do not treat the old "push is dormant" framing anywhere as current. Sending an actual broadcast, widening the audience model, adding credentials, or turning the master flag back off all remain owner-approval actions under §5.
 
+**ADMIN WEB PUSH IS A DIFFERENT CHANNEL AND THIS SECTION DOES NOT GOVERN IT.** Since 2026-09-19 the staff console has its own web-push path for branch closures: a different table (`admin_push_subscriptions`), a different queue (`admin_push_outbox`), a different function (`admin-push-dispatch`) and a different provider (browser push, not Expo). It reaches administrators who opted in on their installed console, never a customer. The separation is enforced rather than intended — both migrations' verification blocks fail the apply if anything in the feature references `push_devices` or `promos_enabled`, and `adminPushWiring.test.ts` fails if the handler does. Detail: `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+
 Marketing is **opt-OUT as of the owner decision on 2026-08-20**. The OS notification permission dialog is the single consent moment: granting it registers the device with **both** channels on (`DEFAULT_DEVICE_PREFS` in `notificationPolicy.ts` now sets `promosEnabled: true`), so a customer never switches anything on inside the app. The Profile "Offers & promotions" toggle stays, as the in-app **opt-out**, alongside iOS/Android Settings.
 
 This supersedes the strictly-opt-in rule and the 2026-08-19 reaffirmation recorded in `docs/OWNER_ACTIONS.md` §10. That section is kept, marked superseded, because it also records a fabricated-approval incident that remains worth reading.
@@ -387,7 +389,29 @@ The guard that catches a bulk apply when a second, legitimate file is
 outstanding has run out of second files again. **Name the target by version.**
 That is what makes the count irrelevant in either shape.
 
-**AMENDED 2026-09-18 — a second file is written, so on merge the outstanding set
+**AMENDED AGAIN 2026-09-19 — a third file is written, so on merge the
+outstanding set is THREE: Moyasar (frozen on purpose),
+`20260927120000_admin_push_subscriptions` and
+`20260928120000_admin_push_closure_notifications` (both written, validated,
+awaiting approval).** The two admin-push files have a DEPENDENCY ORDER that is
+not optional in practice — `…0927` creates the subscription store the sender
+reads, `…0928` creates the queue it drains — but neither refuses to land out of
+order, because each is independently harmless: applied alone, one stores
+subscriptions nobody sends to and the other queues notices nobody claims.
+**Name each target by version and apply them in filename order.** The second
+also IMPLIES A DEPLOY (`admin-push-dispatch` gained a queue-drain mode in the
+same change); applying without deploying leaves notices expiring after two
+hours, which is a delay rather than a fault. Detail: `docs/MIGRATIONS.md` §49
+and §50, steps in `docs/OWNER_ACTIONS.md` §41.
+
+**THREE OUTSTANDING FILES IS NOT SAFER THAN ONE.** `20260824100000` still sorts
+ahead of everything, so "apply the outstanding migrations" still takes the
+frozen payment file FIRST — the count has never been what makes a bulk apply
+dangerous, and naming the target by version is still what makes the count
+irrelevant.
+
+**The superseded statement, kept because its reasoning is the point: AMENDED
+2026-09-18 — a second file is written, so on merge the outstanding set
 is TWO: Moyasar (frozen on purpose) and
 `20260927120000_admin_push_subscriptions` (written, validated, awaiting
 approval).** That restores the *appearance* of an innocent referent for "apply

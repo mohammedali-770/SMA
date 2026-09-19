@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **141**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260927120000_admin_push_subscriptions.sql`.
+Migration files in the repository: **142**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260928120000_admin_push_closure_notifications.sql`.
 
 ## Tables
 
@@ -23,8 +23,9 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `account_deletion_requests` | `20260715120000_account_deletion.sql` | 0 | 2 |
 | `account_deletion_resolution_audit` | `20260810120000_account_deletion_manual_review_resolution.sql` | 0 | 1 |
 | `addresses` | `20260707120300_addresses.sql` | 0 | 2 |
+| `admin_push_outbox` | `20260928120000_admin_push_closure_notifications.sql` | 0 | **none declared** |
 | `admin_push_subscriptions` | `20260927120000_admin_push_subscriptions.sql` | 0 | **none declared** |
-| `app_settings` | `20260707120600_app_settings.sql` | 6 | 2 |
+| `app_settings` | `20260707120600_app_settings.sql` | 7 | 2 |
 | `branch_availability_events` | `20260820110000_branch_availability_snooze.sql` | 1 | 1 |
 | `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 4 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
@@ -107,6 +108,12 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_list_role_change_audit` | 1 | `20260810141000_staff_access_directory.sql` |
 | `admin_list_staff` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_order_stats` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
+| `admin_push_availability_copy` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
+| `admin_push_delivery_copy` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
+| `admin_push_duration_ar` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
+| `admin_push_duration_en` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
+| `admin_push_enqueue_availability` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
+| `admin_push_enqueue_delivery` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `admin_push_state` | 1 | `20260927120000_admin_push_subscriptions.sql` |
 | `admin_search_role_candidates` | 2 | `20260827090000_admin_search_phone_normalization.sql` |
 | `admin_set_comp_member` | 2 | `20260827100000_comp_members_by_phone.sql` |
@@ -126,6 +133,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `cancel_branch_delivery_request` | 1 | `20260916120000_branch_delivery_requests.sql` |
+| `claim_admin_push_notifications` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `claim_comp_membership` | 1 | `20260827100000_comp_members_by_phone.sql` |
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |
@@ -170,6 +178,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `enforce_single_default_address` | 1 | `20260801120000_address_single_default.sql` |
 | `expire_stale_order_refund_claims` | 1 | `20260729090000_payment_refund_scheduler.sql` |
 | `export_my_data` | 1 | `20260912120000_export_my_data.sql` |
+| `finalize_admin_push_notification` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `finalize_checkout_session` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
 | `finalize_operations_alert_email` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `finalize_order_refund` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
@@ -183,6 +192,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `import_lazywait_catalog` | 3 | `20260826080000_import_lazywait_addon_groups.sql` |
 | `insert_order_from_snapshot` | 6 | `20260921120000_loyalty_earn_snapshot_path.sql` |
 | `invoke_account_deletion_processor` | 1 | `20260716180000_account_deletion_scheduler_job.sql` |
+| `invoke_admin_push_dispatch` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `invoke_lazywait_sync_processor` | 1 | `20260720120000_lazywait_sync_scheduler.sql` |
 | `invoke_operations_alert_dispatch` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
 | `invoke_payment_refund_processor` | 1 | `20260729090000_payment_refund_scheduler.sql` |
@@ -305,9 +315,10 @@ A function defined by more than one migration has been redefined; the last defin
 | `validate_coupon` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
 | `validate_pos_sync_notification_before_send` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `verify_account_deletion_process_secret` | 1 | `20260716160000_account_deletion_scheduler_auth.sql` |
+| `verify_admin_push_dispatch_signature` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `verify_operations_alert_dispatch_signature` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
 | `whatsapp_login_enabled` | 2 | `20260710160000_fix_whatsapp_login_review.sql` |
 
 ## Triggers
 
-71 trigger names are declared across the migration set: `aa_normalize_known_pos_failure_for_manual_resend`, `emit_branch_availability_event`, `emit_branch_delivery_event`, `emit_delivery_area_event`, `emit_modifier_availability_event`, `emit_orders_change_event`, `emit_variant_availability_event`, `enforce_customer_manual_resend_limit`, `enforce_deletion_lock_addresses`, `enforce_deletion_lock_checkout_sessions`, `enforce_deletion_lock_orders`, `enforce_deletion_lock_push_devices`, `enforce_orders_refund_transition`, `guard_used_coupon_identity`, `normalize_branch_availability`, `normalize_branch_delivery_pause`, `normalize_delivery_area`, `normalize_manual_pos_sync_notification`, `normalize_modifier_availability`, `normalize_variant_availability`, `on_auth_user_created`, `on_auth_user_phone_confirmed`, `open_orders_refund_record`, `set_`, `set_account_deletion_requests_updated_at`, `set_addresses_updated_at`, `set_admin_push_subscriptions_updated_at`, `set_app_settings_loyalty_expiry_next_run`, `set_app_settings_updated_at`, `set_branch_delivery_areas_updated_at`, `set_branch_delivery_zones_updated_at`, `set_branch_modifier_availability_updated_at`, `set_branch_variant_availability_updated_at`, `set_branch_working_hours_updated_at`, `set_campaigns_updated_at`, `set_checkout_sessions_updated_at`, `set_comp_members_updated_at`, `set_coupons_updated_at`, `set_homepage_banners_updated_at`, `set_integration_settings_updated_at`, `set_legal_documents_updated_at`, `set_loyalty_multipliers_updated_at`, `set_loyalty_transactions_safe_reason`, `set_notification_log_updated_at`, `set_operations_alert_outbox_updated_at`, `set_operations_alert_settings_updated_at`, `set_operations_alert_state_updated_at`, `set_order_refunds_updated_at`, `set_orders_lazywait_initial_sync`, `set_orders_number`, `set_orders_refund_enrollment`, `set_orders_updated_at`, `set_otp_challenges_updated_at`, `set_payment_records_updated_at`, `set_pos_sync_deadline`, `set_product_variants_updated_at`, `set_profiles_updated_at`, `set_push_devices_updated_at`, `set_staff_branch_assignments_updated_at`, `signal_area_change`, `signal_availability_change`, `signal_delivery_change`, `signal_modifier_availability_change`, `signal_variant_availability_change`, `stamp_payment_record_ts`, `trg_addresses_guard_live_checkout`, `trg_addresses_require_description`, `trg_addresses_single_default`, `trg_checkout_sessions_note_length`, `trg_enforce_order_item_note`, `trg_orders_note_length`.
+74 trigger names are declared across the migration set: `aa_normalize_known_pos_failure_for_manual_resend`, `admin_push_enqueue_availability`, `admin_push_enqueue_delivery`, `emit_branch_availability_event`, `emit_branch_delivery_event`, `emit_delivery_area_event`, `emit_modifier_availability_event`, `emit_orders_change_event`, `emit_variant_availability_event`, `enforce_customer_manual_resend_limit`, `enforce_deletion_lock_addresses`, `enforce_deletion_lock_checkout_sessions`, `enforce_deletion_lock_orders`, `enforce_deletion_lock_push_devices`, `enforce_orders_refund_transition`, `guard_used_coupon_identity`, `normalize_branch_availability`, `normalize_branch_delivery_pause`, `normalize_delivery_area`, `normalize_manual_pos_sync_notification`, `normalize_modifier_availability`, `normalize_variant_availability`, `on_auth_user_created`, `on_auth_user_phone_confirmed`, `open_orders_refund_record`, `set_`, `set_account_deletion_requests_updated_at`, `set_addresses_updated_at`, `set_admin_push_outbox_updated_at`, `set_admin_push_subscriptions_updated_at`, `set_app_settings_loyalty_expiry_next_run`, `set_app_settings_updated_at`, `set_branch_delivery_areas_updated_at`, `set_branch_delivery_zones_updated_at`, `set_branch_modifier_availability_updated_at`, `set_branch_variant_availability_updated_at`, `set_branch_working_hours_updated_at`, `set_campaigns_updated_at`, `set_checkout_sessions_updated_at`, `set_comp_members_updated_at`, `set_coupons_updated_at`, `set_homepage_banners_updated_at`, `set_integration_settings_updated_at`, `set_legal_documents_updated_at`, `set_loyalty_multipliers_updated_at`, `set_loyalty_transactions_safe_reason`, `set_notification_log_updated_at`, `set_operations_alert_outbox_updated_at`, `set_operations_alert_settings_updated_at`, `set_operations_alert_state_updated_at`, `set_order_refunds_updated_at`, `set_orders_lazywait_initial_sync`, `set_orders_number`, `set_orders_refund_enrollment`, `set_orders_updated_at`, `set_otp_challenges_updated_at`, `set_payment_records_updated_at`, `set_pos_sync_deadline`, `set_product_variants_updated_at`, `set_profiles_updated_at`, `set_push_devices_updated_at`, `set_staff_branch_assignments_updated_at`, `signal_area_change`, `signal_availability_change`, `signal_delivery_change`, `signal_modifier_availability_change`, `signal_variant_availability_change`, `stamp_payment_record_ts`, `trg_addresses_guard_live_checkout`, `trg_addresses_require_description`, `trg_addresses_single_default`, `trg_checkout_sessions_note_length`, `trg_enforce_order_item_note`, `trg_orders_note_length`.

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { assertVapidKeyPair } from './webPush';
-import { buildPayload, parseNotificationRequest } from './adminPush';
+import { buildPayload, parseNotificationRequest, requestFromQueueRow } from './adminPush';
 
 /**
  * A source-shape tripwire for `admin-push-dispatch`, in the idiom of
@@ -202,6 +202,107 @@ describe('the payload contract with public/sw.js', () => {
     if (!result.ok) throw new Error(result.reason);
     const emitted = Object.keys(buildPayload(result.request, 'ar', 0));
     for (const key of new Set(read)) expect(emitted).toContain(key);
+  });
+});
+
+describe('the queue-drain mode', () => {
+  function migration(): string {
+    return readFileSync(
+      new URL('../../migrations/20260928120000_admin_push_closure_notifications.sql', import.meta.url),
+      'utf8',
+    );
+  }
+
+  it('authenticates the scheduler through Postgres, never by holding its secret', () => {
+    const c = code();
+    expect(c).toContain("rpc('verify_admin_push_dispatch_signature'");
+    expect(c).toContain("req.headers.get('x-admin-push-signature')");
+    // Mutation killed: reading the shared secret itself out of a header or the
+    // environment and comparing it here, which is what `operations-alert-dispatch`
+    // did while its own header claimed otherwise (#329).
+    expect(c).not.toMatch(/x-admin-push-secret/);
+    expect(c).toContain('if (ok !== true)');
+  });
+
+  it('fails closed when the signature RPC does not exist yet', () => {
+    // Deploying before the step 4 migration is applied is an ordering mistake,
+    // and the honest answer is the same as for a bad signature. A 500 here
+    // would read as a fault in the function instead.
+    expect(code()).toMatch(/if \(error\) return json\(\{ error: 'unauthorized'/);
+  });
+
+  it('refuses a queue drain from an admin', () => {
+    const c = code();
+    expect(c).toContain("mode === 'queue' && !mayDrainQueue(caller)");
+    expect(c).toMatch(/code: 'forbidden' \}, 403\)/);
+  });
+
+  it('reads the audience before claiming anything', () => {
+    // Claiming first would burn an attempt against every queued notice on a
+    // deployment where nobody has subscribed, and three ticks later they would
+    // all be `failed` for a reason that was never theirs.
+    const c = code();
+    const audience = c.indexOf("status: 'no_subscriptions'");
+    const claim = c.indexOf("rpc(\n    'claim_admin_push_notifications'");
+    expect(audience).toBeGreaterThan(-1);
+    expect(c.indexOf('claim_admin_push_notifications')).toBeGreaterThan(audience);
+    expect(claim === -1 || claim > audience).toBe(true);
+  });
+
+  it('finalizes every claimed row under the token it claimed with', () => {
+    const c = code();
+    expect(c).toContain("rpc('finalize_admin_push_notification'");
+    expect(c).toContain('p_claim_token: claimToken');
+    // Mutation killed: reporting `sent` regardless of whether any device took
+    // it, which would mark a notification delivered that reached nobody.
+    expect(c).toContain('const ok = delivered > 0;');
+  });
+
+  /*
+   * THE #328 COUPLING, MADE EXECUTABLE. PostgREST serialises an RPC's declared
+   * OUT parameter names, not the aliases inside its body — and naming them
+   * wrong in TypeScript made every field `undefined` in
+   * `operations-alert-dispatch`, which then sent empty mail and stranded every
+   * claim. Here the migration's own `returns table (...)` is parsed and
+   * compared with the keys `requestFromQueueRow` actually reads, collected with
+   * a Proxy rather than written down a second time.
+   */
+  it('reads exactly the columns the claim RPC declares', () => {
+    const declared = /returns table \(([\s\S]*?)\)\nlanguage plpgsql/.exec(migration());
+    expect(declared).not.toBeNull();
+    const columns = new Set(
+      (declared?.[1] ?? '')
+        .split('\n')
+        .map((line) => /^\s*([a-z_]+)\s+\S/.exec(line)?.[1])
+        .filter((name): name is string => Boolean(name)),
+    );
+    expect(columns.size).toBeGreaterThan(4);
+
+    const used = new Set<string>();
+    requestFromQueueRow(
+      new Proxy({} as never, {
+        get(_target, key) {
+          if (typeof key === 'string') used.add(key);
+          return '';
+        },
+      }),
+    );
+    expect(used.size).toBeGreaterThan(0);
+    for (const key of used) expect([...columns]).toContain(key);
+  });
+
+  it('passes the RPC arguments the migration declares', () => {
+    const sql = migration();
+    const c = code();
+    for (const arg of ['p_claim_token', 'p_limit']) {
+      expect(sql).toContain(`${arg} `);
+    }
+    expect(c).toContain('p_claim_token: claimToken');
+    expect(c).toContain('p_limit: CLAIM_LIMIT');
+    for (const arg of ['p_id', 'p_claim_token', 'p_status', 'p_error_safe']) {
+      expect(sql).toContain(arg);
+      expect(c).toContain(`${arg}:`);
+    }
   });
 });
 

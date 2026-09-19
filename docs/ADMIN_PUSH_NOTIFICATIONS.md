@@ -1,12 +1,14 @@
 # Admin push notifications — closures on the phone
 
-**Status: steps 1, 2 and 3 are built. Nothing sends yet, and that is now a
-statement about CONFIGURATION rather than about missing code.** The console is
+**Status: ALL FOUR STEPS ARE BUILT. Nothing sends yet, and that is now entirely
+a statement about CONFIGURATION rather than about missing code.** The console is
 installable, a service worker is registered, an admin can subscribe from the
-header, and the sender exists. What does not exist is a deployed function, a
-VAPID key pair, an applied migration or a trigger — so today there is still no
-path by which a notification is produced. Every one of those is a separate owner
-action under CLAUDE.md §5, listed in §5 below.
+header, the sender exists, and a branch closing an item now queues a
+notification for it. What does not exist is two applied migrations, a VAPID key
+pair and a deployed function — so today there is still no path by which a
+notification reaches a phone. Every one of those is a separate owner action
+under CLAUDE.md §5, listed in §5 below and step by step in
+`docs/OWNER_ACTIONS.md` §41.
 
 ## What this is for
 
@@ -259,15 +261,73 @@ are a real key pair **and** the public half matches the one clients subscribed
 with. Without that check a transposed character produces an opaque 401 from
 every endpoint, which reads like a dead feature rather than a typo.
 
+## 3d. What step 4 added — the trigger and the queue
+
+| File | Role |
+| --- | --- |
+| `supabase/migrations/20260928120000_admin_push_closure_notifications.sql` | The queue, the copy, the two enqueue triggers, claim/finalize, the signature verifier, the pg_cron driver. **Written, not applied.** Detail: `docs/MIGRATIONS.md` §50. |
+| `supabase/tests/admin_push_closure_notifications_test.sql` | 13 cases, including the one that breaks the composer on purpose. |
+| `supabase/functions/admin-push-dispatch/index.ts` | Gained the queue-drain mode and the scheduler gate. |
+
+### No closure RPC is modified, and that is the design
+
+`branch_availability_events` and `branch_delivery_events` have recorded every
+closure since 2026-08-20 — branch, subject, action, duration, reason, actor and
+source — and the availability table is append-only and never pruned. So a
+trigger hangs off each of those two tables and **nothing on the path a cashier
+uses to take an item off the menu is touched**. `set_product_snooze`,
+`set_variant_snooze`, `set_branch_delivery_pause` and the two clear functions
+are exactly what they were, and the migration's own verification fails the apply
+if any of them has gone missing or learned about this feature.
+
+### A notification must never be able to block a closure
+
+The enqueue triggers run **inside** the transaction that closes the item, so an
+exception in one would abort the closure itself — a cashier told "could not
+close Large" because a product name was null. Both bodies swallow every
+exception, warn, and return.
+
+That guard is tested by breaking it on purpose: the suite replaces the copy
+composer with one that raises, drives the real `set_product_snooze`, and asserts
+the closure still lands and is still audited. It then restores the composer and
+asserts the same closure **does** queue a notice — so the case cannot pass by
+the composer never being called at all.
+
+### The queue is pulled, not pushed
+
+The driver pokes the sender once a tick and the sender claims rows, exactly as
+`operations-alert-dispatch` does. Composing a payload in Postgres and POSTing it
+per notification was rejected because `net.http_post` is fire-and-forget: the
+database would have to write `sent` at the moment it posted, which is a claim it
+cannot support. Pulling means the process that actually talks to the push
+service is the one that records the outcome.
+
+### An unconfigured deployment cleans up after itself
+
+With no sender deployed, notices would otherwise queue for ever. The driver
+expires anything older than two hours — the sender's TTL is one hour, so an
+older notice would not be delivered anyway — and prunes terminal rows after
+fourteen days.
+
+**An incomplete Vault is recorded rather than raised**, which is the opposite of
+what the alert dispatcher does and the difference is not squeamishness: this
+driver does the housekeeping first, and pg_cron runs each job in one
+transaction, so an exception would roll the expiry back with it. The fault is
+written onto the rows it is holding up instead. A mutation that raises there
+passes every other assertion in the suite and fails the expiry case.
+
+### The kill switch defaults TRUE
+
+`app_settings.admin_push_enabled` exists to turn notifications **off**, not to
+turn them on. The feature is already gated four ways over — two migrations
+applied, a key configured, the sender deployed, an admin subscribed — so a fifth
+gate that had to be switched on would be friction rather than safety. It is
+checked in the triggers and in the driver, so switching it off stops rows that
+are already queued as well as new ones.
+
 ## 4. What is still to build
 
-**Step 4 — the trigger.** `branch_availability_events` and
-`branch_delivery_events` **already record every closure**, with `branch_id`,
-`product_id`, `variant_id`, `modifier_id`, `action`, `reason_code`,
-`changed_by`, `actor_role` and `source`. So the trigger hangs off those two
-tables and **no closure RPC is modified** — the code that takes items off the
-menu is not touched by this feature at all. Filter: `modifier_id is null` drops
-add-ons; the close action drops reopens.
+Nothing. All four steps are written; what remains is configuration, in §5.
 
 ## 5. Owner actions
 
@@ -282,9 +342,10 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
    `app_settings.admin_push_vapid_public_key` (a live write, so its own §5
    action).
 4. Deploy `admin-push-dispatch`.
-5. **Delete the Home Screen icon and re-add it** after step 1 reaches
-   Production. See §1 — this cannot be skipped.
-6. Apply the step 4 migration, once it is written.
+5. Apply `20260928120000_admin_push_closure_notifications` (step 4).
+6. **Delete the Home Screen icon and re-add it**, last. See §1 — iOS fixes an
+   installed web app's capabilities at install time, so re-adding it before the
+   rest is done means doing it twice.
 
 **CORRECTION, 2026-09-19.** An earlier revision of this list said to generate the
 key "so the private half never crosses the wire, the way the alert-dispatch

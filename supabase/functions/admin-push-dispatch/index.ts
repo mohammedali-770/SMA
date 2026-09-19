@@ -3,9 +3,14 @@ import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import {
   type CallerKind,
+  type NotificationRequest,
+  type QueuedNotification,
   buildPayload,
   classifyDelivery,
+  mayDrainQueue,
+  parseDispatchMode,
   parseNotificationRequest,
+  requestFromQueueRow,
   scopeFor,
   shouldPruneAfterFailure,
 } from '../_shared/adminPush.ts';
@@ -30,12 +35,23 @@ import { assertVapidKeyPair, buildPushRequest, type VapidKeyPair } from '../_sha
  * `push_devices`.
  *
  * WHO MAY CALL IT, and what each caller may reach:
- *   - the SERVICE ROLE, which is how the database's closure driver sends. This
- *     is the only caller that fans out to every subscription.
+ *   - the SCHEDULER, `invoke_admin_push_dispatch` running under pg_cron. It
+ *     proves itself with an HMAC over a Vault-held secret that this process
+ *     never sees: it sends nonce + timestamp + signature and Postgres
+ *     recomputes. So the value cannot appear in a function log, in request
+ *     instrumentation, or in a dump of this process.
+ *   - the SERVICE ROLE, for any other automation.
  *   - an ADMIN at AAL2, which is the console's "send a test notification"
  *     button. Their send reaches THEIR OWN devices only — see `scopeFor`.
  * `verify_jwt = false`, so this check is the only gate on the path; that is the
  * same shape as `push-dispatch`, whose AAL1 hole was worth fixing.
+ *
+ * TWO MODES. `direct` takes the copy in the request body and sends it once.
+ * `queue` claims rows from `admin_push_outbox` — the closure notices the step 4
+ * triggers write — sends each, and records the outcome under a fencing token.
+ * An admin may not use `queue`: a drain CONSUMES rows while their scope is
+ * their own devices, so it would deliver every branch's notices to one phone
+ * and mark them done for everybody (`mayDrainQueue`).
  *
  * THE PRIVATE KEY IS A FUNCTION SECRET AND EXISTS NOWHERE ELSE. The public half
  * lives in `app_settings.admin_push_vapid_public_key` because the browser needs
@@ -59,6 +75,9 @@ const SEND_TIMEOUT_MS = 10_000;
 
 /** Concurrent sends. Small deliberately: the audience is a handful of phones. */
 const SEND_CONCURRENCY = 6;
+
+/** Bounded work per invocation. The driver ticks every minute. */
+const CLAIM_LIMIT = 10;
 
 interface SubscriptionRow {
   id: string;
@@ -102,9 +121,34 @@ Deno.serve(async (req: Request) => {
   const admin = adminClient();
 
   // ---- who is calling -------------------------------------------------------
+  //
+  // In order of how often each is used: the pg_cron driver, the service role,
+  // then an administrator pressing the console's control.
+  const nonce = req.headers.get('x-admin-push-nonce');
+  const stamp = req.headers.get('x-admin-push-timestamp');
+  const signature = req.headers.get('x-admin-push-signature');
+
   let caller: CallerKind;
   let callerId: string | null = null;
-  if (isServiceRoleCall(req)) {
+  if (nonce !== null || stamp !== null || signature !== null) {
+    // ANY ONE of the three present means a scheduler call was attempted. A
+    // partial set is a denial, never a fall-through to another gate.
+    const { data: ok, error } = await admin.rpc('verify_admin_push_dispatch_signature', {
+      p_nonce: nonce,
+      p_timestamp: stamp,
+      p_signature: signature,
+    });
+    // A MISSING RPC IS A DENIAL, not a 500. Deploying this before the step 4
+    // migration is applied is an ordering mistake, not an attack, and the
+    // honest answer is the same as for a bad signature: this caller is not
+    // authorized yet. Nothing calls the scheduler path until that migration
+    // schedules the job, so failing closed here costs nothing.
+    if (error) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
+    // Strict `=== true`: the RPC is fail-closed, but a truthy non-boolean must
+    // never be read as authentication.
+    if (ok !== true) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
+    caller = 'scheduler';
+  } else if (isServiceRoleCall(req)) {
     caller = 'service_role';
   } else {
     const authHeader = req.headers.get('Authorization');
@@ -137,9 +181,20 @@ Deno.serve(async (req: Request) => {
   } catch {
     return json({ error: 'invalid JSON body', code: 'bad_request' }, 400);
   }
-  const parsed = parseNotificationRequest(rawBody);
-  if (!parsed.ok) return json({ error: parsed.reason, code: 'bad_request' }, 400);
-  const request = parsed.request;
+  const mode = parseDispatchMode(rawBody);
+  if (mode === null) return json({ error: 'unknown mode', code: 'bad_request' }, 400);
+  if (mode === 'queue' && !mayDrainQueue(caller)) {
+    return json({ error: 'queue mode is not available to this caller', code: 'forbidden' }, 403);
+  }
+
+  // Only a direct send carries copy. A queue drain gets its copy from the rows
+  // it claims, composed in SQL when the closure happened.
+  let directRequest: NotificationRequest | null = null;
+  if (mode === 'direct') {
+    const parsed = parseNotificationRequest(rawBody);
+    if (!parsed.ok) return json({ error: parsed.reason, code: 'bad_request' }, 400);
+    directRequest = parsed.request;
+  }
 
   // ---- the keys -------------------------------------------------------------
   //
@@ -201,7 +256,7 @@ Deno.serve(async (req: Request) => {
   let failed = 0;
   let pruned = 0;
 
-  async function deliver(row: SubscriptionRow): Promise<void> {
+  async function deliver(row: SubscriptionRow, request: NotificationRequest): Promise<boolean> {
     let status: number;
     try {
       const push = await buildPushRequest({
@@ -236,14 +291,14 @@ Deno.serve(async (req: Request) => {
         .from('admin_push_subscriptions')
         .update({ last_success_at: new Date(at).toISOString(), failure_count: 0 })
         .eq('id', row.id);
-      return;
+      return true;
     }
     if (outcome === 'gone') {
       // The browser is uninstalled or the subscription was revoked. The row is
       // the only thing that would keep it alive, so remove it.
       pruned += 1;
       await admin.from('admin_push_subscriptions').delete().eq('id', row.id);
-      return;
+      return false;
     }
     failed += 1;
     const nextCount = row.failure_count + 1;
@@ -255,17 +310,81 @@ Deno.serve(async (req: Request) => {
     if (shouldPruneAfterFailure(nextCount)) {
       pruned += 1;
       await admin.from('admin_push_subscriptions').delete().eq('id', row.id);
-      return;
+      return false;
     }
     await admin
       .from('admin_push_subscriptions')
       .update({ last_failure_at: new Date(at).toISOString(), failure_count: nextCount })
       .eq('id', row.id);
+    return false;
   }
 
-  for (let i = 0; i < subscriptions.length; i += SEND_CONCURRENCY) {
-    await Promise.all(subscriptions.slice(i, i + SEND_CONCURRENCY).map(deliver));
+  /** Fan one notification out to every subscription in scope. */
+  async function fanOut(request: NotificationRequest): Promise<number> {
+    let delivered = 0;
+    for (let i = 0; i < subscriptions.length; i += SEND_CONCURRENCY) {
+      const batch = subscriptions.slice(i, i + SEND_CONCURRENCY);
+      const results = await Promise.all(batch.map((row) => deliver(row, request)));
+      delivered += results.filter(Boolean).length;
+    }
+    return delivered;
   }
 
-  return json({ status: 'ok', scope, subscriptions: subscriptions.length, sent, failed, pruned }, 200);
+  if (mode === 'direct') {
+    const delivered = await fanOut(directRequest as NotificationRequest);
+    return json(
+      { status: 'ok', mode, scope, subscriptions: subscriptions.length, delivered, sent, failed, pruned },
+      200,
+    );
+  }
+
+  // ---- queue mode -----------------------------------------------------------
+  //
+  // CLAIMED ONLY AFTER THE SUBSCRIPTION READ, which is why the empty-audience
+  // return above sits where it does. Claiming first would burn an attempt
+  // against every queued notice on a deployment where nobody has subscribed,
+  // and three ticks later they would all be `failed` for a reason that was
+  // never theirs.
+  const claimToken = crypto.randomUUID();
+  const { data: claimedRows, error: claimError } = await admin.rpc('claim_admin_push_notifications', {
+    p_claim_token: claimToken,
+    p_limit: CLAIM_LIMIT,
+  });
+  if (claimError) return json({ status: 'error', reason: 'claim failed (transient)' }, 500);
+  const claimed = (claimedRows as QueuedNotification[] | null) ?? [];
+  if (claimed.length === 0) {
+    return json({ status: 'ok', mode, claimed: 0, sent: 0, failed: 0, pruned: 0 }, 200);
+  }
+
+  let notified = 0;
+  let unnotified = 0;
+  for (const row of claimed) {
+    const delivered = await fanOut(requestFromQueueRow(row));
+    // ONE DEVICE IS ENOUGH TO CALL IT SENT. An admin with a dead second browser
+    // must not cause every closure notice to be retried and then marked failed.
+    const ok = delivered > 0;
+    if (ok) notified += 1;
+    else unnotified += 1;
+    await admin.rpc('finalize_admin_push_notification', {
+      p_id: row.id,
+      p_claim_token: claimToken,
+      p_status: ok ? 'sent' : 'failed',
+      p_error_safe: ok ? null : 'no subscription accepted the notification',
+    });
+  }
+
+  return json(
+    {
+      status: 'ok',
+      mode,
+      subscriptions: subscriptions.length,
+      claimed: claimed.length,
+      notified,
+      unnotified,
+      sent,
+      failed,
+      pruned,
+    },
+    200,
+  );
 });

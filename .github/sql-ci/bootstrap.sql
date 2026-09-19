@@ -390,3 +390,49 @@ create table if not exists vault.secrets (
 create or replace view vault.decrypted_secrets as
   select id, name, secret, (secret)::text as decrypted_secret, description, created_at
     from vault.secrets;
+
+-- `vault.create_secret` / `vault.update_secret` — the two entry points both the
+-- CHAIN and the suites call. Real Vault encrypts; this stores plaintext in a
+-- throwaway container.
+--
+-- These lived in harness.sql until 2026-09-19, which was correct while only the
+-- suites called them. `20260928120000_admin_push_closure_notifications` creates
+-- its own trigger secret at apply time — generated inside Postgres so the value
+-- never crosses the wire — so a MIGRATION needs them now, and harness.sql is
+-- loaded only after the whole chain has run.
+create or replace function vault.create_secret(
+  new_secret      text,
+  new_name        text default null,
+  new_description text default ''
+)
+returns uuid
+language plpgsql
+as $$
+declare
+  v_id uuid;
+begin
+  insert into vault.secrets (name, secret, description)
+       values (new_name, new_secret, new_description)
+  on conflict (name) do update
+          set secret = excluded.secret,
+              description = excluded.description
+    returning id into v_id;
+  return v_id;
+end $$;
+
+create or replace function vault.update_secret(
+  secret_id       uuid,
+  new_secret      text default null,
+  new_name        text default null,
+  new_description text default null
+)
+returns void
+language plpgsql
+as $$
+begin
+  update vault.secrets
+     set secret      = coalesce(new_secret, secret),
+         name        = coalesce(new_name, name),
+         description = coalesce(new_description, description)
+   where id = secret_id;
+end $$;

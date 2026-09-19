@@ -67,42 +67,11 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- vault.create_secret / vault.update_secret — the two entry points the suites
--- call. Real Vault encrypts; this stores plaintext in a throwaway container.
+-- vault.create_secret / vault.update_secret MOVED TO bootstrap.sql.
+--
+-- They used to live here, which was fine while only the SUITES called them.
+-- `20260928120000_admin_push_closure_notifications` creates its own trigger
+-- secret at apply time — generated inside Postgres so the value never crosses
+-- the wire — so the MIGRATION CHAIN now needs them too, and this file is loaded
+-- after the chain has already run.
 -- ---------------------------------------------------------------------------
-create or replace function vault.create_secret(
-  new_secret      text,
-  new_name        text default null,
-  new_description text default ''
-)
-returns uuid
-language plpgsql
-as $$
-declare
-  v_id uuid;
-begin
-  insert into vault.secrets (name, secret, description)
-       values (new_name, new_secret, new_description)
-  on conflict (name) do update
-          set secret = excluded.secret,
-              description = excluded.description
-    returning id into v_id;
-  return v_id;
-end $$;
-
-create or replace function vault.update_secret(
-  secret_id       uuid,
-  new_secret      text default null,
-  new_name        text default null,
-  new_description text default null
-)
-returns void
-language plpgsql
-as $$
-begin
-  update vault.secrets
-     set secret      = coalesce(new_secret, secret),
-         name        = coalesce(new_name, name),
-         description = coalesce(new_description, description)
-   where id = secret_id;
-end $$;
