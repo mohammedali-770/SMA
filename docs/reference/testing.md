@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**194 TypeScript test files declaring 3000 test blocks, plus 79 SQL suites.**
+**194 TypeScript test files declaring 3007 test blocks, plus 79 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -200,7 +200,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-101 files, 1413 declared test blocks.
+101 files, 1420 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -298,7 +298,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/pwa/adminPushState.test.ts` | 9 | resolveAdminPushState |
 | `src/lib/pwa/pushSubscription.test.ts` | 13 | urlBase64ToUint8Array |
 | `src/lib/pwa/pushSupport.test.ts` | 16 | pushReadiness |
-| `src/lib/pwa/serviceWorkerPush.test.ts` | 14 | sw.js — push handler |
+| `src/lib/pwa/serviceWorkerPush.test.ts` | 21 | sw.js — push handler |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |

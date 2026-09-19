@@ -37,24 +37,64 @@ self.addEventListener('activate', (event) => {
  * A silent push is not a smaller bug than a wrong one; it is how the admin's
  * subscription quietly dies.
  */
+/**
+ * Resolve a payload's target to a path INSIDE the staff console, or '/'.
+ *
+ * Prefix checks are not enough, and two separate findings say so.
+ * `//evil.example` starts with a slash. So does `/\evil.example/x` — and the URL
+ * parser treats a backslash as a path separator, so that resolves to
+ * https://evil.example/x. Parsing and comparing the ORIGIN is the only check
+ * that holds, because it asks the same question the browser will ask when the
+ * notification is tapped.
+ *
+ * `/app` is excluded too: this origin also serves the customer web export, and a
+ * staff notification must never deep-link into the customer app.
+ */
+function consolePath(raw) {
+  if (typeof raw !== 'string' || !raw) return '/';
+  try {
+    const url = new URL(raw, self.location.origin);
+    if (url.origin !== self.location.origin) return '/';
+    if (url.pathname === '/app' || url.pathname.startsWith('/app/')) return '/';
+    return url.pathname + url.search + url.hash;
+  } catch {
+    return '/';
+  }
+}
+
+/** Whether an open window is the staff console rather than the customer app. */
+function isConsoleClient(client) {
+  try {
+    const url = new URL(client.url);
+    if (url.origin !== self.location.origin) return false;
+    return url.pathname !== '/app' && !url.pathname.startsWith('/app/');
+  } catch {
+    return false;
+  }
+}
+
 self.addEventListener('push', (event) => {
   let payload = {};
   try {
-    payload = event.data ? event.data.json() : {};
+    const parsed = event.data ? event.data.json() : null;
+    /*
+     * ONLY AN OBJECT HAS FIELDS TO READ. A literal `null`, a number, a string
+     * and an array all parse CLEANLY, so the catch below never sees them — and
+     * dereferencing one would throw OUTSIDE this block, before waitUntil or
+     * showNotification ever ran. That is not a cosmetic failure: a push that
+     * displays nothing is how Apple revokes the subscription, which is the exact
+     * outcome this fallback exists to prevent.
+     */
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      payload = parsed;
+    }
   } catch {
     payload = {};
   }
 
   const title = typeof payload.title === 'string' && payload.title.trim() ? payload.title : 'سبايسي ميل';
   const body = typeof payload.body === 'string' ? payload.body : '';
-  // Same-origin paths only. `startsWith('/')` alone is NOT enough: a
-  // protocol-relative "//evil.example" also starts with a slash, and would send
-  // the tap off-site — an open redirect driven by a push payload. Rejecting the
-  // second slash is what closes that.
-  const url =
-    typeof payload.url === 'string' && payload.url.startsWith('/') && !payload.url.startsWith('//')
-      ? payload.url
-      : '/';
+  const url = consolePath(payload.url);
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -84,8 +124,15 @@ self.addEventListener('notificationclick', (event) => {
         type: 'window',
         includeUncontrolled: true,
       });
-      // Reuse an open console window rather than stacking another one.
+      /*
+       * Reuse an open CONSOLE window rather than stacking another one — and
+       * only a console window. This origin also serves the customer web export
+       * at /app, and matchAll returns ANY same-origin window, so navigating the
+       * first one found would throw away a customer tab's state to show a staff
+       * notification. Filter first, then reuse.
+       */
       for (const client of windows) {
+        if (!isConsoleClient(client)) continue;
         if ('focus' in client) {
           if ('navigate' in client) {
             try {

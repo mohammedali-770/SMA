@@ -97,6 +97,38 @@ branch of the `push` handler ends in `showNotification` — including the
 malformed-payload path, which falls back to the brand name. A silent push is not
 a smaller bug than a wrong one; it is how a subscription quietly dies.
 
+**That promise was broken in the first version, and only a review caught it.**
+`event.data.json()` parses a literal JSON `null` perfectly well, so the
+`try/catch` never saw it — and reading `payload.title` then threw **outside** the
+try block, before `waitUntil` and before `showNotification`. A number, a string,
+an array and a boolean all fail identically. The handler now accepts only a
+non-null, non-array object. The lesson is narrow and worth keeping: **a
+`try/catch` around a parse does not protect the code that reads the parsed
+value.**
+
+### Two URL rules, both learned the hard way
+
+`consolePath()` parses the payload's target against the worker's own origin and
+compares `url.origin`. It does **not** check prefixes, because prefix checks kept
+being wrong in new ways:
+
+- `//evil.example` starts with a slash. Caught by a test before the first
+  review.
+- `/\evil.example/x` starts with a *single* slash, and the URL parser treats a
+  backslash as a path separator — so it resolves to `https://evil.example/x`.
+  Caught by review.
+- `https://console.example.evil.com` merely **starts with** our origin, so any
+  `startsWith` on `href` admits it. Caught by mutation testing, not by review.
+
+Each is an open redirect driven by a push payload. Parsing and comparing the
+origin asks the same question the browser will ask when the notification is
+tapped, which is the only version of this check that stays right.
+
+`consolePath()` also refuses an `/app` target, and `notificationclick` reuses
+only console windows. This origin serves the **customer** web export at `/app`,
+and `matchAll` returns any same-origin window — so without the filter, tapping a
+staff alert could navigate a customer's open tab away and discard its state.
+
 ## 3b. What step 2 added
 
 | File | Role |
