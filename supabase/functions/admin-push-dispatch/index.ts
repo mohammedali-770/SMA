@@ -10,6 +10,8 @@ import {
   mayDrainQueue,
   parseDispatchMode,
   parseNotificationRequest,
+  parseTargetEndpoint,
+  refusePushEndpoint,
   requestFromQueueRow,
   scopeFor,
   shouldPruneAfterFailure,
@@ -76,6 +78,13 @@ const SEND_TIMEOUT_MS = 10_000;
 /** Concurrent sends. Small deliberately: the audience is a handful of phones. */
 const SEND_CONCURRENCY = 6;
 
+/**
+ * OPTIONAL pin for the push endpoints this deployment will POST to,
+ * comma-separated. Unset — which is how every deployment stands today — means
+ * "any public hostname", so setting it narrows the guard in
+ * `refusePushEndpoint` and never widens it. Same shape as `SMTP_ALLOWED_HOSTS`.
+ */
+const ADMIN_PUSH_ALLOWED_HOSTS = Deno.env.get('ADMIN_PUSH_ALLOWED_HOSTS') ?? null;
 /** Bounded work per invocation. The driver ticks every minute. */
 const CLAIM_LIMIT = 10;
 
@@ -196,6 +205,16 @@ Deno.serve(async (req: Request) => {
     directRequest = parsed.request;
   }
 
+  const parsed = parseNotificationRequest(rawBody);
+  if (!parsed.ok) return json({ error: parsed.reason, code: 'bad_request' }, 400);
+  const request = parsed.request;
+  // OPTIONAL: narrow the send to ONE of the caller's devices. The console uses
+  // it so its confirmation reaches the browser that was just enabled rather
+  // than every device that admin owns — otherwise a notification arriving on an
+  // older phone looks like proof that the NEW subscription works. Review caught
+  // that on #398. It only ever narrows: the scope filter below still applies.
+  const targetEndpoint = parseTargetEndpoint(rawBody);
+
   // ---- the keys -------------------------------------------------------------
   //
   // `not_configured` is a 200 on purpose. The database driver retries a 5xx,
@@ -243,6 +262,9 @@ Deno.serve(async (req: Request) => {
     if (callerId === null) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     query = query.eq('admin_id', callerId);
   }
+  // ANDed with the scope filter, never instead of it, so naming somebody else's
+  // endpoint narrows a caller's own set to nothing rather than reaching it.
+  if (targetEndpoint !== null) query = query.eq('endpoint', targetEndpoint);
   const { data: rows, error: rowsError } = await query;
   if (rowsError) return json({ status: 'error', reason: 'subscription read failed' }, 500);
   const subscriptions = (rows as SubscriptionRow[] | null) ?? [];
@@ -256,7 +278,52 @@ Deno.serve(async (req: Request) => {
   let failed = 0;
   let pruned = 0;
 
+  /**
+   * Failures per subscription, seeded from the query and updated after EVERY
+   * outcome.
+   *
+   * IN QUEUE MODE ONE INVOCATION SENDS SEVERAL NOTIFICATIONS TO THE SAME ROWS,
+   * so reading `row.failure_count` each time would use the value from before
+   * the batch — a subscription at 19 could take the first notice (resetting the
+   * stored count to zero) and then be DELETED when the second one transiently
+   * failed, because the stale read still computed 20. Review caught that on
+   * #399.
+   *
+   * It is exact within an invocation, which is what that defect needed. Across
+   * CONCURRENT invocations two dispatchers can still read the same value and
+   * write the same increment; the consequence is a slower path to pruning a
+   * dead device, and that is stated rather than claimed away.
+   */
+  const failureCounts = new Map<string, number>(subscriptions.map((sub) => [sub.id, sub.failure_count]));
+  function nextFailureCount(id: string): number {
+    const next = (failureCounts.get(id) ?? 0) + 1;
+    failureCounts.set(id, next);
+    return next;
+  }
+
   async function deliver(row: SubscriptionRow, request: NotificationRequest): Promise<boolean> {
+    // VALIDATED BEFORE ANYTHING IS SENT. The endpoint is whatever was stored,
+    // and storing one needs only an admin at AAL2 — so this is containment for
+    // a compromised admin session or a leaked service key, the same reasoning
+    // as `smtpTarget.ts`. A refusal is terminal for the row: no host check is
+    // going to pass on a later tick, so retrying would only repeat it.
+    const refusal = refusePushEndpoint(row.endpoint, ADMIN_PUSH_ALLOWED_HOSTS);
+    if (refusal !== null) {
+      failed += 1;
+      console.error('admin push: endpoint refused', {
+        origin: endpointOrigin(row.endpoint),
+        reason: refusal,
+      });
+      await admin
+        .from('admin_push_subscriptions')
+        .update({
+          last_failure_at: new Date(at).toISOString(),
+          failure_count: nextFailureCount(row.id),
+        })
+        .eq('id', row.id);
+      return false;
+    }
+
     let status: number;
     try {
       const push = await buildPushRequest({
@@ -270,6 +337,12 @@ Deno.serve(async (req: Request) => {
         method: 'POST',
         headers: push.headers,
         body: push.body,
+        // A CHECKED HOST MUST NOT BE ABLE TO HAND THE REQUEST ON. Following a
+        // 3xx would re-point this POST at an address `refusePushEndpoint` never
+        // saw, which is the whole guard undone by one Location header. Manual
+        // redirects surface as a 3xx status, which `classifyDelivery` reads as
+        // a retryable failure rather than a dead subscription.
+        redirect: 'manual',
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
       status = response.status;
@@ -287,6 +360,10 @@ Deno.serve(async (req: Request) => {
     const outcome = classifyDelivery(status);
     if (outcome === 'sent') {
       sent += 1;
+      // The stored count resets, so the in-memory one must too — otherwise a
+      // later notice in the same batch would be judged against failures this
+      // success already cleared.
+      failureCounts.set(row.id, 0);
       await admin
         .from('admin_push_subscriptions')
         .update({ last_success_at: new Date(at).toISOString(), failure_count: 0 })
@@ -301,7 +378,7 @@ Deno.serve(async (req: Request) => {
       return false;
     }
     failed += 1;
-    const nextCount = row.failure_count + 1;
+    const nextCount = nextFailureCount(row.id);
     console.error('admin push: send refused', {
       origin: endpointOrigin(row.endpoint),
       status,

@@ -706,6 +706,18 @@ hostname; and a port outside 1-65535. An optional `SMTP_ALLOWED_HOSTS`
 environment allowlist pins the endpoint further; unset, which is how it stands,
 means "any public hostname" — so setting it only ever narrows.
 
+**THE HOST RULES MOVED TO `_shared/publicHost.ts` ON 2026-09-19, and this
+paragraph would otherwise send a reader to a file that no longer holds them.**
+The admin push sender needed the same question answered about a push endpoint an
+administrator supplied, and duplicating forty lines of security-critical host
+parsing is how two copies of a rule drift apart. `smtpTarget.ts` keeps its own
+reason codes, its port handling and this function's behaviour unchanged; what it
+now imports is `isIpLiteral`, `isPrivateName`, `isValidHostname`,
+`isAllowedHost` and `normalizeHost`. The 34-case `smtpTarget.test.ts` suite
+passes unchanged across the extraction, which is what makes it verified rather
+than assumed — and it is the reason a future change to those rules has to be
+read as touching **both** callers.
+
 A refusal returns `disabled`, not `error`, on purpose: a bad endpoint is a
 configuration state, and an error would have the scheduler retrying a row that
 cannot be delivered until somebody edits it.

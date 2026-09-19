@@ -6311,8 +6311,8 @@ closure-notification work; the feature is described in
 `docs/ADMIN_PUSH_NOTIFICATIONS.md` and the owner steps are
 `docs/OWNER_ACTIONS.md` §41.
 
-sha256 `a6ddec6dc365c7925d22305f35a9903b759980519e98899a3d7344920f4d5aa8`,
-937 lines / 42 541 bytes — **re-hash the MERGED copy before applying**, per §15.
+sha256 `e3e265e484fd50d0cee51fa45dcd07692ce9a33db53171a0c3504e38fb962068`,
+983 lines / 45 326 bytes — **re-hash the MERGED copy before applying**, per §15.
 
 It adds `app_settings.admin_push_enabled`, an `admin_push_outbox` queue, two
 bilingual copy composers, an enqueue trigger on each of the two closure audit
@@ -6396,12 +6396,31 @@ Arabic duration forms, the master switch, the real RPC path end to end, the
 broken-composer guard, the claim fence, the attempt budget, expiry, retention
 and the channel separation.
 
-**Mutation-tested 13 ways; 12 killed.** The survivor is recorded rather than
+**Mutation-tested 17 ways; 16 killed.** The survivor is recorded rather than
 hidden: removing the trigger's `modifier_id is not null` early-out changes
 nothing observable, because the composer independently refuses an event naming
 no product or tier. The filter is a performance guard on the highest-volume
 event there is, not the thing that makes the behaviour correct — and the suite
 now asserts the half that does.
+
+### A transient failure lost the notification, and review caught it
+
+`finalize_admin_push_notification` wrote a terminal `failed` on the first bad
+minute, and `claim_admin_push_notifications` claims only `pending` rows and
+expired `processing` leases — so the three attempts the file advertises were
+**unreachable**, and one 429 or 5xx across every subscription lost the closure
+notice permanently. A failure now returns the row to the queue, with
+`claim_token` and `claimed_at` both cleared, until the budget is spent.
+
+**The budget is written in THREE places** — the claim RPC's default, the
+finalize RPC's default, and a literal in the driver's claimable count. Drift
+between them is silent in both directions: retry for ever, or give up early.
+The verification block reads two of them out of `pg_get_function_arguments` and
+greps the third, and refuses to apply if they disagree — the rule
+`20260913120000` established. CASE 11b drives all three attempts and asserts the
+row is `pending` after each of the first two and `failed` after the third;
+mutations that make a failure terminal at once, that make it retry for ever,
+that leave the lease attached, and that drift the constant are all killed.
 
 **A real gap was found by the suite and fixed in the migration, not only in the
 test.** Assertion 10.8 — nothing in this feature may reference the customer push

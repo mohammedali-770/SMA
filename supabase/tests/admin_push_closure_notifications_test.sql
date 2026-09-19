@@ -574,6 +574,82 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- CASE 11b — A TRANSIENT FAILURE DOES NOT LOSE THE NOTIFICATION
+--
+-- `claim_admin_push_notifications` claims only `pending` rows and expired
+-- `processing` leases, so a finalize that wrote a terminal `failed` on the
+-- first bad minute made the advertised three-attempt budget unreachable: one
+-- 429 across every subscription lost the closure notice for good. The row must
+-- go back to the queue until the budget is actually spent.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_fx    t_fx%rowtype;
+  v_token uuid;
+  v_id    bigint;
+  v_row   public.admin_push_outbox%rowtype;
+  v_n     integer;
+  v_i     integer;
+begin
+  select * into v_fx from t_fx;
+  delete from public.admin_push_outbox;
+  v_id := pg_temp.emit_availability(v_fx.branch_id, v_fx.product_id, null, null, 'closed', 10);
+
+  -- Two failures, each of which must leave the row claimable again.
+  for v_i in 1..2 loop
+    v_token := gen_random_uuid();
+    select count(*) into v_n from public.claim_admin_push_notifications(v_token, 10);
+    if v_n <> 1 then
+      raise exception 'CASE 11b FAILED: attempt % could not claim the row', v_i;
+    end if;
+    perform public.finalize_admin_push_notification(
+      (select id from public.admin_push_outbox limit 1), v_token, 'failed', 'transient');
+
+    select * into v_row from public.admin_push_outbox limit 1;
+    if v_row.status <> 'pending' then
+      raise exception 'CASE 11b FAILED: after failure % the row is %, not pending', v_i, v_row.status;
+    end if;
+    if v_row.attempt_count <> v_i then
+      raise exception 'CASE 11b FAILED: after failure % attempt_count is %', v_i, v_row.attempt_count;
+    end if;
+    -- The lease must be released with it, or the row looks owned.
+    if v_row.claim_token is not null or v_row.claimed_at is not null then
+      raise exception 'CASE 11b FAILED: a requeued row still carries its lease';
+    end if;
+  end loop;
+
+  -- The third failure spends the budget and IS terminal.
+  v_token := gen_random_uuid();
+  select count(*) into v_n from public.claim_admin_push_notifications(v_token, 10);
+  if v_n <> 1 then
+    raise exception 'CASE 11b FAILED: the third attempt could not claim the row';
+  end if;
+  perform public.finalize_admin_push_notification(
+    (select id from public.admin_push_outbox limit 1), v_token, 'failed', 'gave up');
+  select * into v_row from public.admin_push_outbox limit 1;
+  if v_row.status <> 'failed' then
+    raise exception 'CASE 11b FAILED: the third failure left the row %, not failed', v_row.status;
+  end if;
+
+  -- And a spent row is not claimable again, so it cannot retry for ever.
+  select count(*) into v_n from public.claim_admin_push_notifications(gen_random_uuid(), 10);
+  if v_n <> 0 then
+    raise exception 'CASE 11b FAILED: a terminal row was claimed again';
+  end if;
+
+  -- A SUCCESS IS TERMINAL IMMEDIATELY, whatever the budget says.
+  delete from public.admin_push_outbox;
+  v_id := pg_temp.emit_availability(v_fx.branch_id, null, v_fx.variant_id, null, 'closed', 10);
+  v_token := gen_random_uuid();
+  perform public.claim_admin_push_notifications(v_token, 10);
+  perform public.finalize_admin_push_notification(
+    (select id from public.admin_push_outbox limit 1), v_token, 'sent', null);
+  if (select status from public.admin_push_outbox limit 1) <> 'sent' then
+    raise exception 'CASE 11b FAILED: a success did not finalize';
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- CASE 12 — the driver expires and prunes, and no-ops on an empty queue
 --
 -- With no sender deployed the queue must clean itself rather than grow for

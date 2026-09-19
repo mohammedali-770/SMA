@@ -475,10 +475,11 @@ comment on function public.claim_admin_push_notifications(uuid, integer, integer
   'Claims up to p_limit queued admin closure notifications under a fencing token. Skips rows that have already used their attempt budget, and reclaims a lease older than five minutes.';
 
 create or replace function public.finalize_admin_push_notification(
-  p_id          bigint,
-  p_claim_token uuid,
-  p_status      text,
-  p_error_safe  text default null
+  p_id           bigint,
+  p_claim_token  uuid,
+  p_status       text,
+  p_error_safe   text default null,
+  p_max_attempts integer default 3
 )
 returns boolean
 language plpgsql
@@ -495,9 +496,29 @@ begin
   end if;
 
   update public.admin_push_outbox o
-     set status     = p_status,
-         last_error = left(p_error_safe, 300),
-         claim_token = null
+     set status = case
+           when p_status = 'sent' then 'sent'
+           -- A RETRYABLE FAILURE GOES BACK IN THE QUEUE, and the ATTEMPT BUDGET
+           -- is what ends it — not the first bad minute a push service has.
+           --
+           -- The first version wrote 'failed' here unconditionally, and
+           -- `claim_admin_push_notifications` claims only 'pending' or an
+           -- expired 'processing' lease. So the three attempts this function
+           -- advertises were never reachable: one 429 or 5xx across every
+           -- subscription lost the closure notice permanently. Review caught it
+           -- on #399.
+           --
+           -- `attempt_count` was already incremented at CLAIM time, so after
+           -- the first attempt it is 1: with the default budget this yields
+           -- three sends in total and then a terminal 'failed'.
+           when o.attempt_count < p_max_attempts then 'pending'
+           else 'failed'
+         end,
+         last_error  = left(p_error_safe, 300),
+         -- Both cleared: a row going back to 'pending' must not look like it
+         -- still belongs to the dispatcher that just gave up on it.
+         claim_token = null,
+         claimed_at  = null
    where o.id = p_id
      -- THE FENCE. Without it a dispatcher whose lease expired could overwrite
      -- the outcome written by the one that took over.
@@ -507,13 +528,13 @@ begin
 end;
 $$;
 
-comment on function public.finalize_admin_push_notification(bigint, uuid, text, text) is
-  'Records the outcome of one admin closure notification, guarded by the claim token. Returns false when the token no longer owns the row, which means another dispatcher took over.';
+comment on function public.finalize_admin_push_notification(bigint, uuid, text, text, integer) is
+  'Records the outcome of one admin closure notification, guarded by the claim token. A failure returns the row to the queue until its attempt budget is spent, then becomes terminal. Returns false when the token no longer owns the row, which means another dispatcher took over.';
 
 revoke all on function public.claim_admin_push_notifications(uuid, integer, integer) from public, anon, authenticated;
-revoke all on function public.finalize_admin_push_notification(bigint, uuid, text, text) from public, anon, authenticated;
+revoke all on function public.finalize_admin_push_notification(bigint, uuid, text, text, integer) from public, anon, authenticated;
 grant execute on function public.claim_admin_push_notifications(uuid, integer, integer) to service_role;
-grant execute on function public.finalize_admin_push_notification(bigint, uuid, text, text) to service_role;
+grant execute on function public.finalize_admin_push_notification(bigint, uuid, text, text, integer) to service_role;
 
 revoke all on function public.admin_push_availability_copy(uuid, uuid, uuid, integer) from public, anon, authenticated;
 revoke all on function public.admin_push_delivery_copy(uuid, integer) from public, anon, authenticated;
@@ -865,6 +886,31 @@ begin
       raise exception 'enqueue trigger % lost its exception guard', v_txt;
     end if;
   end loop;
+
+  -- 10.6b THE ATTEMPT BUDGET IS WRITTEN IN THREE PLACES AND MUST AGREE.
+  -- `claim_admin_push_notifications` defaults it, `finalize_admin_push_notification`
+  -- defaults it, and the driver counts claimable rows with a literal. A drift
+  -- between them is silent: the queue would either retry for ever or give up
+  -- early, and neither shows up as an error. Same rule as `20260913120000`,
+  -- which reads a default out of the catalog rather than trusting a comment.
+  select pg_get_function_arguments(p.oid) into v_src from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'claim_admin_push_notifications';
+  if v_src not like '%p_max_attempts integer DEFAULT 3%' then
+    raise exception 'claim_admin_push_notifications budget drifted: %', v_src;
+  end if;
+  select pg_get_function_arguments(p.oid) into v_src from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'finalize_admin_push_notification';
+  if v_src not like '%p_max_attempts integer DEFAULT 3%' then
+    raise exception 'finalize_admin_push_notification budget drifted: %', v_src;
+  end if;
+  select p.prosrc into v_src from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'invoke_admin_push_dispatch';
+  if v_src not like '%attempt_count < 3%' then
+    raise exception 'the driver no longer counts claimable rows against the budget of 3';
+  end if;
 
   -- 10.7 The cron job exists exactly once.
   select count(*) into v_count from cron.job where jobname = 'admin-push-dispatch';

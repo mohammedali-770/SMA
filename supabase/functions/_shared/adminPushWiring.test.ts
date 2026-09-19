@@ -132,6 +132,39 @@ describe('the VAPID configuration is checked before anything is sent', () => {
   });
 });
 
+describe('the endpoint is treated as untrusted input', () => {
+  /*
+   * Storing an endpoint needs only an admin at AAL2, and the SQL checks only
+   * that it is non-empty — so what this function POSTs to is caller-controlled.
+   * Both halves matter and neither implies the other: the check stops the
+   * request, and `redirect: 'manual'` stops a checked host handing it on.
+   */
+  it('refuses a non-push endpoint before any request is made', () => {
+    const c = code();
+    expect(c).toContain('refusePushEndpoint(row.endpoint, ADMIN_PUSH_ALLOWED_HOSTS)');
+    // Before the fetch, not after it.
+    expect(c.indexOf('refusePushEndpoint')).toBeLessThan(c.indexOf('await fetch('));
+  });
+
+  it('does not follow a redirect out of the checked host', () => {
+    const c = code();
+    expect(c).toContain("redirect: 'manual'");
+    // Mutation killed: `redirect: 'follow'`, which is also the default, so the
+    // absence of the option is the defect — assert the value, not the key.
+    expect(c).not.toContain("redirect: 'follow'");
+  });
+
+  it('narrows to one device only in addition to the scope filter', () => {
+    const c = code();
+    expect(c).toContain("query.eq('endpoint', targetEndpoint)");
+    // The scope filter must still be applied: an endpoint filter that REPLACED
+    // it would let any admin name another admin's device.
+    expect(c.indexOf("query.eq('admin_id', callerId)")).toBeLessThan(
+      c.indexOf("query.eq('endpoint', targetEndpoint)"),
+    );
+  });
+});
+
 describe('failure handling', () => {
   it('deletes a subscription only through classifyDelivery', () => {
     const c = code();
@@ -147,6 +180,24 @@ describe('failure handling', () => {
      */
     expect(c).not.toMatch(/status\s*===\s*\d/);
     expect((c.match(/\.delete\(\)/g) ?? []).length).toBe(2);
+  });
+
+  /*
+   * IN QUEUE MODE ONE INVOCATION SENDS SEVERAL NOTIFICATIONS TO THE SAME ROWS.
+   * Reading `row.failure_count` for each would use the value from before the
+   * batch, so a subscription at 19 could take the first notice — resetting the
+   * stored count to zero — and then be DELETED when the second transiently
+   * failed, because the stale read still computed 20. Review caught it on #399.
+   */
+  it('counts failures from a running total rather than the value read before the batch', () => {
+    const c = code();
+    expect(c).toContain('const failureCounts = new Map<string, number>(');
+    expect(c).toContain('nextFailureCount(row.id)');
+    // A success clears the running total too, or a later notice in the same
+    // batch is judged against failures that success already cleared.
+    expect(c).toContain('failureCounts.set(row.id, 0);');
+    // Mutation killed: any remaining read of the stale per-row value.
+    expect(c).not.toMatch(/row\.failure_count\s*\+\s*1/);
   });
 
   it('treats a thrown send as retryable rather than as a dead subscription', () => {

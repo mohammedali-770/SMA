@@ -243,6 +243,49 @@ not undo the toggle or raise an error** — the subscription is stored either wa
 and the control's state is already truthful. The notification arriving is the
 end-to-end evidence; its absence is the diagnostic.
 
+**It names the device that was just enabled, and review caught that it didn't.**
+The first version sent to every device that admin owned. An admin who already
+had a subscribed phone would get the confirmation *there* — which looks exactly
+like proof that the browser they are sitting in front of works, and is not. The
+endpoint is now passed and the sender narrows to that row, **ANDed with the
+scope filter** so naming somebody else's endpoint reaches nothing rather than
+reaching them.
+
+### The payload size is measured on the largest variant, not the first
+
+`parseNotificationRequest` refuses copy that could not be encrypted into one
+record. The first version measured the Arabic payload with `at: 0`, which
+understates the real thing twice: a bilingual request may carry a longer English
+body that only an English-registered device sees, and `at` is a 13-digit epoch at
+delivery rather than one character. A request could therefore pass the check and
+throw inside `encryptPayload` for some devices and not others — counted as a
+failure, and looking like a flaky push service. Both languages are now measured
+at a full-width timestamp. Review caught this one too.
+
+### The stored endpoint is untrusted input, and review caught that it wasn't
+
+`save_admin_push_subscription` checks only that the endpoint is non-empty, so
+what the sender POSTs to is whatever was stored — and storing one needs an admin
+at AAL2. The first version fetched it unvalidated, which turns one row edit into
+a connector to any address the Edge runtime can reach, the cloud metadata
+endpoint included. This is not an anonymous SSRF; it is containment for a
+compromised admin session or a leaked service key, which bypasses RLS entirely —
+the same reasoning, and now literally the same host rules, as `smtpTarget.ts`.
+
+Two halves, and neither implies the other:
+
+- **`refusePushEndpoint`** requires HTTPS, no credentials in the URL, and a
+  public dotted hostname — refusing IP literals in all four spellings, IPv6,
+  and the `.local` / `.internal` / `.localhost` / `.home.arpa` suffixes. An
+  optional `ADMIN_PUSH_ALLOWED_HOSTS` narrows it further.
+- **`redirect: 'manual'`** stops a *checked* host handing the request on. The
+  guard is otherwise undone by one `Location` header.
+
+The host rules moved to `supabase/functions/_shared/publicHost.ts` rather than
+being copied: duplicating forty lines of security-critical host parsing is how
+two copies of a rule drift apart. The 34-case SMTP suite passes unchanged, which
+is what makes the extraction verified rather than assumed.
+
 ### A subscription is deleted on 404 and 410, and on nothing else
 
 A 401 means our VAPID token is wrong; a 403 that our key does not match the
@@ -301,6 +344,16 @@ per notification was rejected because `net.http_post` is fire-and-forget: the
 database would have to write `sent` at the moment it posted, which is a claim it
 cannot support. Pulling means the process that actually talks to the push
 service is the one that records the outcome.
+
+### A transient failure does not lose the notification
+
+`finalize_admin_push_notification` returns a failed row to the queue until its
+attempt budget is spent, and only then writes a terminal `failed`. The first
+version wrote `failed` immediately — and the claim RPC never re-claims `failed`
+— so the three attempts it advertised were unreachable and one bad minute at a
+push service lost a closure notice for good. Review caught it on #399. The
+budget is written in three places, so the migration reads two of them out of the
+catalog and greps the third, and refuses to apply if they have drifted apart.
 
 ### An unconfigured deployment cleans up after itself
 

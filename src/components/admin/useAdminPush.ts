@@ -153,7 +153,7 @@ export function useAdminPush(lang: 'en' | 'ar', enabled: boolean): AdminPushCont
            * the admin gets instead is the diagnostic: a notification arrives,
            * or the sending half is not configured.
            */
-          await sendAdminPushConfirmation().catch(() => undefined);
+          await sendAdminPushConfirmation(serialized.endpoint).catch(() => undefined);
         }
 
         await refresh();
