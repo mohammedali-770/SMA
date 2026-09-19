@@ -387,6 +387,35 @@ The guard that catches a bulk apply when a second, legitimate file is
 outstanding has run out of second files again. **Name the target by version.**
 That is what makes the count irrelevant in either shape.
 
+**AMENDED 2026-09-18 — a second file is written, so on merge the outstanding set
+is TWO: Moyasar (frozen on purpose) and
+`20260927120000_admin_push_subscriptions` (written, validated, awaiting
+approval).** That restores the *appearance* of an innocent referent for "apply
+the outstanding migrations" **without making a bulk apply any safer**:
+`20260824100000` still sorts ahead of everything, so such an instruction takes
+the frozen payment file FIRST. **Name the target by version.**
+
+**THE NEW FILE IS A SEPARATE PUSH CHANNEL FROM THE CUSTOMER ONE, AND THAT
+SEPARATION IS THE SAFETY PROPERTY RATHER THAN AN IMPLEMENTATION DETAIL.** It
+creates `admin_push_subscriptions` for WEB push to the staff console — a
+different table, different RPCs and a different client module from
+`push_devices`, which is keyed by `customer_id` and whose every row belongs to a
+customer (measured 2026-09-18: 5 active devices, all customers; admin, branch
+staff and call centre hold **zero**). Nothing in the migration may reference
+`push_devices`, and its own assertion 5.9 fails the apply if it ever does —
+because the moment the two channels share a code path, a predicate error in a
+staff feature can put a branch closure on a real customer's lock screen. §7's
+rules govern the customer channel and are untouched by this work.
+
+**Applying it sends nothing and subscribes nobody:** one empty table, one
+nullable `app_settings` column, three `is_admin()`-gated RPCs. The table is
+CLOSED to client roles — RLS on with zero policies, grants revoked — and the file
+asserts that outcome rather than the `revoke` statement. **Money path untouched,
+and self-asserted:** it refuses to apply unless `place_order` still hashes
+`12b6816d…` and `compute_order_snapshot` still hashes `22e2d429…`. No deploy
+implied. Detail: `docs/MIGRATIONS.md` §49 and
+`docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+
 **`20260920120000` IS THE ONE WHERE "MONEY PATH UNTOUCHED" NEEDED PROVING,
 because both money-path functions CALL `validate_coupon`.** They bind the whole
 row — `select * into v_coupon from public.validate_coupon(...)` — so the return

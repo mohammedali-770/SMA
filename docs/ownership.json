@@ -60,7 +60,22 @@
         "apps/mobile/src/features/notifications/**",
         "src/components/admin/PushToolsPanel.tsx"
       ],
-      "docs": ["docs/OWNER_ACTIONS.md", "CLAUDE.md"]
+      "docs": [
+        "docs/OWNER_ACTIONS.md",
+        "CLAUDE.md"
+      ]
+    },
+    {
+      "id": "admin-push",
+      "why": "Web push to the staff console is a SEPARATE channel from the customer Expo push, and the separation is the safety property. A change to the manifest, the service worker or the readiness check can silently stop an admin receiving closure alerts, or — far worse — blur the line between the staff channel and the live customer one.",
+      "sources": [
+        "public/sw.js",
+        "public/manifest.webmanifest",
+        "src/lib/pwa/**"
+      ],
+      "docs": [
+        "docs/ADMIN_PUSH_NOTIFICATIONS.md"
+      ]
     },
     {
       "id": "whatsapp-auth",
@@ -71,7 +86,9 @@
         "supabase/functions/_shared/whatsapp*.ts",
         "supabase/functions/_shared/authHook.ts"
       ],
-      "docs": ["docs/WHATSAPP_LOGIN.md"]
+      "docs": [
+        "docs/WHATSAPP_LOGIN.md"
+      ]
     },
     {
       "id": "lazywait-pos",
@@ -82,7 +99,10 @@
         "src/components/admin/LazywaitPanel.tsx",
         "src/components/admin/LazywaitCatalogMapping.tsx"
       ],
-      "docs": ["docs/LAZYWAIT.md", "docs/integrations/Lazywait_API_Reference.md"]
+      "docs": [
+        "docs/LAZYWAIT.md",
+        "docs/integrations/Lazywait_API_Reference.md"
+      ]
     },
     {
       "id": "account-deletion",
@@ -92,7 +112,10 @@
         "supabase/functions/_shared/accountDeletion.ts",
         "apps/mobile/src/features/account/**"
       ],
-      "docs": ["docs/account-deletion-scheduler.md", "docs/OWNER_ACTIONS.md"]
+      "docs": [
+        "docs/account-deletion-scheduler.md",
+        "docs/OWNER_ACTIONS.md"
+      ]
     },
     {
       "id": "comped-customers",
@@ -116,7 +139,9 @@
         "src/components/admin/BranchDataImportPanel.tsx",
         "src/components/admin/view/branches/workingHours.ts"
       ],
-      "docs": ["docs/BRANCH_ONBOARDING.md"]
+      "docs": [
+        "docs/BRANCH_ONBOARDING.md"
+      ]
     },
     {
       "id": "coupons",
@@ -125,7 +150,9 @@
         "src/lib/couponsApi.ts",
         "src/components/admin/CouponsPanel.tsx"
       ],
-      "docs": ["docs/DISCOUNTS_CAMPAIGNS.md"]
+      "docs": [
+        "docs/DISCOUNTS_CAMPAIGNS.md"
+      ]
     },
     {
       "id": "loyalty",
@@ -143,7 +170,9 @@
         "src/lib/mappers.ts",
         "apps/mobile/src/lib/mappers.ts"
       ],
-      "docs": ["docs/LOYALTY.md"]
+      "docs": [
+        "docs/LOYALTY.md"
+      ]
     },
     {
       "id": "order-lifecycle",
@@ -154,7 +183,9 @@
         "apps/mobile/src/features/orders/**",
         "apps/mobile/src/features/checkout/**"
       ],
-      "docs": ["docs/ORDER_CONFIRMATION_FLOW.md"]
+      "docs": [
+        "docs/ORDER_CONFIRMATION_FLOW.md"
+      ]
     },
     {
       "id": "order-integrity",
@@ -200,13 +231,19 @@
         "apps/mobile/src/lib/mapsLink.ts",
         "apps/mobile/src/components/LocationPickerMap.tsx"
       ],
-      "docs": ["docs/MAPS.md"]
+      "docs": [
+        "docs/MAPS.md"
+      ]
     },
     {
       "id": "otp-entry",
       "why": "The one-time-code field carries platform-specific autofill behaviour that took a long investigation to establish. Changing it without updating the findings invites repeating that investigation.",
-      "sources": ["apps/mobile/src/features/otp/**"],
-      "docs": ["docs/OTP_AUTOFILL.md"]
+      "sources": [
+        "apps/mobile/src/features/otp/**"
+      ],
+      "docs": [
+        "docs/OTP_AUTOFILL.md"
+      ]
     },
     {
       "id": "deployment",
@@ -216,7 +253,11 @@
         ".github/workflows/eas-build.yml",
         "vercel.json"
       ],
-      "docs": ["docs/DEPLOY.md", "docs/RELEASE_CHECKLIST.md", "docs/OWNER_ACTIONS.md"]
+      "docs": [
+        "docs/DEPLOY.md",
+        "docs/RELEASE_CHECKLIST.md",
+        "docs/OWNER_ACTIONS.md"
+      ]
     },
     {
       "id": "mobile-session-storage",
@@ -226,7 +267,9 @@
         "apps/mobile/src/lib/secureSessionStorage.ts",
         "apps/mobile/src/lib/chunkedSecureStorage.ts"
       ],
-      "docs": ["docs/SECURITY_REVIEW.md"]
+      "docs": [
+        "docs/SECURITY_REVIEW.md"
+      ]
     },
     {
       "id": "alert-dispatch",
@@ -235,7 +278,9 @@
         "supabase/functions/operations-alert-dispatch/**",
         "supabase/functions/_shared/smtpTarget.ts"
       ],
-      "docs": ["docs/OPERATIONS_ALERTS_DIGEST.md"]
+      "docs": [
+        "docs/OPERATIONS_ALERTS_DIGEST.md"
+      ]
     },
     {
       "id": "play-store-assets",
@@ -249,7 +294,9 @@
         "apps/mobile/eas.json",
         "apps/mobile/app.json"
       ],
-      "docs": ["docs/PLAY_STORE_SUBMISSION.md"]
+      "docs": [
+        "docs/PLAY_STORE_SUBMISSION.md"
+      ]
     },
     {
       "id": "app-store-submission",
@@ -259,7 +306,9 @@
         "apps/mobile/locales/*.json",
         "apps/mobile/src/components/iosPurposeStrings.test.ts"
       ],
-      "docs": ["docs/APP_STORE_SUBMISSION.md"]
+      "docs": [
+        "docs/APP_STORE_SUBMISSION.md"
+      ]
     },
     {
       "id": "store-listing-copy",
@@ -271,7 +320,9 @@
         "apps/mobile/src/lib/payment.ts",
         "src/lib/loyaltyRulesSummary.ts"
       ],
-      "docs": ["docs/store/LISTING_COPY.md"]
+      "docs": [
+        "docs/store/LISTING_COPY.md"
+      ]
     }
   ]
 }

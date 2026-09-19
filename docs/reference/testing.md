@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**189 TypeScript test files declaring 2939 test blocks, plus 78 SQL suites.**
+**194 TypeScript test files declaring 3007 test blocks, plus 79 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -36,6 +36,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/account_deletion_resolution_note_privacy_test.sql`
 - `supabase/tests/account_deletion_test.sql`
 - `supabase/tests/address_single_default_test.sql`
+- `supabase/tests/admin_push_subscriptions_test.sql`
 - `supabase/tests/admin_ranged_orders_and_stats_test.sql`
 - `supabase/tests/admin_search_phone_normalization_test.sql`
 - `supabase/tests/alert_recovery_email_pairing_test.sql`
@@ -199,7 +200,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-96 files, 1352 declared test blocks.
+101 files, 1420 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -232,6 +233,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 3 | OrderReceiptModal — customer note |
 | `src/components/admin/view/orders/ordersView.test.ts` | 28 | needsPaymentConfirm — the money contract |
+| `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
@@ -293,6 +295,10 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/payment.test.ts` | 17 | checkout payment availability |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
 | `src/lib/productImages.test.ts` | 15 | product image type gate |
+| `src/lib/pwa/adminPushState.test.ts` | 9 | resolveAdminPushState |
+| `src/lib/pwa/pushSubscription.test.ts` | 13 | urlBase64ToUint8Array |
+| `src/lib/pwa/pushSupport.test.ts` | 16 | pushReadiness |
+| `src/lib/pwa/serviceWorkerPush.test.ts` | 21 | sw.js — push handler |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |

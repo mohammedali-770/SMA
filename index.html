@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
+    <!--
+      Installable web app. The manifest is what makes iOS expose PushManager to a
+      Home Screen entry at all: without `display: standalone` in it, Apple never
+      offers web push, however correct the service worker is. See
+      docs/ADMIN_PUSH_NOTIFICATIONS.md.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#100C1C" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="سبايسي ميل" />
     <title>Spicy Meal — Saudi Fast-Food Delivery & POS</title>
     <script>
       (() => {

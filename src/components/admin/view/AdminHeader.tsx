@@ -28,6 +28,7 @@ export function AdminHeader({
   soundOffLabel,
   liveMode,
   lastUpdated,
+  pushBell,
 }: {
   title: string;
   subtitle: string;
@@ -42,6 +43,12 @@ export function AdminHeader({
   soundOffLabel: string;
   liveMode: LiveMode;
   lastUpdated: number | null | undefined;
+  /**
+   * The closure-alerts control, already built by the shell. A slot rather than a
+   * set of props because only the admin gets one, and this component must not
+   * learn what a role is.
+   */
+  pushBell?: React.ReactNode;
 }) {
   return (
     <header className="flex flex-col items-start justify-between gap-3 border-b border-con-line bg-con-surface p-4 sm:flex-row sm:items-center">
@@ -55,6 +62,8 @@ export function AdminHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+        {pushBell}
+
         <button
           type="button"
           onClick={onToggleSound}
