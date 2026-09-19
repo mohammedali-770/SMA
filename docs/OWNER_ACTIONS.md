@@ -2897,8 +2897,25 @@ Each was its own §5 action, applied on explicit approval in dependency order,
 
 **Applying all four closed no size and changed nothing a customer sees, and that
 was measured rather than assumed:** `branch_variant_availability` holds 0 rows,
-`variant_closing_enabled` is false, and orders are unchanged at 76. Nobody can
-write a closure until step 40.3.
+`variant_closing_enabled` is false, and orders are unchanged at 76.
+
+**THE FLAG IS A UI GATE, NOT A SERVER INTERLOCK — an earlier version of this
+section said "nobody can write a closure until step 40.3", and that was false.**
+Review caught it on #396 and it was verified live rather than argued:
+`set_variant_snooze` and `clear_variant_snooze` are granted to `authenticated`
+and authorize on `is_admin() or is_branch_operator(branch)` **without consulting
+`variant_closing_enabled` at all**. So an admin or branch operator who calls the
+RPC directly — outside the console, with their own token — can create a closure
+before the build ships, and an old app would then show that generic payment-step
+error.
+
+What the flag actually buys is that **the console offers no way to do it**, and
+the console is the only client that calls those RPCs. The sequencing therefore
+holds for anyone working normally, which is the realistic risk it was written to
+manage. It does not hold against a deliberate hand-made call. If you want the
+ordering to be a guarantee rather than a convention, the fix is to make the two
+RPCs consult the flag — a further migration, not a setting change; say so and it
+can be written.
 
 ### 40.2 Ship an EAS build carrying the customer half — BEFORE step 40.3 — OUTSTANDING
 

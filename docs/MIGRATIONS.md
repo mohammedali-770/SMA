@@ -5990,10 +5990,26 @@ the server's sentence (`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). The
 customer sees a generic error at the payment step, on a cart that looked fine.
 
 Merging both halves together does **not** close that window — it moves its start
-from merge to deploy. Only a switch closes it. While the flag is false the
-operator controls are absent, so no closed-tier row can be written, so the
-refusal is unreachable on any build. Turning it on is a deliberate act performed
-once a build carrying the customer half is live.
+from merge to deploy. A switch is what manages it. While the flag is false the
+operator controls are absent from the console, and the console is the only client
+that calls the snooze RPCs, so no closure gets created in the course of ordinary
+work. Turning it on is a deliberate act performed once a build carrying the
+customer half is live.
+
+**CORRECTED 2026-09-19 — this paragraph used to end "so no closed-tier row can be
+written, so the refusal is unreachable on any build", and that was FALSE.**
+Review caught it on #396; verified live rather than reasoned:
+`set_variant_snooze` and `clear_variant_snooze` are granted to `authenticated`
+and gate on `is_admin() or is_branch_operator(branch)` **without reading
+`variant_closing_enabled`**. A direct RPC call by an admin or branch operator
+therefore still writes a closure with the flag false. **The applied migration's
+own header carries the same overstatement** (`…which means no closed-tier row can
+be written…`) and is deliberately left unedited: it is an applied file, its
+sha256 is recorded, and rewriting it would misrepresent what was sent to
+Production. Read that header against this paragraph. The general lesson is the
+one §12 keeps relearning in a different costume: **a control that hides a button
+constrains the UI, not the API — ask what the action writes, not only what the
+console shows.**
 
 ### Why a setting rather than a client constant
 

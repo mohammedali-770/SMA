@@ -298,10 +298,21 @@ a **generic error at the payment step**, since `failureMessage` returns a
 translated KEY rather than the server's sentence
 (`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). Merging both halves
 together does not close that window; it moves its start from merge to deploy.
-Only the switch closes it. **Applying it changed nothing** (it defaults false, and
-the live value was read back as false); **turning it on is a separate §5
-decision** that must follow the build carrying the customer half. Steps and
+The switch is what manages it. **Applying it changed nothing** (it defaults
+false, and the live value was read back as false); **turning it on is a separate
+§5 decision** that must follow the build carrying the customer half. Steps and
 ordering: `docs/OWNER_ACTIONS.md` §40.
+
+**IT GATES THE CONSOLE, NOT THE API, and the documentation said otherwise until
+2026-09-19.** Review caught it on #396 and it was measured, not argued:
+`set_variant_snooze` and `clear_variant_snooze` are granted to `authenticated`
+and authorize on `is_admin() or is_branch_operator(branch)` **without consulting
+the flag**. A direct RPC call therefore still writes a closure while the flag is
+false. The flag removes the control from the console — the only client that calls
+those RPCs — so ordinary work is sequenced correctly, but this is a convention
+rather than a guarantee. **Ask what an action WRITES, not only what the console
+shows**; §12's `operations_alert_settings` correction is the same lesson about a
+different control.
 
 **THE COLUMN-GRANT TRAP WAS CHECKED HERE AND THEN MEASURED AGAIN, and the
 measurement is worth carrying.** `app_settings` grants are TABLE-level, so a new
