@@ -2978,21 +2978,21 @@ it is the copy a cashier reads during a rush.
 
 ---
 
-## 41. Admin push notifications — the five steps that turn it on
+## 41. Admin push notifications — the steps that turn it on
 
 You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
 size or delivery. The code is written; none of it is live. Behaviour, design and
 evidence: `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
-**Nothing below sends anything by itself.** Steps 41.1-41.4 make a notification
-*possible*; until the step 4 trigger exists (41.6) the only notification anyone
-receives is the single confirmation the console sends when an admin turns the
-control on. Each step is its own §5 action — approval for one is not approval for
-the next.
+**Nothing below sends anything by itself.** Each step makes a notification more
+possible; the first real one arrives when a branch closes something after all of
+41.1-41.5 are done. Before that, the only notification anyone receives is the
+single confirmation the console sends when an admin turns the control on. Each
+step is its own §5 action — approval for one is not approval for the next.
 
 ### The order matters, and here is the one way to get it wrong
 
-**Do not delete and re-add the Home Screen icon (41.5) before 41.1-41.4 are
+**Do not delete and re-add the Home Screen icon (41.6) before 41.1-41.5 are
 done.** iOS fixes an installed web app's capabilities at install time, so an icon
 re-added while the VAPID key is still missing installs an app that *can* receive
 push but has nothing to subscribe to — and you would have to delete and re-add it
@@ -3071,7 +3071,30 @@ migration applies — so a deploy that lands first answers 500 on every call. It
 breaks nothing else (no other function or client touches this path), but it
 wastes a round trip and looks like a fault in the code rather than the order.
 
-### 41.5 Delete the Home Screen icon and re-add it — LAST
+### 41.5 Apply `20260928120000_admin_push_closure_notifications`
+
+The piece that turns a real branch closure into a notification. It hangs off
+`branch_availability_events` and `branch_delivery_events`, which already record
+every closure, so **no closure RPC is modified** — nothing about how a branch
+takes an item off the menu changes, and the file's own verification fails the
+apply if any of the five closure RPCs has gone missing or learned about this
+feature.
+
+**Applying it sends nothing and notifies nobody.** It creates one empty queue,
+one `app_settings` column and a cron job that finds nothing to do. It also
+creates its own HMAC trigger secret, generated inside Postgres so the value
+never crosses the wire, and copies the project URL from the alert dispatcher's
+Vault secret.
+
+**It implies the deploy in 41.4** — `admin-push-dispatch` gained a queue-drain
+mode in the same change. Applying this without that deploy leaves notices
+queueing and expiring after two hours; deploying without applying leaves the
+function with nothing to claim. Neither breaks anything and neither sends, so
+the order between 41.4 and 41.5 does not matter — only that both happen.
+
+Detail: `docs/MIGRATIONS.md` §50.
+
+### 41.6 Delete the Home Screen icon and re-add it — LAST
 
 The console is already on your Home Screen as **تقفيل المنتجات**, and it was added
 before any of this existed. iOS will not grant that entry push capability
@@ -3083,12 +3106,51 @@ within a few seconds** confirming notifications are on. If it does not arrive,
 one of 41.2-41.4 is incomplete — the subscription itself will still have been
 stored, so the control showing "on" is not evidence that sending works.
 
-### 41.6 Apply the step 4 trigger migration — not written yet
+### 41.7 Two things to check afterwards, and what each tells you
 
-The piece that turns a real branch closure into a notification. It hangs off
-`branch_availability_events` and `branch_delivery_events`, which already record
-every closure, so **no closure RPC is modified** — nothing about how a branch
-takes an item off the menu changes. It will be offered for approval when written.
+**Did the project URL copy?** The migration copies it from
+`operations_alert_dispatch_project_url`. If that secret was ever renamed the
+copy silently does not happen, and the driver then holds every notice with the
+reason written onto the row:
+
+```sql
+select name from vault.secrets where name like 'admin_push_%';
+-- expect BOTH admin_push_dispatch_secret and admin_push_dispatch_project_url
+```
+
+If the URL is missing, add it. The value is the ordinary project URL, not a
+secret in any real sense:
+
+```sql
+select vault.create_secret(
+  new_secret      => 'https://<project-ref>.supabase.co',
+  new_name        => 'admin_push_dispatch_project_url',
+  new_description => 'Supabase project URL used by invoke_admin_push_dispatch.'
+);
+```
+
+**Is anything stuck?** One query answers it:
+
+```sql
+select status, count(*), max(last_error)
+  from public.admin_push_outbox group by status;
+```
+
+`pending` rows carrying a `last_error` about configuration mean the driver is
+running and cannot reach the sender. `skipped` means they expired before it
+could. An empty table means nothing has been closed since the apply.
+
+### 41.8 If it becomes noisy
+
+```sql
+update public.app_settings set admin_push_enabled = false where id is true;
+```
+
+That stops the queueing and the sending immediately, without deleting anybody's
+subscription or undeploying anything; setting it back to `true` resumes.
+Notifications are one per event with no batching, by your decision on
+2026-09-18 — if the volume is the problem rather than the feature, batching
+belongs in the sender and can be added without touching the triggers.
 
 ---
 

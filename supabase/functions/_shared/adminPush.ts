@@ -11,8 +11,15 @@
 import { MAX_PLAINTEXT_BYTES, isGoneStatus } from './webPush.ts';
 import { isAllowedHost, isPublicHostname, normalizeHost } from './publicHost.ts';
 
-/** How a caller proved who they are. Decided in the handler, used here. */
-export type CallerKind = 'service_role' | 'admin';
+/**
+ * How a caller proved who they are. Decided in the handler, used here.
+ *
+ * `scheduler` is the pg_cron driver, which carries an HMAC over a Vault-held
+ * secret rather than any key this function could read. It is a separate kind
+ * from `service_role` because the two are proven differently, even though they
+ * may do the same things.
+ */
+export type CallerKind = 'service_role' | 'admin' | 'scheduler';
 
 /**
  * Which subscriptions a caller may reach.
@@ -26,7 +33,65 @@ export type CallerKind = 'service_role' | 'admin';
  * service role, which is the only path that fans out.
  */
 export function scopeFor(caller: CallerKind): 'all' | 'self' {
-  return caller === 'service_role' ? 'all' : 'self';
+  return caller === 'admin' ? 'self' : 'all';
+}
+
+/** What the caller asked the function to do. */
+export type DispatchMode = 'direct' | 'queue';
+
+export function parseDispatchMode(raw: unknown): DispatchMode | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const mode = (raw as Record<string, unknown>).mode;
+  if (mode === undefined || mode === 'direct') return 'direct';
+  if (mode === 'queue') return 'queue';
+  return null;
+}
+
+/**
+ * Whether a caller may drain the closure queue.
+ *
+ * AN ADMIN MAY NOT, and the reason is not that they are untrusted. A queue drain
+ * CONSUMES rows — each one is claimed, sent and finalized — while an admin's
+ * send is scoped to their own devices. So an admin draining the queue would
+ * deliver every branch's closure notices to their phone alone and mark them
+ * done, leaving every other administrator with nothing. The queue belongs to
+ * the scheduler.
+ */
+export function mayDrainQueue(caller: CallerKind): boolean {
+  return caller !== 'admin';
+}
+
+/** One row as `claim_admin_push_notifications` returns it. */
+export interface QueuedNotification {
+  id: number;
+  title_ar: string;
+  body_ar: string;
+  title_en: string;
+  body_en: string;
+  url: string | null;
+  tag: string | null;
+}
+
+/**
+ * Turn a claimed row into the same shape a direct request produces, so both
+ * modes share one send path.
+ *
+ * THE COLUMN NAMES HERE COME FROM THE RPC'S `returns table`, not from any alias
+ * inside its body — PostgREST serialises the declared OUT parameter names, and
+ * naming them wrong made every field `undefined` in `operations-alert-dispatch`
+ * (#328). `adminPushWiring.test.ts` parses the migration and fails if these
+ * drift from it.
+ */
+export function requestFromQueueRow(row: QueuedNotification): NotificationRequest {
+  return {
+    title: row.title_ar,
+    body: row.body_ar,
+    titleEn: row.title_en,
+    bodyEn: row.body_en,
+    url: row.url,
+    tag: row.tag,
+    ttlSeconds: DEFAULT_TTL_SECONDS,
+  };
 }
 
 /**

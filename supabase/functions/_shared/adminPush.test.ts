@@ -6,9 +6,14 @@ import {
   MAX_CONSECUTIVE_FAILURES,
   buildPayload,
   classifyDelivery,
+  mayDrainQueue,
+  parseDispatchMode,
   parseNotificationRequest,
+  mayDrainQueue,
+  parseDispatchMode,
   parseTargetEndpoint,
   refusePushEndpoint,
+  requestFromQueueRow,
   scopeFor,
   shouldPruneAfterFailure,
 } from './adminPush';
@@ -31,8 +36,89 @@ describe('scopeFor', () => {
     expect(scopeFor('admin')).toBe('self');
   });
 
-  it('lets the service role fan out', () => {
-    expect(scopeFor('service_role')).toBe('all');
+  it.each(['service_role', 'scheduler'] as const)('lets %s fan out', (caller) => {
+    expect(scopeFor(caller)).toBe('all');
+  });
+});
+
+describe('parseDispatchMode', () => {
+  it('defaults to a direct send when no mode is given', () => {
+    expect(parseDispatchMode({ title: 'a', body: 'b' })).toBe('direct');
+  });
+
+  it.each([
+    ['direct', 'direct'],
+    ['queue', 'queue'],
+  ])('accepts %s', (mode, expected) => {
+    expect(parseDispatchMode({ mode })).toBe(expected);
+  });
+
+  /*
+   * A mode it does not recognise is a REFUSAL, not a fall-back to direct. A
+   * typo like `mode: "queued"` silently becoming a direct send would answer
+   * `ok` to a scheduler tick while draining nothing, and the queue would fill
+   * until every row expired — a failure that reports success.
+   */
+  it.each([['queued'], ['QUEUE'], [''], [null], [1], [{}]])('refuses %s', (mode) => {
+    expect(parseDispatchMode({ mode })).toBeNull();
+  });
+
+  it.each([[null], ['queue'], [7], [['queue']]])('refuses %s as a body', (raw) => {
+    expect(parseDispatchMode(raw)).toBeNull();
+  });
+});
+
+describe('mayDrainQueue', () => {
+  /*
+   * THE REASON AN ADMIN MAY NOT is not that they are untrusted. A drain
+   * CONSUMES rows — claimed, sent, finalized — while an admin's scope is their
+   * own devices. So an admin draining the queue would deliver every branch's
+   * closure notices to one phone and mark them done for everybody else.
+   */
+  it('refuses an admin', () => {
+    expect(mayDrainQueue('admin')).toBe(false);
+  });
+
+  it.each(['service_role', 'scheduler'] as const)('allows %s', (caller) => {
+    expect(mayDrainQueue(caller)).toBe(true);
+  });
+});
+
+describe('requestFromQueueRow', () => {
+  const row = {
+    id: 7,
+    title_ar: 'إغلاق حجم — الرياض',
+    body_ar: 'تم إغلاق حجم «كبير».',
+    title_en: 'Size closed — Riyadh',
+    body_en: '"Large" was closed.',
+    url: '/',
+    tag: 'variant:abc',
+  };
+
+  it('maps Arabic to the default copy and English to the override', () => {
+    expect(requestFromQueueRow(row)).toEqual({
+      title: row.title_ar,
+      body: row.body_ar,
+      titleEn: row.title_en,
+      bodyEn: row.body_en,
+      url: '/',
+      tag: 'variant:abc',
+      ttlSeconds: DEFAULT_TTL_SECONDS,
+    });
+  });
+
+  it('produces a payload the service worker can read', () => {
+    const payload = buildPayload(requestFromQueueRow(row), 'ar', 0);
+    expect(payload.title).toBe(row.title_ar);
+    expect(payload.lang).toBe('ar');
+    expect(payload.dir).toBe('rtl');
+  });
+
+  it('keeps a null url and tag null rather than inventing a target', () => {
+    const request = requestFromQueueRow({ ...row, url: null, tag: null });
+    expect(request.url).toBeNull();
+    expect(request.tag).toBeNull();
+    expect('url' in buildPayload(request, 'ar', 0)).toBe(false);
   });
 });
 

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**198 TypeScript test files declaring 3098 test blocks, plus 79 SQL suites.**
+**198 TypeScript test files declaring 3115 test blocks, plus 80 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -36,6 +36,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/account_deletion_resolution_note_privacy_test.sql`
 - `supabase/tests/account_deletion_test.sql`
 - `supabase/tests/address_single_default_test.sql`
+- `supabase/tests/admin_push_closure_notifications_test.sql`
 - `supabase/tests/admin_push_subscriptions_test.sql`
 - `supabase/tests/admin_ranged_orders_and_stats_test.sql`
 - `supabase/tests/admin_search_phone_normalization_test.sql`
@@ -309,15 +310,15 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-26 files, 674 declared test blocks.
+26 files, 691 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
-| `supabase/functions/_shared/adminPush.test.ts` | 35 | scopeFor |
-| `supabase/functions/_shared/adminPushWiring.test.ts` | 20 | the admin channel is separate from the customer channel |
+| `supabase/functions/_shared/adminPush.test.ts` | 44 | scopeFor |
+| `supabase/functions/_shared/adminPushWiring.test.ts` | 28 | the admin channel is separate from the customer channel |
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 17 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |

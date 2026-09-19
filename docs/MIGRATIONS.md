@@ -6300,3 +6300,139 @@ foreign key; identities have to start in `auth.users` and let
 `handle_new_user()` create the profile. The first version of the suite failed
 exactly there, which is the value of running a suite against a real chain
 instead of reasoning about it.
+
+---
+
+## 50. Admin closure notifications — WRITTEN, NOT APPLIED (2026-09-19)
+
+`20260928120000_admin_push_closure_notifications.sql`. **Written 2026-09-19,
+validated, awaiting owner approval.** Step 4, the last of the admin
+closure-notification work; the feature is described in
+`docs/ADMIN_PUSH_NOTIFICATIONS.md` and the owner steps are
+`docs/OWNER_ACTIONS.md` §41.
+
+sha256 `e3e265e484fd50d0cee51fa45dcd07692ce9a33db53171a0c3504e38fb962068`,
+983 lines / 45 326 bytes — **re-hash the MERGED copy before applying**, per §15.
+
+It adds `app_settings.admin_push_enabled`, an `admin_push_outbox` queue, two
+bilingual copy composers, an enqueue trigger on each of the two closure audit
+tables, claim/finalize RPCs, an HMAC signature verifier, a pg_cron driver and
+the job that runs it.
+
+**MONEY PATH UNTOUCHED, and the file asserts it rather than claiming it.** Its
+closing block refuses to apply unless `place_order` still hashes
+`12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` still hashes
+`22e2d42935459e7bf93abb2941b56325`. **DEPLOY IMPLIED: one.**
+`admin-push-dispatch` gains a queue-drain mode in the same change; applying this
+without deploying that leaves rows queueing and expiring, and deploying without
+applying leaves the function with nothing to claim. Neither breaks anything and
+neither sends.
+
+### No closure RPC is modified, and that is the design rather than a convenience
+
+`branch_availability_events` and `branch_delivery_events` have recorded every
+closure since 2026-08-20 — branch, subject, action, duration, reason, actor and
+source — and the availability table is append-only and never pruned
+(`20260822090000` prunes the run ledger and deliberately leaves the audit
+alone). So the feature hangs a trigger off those two tables and touches nothing
+on the path a cashier uses. Assertion 10.5 enumerates the five closure RPCs and
+fails the apply if any of them has gone missing **or** mentions `admin_push`.
+
+### A notification must never be able to block a closure
+
+The enqueue triggers run inside the transaction that closes the item, so an
+exception in one would abort the closure itself — a cashier told "could not
+close Large" because a product name was null. Both bodies wrap their work in
+`exception when others`, warn, and return; assertion 10.6 fails the apply if
+either loses that guard.
+
+**This is tested by breaking it on purpose.** CASE 9 of the paired suite
+replaces the copy composer with one that raises, drives the real
+`set_product_snooze`, and asserts the closure still lands and is still audited —
+then restores the composer with a savepoint and asserts the same closure DOES
+queue a notice, so the case cannot pass by the composer never being called.
+
+### An incomplete Vault is RECORDED, not raised — the opposite of §47's driver
+
+`invoke_operations_alert_dispatch` raises when its Vault secrets are missing,
+correctly: it does no other work, so aborting costs nothing and turns an
+unconfigured dispatcher into a visible failure in `cron.job_run_details`.
+
+This driver expires stale rows and prunes old ones **first**, and pg_cron runs
+each job in one transaction — so an exception would roll the housekeeping back
+with it, and the queue would grow for ever on exactly the deployment that cannot
+send. The fault is therefore written onto the rows it is holding up, plus a
+`raise warning`. Mutation M8 is the proof that this matters: a driver that
+raises here passes every other assertion in the suite and fails CASE 12.
+
+### What it notifies on, and what it deliberately does not
+
+| event | behaviour |
+| --- | --- |
+| whole item closed | notifies |
+| price tier (size) closed | notifies |
+| delivery paused at a branch | notifies |
+| every reopen, manual or automatic | **silent** — the owner chose closing only |
+| option / add-on closed | **silent** — highest volume, lowest value |
+| a single delivery AREA disabled | **silent** — narrower than the branch pause asked for; one value to add if wanted |
+
+### The kill switch defaults TRUE, against this repository's habit
+
+A flag that defaults off exists to stop an apply changing behaviour. Here the
+behaviour is already gated four ways — this migration applied, a VAPID key
+configured, the sender deployed, and an admin subscribed — so a fifth gate that
+must be switched on would be friction rather than safety. What the column is for
+is the other direction: stopping notifications without deleting anybody's
+subscription or undeploying the sender. It is checked in the triggers **and** in
+the driver, so switching it off stops rows that are already queued.
+
+### Validation
+
+Local chain harness: **142 migrations applied, 80 suites run, 78 passed, 2
+quarantined, 0 new failures.** The file's own verification block ran as part of
+that apply. `supabase/tests/admin_push_closure_notifications_test.sql` adds 13
+cases covering the closed table, the copy in both languages, every filter, the
+Arabic duration forms, the master switch, the real RPC path end to end, the
+broken-composer guard, the claim fence, the attempt budget, expiry, retention
+and the channel separation.
+
+**Mutation-tested 17 ways; 16 killed.** The survivor is recorded rather than
+hidden: removing the trigger's `modifier_id is not null` early-out changes
+nothing observable, because the composer independently refuses an event naming
+no product or tier. The filter is a performance guard on the highest-volume
+event there is, not the thing that makes the behaviour correct — and the suite
+now asserts the half that does.
+
+### A transient failure lost the notification, and review caught it
+
+`finalize_admin_push_notification` wrote a terminal `failed` on the first bad
+minute, and `claim_admin_push_notifications` claims only `pending` rows and
+expired `processing` leases — so the three attempts the file advertises were
+**unreachable**, and one 429 or 5xx across every subscription lost the closure
+notice permanently. A failure now returns the row to the queue, with
+`claim_token` and `claimed_at` both cleared, until the budget is spent.
+
+**The budget is written in THREE places** — the claim RPC's default, the
+finalize RPC's default, and a literal in the driver's claimable count. Drift
+between them is silent in both directions: retry for ever, or give up early.
+The verification block reads two of them out of `pg_get_function_arguments` and
+greps the third, and refuses to apply if they disagree — the rule
+`20260913120000` established. CASE 11b drives all three attempts and asserts the
+row is `pending` after each of the first two and `failed` after the third;
+mutations that make a failure terminal at once, that make it retry for ever,
+that leave the lease attached, and that drift the constant are all killed.
+
+**A real gap was found by the suite and fixed in the migration, not only in the
+test.** Assertion 10.8 — nothing in this feature may reference the customer push
+channel — matched `admin_push%`, which silently exempts
+`claim_admin_push_notifications`, `finalize_admin_push_notification` and
+`invoke_admin_push_dispatch`. The claim RPC is the one function that reads rows,
+and so the natural place for a later change to "also notify the customer". Both
+the assertion and the suite now match `%admin_push%`.
+
+**The test harness needed a change, recorded because it is shared.**
+`vault.create_secret` lived in `.github/sql-ci/harness.sql`, which is loaded
+**after** the migration chain — correct while only the suites called it. This
+migration creates its own trigger secret at apply time, generated inside
+Postgres so the value never crosses the wire, so the chain needs it now. Both
+vault shims moved to `bootstrap.sql`.
