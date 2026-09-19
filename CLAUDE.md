@@ -226,32 +226,71 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-16, read live: 136 repository files on the default
-branch / 141 live history rows / exactly ONE unapplied — Moyasar, unapplied on
-purpose.** Latest live version `20260916114130`; the most recent apply is
-`20260922120000` (ledger row 96, `docs/MIGRATIONS.md` §43).
+**Current position 2026-09-17, read live AFTER the per-size-closing run: 140
+repository files on the default branch / 145 live history rows / exactly ONE
+unapplied — Moyasar, unapplied on purpose.** Latest live version
+`20260917124937`; the most recent apply is `20260926120000` (ledger row 100,
+`docs/MIGRATIONS.md` §48). Reconciled **by name** against the default branch,
+because versions are apply-time stamps; the delta against the previous read is
+exactly +4 files and +4 rows, which is that run and nothing else.
 
-**THE COUNT LEAVES THE DANGEROUS SHAPE ON THE BRANCH THAT CARRIES THIS
-SENTENCE, AND THAT MAKES A BULK APPLY NO SAFER.** Four files are written,
-validated and awaiting approval — `20260923120000_branch_variant_availability`,
-`20260924120000_place_order_variant_availability`,
-`20260925120000_health_card_variant_coverage` and
-`20260926120000_variant_closing_flag` — so once they merge the outstanding set
-is **FIVE**. `20260824100000` still sorts ahead of all four, so
-"apply the outstanding migrations" takes the frozen payment file FIRST. **Name
-the target by version.** That is what makes the count irrelevant in any shape.
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
+rather than the bottom.** With a single file left, "apply the outstanding
+migrations" reads like a no-op and is in fact the one instruction that would
+break the §6 payment freeze — there is no other file it could plausibly mean.
+The guard that catches a bulk apply when a second, legitimate file is
+outstanding has run out of second files again. **Name the target by version.**
+That is what makes the count irrelevant in either shape.
 
-**THE FOUR NEW FILES HAVE A DEPENDENCY ORDER AND IT IS NOT OPTIONAL.** Apply
-`20260923120000`, then `20260924120000`, then `20260925120000`, then
-`20260926120000`, each on its own
-approval, each named by its own version. The first three refuse to land out of
-order: the first asserts that neither money-path function mentions
+**THE MONEY-PATH PAIR MOVED, ONCE, AT `20260924120000`, AND THAT IS THE INTENDED
+EFFECT OF THE WORK RATHER THAN AN ANOMALY.** The new pair, to be treated as the
+baseline from here: `place_order` **`12b6816d256c29b76edf947ae1a7ea77`**,
+`compute_order_snapshot` **`22e2d42935459e7bf93abb2941b56325`**. The pair it
+retires — `bfd3f1f4…` / `ca276a84…` — should no longer be quoted as current. The
+other three files in the run left it identical, verified at each.
+
+**A RECORDED HASH HAS A SIDE, AND READING IT ON THE WRONG SIDE MAKES A CORRECT
+APPLY LOOK WRONG.** `20260925120000`'s header lists a
+`md5(pg_get_functiondef(oid))` pair under *"Ledger basis … which WILL move on
+apply"*: those are the **pre-apply** values, and reading them as post-apply
+predictions produces a mismatch on a file whose body was in fact byte-identical.
+The three earlier traps of this shape recorded below (the `md5(prosrc)` basis,
+and the newline at each `$$` delimiter) were all errors in the MEASUREMENT; this
+one was an error in the READING. It was settled by reconstructing both pre- and
+post-image bodies from their source files, combining each with the live
+prologue, and reproducing all four hashes and both lengths exactly. **Check
+which side of the apply a recorded hash describes before calling a mismatch.**
+
+**A PREDICATE IS NOT AN OUTCOME.** `20260926120000` asserts
+`has_column_privilege` for both client roles — the right question, and still not
+the same as the client's read actually succeeding, which is the distinction row
+96 exists for. After the apply the read itself was performed under both roles
+(`set local role anon; select * from public.app_settings` returns its row rather
+than raising). Prefer the outcome where one is cheap to obtain.
+
+**APPLIED 2026-09-17 — the four per-size files are all APPLIED**, in dependency
+order, each named by its own version, one call per file, each verified before
+the next was sent: `20260923120000` → `20260917122329` (row 97),
+`20260924120000` → `20260917123545` (row 98), `20260925120000` →
+`20260917124256` (row 99), `20260926120000` → `20260917124937` (row 100).
+**Applying them changed nothing customer-visible, measured:**
+`branch_variant_availability` holds 0 rows, `variant_closing_enabled` is false,
+orders unchanged at 76. Their dependency order is kept below because it is why
+the run was safe, and because the same order governs any replay.
+
+Their order was not a preference. Apply `20260923120000`, then `20260924120000`,
+then `20260925120000`, then `20260926120000`, each on its own approval, each
+named by its own version. The first three refuse to land out of order: the first
+asserts that neither money-path function mentions
 `branch_variant_availability`; the second asserts that the table, both RPCs and
 the sweeper arm already exist; the third asserts both, and both halves of its
-guard were proven by building a database that fails exactly one of them.
+guard were proven by building a database that fails exactly one of them. **Those
+guards were not leaned on** — every precondition was verified live before each
+file was sent, which is the difference between a guard that catches a mistake
+and one that is never tested.
 
-**THE FOURTH IS A SWITCH, AND IT IS THE ONE THAT DECIDES WHEN CUSTOMERS ARE
-EXPOSED.** `20260926120000` adds `app_settings.variant_closing_enabled`,
+**THE FOURTH IS A SWITCH, AND IT IS STILL THE ONE THAT DECIDES WHEN CUSTOMERS
+ARE EXPOSED — APPLYING IT DID NOT FLIP IT.** `20260926120000` adds `app_settings.variant_closing_enabled`,
 defaulting FALSE, which hides the branch console's per-size controls. It exists
 because the console deploys on merge while the customer app reaches a customer
 only in the next EAS build — and a build that does not know a closed size shows
@@ -259,9 +298,21 @@ a **generic error at the payment step**, since `failureMessage` returns a
 translated KEY rather than the server's sentence
 (`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). Merging both halves
 together does not close that window; it moves its start from merge to deploy.
-Only the switch closes it. **Applying it changes nothing** (defaults false);
-**turning it on is a separate §5 decision** that must follow the build carrying
-the customer half. Steps and ordering: `docs/OWNER_ACTIONS.md` §40.
+The switch is what manages it. **Applying it changed nothing** (it defaults
+false, and the live value was read back as false); **turning it on is a separate
+§5 decision** that must follow the build carrying the customer half. Steps and
+ordering: `docs/OWNER_ACTIONS.md` §40.
+
+**IT GATES THE CONSOLE, NOT THE API, and the documentation said otherwise until
+2026-09-19.** Review caught it on #396 and it was measured, not argued:
+`set_variant_snooze` and `clear_variant_snooze` are granted to `authenticated`
+and authorize on `is_admin() or is_branch_operator(branch)` **without consulting
+the flag**. A direct RPC call therefore still writes a closure while the flag is
+false. The flag removes the control from the console — the only client that calls
+those RPCs — so ordinary work is sequenced correctly, but this is a convention
+rather than a guarantee. **Ask what an action WRITES, not only what the console
+shows**; §12's `operations_alert_settings` correction is the same lesson about a
+different control.
 
 **THE COLUMN-GRANT TRAP WAS CHECKED HERE AND THEN MEASURED AGAIN, and the
 measurement is worth carrying.** `app_settings` grants are TABLE-level, so a new

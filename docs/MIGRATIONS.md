@@ -1358,6 +1358,17 @@ equality means content equivalence regardless of formatting or statement
 splitting. `=` in the live column means *identical to the repository
 fingerprint on that row*.
 
+**The `repo skel` column drifted from that definition at row 93, and it is
+recorded here rather than silently corrected.** Rows 85-92 carry `n/a`, and
+rows 93 onward carry the **first 12 hex of the file's sha256** — the fingerprint
+§9-B.7 requires be re-hashed from the merged copy before an apply — not the
+comment-and-whitespace-stripped MD5 defined above. Both are honest fingerprints
+of the same file and neither is wrong, but they are not interchangeable: the
+skel is deliberately insensitive to formatting and comments, and the sha256 is
+deliberately not. Rows 97-100 follow the current convention so the column stays
+internally consistent with its neighbours. Verified by recomputing both hashes
+for every row from 85 to 100 against the repository file, not by reading.
+
 ## 5. Complete authoritative migration ledger
 
 State result key: ✔ = live object state verified against the current catalog.
@@ -1465,6 +1476,10 @@ production.
 | 94 | 20260919120000 | security_audit_db_hardening | `4c030fa13924` | 20260914104107 | security_audit_db_hardening | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:41:07 UTC** on explicit owner approval ("apply 20260919120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Five independent items from the 2026-09-13 audit. Merged in PR #373 as squash `87b785e`; §9-B.7: the merged copy was re-hashed from the default branch and matched the recorded value exactly (sha256 `4c030fa139248766c60bd7a6828656166a36e208e32a475a0566749f19ff5d1e`, 364 lines / 17 642 bytes). **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — neither is read nor redefined here. **Fidelity on three bodies**, each against a hash **pre-computed from the merged file before sending**, all three byte-identical: `anonymize_account_data` `c44b5c79be74a548bc756d0d9789ce22` (4 504 chars), `deactivate_push_device` `1836af394523e92de49f3d8273b9eb71` (450), `admin_coupon_usage_counts` `dcc0e74f83fec0ec46fe8ca261e6f20f` (459). **`register_push_device` is BYTE-IDENTICAL before and after** (`e6d370b56521959ba20ad6c80543571a`, 1 310 chars) — the deliberate asymmetry survived: silencing is now owner-scoped, reassignment is not, because a shared handset changing hands is a real flow and silencing another customer's device is not. **THE PRE-IMAGE MATCHED LIVE EXACTLY BEFORE THE DERIVATION WAS TRUSTED:** live `anonymize_account_data` hashed `4ea045732529d4cd242a4191e15e8af5` / 4 105 chars, identical to the body extracted from `20260827110000_comp_erasure.sql`. **THE ONE REAL RISK HERE WAS NAME RESOLUTION ON THE ACCOUNT-DELETION PATH, and it was checked rather than assumed — twice.** This file's own header records that an earlier draft referenced `whatsapp_message_logs.to_phone`, a column that does not exist. So: an identifier-set diff of old vs new erasure body named **exactly** the new references (`public.order_items`, `oi.note`, `oi.order_id`, `o.id`, `o.customer_id`), `information_schema` confirmed both `order_items` columns present, and then **the new statement itself was run live as a read-only SELECT with the identical predicate** against a nonexistent customer id — 0 rows, nothing written. A `plpgsql` body is not name-resolved at creation, and this function erases real customer data, so it cannot simply be called. **The other two WERE called**, and their outcomes read back as VALUES rather than notices (row 90): `admin_coupon_usage_counts()` refused this non-admin connection with **`42501 :: Only admins may read coupon usage`**, and `deactivate_push_device` refused with **`P0001 :: not authenticated`** before touching any row. The coupon RPC's inner aggregate was additionally run verbatim read-only and returns `{}` — **no order in Production carries a coupon code**, so the Promo Codes panel will render an empty map, correctly. **APPLYING IT CHANGED NO DATA, measured:** the erasure function was REDEFINED, not run — the **2** `order_items` rows carrying a note still carry it, 4 push devices still active, 72 orders, 2 addresses, all unchanged. **Grants moved exactly as intended:** `anon` INSERT/UPDATE/DELETE on the eleven catalog tables went **33 → 0**, while `anon` SELECT is untouched at **9** tables — the signed-out menu still reads. Revoking those could not break push registration, verified first: both `register_push_device` and `deactivate_push_device` are `SECURITY DEFINER` and **neither is executable by `anon`**, so a table-level grant was never on that path. Mutable `search_path` functions **0 → 2** pinned. **THE CUSTOMER COLUMN CONTRACT DID NOT MOVE, which is the regression review caught in this file's first version:** `authenticated` still **cannot** select `orders.coupon_code` (nor `customer_name`, `customer_phone`, `customer_id`). The admin aggregate is reachable by `authenticated` and **not** by `anon`, and is gated on `is_admin()` — role **and** AAL2. **Moyasar re-verified absent:** 0 `%moyasar%` functions. Live history **138 → 139**. **No deploy implied** — two bodies changed under unchanged signatures, one function is new. **Version NOT aligned** — live carries the apply-time stamp `20260914104107` (§9-D). **TWO repository files remain unapplied: Moyasar (frozen on purpose) and `20260920120000_promo_disclosure_hardening`.** |
 | 95 | 20260920120000 | promo_disclosure_hardening | `45f8ee28461f` | 20260914105232 | promo_disclosure_hardening | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:52:32 UTC** on explicit owner approval ("apply 20260920120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Audit finding 2.9: `validate_coupon` and `compute_campaign_discount` described a promotion the caller cannot use. Merged in PR #375 as squash `d6eb639`; §9-B.7: the merged copy was re-hashed and matched `45f8ee28461f3dbe490109e9657efff630bf5df8b67cc315b66c53a7281fa966` exactly (365 lines / 18 898 bytes). **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — and this is the apply where that needed proving rather than asserting, because **both money-path functions CALL `validate_coupon`**. **THE CONSUMPTION CONTRACT WAS MEASURED, NOT TAKEN FROM THE HEADER.** Both call it as `select * into v_coupon from public.validate_coupon(...)`, binding the whole row — so the RETURN SIGNATURE is load-bearing. A regex over both live bodies enumerated every `v_coupon.<field>` reference and found exactly **`discount_amount`, `message`, `valid`** in each, and **neither reads `type` nor `value`** — the two fields this migration nulls on refusal. The signature is unchanged after the apply (`TABLE(valid boolean, code text, type coupon_type, value numeric, discount_amount numeric, message text)`), so the `select *` binding still resolves. **Both pre-images matched live BEFORE the derivation was trusted:** `validate_coupon` `51d3805e52ddf0bda03cce4b980db4bf` / 1 764 chars and `compute_campaign_discount` `4d8a5cf3ff954653baf1ae51847c4b9c` / 4 411 chars, each identical to the body extracted from the only migration that has ever defined it. **Fidelity on both bodies**, against hashes **pre-computed from the merged file before sending**, both byte-identical: `validate_coupon` `0e9c1d0f364ff93a58f062d664e83ce9` (2 196 chars), `compute_campaign_discount` `ae56104124a9670c238febe5d9502e0d` (4 670). **THE SECURITY PROPERTY WAS PROVEN LIVE AGAINST THE REAL CODES, which is better evidence than the migration's own fixture probe.** `validate_coupon` is `stable`, so it was simply called read-only. Production holds exactly two coupons, **`SPICY15` and `RIYADH10`, both `is_active = false`, both `usage_count = 0`** — so both are precisely the "exists but switched off" case the change is about. All three of `SPICY15`, `RIYADH10` and a code that has never existed now return **byte-identical** answers: `valid=false`, `type=null`, `value=null`, `discount_amount=0`, `message='Coupon not found'`. Lowercase input normalises to the same answer; an empty string still answers `'No code supplied'`. The `code` field echoes the caller's own normalised input, which is not a disclosure. **THIS IS A REAL, CUSTOMER-VISIBLE COPY CHANGE, and it is stated rather than buried:** a customer typing `SPICY15` today was told *"Coupon is inactive"* and is now told *"Coupon not found"*. Both are refusals; the new one simply stops confirming that an unlaunched code exists. **The migration's own fixture probe rolled back, verified independently:** 0 rows matching `ZZPROMO%` survive in `coupons`. `compute_campaign_discount` could only be driven as far as its `auth.uid()` gate from a migration, and that limitation is recorded in the file itself rather than glossed; its refusal branches are covered by `supabase/tests/promo_disclosure_test.sql`. **Grants preserved exactly:** `anon` **cannot** execute either function, `authenticated` can — the boundary the whole design rests on, re-measured after the apply. **Data untouched:** 2 coupons, 0 campaigns, 72 orders. Moyasar re-verified absent. Live history **139 → 140**. **No deploy implied** — both signatures unchanged, and both clients type the coupon result without `type` or `value`. **Version NOT aligned** — live carries the apply-time stamp `20260914105232` (§9-D). **ONE repository file now remains unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — "apply the outstanding migrations" now reads like a no-op and is the one instruction that would break the payment freeze, because there is no other file it could mean. |
 | 96 | 20260922120000 | orders_comp_columns_customer_grant | `05878e9c1944` | 20260916114130 | orders_comp_columns_customer_grant | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-16 11:41:30 UTC** on explicit owner approval ("apply 20260922120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. **IT FIXED A LIVE CUSTOMER-FACING OUTAGE**: every "My Orders" list and every post-order receipt had been failing since 2026-08-26 on every channel whose client was built after that date, because `authenticated` holds COLUMN-LEVEL select grants on `public.orders` and `20260826100000_comp_order_totals.sql` added `is_comped` and `comp_discount_amount` without granting them, while #269 added both to the client read contract the same day — and PostgREST refuses the WHOLE query when one column is unreadable. Merged in PR #391 as squash `ad52d22`; §9-B.7: the merged copy was re-hashed from the default branch and matched exactly (sha256 `05878e9c194490a414ce93801241a4b0a301292267bf44983c865ddedb303988`, 125 lines / 6 004 bytes) before anything was sent. **THE DEFECT WAS CONFIRMED STILL PRESENT IN THE LIVE GRANT IMMEDIATELY BEFORE THE APPLY**, so this was not a no-op dressed as one: `authenticated` could select neither comp column and held **25** select grants on `orders`. **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — this migration redefines no function at all. **Grants moved exactly as intended: 25 → 27**, the two comp columns and nothing else. **EVERY BOUNDARY HELD, re-measured after the apply:** `anon` still refused on both columns; `authenticated` still refused `coupon_code`, `customer_phone` and `order_number`; **no table-wide SELECT** for `authenticated` (the privilege whose absence is what makes the column allowlist meaningful); RLS still enabled on `orders`, so a column grant cannot bypass `orders_select_own_or_staff`. **ROW 86'S LESSON APPLIED — a clean apply proves the text was stored, not that the query runs.** The **exact 27-column list the client sends** (`CUSTOMER_ORDER_SELECT`) was executed as `authenticated` and **succeeds**; so do the nested `order_items` and `order_item_modifiers` embeds. Both leak checks ran in the SAME probe and still refuse — `coupon_code` as `authenticated` → **42501**, `is_comped` as `anon` → **42501** — with outcomes read back as VALUES rather than notices (row 90). **APPLYING IT CHANGED NO DATA:** 73 orders, 5 comped, 12 profiles, identical before and after. **§15 WAS HONOURED RATHER THAN ASSUMED:** the apply instruction arrived while #391 was still open and blocked on an unresolved review thread, and nothing was sent until the merge actually landed and the file was confirmed present on the default branch. **A CONVENTION DEVIATION WAS TESTED RATHER THAN GAMBLED ON:** this file carries explicit `begin;`/`commit;`, which no previously-applied migration here does, so the nested-transaction behaviour was probed harmlessly first — both execute cleanly — allowing the **exact merged bytes** to be sent without editing them for transport, which is what keeps the applied text equal to the repository text. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Live history **140 → 141**. **No deploy implied** — no function was redefined, and the fix reaches every channel (web and both binaries) the moment it applies. **Version NOT aligned** — live carries the apply-time stamp `20260916114130` (§9-D). **ONE repository file remains unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — name the target by version. |
+| 97 | 20260923120000 | branch_variant_availability | `a3440839b78c` | 20260917122329 | branch_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:23:29 UTC** on explicit owner approval ("apply 20260923120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Per-branch price-tier availability: the `branch_variant_availability` table, `set_variant_snooze` / `clear_variant_snooze`, the audit-event emitter, and the sweeper arm that reopens a tier whose restore timer has run out. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `a3440839b78c34fb4e309a32c4da842e2e3615d8fdc6dfc21789279ddca8d967`, 622 lines / 27 922 bytes) and matched the recorded value before anything was sent. **MONEY PATH UNTOUCHED AT THIS STEP** — `place_order` `bfd3f1f423e61c850ab6101e37431799` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after; row 98 is the one that moves them. **APPLYING IT CLOSED NOTHING:** the table was created EMPTY and still holds 0 rows, and 76 orders, 61 products, 147 variants (144 active), 40 branches, 3 product closures, 0 option closures, 10 audit events and 10 cron jobs are all unchanged. **All six function bodies byte-identical** against hashes pre-computed from the merged file: `normalize_variant_availability` `317e2bdd…`, `emit_variant_availability_event` `5c45017e…`, `signal_variant_availability_change` `dd7f73e7…`, `set_variant_snooze` `4fbd4518…`, `clear_variant_snooze` `c14ba219…`, `branch_availability_sweep` `0872a568…`. Grants as designed: `anon` SELECT only, `authenticated` SELECT/INSERT/UPDATE/DELETE with RLS deciding; 12/12 audit columns present, 5/5 helper signatures resolve. **Both RPCs were CALLED** (row 86's lesson) and refused at their gate — `42501 :: Not authorized to change availability for this branch` — with the outcome read back as a VALUE rather than a notice. **That proves them only as far as the gate, and it is stated rather than glossed:** driving deeper would close a real tier at a real branch. **The redefined sweeper has since RUN in Production** — 2 scheduled runs after the apply, both `success`, 0 variants reopened, 45 ms slowest — which is execution evidence the apply itself could not give. **The 14-day retention prune survived the sweeper's redefinition, corroborated arithmetically rather than by reading:** `branch_availability_runs` holds exactly 20 160 rows = 14 days × 1440 minutes. Moyasar re-verified absent (0 functions, 0 history rows). |
+| 98 | 20260924120000 | place_order_variant_availability | `53c433d9cf82` | 20260917123545 | place_order_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:35:45 UTC** on explicit owner approval ("do the required migrations", given against a list naming each file by version), via MCP `apply_migration`, **one call, target named explicitly**. **THIS IS THE MONEY-PATH STEP**: `place_order` and `compute_order_snapshot` now refuse a closed price tier, so the server is the authority and no client can talk its way past it. §9-B.7: merged copy re-hashed (sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`, 1 110 lines / 55 033 bytes) and matched before sending. **THE PRE-IMAGES WERE PROVEN AGAINST LIVE BEFORE THE DERIVATION WAS TRUSTED** (rows 92 and 95's lesson): the file derives both bodies from the running ones, so the pre-image was reconstructed by removing the 1 461-character guard block and hashed against live — `place_order` `1c854febfa239dc93ee594e704fa18f1` / 24 827 chars and `compute_order_snapshot` `52490fe4d9b692c4b8631a28977c3d73` / 15 398 chars, **both matching exactly**, which bounds the change to precisely the intended region. Both resulting bodies **byte-identical** to the merged file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288 chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859 chars. **THE MONEY-PATH LEDGER PAIR MOVED, AND THAT IS THE INTENDED EFFECT OF THE WORK RATHER THAN AN ANOMALY** — record the new pair: `place_order` `bfd3f1f423e61c850ab6101e37431799` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c` → **`22e2d42935459e7bf93abb2941b56325`**. **APPLYING IT REFUSED NOTHING:** `branch_variant_availability` is empty, so no tier is closed and the new guard cannot fire; orders unchanged at 76. **NOT CALLED live** — `place_order` writes a real order and `orders` carries 12 triggers including POS-sync enrolment, so a probe would create a kitchen ticket and burn an `SM-2026-…` sequence number (row 93's correction). The paths are proven on the local chain harness instead. Moyasar re-verified absent. |
+| 99 | 20260925120000 | health_card_variant_coverage | `65dabf4f5096` | 20260917124256 | health_card_variant_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:42:56 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. **A MONITOR THAT ENUMERATES ITS SUBJECTS BY NAME IS CORRECT UNTIL A SUBJECT IS ADDED, AND THEN SILENTLY WRONG** — `operations_health_snapshot_internal` named the availability tables in three places, so a tier whose restore timer ran out and was never honoured would have read `idle`, the fail-quiet warm-up, with no alert at all. Same defect class as row 72. §9-B.7: merged copy re-hashed (sha256 `65dabf4f5096b985b2c0130589e39eabfcce54e1cf364d348fbc2850f5a7ca3a`, 1 735 lines / 82 365 bytes) and matched before sending. Both pre-images verified against live first, each with exactly one overload (cardinality checked BEFORE the body was read): `operations_health_snapshot_internal` `3f2f145ca1283e5ff8040a0b2b01ce81` / 46 688 chars, `operations_alerts_derive_pre_stranded` `19177f263090d96500a571a4bf6a1dd4` / 18 002 chars. Both new bodies **byte-identical** to hashes pre-computed from the merged file: `10265270ab70597cadc5e84134384051` / 47 919 chars and `dabd46192e37eaa69c5cfd2a765f6cbf` / 18 094 chars. **New ledger-basis pair for these two functions:** `operations_health_snapshot_internal` `aefe82538f13bc2d6fbf04d3f620506b` → **`47c7553a3acaf437f6d0dd30d8a760c6`**, `operations_alerts_derive_pre_stranded` `662ee646ea4ea9e89ff64203bcb542ee` → **`bc00fff87658de5f6d5321c6745744d9`**. **A HASH THAT LOOKED LIKE A MISMATCH WAS A MISREAD OF THE FILE'S OWN HEADER, WHICH IS WORTH RECORDING BECAUSE THE PREVIOUS THREE TRAPS OF THIS SHAPE WERE MEASUREMENT ERRORS AND THIS ONE IS NOT.** The header lists `aefe8253…` / `662ee646…` under "Ledger basis … which WILL move on apply" — those are the **pre-apply** values, not predictions of the post-apply ones, and reading them as predictions makes a correct apply look wrong. It was settled by reconstruction rather than by argument: both bodies were extracted from `20260820160000` and from the merged file, combined with the live prologue, and hashed — reproducing `662ee646…` / `aefe8253…` for the pre-images and `bc00fff8…` / `47c7553a…` for the posts, with `pg_get_functiondef` lengths 18 296 and 48 102 matching live exactly. **Read a header's hashes for WHICH SIDE OF THE APPLY they describe before calling a mismatch.** **MONEY PATH UNCHANGED** at `12b6816d…` / `22e2d429…`. **It was CALLED afterwards, independently of its own verification block** (row 86's lesson, and the specific reason mutation 12 exists): the `branch_availability` system reads **`healthy`** with `closed_sizes: 0`, `overdue_restores: 0` and **`safe_error_code: null`** — so the availability block's `exception when others` did not fire, which is the quiet failure a source-level assertion cannot see, because a `plpgsql` body is not name-resolved at creation. The sweeper then ran at 12:48 UTC and succeeded against the new definition. Moyasar re-verified absent. |
+| 100 | 20260926120000 | variant_closing_flag | `01a4c9ac95cf` | 20260917124937 | variant_closing_flag | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:49:37 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Adds `app_settings.variant_closing_enabled`, defaulting FALSE, which hides the branch console's per-size controls. It exists because the console deploys on merge while the customer app reaches a customer only in the next EAS build, and a build that does not understand a closed tier shows a **generic error at the payment step** — `failureMessage` returns a translated KEY rather than the server's sentence. §9-B.7: merged copy re-hashed (sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`, 135 lines / 7 622 bytes) and matched before sending. **APPLYING IT CHANGED NOTHING, WHICH IS THE WHOLE POINT** — contrast row 82, where the default was TRUE and applying the migration WAS the behaviour change. Live value **false**, column NOT NULL, default `false`, `app_settings` 34 → 35 columns, still 1 row; money path unchanged at `12b6816d…` / `22e2d429…`; **0 functions anywhere in `public` mention the flag**, so server-side refusal stays unconditional; orders 76; `branch_variant_availability` still 0 rows. **THE COLUMN-GRANT TRAP WAS CHECKED BY OUTCOME, NOT BY PREDICATE, BECAUSE THAT IS THE DISTINCTION ROW 96 TURNED ON.** `orders.is_comped` broke every My Orders list for three weeks because a new column landed on a table whose client grants are COLUMN-scoped. `app_settings` grants are TABLE-level — measured live before the apply in `information_schema.table_privileges` (SELECT for `anon` and `authenticated`, UPDATE for `authenticated`) — so a new column is covered automatically. Afterwards, rather than trusting `has_column_privilege`, the client-shaped read was actually performed under both roles: `set local role anon; select * from public.app_settings` **returns its row** instead of raising, and `anon` reads the new column directly as `false`; same under `authenticated`. **APPLIED IS NOT ENABLED.** Turning the flag on is a separate §5 decision that must follow the EAS build carrying the customer half — `docs/OWNER_ACTIONS.md` §40. Moyasar re-verified absent. |
 
 Reconciliation check: the rows above detail **88 repository / 89 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
@@ -5496,10 +5511,14 @@ like a no-op and is the one instruction that would break the payment freeze.
 
 ---
 
-## 44. Per-branch variant (price tier) availability — WRITTEN, NOT APPLIED (2026-09-16)
+## 44. Per-branch variant (price tier) availability — APPLIED 2026-09-17 (row 97)
 
-`20260923120000_branch_variant_availability.sql`. **Written 2026-09-16,
-validated, awaiting owner approval.** The first of three files.
+`20260923120000_branch_variant_availability.sql`. **APPLIED 2026-09-17
+12:23:29 UTC**, live version `20260917122329`, on explicit owner approval naming
+the target by version; ledger row 97. The first of what became four files.
+Applying it closed nothing — the table was created EMPTY and still holds 0 rows —
+and the redefined sweeper has since run twice in Production, both `success`.
+The description below is kept as written.
 
 sha256 `a3440839b78c34fb4e309a32c4da842e2e3615d8fdc6dfc21789279ddca8d967`,
 622 lines / 27,922 bytes — **re-hash the MERGED copy before applying**, per
@@ -5579,10 +5598,15 @@ ordering guard exercises it directly.
 
 ---
 
-## 45. The order path refuses a closed price tier — WRITTEN, NOT APPLIED (2026-09-16)
+## 45. The order path refuses a closed price tier — APPLIED 2026-09-17 (row 98)
 
-`20260924120000_place_order_variant_availability.sql`. **Written 2026-09-16,
-validated, awaiting owner approval.** The second of three files. It is the one
+`20260924120000_place_order_variant_availability.sql`. **APPLIED 2026-09-17
+12:35:45 UTC**, live version `20260917123545`, on explicit owner approval;
+ledger row 98. **The money-path pair moved, as intended:** `place_order`
+`bfd3f1f4…` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot`
+`ca276a84…` → **`22e2d42935459e7bf93abb2941b56325`**. Both pre-images were proven
+identical to live before the derivation was trusted. Applying it refused nothing,
+because no tier is closed. The description below is kept as written. The second of what became four files. It is the one
 that makes §44 mean anything, and it is a **MONEY-PATH CHANGE**: it redefines
 both `place_order` and `compute_order_snapshot`.
 
@@ -5749,10 +5773,15 @@ must name the target by version.
 
 ---
 
-## 46. Operations Health observes the new availability table — WRITTEN, NOT APPLIED (2026-09-16)
+## 46. Operations Health observes the new availability table — APPLIED 2026-09-17 (row 99)
 
-`20260925120000_health_card_variant_coverage.sql`. **Written 2026-09-16,
-validated, awaiting owner approval.** The third and last file of the set.
+`20260925120000_health_card_variant_coverage.sql`. **APPLIED 2026-09-17
+12:42:56 UTC**, live version `20260917124256`, on explicit owner approval;
+ledger row 99. Called live afterwards, independently of its own verification
+block: the `branch_availability` system reads `healthy` with `closed_sizes: 0`
+and `safe_error_code: null`. The description below is kept as written, except
+that it called this "the third and last file of the set" — the set became four
+when §47 was written the next day.
 
 sha256 `65dabf4f5096b985b2c0130589e39eabfcce54e1cf364d348fbc2850f5a7ca3a`,
 1735 lines / 82365 bytes — **re-hash the MERGED copy before applying**, per
@@ -5927,10 +5956,14 @@ Applying this file is a §5 action and must name the target by version.
 
 ---
 
-## 47. The switch that lets the operator controls ship first — WRITTEN, NOT APPLIED (2026-09-17)
+## 47. The switch that lets the operator controls ship first — APPLIED 2026-09-17 (row 100)
 
-`20260926120000_variant_closing_flag.sql`. **Written 2026-09-17, validated,
-awaiting owner approval.** The fourth and last file of the per-size-closing set,
+`20260926120000_variant_closing_flag.sql`. **APPLIED 2026-09-17 12:49:37 UTC**,
+live version `20260917124937`, on explicit owner approval; ledger row 100, and
+the row that returns the outstanding count to ONE. **Applying it changed
+nothing** — the live value is `false` — and **turning it on remains a separate
+§5 decision** that must follow the EAS build carrying the customer half. The
+fourth and last file of the per-size-closing set,
 and by far the smallest: one boolean column on `app_settings`, defaulting FALSE.
 
 sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`,
@@ -5957,10 +5990,26 @@ the server's sentence (`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). The
 customer sees a generic error at the payment step, on a cart that looked fine.
 
 Merging both halves together does **not** close that window — it moves its start
-from merge to deploy. Only a switch closes it. While the flag is false the
-operator controls are absent, so no closed-tier row can be written, so the
-refusal is unreachable on any build. Turning it on is a deliberate act performed
-once a build carrying the customer half is live.
+from merge to deploy. A switch is what manages it. While the flag is false the
+operator controls are absent from the console, and the console is the only client
+that calls the snooze RPCs, so no closure gets created in the course of ordinary
+work. Turning it on is a deliberate act performed once a build carrying the
+customer half is live.
+
+**CORRECTED 2026-09-19 — this paragraph used to end "so no closed-tier row can be
+written, so the refusal is unreachable on any build", and that was FALSE.**
+Review caught it on #396; verified live rather than reasoned:
+`set_variant_snooze` and `clear_variant_snooze` are granted to `authenticated`
+and gate on `is_admin() or is_branch_operator(branch)` **without reading
+`variant_closing_enabled`**. A direct RPC call by an admin or branch operator
+therefore still writes a closure with the flag false. **The applied migration's
+own header carries the same overstatement** (`…which means no closed-tier row can
+be written…`) and is deliberately left unedited: it is an applied file, its
+sha256 is recorded, and rewriting it would misrepresent what was sent to
+Production. Read that header against this paragraph. The general lesson is the
+one §12 keeps relearning in a different costume: **a control that hides a button
+constrains the UI, not the API — ask what the action writes, not only what the
+console shows.**
 
 ### Why a setting rather than a client constant
 
@@ -6085,3 +6134,93 @@ it alone does nothing: `20260923120000`, `20260924120000` and `20260925120000`
 are its prerequisites, and turning the flag on is a further, separate decision
 that should follow the EAS build carrying the customer half. Recorded as an
 owner action in `docs/OWNER_ACTIONS.md`.
+
+## 48. The per-size-closing application — APPLIED 2026-09-17 (rows 97-100)
+
+Four migrations, applied in one session on explicit owner approval, in the
+documented dependency order, **each named by version, one `apply_migration` call
+per file, each followed by read-only verification before the next was sent**.
+
+| order | file | live version | history |
+| --- | --- | --- | --- |
+| 1 | `20260923120000_branch_variant_availability` | `20260917122329` | 141 → 142 |
+| 2 | `20260924120000_place_order_variant_availability` | `20260917123545` | 142 → 143 |
+| 3 | `20260925120000_health_card_variant_coverage` | `20260917124256` | 143 → 144 |
+| 4 | `20260926120000_variant_closing_flag` | `20260917124937` | 144 → 145 |
+
+**The order was not a preference.** The first three refuse to land out of
+sequence and say so in their own leading blocks: the first asserts that neither
+money-path function mentions `branch_variant_availability`, the second asserts
+that the table, both RPCs and the sweeper arm already exist, the third asserts
+both. Those guards were not relied on — each precondition was verified live
+before the file was sent, which is the difference between a guard that catches a
+mistake and a guard that is never tested.
+
+### What it changed in Production: nothing yet, and that is measured
+
+`branch_variant_availability` holds **0 rows**, so no tier is closed anywhere.
+`variant_closing_enabled` is **false**, so the operator controls are hidden.
+Orders unchanged at **76**; 61 products, 147 variants (144 active), 40 branches,
+3 product closures, 0 option closures. Moyasar re-verified absent after every
+apply: zero `%moyasar%` functions, zero history rows.
+
+**The money-path pair moved once, at step 2, and that is the intended effect of
+the work rather than an anomaly.** Record the new pair:
+
+- `place_order` `bfd3f1f423e61c850ab6101e37431799` → **`12b6816d256c29b76edf947ae1a7ea77`**
+- `compute_order_snapshot` `ca276a84424e403a98d34860817f815c` → **`22e2d42935459e7bf93abb2941b56325`**
+
+Steps 1, 3 and 4 left it identical, verified at each.
+
+### Live reconciliation after the run
+
+**140 repository files on the default branch / 145 live history rows / exactly
+ONE unapplied — Moyasar, unapplied on purpose.** Latest live version
+`20260917124937`.
+
+Reconciled **by name**, not by arithmetic: versions are apply-time stamps, so
+filenames cannot be compared to live versions directly. Three repository files
+from the 2026-07-07 baseline (`place_order`, `loyalty`, `order_idempotency`)
+match live rows carrying different names, and five live names have no repository
+file of that name (`noop`, `order_idempotency_and_place_order`,
+`harden_trigger_functions`, `checkout_sessions_zero_total`,
+`checkout_sessions_fix_payment_status_cast`) — all early-baseline naming, none of
+it outstanding work. The delta against the last recorded read is exactly **+4
+files and +4 rows**, which is this run and nothing else.
+
+### THE COUNT IS BACK TO THE DANGEROUS SHAPE
+
+With a single file left, *"apply the outstanding migrations"* reads like a no-op
+and is in fact the one instruction that would break the §6 payment freeze —
+there is no other file it could plausibly mean. `20260824100000` sorts ahead of
+everything, so it goes first in any bulk operation. **Name the target by
+version.** That is what makes the count irrelevant in either shape.
+
+### What this run is worth reading for
+
+**A header's hashes have a side, and reading them on the wrong side makes a
+correct apply look wrong.** Step 3's file lists a `md5(pg_get_functiondef(oid))`
+pair under *"Ledger basis … which WILL move on apply"*. Those are the **pre-apply**
+values. Read as post-apply predictions they produce a mismatch on a file whose
+body was, in fact, byte-identical. The previous three hash traps in this ledger
+(rows 81, 88, 89) were all measurement errors in the extraction span; this one is
+a reading error in the record. It was settled by reconstruction rather than
+argument — both pre- and post-image bodies extracted from their source files,
+combined with the live prologue and hashed, reproducing all four values and both
+`pg_get_functiondef` lengths exactly. **Check which side of the apply a recorded
+hash describes before calling a mismatch.**
+
+**A predicate is not an outcome.** Step 4's own verification asserts
+`has_column_privilege(...)` for both client roles, which is the right question
+and still not the same as the client's actual read succeeding. Row 96 is in this
+ledger precisely because a column landed on a table whose grants were
+column-scoped and every My Orders list failed for three weeks. So after the
+apply the read itself was performed under both roles — `set local role anon;
+select * from public.app_settings` returns its row rather than raising — which is
+the outcome the assertion stands in for.
+
+**Applying is not enabling, and the two are deliberately separated here.** Step 4
+exists only to hold the feature shut while the ops console (which deploys on
+merge) waits for the customer app (which reaches a customer only in the next EAS
+build). Applying it changed nothing. Turning it on is a separate §5 decision that
+must follow that build: `docs/OWNER_ACTIONS.md` §40.
