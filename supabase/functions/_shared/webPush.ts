@@ -27,6 +27,23 @@
 
 const encoder = new TextEncoder();
 
+/**
+ * A byte array whose backing store is a plain `ArrayBuffer`.
+ *
+ * SINCE TYPESCRIPT 5.7 A BARE `Uint8Array` MEANS `Uint8Array<ArrayBufferLike>`,
+ * and `ArrayBufferLike` includes `SharedArrayBuffer` — which Web Crypto refuses,
+ * so `BufferSource` does not accept it. Every array in this module really is
+ * backed by an ArrayBuffer; saying so in the types is what lets these values
+ * reach `crypto.subtle` and `fetch` without a cast at each call site.
+ *
+ * THIS WAS FOUND BY CI, NOT LOCALLY, AND THAT IS THE POINT. A strict `tsc` run
+ * over this file with `lib: ["es2022", "dom"]` passes — the DOM's `BufferSource`
+ * is the looser of the two definitions. Only `deno check` uses the lib these
+ * functions actually run against, so it is the only typecheck that speaks for
+ * them.
+ */
+export type Bytes = Uint8Array<ArrayBuffer>;
+
 /** The bytes a push service is guaranteed to accept in one request (RFC 8030 §5.1). */
 export const MAX_REQUEST_BODY_BYTES = 4096;
 
@@ -64,7 +81,7 @@ export interface PushSubscriptionKeys {
   auth: string;
 }
 
-export function base64UrlToBytes(value: string): Uint8Array {
+export function base64UrlToBytes(value: string): Bytes {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padded =
     normalized.length % 4 === 0 ? normalized : normalized + '='.repeat(4 - (normalized.length % 4));
@@ -80,7 +97,7 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function concatBytes(...parts: Uint8Array[]): Uint8Array {
+function concatBytes(...parts: Bytes[]): Bytes {
   const total = parts.reduce((sum, part) => sum + part.length, 0);
   const out = new Uint8Array(total);
   let offset = 0;
@@ -92,12 +109,7 @@ function concatBytes(...parts: Uint8Array[]): Uint8Array {
 }
 
 /** HKDF-SHA256 extract-and-expand in one call, which is what Web Crypto gives us. */
-async function hkdf(
-  salt: Uint8Array,
-  ikm: Uint8Array,
-  info: Uint8Array,
-  lengthBytes: number,
-): Promise<Uint8Array> {
+async function hkdf(salt: Bytes, ikm: Bytes, info: Bytes, lengthBytes: number): Promise<Bytes> {
   const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
     { name: 'HKDF', hash: 'SHA-256', salt, info },
@@ -108,7 +120,7 @@ async function hkdf(
 }
 
 /** `"<label>" || 0x00` — the info string shape both RFC 8188 and RFC 8291 use. */
-function infoString(label: string): Uint8Array {
+function infoString(label: string): Bytes {
   return concatBytes(encoder.encode(label), new Uint8Array([0]));
 }
 
@@ -120,7 +132,7 @@ function infoString(label: string): Uint8Array {
  * why `assertVapidKeyPair` can rely on the import itself rejecting a pair that
  * does not belong together.
  */
-function privateJwk(publicKey: Uint8Array, privateKeyB64: string): JsonWebKey {
+function privateJwk(publicKey: Bytes, privateKeyB64: string): JsonWebKey {
   if (publicKey.length !== 65 || publicKey[0] !== 0x04) {
     throw new Error('web push: public key must be a 65-byte uncompressed P-256 point');
   }
@@ -253,7 +265,7 @@ export async function buildVapidAuthorization(options: VapidOptions): Promise<st
 }
 
 export interface EncryptOptions {
-  plaintext: Uint8Array;
+  plaintext: Bytes;
   /** The subscription's `p256dh` and `auth`, base64url as the browser gives them. */
   subscription: Pick<PushSubscriptionKeys, 'p256dh' | 'auth'>;
   /**
@@ -261,7 +273,7 @@ export interface EncryptOptions {
    * be reproduced by pinning them, and pinning them is the only way to check
    * this implementation against something other than itself.
    */
-  salt?: Uint8Array;
+  salt?: Bytes;
   serverKeys?: VapidKeyPair;
 }
 
@@ -269,7 +281,7 @@ export interface EncryptOptions {
  * Encrypt one aes128gcm record (RFC 8291 §3 / RFC 8188 §2), returning the whole
  * request body: `salt(16) || rs(4) || idlen(1) || as_public(65) || ciphertext`.
  */
-export async function encryptPayload(options: EncryptOptions): Promise<Uint8Array> {
+export async function encryptPayload(options: EncryptOptions): Promise<Bytes> {
   const { plaintext, subscription } = options;
   if (plaintext.length > MAX_PLAINTEXT_BYTES) {
     throw new Error(
@@ -289,7 +301,7 @@ export async function encryptPayload(options: EncryptOptions): Promise<Uint8Arra
   if (salt.length !== 16) throw new Error('web push: salt must be 16 bytes');
 
   let serverPrivate: CryptoKey;
-  let serverPublic: Uint8Array;
+  let serverPublic: Bytes;
   if (options.serverKeys) {
     serverPublic = base64UrlToBytes(options.serverKeys.publicKey);
     serverPrivate = await crypto.subtle.importKey(
@@ -352,14 +364,14 @@ export interface PushRequestOptions {
   nowSeconds: number;
   /** How long the push service may hold an undelivered message, in seconds. */
   ttlSeconds?: number;
-  salt?: Uint8Array;
+  salt?: Bytes;
   serverKeys?: VapidKeyPair;
 }
 
 export interface PushRequest {
   url: string;
   headers: Record<string, string>;
-  body: Uint8Array;
+  body: Bytes;
 }
 
 /** Everything needed to `fetch` one notification to one subscription. */

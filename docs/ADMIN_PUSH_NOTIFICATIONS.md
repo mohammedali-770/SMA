@@ -204,6 +204,23 @@ That second one is the repository's "a check a comment can satisfy is not a
 check" wearing a new costume, and the fix — stripping the import block as well
 as the comments — protects every future assertion in that file.
 
+### The only typecheck that speaks for an Edge Function is `deno check`
+
+Worth recording because it cost a red CI run. `supabase/functions` is excluded
+from the repository's `tsconfig.json`, so `npm run lint` never sees these files;
+a separate strict `tsc` run over `webPush.ts` with `lib: ["es2022", "dom"]`
+passed cleanly. CI's `deno check` then produced **eight errors**, all the same
+one: since TypeScript 5.7 a bare `Uint8Array` means
+`Uint8Array<ArrayBufferLike>`, `ArrayBufferLike` includes `SharedArrayBuffer`,
+and Deno's `BufferSource` — unlike the DOM's — refuses it. So every value handed
+to `crypto.subtle` and to `fetch` was rejected.
+
+The fix is a `Bytes = Uint8Array<ArrayBuffer>` alias threaded through the module.
+The lesson is that the DOM lib is the looser of the two definitions, so passing
+under it proves nothing about the runtime these functions actually run on. Deno
+2.9.4 — the version CI pins — reproduces the gate exactly and is worth running
+before pushing anything under `supabase/functions/`.
+
 ### An admin can only ever push to their own devices
 
 `scopeFor` gives `all` to the service role and `self` to an authenticated admin,
