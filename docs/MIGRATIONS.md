@@ -6231,8 +6231,13 @@ must follow that build: `docs/OWNER_ACTIONS.md` §40.
 awaiting owner approval.** Step 2 of the four-step admin closure-notification
 work; the whole feature is described in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
-sha256 `9861df2186a21aa7b06e1758449af0982b6b37d425da5ad44941c97db24eb9d0`,
-365 lines / 16 369 bytes — **re-hash the MERGED copy before applying**, per §15.
+sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`,
+400 lines / 18 474 bytes — **re-hash the MERGED copy before applying**, per §15.
+
+**CORRECTED 2026-09-20, AFTER AN APPLY ATTEMPT REFUSED IT.** The fingerprint
+above replaces `9861df21…` / 365 lines, which described the version that could
+not apply. The story is in the next section, and it is the most useful thing in
+this entry.
 
 **APPLYING IT SENDS NOTHING AND SUBSCRIBES NOBODY.** It creates one empty table,
 one nullable `app_settings` column, and three RPCs. The sender (step 3) and the
@@ -6244,6 +6249,63 @@ is a new-objects-only migration; its closing block refuses to apply unless
 `place_order` still hashes `12b6816d256c29b76edf947ae1a7ea77` and
 `compute_order_snapshot` still hashes `22e2d42935459e7bf93abb2941b56325`.
 **No deploy implied** — nothing existing changes signature or behaviour.
+
+### It was REFUSED BY ITS OWN ASSERTION on the first apply, and that is the record
+
+On 2026-09-19 the owner approved "apply 20260927120000". The merged copy hashed
+correctly, every live precondition held, and the apply was sent — and assertion
+5.5 raised:
+
+```
+ERROR:  anon can execute save_admin_push_subscription(text,text,text,text,text),
+        which must never be true
+```
+
+**Nothing landed.** The apply is transactional, so history stayed at 145 rows /
+`20260917124937`, with no table, no column and no functions — verified
+immediately afterwards rather than assumed.
+
+**The cause.** The file wrote `revoke all on function … from public` for its
+three RPCs. This project's `pg_default_acl` grants EXECUTE on new functions in
+`public` to `anon`, `authenticated` and `service_role` **directly**, so revoking
+from the PUBLIC pseudo-role leaves anon's grant untouched and all three stayed
+callable by an unauthenticated role.
+
+**There was no exposure, and that is a bound rather than a dismissal.** All
+three gate on `is_admin()` as their first statement, so an anon caller reaches
+`42501` and nothing else. The grant was still wrong: least privilege belongs on
+the grant, not on the body's current logic.
+
+**This repository had made the identical mistake once before.**
+`20260729091000_caller_can_read_order_anon_revoke` exists solely to correct
+`caller_can_read_order` after the fact, records the same mechanism, and notes
+that the Supabase Security Advisor reports it as
+`anon_security_definer_function_executable`. 85 of the 89 `revoke all on
+function` statements in this tree already say `public, anon`; these three were
+the outlier. The difference this time is that the file had **not** been applied,
+so it was corrected in place rather than by a second migration.
+
+**THE HARNESS COULD NOT HAVE CAUGHT IT, AND NOW CAN.** `.github/sql-ci/bootstrap.sql`
+modelled Production's default privileges for TABLES only — a deliberate,
+documented limitation that left widening to functions "for its own change". On
+such a database `from public` and `from public, anon` are indistinguishable, so
+the chain, the paired suite and every CI check were green on a file that could
+not apply. The bootstrap now models functions and sequences too, read live from
+`pg_default_acl`. Proven rather than asserted: with the original `from public`
+restored, the chain now fails at file 141 with the exact Production message, and
+was green before the change.
+
+**A harness that is STRICTER than Production is not the safe direction.** The
+usual worry is a harness that is too permissive, hiding a hole. This one was too
+strict, and it hid a bug — spending an owner's approval and a Production apply
+attempt to find what a local run should have.
+
+Widening it required correcting 8 of the 13 `"svc"` expectations in
+`operations_alerts_digest_test.sql`, which claimed `service_role` cannot execute
+functions Production grants it. Measured live 2026-09-19: all 13 are
+`svc=true`. That suite never described Production on that column and passed only
+because the harness was stricter. The `anon` column, the one that matters, was
+correct throughout and is unchanged.
 
 ### The separation is the safety property, not a detail
 

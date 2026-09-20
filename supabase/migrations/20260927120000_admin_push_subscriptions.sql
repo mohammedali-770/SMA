@@ -45,6 +45,12 @@
 -- it applies, and the block at the end asserts exactly that.
 --
 -- NO DEPLOY IMPLIED. Nothing existing changes signature or behaviour.
+--
+-- CORRECTED 2026-09-19 BEFORE IT WAS EVER APPLIED. The first version revoked the
+-- three RPCs `from public` alone, which leaves the DIRECT `anon` grant this
+-- database's default ACL creates — so all three would have been callable by an
+-- unauthenticated role. The file's own assertion 5.5 caught it and refused the
+-- apply, and nothing reached Production. See the note above the revokes.
 
 -- ---- 1. Where the VAPID public key lives -------------------------------------
 
@@ -210,9 +216,24 @@ begin
 end;
 $$;
 
-revoke all on function public.save_admin_push_subscription(text, text, text, text, text) from public;
-revoke all on function public.delete_admin_push_subscription(text) from public;
-revoke all on function public.admin_push_state(text) from public;
+-- `from public, anon` — BOTH, and the second word is the one that matters.
+--
+-- This database's default ACL for functions in `public` grants EXECUTE to
+-- `anon`, `authenticated` and `service_role` DIRECTLY (pg_default_acl, verified
+-- live 2026-09-19). A `revoke ... from public` removes only the PUBLIC
+-- pseudo-role's grant and leaves anon's untouched, so a definer function stays
+-- callable by an unauthenticated caller.
+--
+-- The first version of this file wrote `from public` alone and assertion 5.5
+-- REFUSED THE APPLY — which is what that assertion is for. This repository has
+-- made the identical mistake once before, on `caller_can_read_order`, and
+-- 20260729091000 exists solely to correct it after the fact; the Supabase
+-- Security Advisor reports it as `anon_security_definer_function_executable`.
+-- 85 of the 89 `revoke all on function` statements in this tree already say
+-- `public, anon`. These three were the outlier.
+revoke all on function public.save_admin_push_subscription(text, text, text, text, text) from public, anon;
+revoke all on function public.delete_admin_push_subscription(text) from public, anon;
+revoke all on function public.admin_push_state(text) from public, anon;
 grant execute on function public.save_admin_push_subscription(text, text, text, text, text) to authenticated;
 grant execute on function public.delete_admin_push_subscription(text) to authenticated;
 grant execute on function public.admin_push_state(text) to authenticated;
@@ -289,6 +310,20 @@ begin
   loop
     if has_function_privilege('anon', 'public.' || v_txt, 'EXECUTE') then
       raise exception 'anon can execute %, which must never be true', v_txt;
+    end if;
+  end loop;
+
+  -- 5.5b AND `authenticated` MUST STILL HOLD IT. 5.5 is satisfied by revoking
+  --      from everybody, which would leave the console unable to subscribe at
+  --      all — a one-word typo away from the fix that was just made. The
+  --      20260729091000 precedent asserts both halves for the same reason.
+  for v_txt in
+    select unnest(array['save_admin_push_subscription(text,text,text,text,text)',
+                        'delete_admin_push_subscription(text)',
+                        'admin_push_state(text)'])
+  loop
+    if not has_function_privilege('authenticated', 'public.' || v_txt, 'EXECUTE') then
+      raise exception 'authenticated cannot execute %, so the console could never call it', v_txt;
     end if;
   end loop;
 
