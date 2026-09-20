@@ -228,17 +228,51 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-20, read live AFTER the admin-push-subscriptions
-apply: 142 repository files on the default branch / 146 live history rows / TWO
-unapplied — `20260824100000_moyasar_payment_provider` (frozen on purpose, §6) and
-`20260928120000_admin_push_closure_notifications` (written, validated, awaiting
-approval).** Latest live version `20260920050434`; the most recent apply is
-`20260927120000` (ledger row 101, `docs/MIGRATIONS.md` §49). Reconciled **by
+**Current position 2026-09-20, read live AFTER the admin-push closure-queue
+apply: 142 repository files on the default branch / 147 live history rows /
+exactly ONE unapplied — `20260824100000_moyasar_payment_provider`, frozen on
+purpose (§6).** Latest live version `20260920061858`; the most recent apply is
+`20260928120000` (ledger row 102, `docs/MIGRATIONS.md` §50). Reconciled **by
 name** against the default branch, because versions are apply-time stamps; the
-delta against the previous read is exactly **+2 files** (the two admin-push
-files) and **+1 row** (this apply), which is that work and nothing else.
+delta against the previous read is **+0 files and +1 row**, which is that apply
+and nothing else.
 
-**TWO IS THE SHAPE THAT LOOKS SAFE AND IS NOT.** It restores the *appearance* of
+**THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
+rather than the bottom.** With a single file left, "apply the outstanding
+migrations" reads like a no-op and is in fact the one instruction that would
+break the §6 payment freeze — there is no other file it could plausibly mean.
+The guard that catches a bulk apply when a second, legitimate file is
+outstanding has run out of second files again. **Name the target by version.**
+That is what makes the count irrelevant in either shape.
+
+**THE ADMIN PUSH CHAIN IS NOW COMPLETE SERVER-SIDE AND IDLE, which is a
+different thing from being on.** Both migrations are applied, the VAPID public
+key is in `app_settings`, `admin-push-dispatch` is deployed, and the pg_cron
+driver ticks every minute and succeeds. **Nothing sends, because nobody is
+subscribed** — `admin_push_subscriptions` holds 0 rows and only an administrator
+enabling the bell on their own installed console can add one. The customer Expo
+channel is untouched throughout: `push_devices` unchanged at 5, and assertion
+10.8 fails the apply if any `%admin_push%` function ever references it.
+
+**A 45 KB HAND-TRANSCRIPTION WAS CHECKED THE ONLY WAY THAT COULD HAVE CAUGHT
+IT, and the method generalises to every inline apply.** `apply_migration` takes
+SQL inline, and `20260928120000` carries Arabic notification copy where one
+wrong character would be invisible: the apply result, all ten self-verification
+assertions and the cron ticks would every one of them have looked identical. So
+all ten function bodies were hashed against values **pre-computed from the
+merged file BEFORE sending**, and compared afterwards — all ten byte-identical.
+A hash read back and then rationalised proves nothing; a hash computed from the
+artifact first is evidence. **What body hashes do not cover is stated rather
+than glossed:** comments outside function bodies were trimmed for transport, so
+the applied TEXT is not byte-identical to the repository file even though every
+stored body is.
+
+**Superseded, kept because the count is the point: 142 repository files / 146
+live history rows / TWO unapplied** — Moyasar (frozen on purpose) and
+`20260928120000_admin_push_closure_notifications` (written, awaiting approval).
+Latest live version then `20260920050434`; ledger row 101.
+
+**TWO IS THE SHAPE THAT LOOKS SAFE AND IS NOT.** It restored the *appearance* of
 an innocent referent for "apply the outstanding migrations" without making a bulk
 apply any safer: `20260824100000` still sorts ahead of everything, so such an
 instruction takes the frozen payment file **FIRST**. **Name the target by
@@ -438,7 +472,15 @@ The guard that catches a bulk apply when a second, legitimate file is
 outstanding has run out of second files again. **Name the target by version.**
 That is what makes the count irrelevant in either shape.
 
-**SUPERSEDED 2026-09-20 — `20260927120000` IS NOW APPLIED (live version
+**SUPERSEDED AGAIN 2026-09-20 — BOTH admin-push migrations are now APPLIED.**
+`20260927120000` landed at live version `20260920050434` (ledger row 101) and
+`20260928120000` at `20260920061858` (ledger row 102), in that order, each on
+its own approval and each named by version. **The outstanding set is back to
+ONE: Moyasar, frozen on purpose.** The dependency note below is now history
+rather than a plan, and is kept because its reasoning about the pair is what
+matters.
+
+**The statement it supersedes: `20260927120000` IS NOW APPLIED (live version
 `20260920050434`, ledger row 101), so the outstanding set is TWO: Moyasar
 (frozen on purpose) and `20260928120000_admin_push_closure_notifications`
 (written, validated, awaiting approval).** The dependency note below still

@@ -1,17 +1,24 @@
 # Admin push notifications — closures on the phone
 
-**Status: ALL FOUR STEPS ARE BUILT, and the FIRST of the four configuration
-actions is done. Nothing sends yet, and that remains entirely a statement about
-CONFIGURATION rather than about missing code.** The console is installable, a
-service worker is registered, an admin can subscribe from the header, the sender
-exists, and a branch closing an item now queues a notification for it.
-**`20260927120000` was APPLIED 2026-09-20** (live version `20260920050434`), so
-the subscription store now exists — empty, with a NULL VAPID key. What still does
-not exist is a VAPID key pair, a deployed `admin-push-dispatch`, and the applied
-queue migration `20260928120000` — so today there is still no path by which a
-notification reaches a phone, and nobody is subscribed. Every one of those is a
-separate owner action under CLAUDE.md §5, listed in §5 below and step by step in
-`docs/OWNER_ACTIONS.md` §41.
+**Status: THE SERVER SIDE IS COMPLETE AND IDLE. One step remains and it is
+physical — re-adding the Home Screen icon.** Both migrations are applied
+(`20260927120000` → `20260920050434`, `20260928120000` → `20260920061858`), the
+VAPID public key is in `app_settings`, `admin-push-dispatch` is deployed as
+version 1, and the pg_cron driver ticks every minute and succeeds. A branch
+closing an item, a size or delivery now genuinely queues a notification.
+
+**Nothing sends, and that is now a statement about SUBSCRIBERS rather than about
+configuration.** `admin_push_subscriptions` holds **0 rows**. Only an
+administrator enabling the bell on their own installed console can add one, and
+iOS fixes a web app's push capability at install time — which is why
+`docs/OWNER_ACTIONS.md` §41.6 (delete the Home Screen icon and re-add it) is
+last, and is the only step left.
+
+**Still unproven until that tap:** whether the two halves of the VAPID key pair
+match. `assertVapidKeyPair` runs only inside the deployed function, after the
+caller gate, so no probe from outside can reach it — every unauthenticated
+attempt stops at 401. The bell is the test, and one notification within a few
+seconds is the pass.
 
 ## What this is for
 
@@ -311,7 +318,7 @@ every endpoint, which reads like a dead feature rather than a typo.
 
 | File | Role |
 | --- | --- |
-| `supabase/migrations/20260928120000_admin_push_closure_notifications.sql` | The queue, the copy, the two enqueue triggers, claim/finalize, the signature verifier, the pg_cron driver. **Written, not applied.** Detail: `docs/MIGRATIONS.md` §50. |
+| `supabase/migrations/20260928120000_admin_push_closure_notifications.sql` | The queue, the copy, the two enqueue triggers, claim/finalize, the signature verifier, the pg_cron driver. **APPLIED 2026-09-20**, live version `20260920061858`, ledger row 102 — the outbox is empty, both Vault secrets exist, and the cron job ticks every minute and succeeds. Detail: `docs/MIGRATIONS.md` §50. |
 | `supabase/tests/admin_push_closure_notifications_test.sql` | 13 cases, including the one that breaks the composer on purpose. |
 | `supabase/functions/admin-push-dispatch/index.ts` | Gained the queue-drain mode and the scheduler gate. |
 
@@ -459,7 +466,8 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
    `app_settings.admin_push_vapid_public_key` (a live write, so its own §5
    action).
 4. Deploy `admin-push-dispatch`.
-5. Apply `20260928120000_admin_push_closure_notifications` (step 4).
+5. ~~Apply `20260928120000_admin_push_closure_notifications` (step 4).~~ **DONE
+   2026-09-20**, live version `20260920061858`, ledger row 102.
 6. **Delete the Home Screen icon and re-add it**, last. See §1 — iOS fixes an
    installed web app's capabilities at install time, so re-adding it before the
    rest is done means doing it twice.

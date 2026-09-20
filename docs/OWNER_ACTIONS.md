@@ -2984,15 +2984,24 @@ You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
 size or delivery. The code is written. Behaviour, design and evidence:
 `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
-**Progress: 41.1-41.4 are DONE (2026-09-20); 41.5-41.8 remain.** The
-subscription store exists and is empty, the VAPID public key is in
-`app_settings`, and `admin-push-dispatch` is deployed as version 1 and probed
-inert. The queue migration `20260928120000` is NOT applied, and nobody is
-subscribed — so nothing can be sent yet.
+**Progress: 41.1-41.5 are DONE (2026-09-20). ONLY 41.6 IS LEFT, and it is
+yours.** Both migrations are applied, the VAPID public key is in `app_settings`,
+`admin-push-dispatch` is deployed, and the pg_cron driver ticks every minute and
+succeeds. **The whole chain is live and idle: nothing sends because nobody is
+subscribed.** `admin_push_subscriptions` holds 0 rows, and only an administrator
+enabling the bell on their own installed console can add one — which is 41.6.
 
-**One caveat carried forward:** the deployed bundle is functionally identical to
-commit `38c50f7` but NOT byte-identical — comments were stripped in transport.
-Recorded, with the reasoning, in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+**Two caveats carried forward, both recorded in
+`docs/ADMIN_PUSH_NOTIFICATIONS.md`:** the deployed function bundle is
+functionally identical to commit `38c50f7` but NOT byte-identical (comments
+stripped in transport), and the applied migration text likewise had comments
+outside function bodies trimmed — though all ten stored function bodies were
+verified byte-identical against pre-computed hashes.
+
+**Still unproven until you do 41.6:** whether the two halves of the VAPID key
+pair match. `assertVapidKeyPair` runs only inside the deployed function after
+the caller gate, so no probe from outside can reach it. The bell tap is the
+test.
 
 **Nothing below sends anything by itself.** Each step makes a notification more
 possible; the first real one arrives when a branch closes something after all of
@@ -3092,7 +3101,7 @@ migration applies — so a deploy that lands first answers 500 on every call. It
 breaks nothing else (no other function or client touches this path), but it
 wastes a round trip and looks like a fault in the code rather than the order.
 
-### 41.5 Apply `20260928120000_admin_push_closure_notifications`
+### 41.5 Apply `20260928120000_admin_push_closure_notifications` — ✅ DONE 2026-09-20
 
 The piece that turns a real branch closure into a notification. It hangs off
 `branch_availability_events` and `branch_delivery_events`, which already record
