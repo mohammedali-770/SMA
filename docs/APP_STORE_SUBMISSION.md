@@ -525,8 +525,10 @@ update both, and Play in particular reuses them for every future review.
    confirmed — nothing in the pipeline can answer "is it installable?", and the
    one time it was answered by opening the app it found a three-week outage
    (item 2).
-5. **Flip `app_settings.variant_closing_enabled`** — §5, owner approval.
-   `OWNER_ACTIONS.md` §40.
+5. ~~**Flip `app_settings.variant_closing_enabled`**~~ — **DONE 2026-09-20
+   07:47:05 UTC** on explicit owner approval. It reads `true`, nothing else
+   moved, and both client roles were confirmed to read it by performing the
+   select rather than checking the grant. `OWNER_ACTIONS.md` §40.3.
 6. **Then** close a size in the branch console and check the customer app refuses
    it with the server's sentence rather than a generic payment error. If
    anything is wrong, flip the flag back: one statement, reversible, and with no
