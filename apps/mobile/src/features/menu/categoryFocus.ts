@@ -47,10 +47,7 @@ export type CategoryFocusEvent =
 
 export const INITIAL_CATEGORY_FOCUS: CategoryFocus = { activeCatId: null, awaitingSettle: false };
 
-export function categoryFocusReducer(
-  state: CategoryFocus,
-  event: CategoryFocusEvent,
-): CategoryFocus {
+export function categoryFocusReducer(state: CategoryFocus, event: CategoryFocusEvent): CategoryFocus {
   switch (event.kind) {
     case 'tap':
       // Re-tapping the same chip still re-arms the hold: it scrolls again, so

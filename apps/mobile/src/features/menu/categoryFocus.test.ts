@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  categoryFocusReducer, INITIAL_CATEGORY_FOCUS,
-  type CategoryFocus, type CategoryFocusEvent,
+  categoryFocusReducer,
+  INITIAL_CATEGORY_FOCUS,
+  type CategoryFocus,
+  type CategoryFocusEvent,
 } from './categoryFocus';
 
 const run = (events: CategoryFocusEvent[], from: CategoryFocus = INITIAL_CATEGORY_FOCUS) =>
@@ -39,11 +41,7 @@ describe('categoryFocusReducer', () => {
   it('lets the spy drive again after the list settles — a drag must move it', () => {
     // The spy is muted for one journey, not disabled. Losing this would trade
     // one bug for a worse one: a highlight that never follows the menu.
-    const out = run([
-      { kind: 'tap', catId: 'sides' },
-      { kind: 'settled' },
-      { kind: 'spy', catId: 'drinks' },
-    ]);
+    const out = run([{ kind: 'tap', catId: 'sides' }, { kind: 'settled' }, { kind: 'spy', catId: 'drinks' }]);
     expect(out.activeCatId).toBe('drinks');
   });
 
@@ -91,11 +89,7 @@ describe('categoryFocusReducer', () => {
   it('a settle from a drag the user started does not strand the spy', () => {
     // momentum-end fires for user drags too. That is fine: it only clears a
     // hold, and with no hold set it is a no-op.
-    const out = run([
-      { kind: 'spy', catId: 'meals' },
-      { kind: 'settled' },
-      { kind: 'spy', catId: 'drinks' },
-    ]);
+    const out = run([{ kind: 'spy', catId: 'meals' }, { kind: 'settled' }, { kind: 'spy', catId: 'drinks' }]);
     expect(out.activeCatId).toBe('drinks');
   });
 });
