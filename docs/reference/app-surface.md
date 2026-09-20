@@ -52,7 +52,7 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | `cart` | 6 |
 | `checkout` | 23 |
 | `legal` | 2 |
-| `menu` | 3 |
+| `menu` | 4 |
 | `notifications` | 9 |
 | `onboarding` | 4 |
 | `order` | 6 |

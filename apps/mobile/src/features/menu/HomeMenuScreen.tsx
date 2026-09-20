@@ -1,7 +1,7 @@
 /** Home + Menu on ONE page with virtualized sections and a sticky cart bar. */
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerCarousel, useHomeBanners } from './BannerCarousel';
+import { categoryFocusReducer, INITIAL_CATEGORY_FOCUS } from './categoryFocus';
 import {
   buildMenuSections,
   buildSearchIndex,
@@ -39,6 +40,15 @@ import type { Product } from '../../types/models';
 
 export { ProductCard };
 const SECTION_HEADER_OFFSET = 40;
+/**
+ * How long a tapped chip outranks the scroll spy when no momentum event
+ * arrives. `scrollToLocation` has no completion callback, and fires no momentum
+ * event at all when the target is already on screen — without this the spy
+ * would stay muted for good. Comfortably longer than the animation plus the
+ * 120 ms `onScrollToIndexFailed` retry, and short enough that a dropped
+ * momentum event costs at most this much spy latency.
+ */
+const CATEGORY_SETTLE_MS = 700;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen({
@@ -85,7 +95,8 @@ export function HomeMenuScreen({
   const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null);
   const chipScrollRef = useRef<ScrollView>(null);
   const chipOffsets = useRef<Record<string, { x: number; width: number }>>({});
-  const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [catFocus, dispatchCatFocus] = useReducer(categoryFocusReducer, INITIAL_CATEGORY_FOCUS);
+  const activeCatId = catFocus.activeCatId;
   const branchOpen = branchIsOpen(selectedBranch);
   const searchIndex = useMemo(() => buildSearchIndex(products), [products]);
   const hasModifiers = useCallback((p: Product) => groupsForProduct(p).length > 0, [groupsForProduct]);
@@ -102,9 +113,12 @@ export function HomeMenuScreen({
       }),
     [products, categories, selectedBranchId, search, searchIndex, isOrderable, hasModifiers],
   );
+  // `dispatch` has a stable identity, so this stays referentially stable — which
+  // SectionList requires; changing it at runtime throws. The reducer, not this
+  // callback, decides whether a report is allowed to move the chip.
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined;
-    if (section) setActiveCatId((prev) => (prev === section.category.id ? prev : section.category.id));
+    if (section) dispatchCatFocus({ kind: 'spy', catId: section.category.id });
   }, []);
   // Fetched HERE rather than inside BannerCarousel so the request starts when
   // the screen mounts, concurrently with the menu load. The carousel is the
@@ -120,8 +134,36 @@ export function HomeMenuScreen({
   // computed from the 16:6 ratio, since the header collapses to zero when there
   // are no active banners.
   const headerHeight = useRef(0);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleNow = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    dispatchCatFocus({ kind: 'settled' });
+  }, []);
+  // The user putting a finger down outranks their last tap. `onScrollBeginDrag`
+  // fires ONLY for real drags — a programmatic `scrollToLocation` never emits
+  // it — so releasing the hold here cannot reintroduce the lag this fixes.
+  const dragBegan = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    dispatchCatFocus({ kind: 'drag' });
+  }, []);
+  // A pending timer outliving the screen would dispatch into an unmounted
+  // reducer on every navigation away mid-scroll.
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+    },
+    [],
+  );
   const scrollToCategory = (catId: string) => {
-    setActiveCatId(catId);
+    dispatchCatFocus({ kind: 'tap', catId });
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+    settleTimer.current = setTimeout(settleNow, CATEGORY_SETTLE_MS);
     const sectionIndex = sections.findIndex((s) => s.category.id === catId);
     if (sectionIndex < 0) return;
     pendingScroll.current = { sectionIndex, retried: false };
@@ -338,6 +380,8 @@ export function HomeMenuScreen({
               stickySectionHeadersEnabled={false}
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={VIEWABILITY_CONFIG}
+              onMomentumScrollEnd={settleNow}
+              onScrollBeginDrag={dragBegan}
               onScrollToIndexFailed={onScrollToIndexFailed}
               initialNumToRender={8}
               maxToRenderPerBatch={8}
