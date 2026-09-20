@@ -160,6 +160,36 @@ export const opsApi = {
   },
 
   /**
+   * Price-tier exceptions across EVERY branch, for the call-centre board.
+   *
+   * THE BOARD HAD NO SOURCE FOR THIS AT ALL UNTIL 2026-09-20, which is why a
+   * branch with a size closed read "operating normally" cross-branch while its
+   * own console showed the size off. `buildClosureSummaries` took products and
+   * options and nothing else, so the subject added by `20260923120000` was
+   * invisible to the one screen whose job is to answer "what is off anywhere?".
+   *
+   * IT DEGRADES TO `[]` RATHER THAN THROWING, for the same reason
+   * `branchVariantAvailability` does: the board's load is one `Promise.all`, so
+   * a missing relation would reject the whole thing and replace an operator's
+   * entire board with a blocking error over a table that holds only exceptions.
+   * No rows means no size is closed, which is exactly what a table that does
+   * not exist implies.
+   */
+  async allVariantAvailability(): Promise<(BranchVariantAvailabilityRow & { branchId: string })[]> {
+    const { data, error } = await supabase
+      .from('branch_variant_availability')
+      .select('branch_id, variant_id, is_available, snoozed_until, reason_code');
+    if (error) return [];
+    return (data ?? []).map((r) => ({
+      branchId: r.branch_id as string,
+      variantId: r.variant_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
+  /**
    * Option-availability exceptions across EVERY branch, for the call-centre
    * board. One unfiltered read, for the same reason as `allAvailability`: the
    * table stores only exceptions, so it is small by construction.

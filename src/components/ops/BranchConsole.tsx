@@ -374,6 +374,7 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
             categories={categories}
             rows={rows}
             closed={closed}
+            closedTierCount={closedTiers.length}
             blockedIds={optionBlocked}
             now={now}
             loading={loading}

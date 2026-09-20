@@ -16,7 +16,8 @@ import { LiveModeBadge } from '../admin/view/LiveModeBadge';
 import { RequestsWaitingCard } from './RequestsWaitingCard';
 import { DeliveryArea, WorkingHoursDay, branchConfig } from '../../lib/branchConfigApi';
 import {
-  BranchAvailabilityRow, BranchDeliveryState, BranchModifierAvailabilityRow, DeliveryReasonCode,
+  BranchAvailabilityRow, BranchDeliveryState, BranchModifierAvailabilityRow,
+  BranchVariantAvailabilityRow, DeliveryReasonCode,
   DeliveryRequestRow,
   opsApi,
 } from '../../lib/opsApi';
@@ -57,6 +58,8 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
   const [availability, setAvailability] = useState<(BranchAvailabilityRow & { branchId: string })[]>([]);
   const [modAvailability, setModAvailability] =
     useState<(BranchModifierAvailabilityRow & { branchId: string })[]>([]);
+  const [varAvailability, setVarAvailability] =
+    useState<(BranchVariantAvailabilityRow & { branchId: string })[]>([]);
   const [areas, setAreas] = useState<DeliveryArea[]>([]);
   const [deliveryState, setDeliveryState] = useState<BranchDeliveryState[]>([]);
   const [pendingRequests, setPendingRequests] = useState<DeliveryRequestRow[]>([]);
@@ -114,9 +117,12 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
       // One round of reads, and one failure mode. A partial board is worse than
       // an error here: an operator cannot tell "no options closed" from "the
       // option read failed", and would tell a customer the item is fine.
-      const [avail, modAvail, allAreas, delivery, pending] = await Promise.all([
+      const [avail, modAvail, varAvail, allAreas, delivery, pending] = await Promise.all([
         opsApi.allAvailability(),
         opsApi.allModifierAvailability(),
+        // Degrades to `[]` internally rather than throwing, so a missing
+        // relation cannot take the whole board down over a table of exceptions.
+        opsApi.allVariantAvailability(),
         branchConfig.allAreas(),
         // `branches` in the app context is loaded once at sign-in. Without this
         // read, pausing delivery from this very console left the board showing
@@ -127,6 +133,7 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
       ]);
       setAvailability(avail);
       setModAvailability(modAvail);
+      setVarAvailability(varAvail);
       setAreas(allAreas);
       setDeliveryState(delivery);
       setPendingRequests(pending);
@@ -165,10 +172,11 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
     () => ({
       branches: liveBranches, products, availability, areas,
       modifierGroups, modifierAvailability: modAvailability,
+      variantAvailability: varAvailability,
       pendingRequests,
     }),
     [liveBranches, products, availability, areas, modifierGroups, modAvailability,
-     pendingRequests],
+     varAvailability, pendingRequests],
   );
   const summaries = useMemo(() => buildClosureSummaries(boardInput), [boardInput]);
   // Branches whose only issue is an option that blocks nothing. Not board-worthy
@@ -313,6 +321,17 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
                         {s.blockedProducts.length} {t('blockedCountLabel')}
                       </Text>
                     ) : null}
+                    {/* Sizes are counted SEPARATELY from `unavailable` rather
+                        than folded into it. A closed tier does not make the item
+                        unavailable -- the other sizes are still on sale -- so
+                        adding it to that number would tell an operator an item
+                        is off when it is not. "Large is out" and "Dinner is out"
+                        are different answers on the phone. */}
+                    {s.closedTiers.length > 0 ? (
+                      <Text variant="caption" tone="secondary" as="p" numeric>
+                        {s.closedTiers.length} {t('sizesClosedCount')}
+                      </Text>
+                    ) : null}
                     {s.disabledAreas.length > 0 ? (
                       <Text variant="caption" tone="secondary" as="p" numeric>
                         {s.disabledAreas.length} {t('areasDisabledCount')}
@@ -332,6 +351,16 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
                         if (soonest) {
                           const r = returnLabel(soonest.snoozedUntil, now);
                           if (!soonest.snoozedUntil) return t('untimed');
+                          return r ? `${t('backIn')} ${r}` : t('reopeningNow');
+                        }
+                        // A branch whose only problem is a closed SIZE has no
+                        // closed product to borrow a time from, so without this
+                        // it showed no time at all -- the same gap blocked
+                        // products had before, one subject later.
+                        const tier = s.closedTiers[0];
+                        if (tier && s.blockedProducts.length === 0) {
+                          if (!tier.snoozedUntil) return t('untimed');
+                          const r = returnLabel(tier.snoozedUntil, now);
                           return r ? `${t('backIn')} ${r}` : t('reopeningNow');
                         }
                         // A branch whose ONLY problem is blocked products used to

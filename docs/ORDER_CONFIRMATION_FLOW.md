@@ -1576,6 +1576,59 @@ caught it on #396, and this copy survived the retraction — which is why a
 correction recorded in one document has to be grepped for in the others.
 `docs/OWNER_ACTIONS.md` §40 holds the ordering and the current state.
 
+### Who can SEE a closed tier — fixed 2026-09-20, after both consoles missed it
+
+Switching per-size closing on immediately found two screens with no notion of a
+closed tier at all. A branch closed one size of one item; the customer app
+refused it correctly and the admin push arrived, and then:
+
+| surface | said | correct? |
+| --- | --- | --- |
+| customer app | size unavailable | ✅ |
+| admin push | closure notified | ✅ |
+| branch console, **item sheet** | «موقوف» on that size | ✅ |
+| branch console, **summary strip** | *"Everything is available"* | ❌ |
+| **call-centre board** | *"Every branch is running normally"* | ❌ |
+
+**THIS IS THE MONITOR-BLINDNESS DEFECT, and it is the third recorded instance in
+this repository.** CLAUDE.md §8 states it for SQL — *"a monitor that enumerates
+its subjects by name is correct until a subject is added, and then silently
+wrong"* — after `operations_health_snapshot_internal` named the availability
+tables in three places and went quiet when a fourth arrived, and after
+`20260827130000` found two watchdog rules blind to delivery orders the day
+delivery went live. Both consoles enumerated **products and options**. A tier is
+a third subject, and neither was told.
+
+The two causes were different, and only one was a UI bug:
+
+- **The branch strip had the data and drew the wrong conclusion.** It counts
+  `closedItems`, which reads product rows only, and treated zero closed products
+  as "nothing is off" — with the closed-sizes card rendering directly below it
+  saying otherwise. It now has a third state. **The count stays products-only on
+  purpose:** `reopenAllTargets` derives the Reopen-all ids from the same list,
+  and #393 established that the number a cashier confirms must BE the number of
+  ids acted on. What changed is that zero no longer licenses the claim.
+- **The call-centre board had no data at all.** `buildClosureSummaries` took
+  products and options; `opsApi` had only a per-branch tier read, never a
+  cross-branch one. The board could not have known. It now takes
+  `variantAvailability`, carries `closedTiers` per branch, counts them toward
+  severity, and shows the count on the tile — **separately** from "items
+  unavailable", because the other sizes are still on sale and folding the two
+  numbers would tell an operator an item is off when it is not.
+
+`opsApi.allVariantAvailability` degrades to `[]` rather than throwing, for the
+same reason `branchVariantAvailability` does: the board's load is one
+`Promise.all`, so a missing relation would replace an operator's whole board
+with a blocking error over a table that holds only exceptions. Adding the method
+without adding it to the console's test mock made all 28 existing board tests
+fail at once — an unplanned demonstration of exactly that failure mode.
+
+**The generalisable rule, stated because it keeps costing:** when a change adds
+a SUBJECT — a new kind of thing that can be closed, failed or degraded — grep
+every monitor, dashboard and summary for the subjects they already name, and add
+the new one to each. Passing tests will not find it: every one of them was
+written before the subject existed.
+
 Details of the availability model itself — the keystone that keeps
 `is_available` authoritative, and why `begin_checkout_session` and
 `compute_order_snapshot` were never touched — are in `docs/ARCHITECTURE.md` §4.

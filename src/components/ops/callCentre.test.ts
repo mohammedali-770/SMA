@@ -3,7 +3,7 @@ import {
   BranchClosureSummary, buildClosureSummaries, compareSummaries, newlyClosedBranchIds,
   nonBlockingOptions, optionOnlyBranches, returnLabel, severityBand,
 } from './callCentre';
-import type { Branch, Modifier, ModifierGroup, Product } from '../../types';
+import type { Branch, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
 import type { DeliveryArea } from '../../lib/branchConfigApi';
 
 const branch = (id: string, over: Partial<Branch> = {}): Branch => ({
@@ -49,6 +49,90 @@ const base = {
   modifierGroups: [] as ModifierGroup[],
   modifierAvailability: [] as ReturnType<typeof modAvail>[],
 };
+
+const tier = (id: string, productId: string, over: Partial<ProductVariant> = {}): ProductVariant => ({
+  id, productId, nameAr: id, nameEn: id, price: 10, calories: null,
+  sortOrder: 1, isActive: true,
+  ...over,
+});
+
+const varAvail = (
+  branchId: string, variantId: string, isAvailable: boolean, snoozedUntil: string | null = null,
+) => ({ branchId, variantId, isAvailable, snoozedUntil, reasonCode: null });
+
+/**
+ * A closed SIZE must put its branch on the board.
+ *
+ * Reported live on 2026-09-20, the day per-size closing was switched on: a
+ * branch closed one tier, its own console showed the size off, and the
+ * call-centre board said "every branch is running normally". The board took
+ * products and options and had no notion of a tier at all, so the subject added
+ * by `20260923120000` was invisible to the one screen whose job is to answer
+ * "what is off anywhere?" -- the monitor-blindness defect CLAUDE.md records,
+ * where a monitor that enumerates its subjects by name is correct until a
+ * subject is added and then silently wrong.
+ */
+describe('buildClosureSummaries and closed price tiers', () => {
+  const dinner = product('p1', { variants: [tier('v1', 'p1'), tier('v2', 'p1')] });
+  const withTiers = { ...base, products: [dinner, product('p2')] };
+
+  it('puts a branch with only a closed tier on the board', () => {
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', false, '2026-09-20T08:30:00Z')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].branch.id).toBe('a');
+    expect(out[0].closedTiers).toHaveLength(1);
+    expect(out[0].closedTiers[0].variant.id).toBe('v1');
+    expect(out[0].closedTiers[0].product.id).toBe('p1');
+    expect(out[0].closedTiers[0].snoozedUntil).toBe('2026-09-20T08:30:00Z');
+  });
+
+  it('counts a closed tier toward severity', () => {
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', false)],
+    });
+    expect(out[0].severity).toBeGreaterThan(0);
+  });
+
+  it('ignores an AVAILABLE tier row', () => {
+    // The table stores reopenings as well as closures; only `false` is closed.
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', true)],
+    });
+    expect(out).toEqual([]);
+  });
+
+  it('drops a tier whose product the board cannot see', () => {
+    // Same rule as `closedProducts`: a row naming a catalog the console does
+    // not hold is dropped rather than rendered nameless.
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'gone', false)],
+    });
+    expect(out).toEqual([]);
+  });
+
+  it('leaves every existing caller working when the input is absent', () => {
+    // `variantAvailability` is optional so no existing call site or test breaks.
+    const out = buildClosureSummaries({ ...withTiers, availability: [], areas: [] });
+    expect(out).toEqual([]);
+  });
+
+  it('orders closed tiers soonest-returning first, untimed last', () => {
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [
+        varAvail('a', 'v2', false, null),
+        varAvail('a', 'v1', false, '2026-09-20T08:30:00Z'),
+      ],
+    });
+    expect(out[0].closedTiers.map((c) => c.variant.id)).toEqual(['v1', 'v2']);
+  });
+});
 
 describe('buildClosureSummaries', () => {
   it('omits healthy branches entirely', () => {
@@ -565,7 +649,7 @@ describe('pending delivery requests on the board', () => {
 describe('severityBand', () => {
   const summary = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], deliveryPaused: false,
+    closedOptions: [], closedTiers: [], deliveryPaused: false,
     deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity: 0, ...over,
   });
 
@@ -598,7 +682,7 @@ describe('severityBand', () => {
 describe('compareSummaries', () => {
   const at = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], deliveryPaused: false, deliveryUntil: null, disabledAreas: [],
+    closedOptions: [], closedTiers: [], deliveryPaused: false, deliveryUntil: null, disabledAreas: [],
     pendingRequests: [], severity: 0, ...over,
   });
 
@@ -646,7 +730,7 @@ describe('newlyClosedBranchIds', () => {
     id: string, severity: number, over: Partial<BranchClosureSummary> = {},
   ): BranchClosureSummary => ({
     branch: branch(id), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], deliveryPaused: false,
+    closedOptions: [], closedTiers: [], deliveryPaused: false,
     deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity, ...over,
   });
 
