@@ -41,11 +41,16 @@ the **customer half of per-size closing** (`OWNER_ACTIONS.md` §40): without it,
 customer whose app predates `b7868e2` who orders a size a branch has closed gets
 a **generic error at the payment step** rather than the server's sentence,
 because `failureMessage` returns a translated key
-(`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). That is why
-`app_settings.variant_closing_enabled` is still FALSE — the switch exists to hold
-the branch console's per-size controls back until a build that understands them
-is on real phones. **Build 25 is the build; flipping the switch is a separate
-§5 decision that should follow it, not precede it.**
+(`apps/mobile/src/lib/errors/reportFailure.ts:65-71`).
+
+**`app_settings.variant_closing_enabled` is now TRUE**, flipped 2026-09-20
+07:47:05 UTC on explicit owner approval, so the branch console's per-size
+controls are live (§8 item 5, `OWNER_ACTIONS.md` §40.3). **That did not by itself
+put anyone at risk, and the reason is worth carrying:** the flag gates the
+CONSOLE rather than the API, and with **zero** sizes closed no client behaves
+differently whatever it says. **The risk above begins when a branch actually
+closes a size** — so what still binds is getting build 25 onto every device that
+can order BEFORE a size is closed for real.
 
 **"Needs another build" means NOTHING KNOWN NEEDS ONE — it is not a promise that
 App Review will not force one**, and the distinction is worth keeping because

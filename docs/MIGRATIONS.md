@@ -6184,7 +6184,9 @@ mistake and a guard that is never tested.
 ### What it changed in Production: nothing yet, and that is measured
 
 `branch_variant_availability` holds **0 rows**, so no tier is closed anywhere.
-`variant_closing_enabled` is **false**, so the operator controls are hidden.
+`variant_closing_enabled` was **false** at that moment, so the operator controls
+were hidden — it was turned on separately on 2026-09-20 (`OWNER_ACTIONS.md`
+§40.3); this row records the apply, not the switch.
 Orders unchanged at **76**; 61 products, 147 variants (144 active), 40 branches,
 3 product closures, 0 option closures. Moyasar re-verified absent after every
 apply: zero `%moyasar%` functions, zero history rows.

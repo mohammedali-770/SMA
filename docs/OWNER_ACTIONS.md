@@ -2878,9 +2878,17 @@ Four migrations make it possible for a branch to close **one price tier** —
 Three are server work; the fourth is the switch that decides when cashiers see
 the buttons.
 
-**All four are APPLIED as of 2026-09-17, so 40.1 is DONE and nothing is asked of
-you there.** The two steps still outstanding are **40.2** (the EAS build) and
-then **40.3** (the switch), in that order.
+**40.1, 40.2 AND 40.3 ARE ALL DONE.** The four migrations were applied
+2026-09-17; both binaries were built from `b7868e2` and iOS 1.0.0 (25) was
+submitted to TestFlight on 2026-09-20; and the switch was flipped the same day
+at 07:47:05 UTC. **Per-size closing is live in the branch console.**
+
+**What is left is not a step in this sequence.** 40.4 (a native Arabic read of
+five console strings) is optional and does not block anything. The one operational
+precondition that still binds is stated in 40.3 and is about CLOSING a size
+rather than about the switch: get build 25 onto every device that can order
+before a size is closed for real, because an older client accepts a closed size
+and then fails with a generic error at the payment step.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
@@ -2896,8 +2904,10 @@ Each was its own §5 action, applied on explicit approval in dependency order,
 | 4 | `20260926120000_variant_closing_flag` | `20260917124937` | added `app_settings.variant_closing_enabled`, **defaulting FALSE**. The live value was read back as `false`. |
 
 **Applying all four closed no size and changed nothing a customer sees, and that
-was measured rather than assumed:** `branch_variant_availability` holds 0 rows,
-`variant_closing_enabled` is false, and orders are unchanged at 76.
+was measured rather than assumed:** `branch_variant_availability` held 0 rows,
+`variant_closing_enabled` was false, and orders were unchanged at 76. **Those are
+the figures AT THE APPLY**; the switch was turned on separately on 2026-09-20 —
+see 40.3.
 
 **THE FLAG IS A UI GATE, NOT A SERVER INTERLOCK — an earlier version of this
 section said "nobody can write a closure until step 40.3", and that was false.**

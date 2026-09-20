@@ -1560,12 +1560,21 @@ older hole of the same shape, where a product with a fully closed *required*
 option group could be suggested.
 
 **The operator controls are behind `app_settings.variant_closing_enabled`
-(`20260926120000`), which defaults FALSE.** The branch console deploys on merge
-while the customer app reaches a customer only in the next EAS build, and a build
-that does not know this refusal shows a generic error at the payment step —
-`failureMessage` returns a translated key, never the server's sentence. Until the
-flag is on, no closed-tier row can exist and none of the above is reachable.
-`docs/OWNER_ACTIONS.md` §40 holds the ordering.
+(`20260926120000`), which defaults FALSE and was turned ON in Production on
+2026-09-20.** It exists because the branch console deploys on merge while the
+customer app reaches a customer only in the next EAS build, and a build that does
+not know this refusal shows a generic error at the payment step —
+`failureMessage` returns a translated key, never the server's sentence.
+
+**CORRECTED 2026-09-20 — an earlier version of this paragraph said "until the flag
+is on, no closed-tier row can exist and none of the above is reachable", and that
+was FALSE.** The flag gates the CONSOLE, not the API: `set_variant_snooze` and
+`clear_variant_snooze` authorize on `is_admin() or is_branch_operator(branch)`
+**without consulting it**, so a direct RPC call could always create a closure.
+The identical claim was retracted in `docs/OWNER_ACTIONS.md` §40 after review
+caught it on #396, and this copy survived the retraction — which is why a
+correction recorded in one document has to be grepped for in the others.
+`docs/OWNER_ACTIONS.md` §40 holds the ordering and the current state.
 
 Details of the availability model itself — the keystone that keeps
 `is_available` authoritative, and why `begin_checkout_session` and
