@@ -2981,8 +2981,13 @@ it is the copy a cashier reads during a rush.
 ## 41. Admin push notifications — the steps that turn it on
 
 You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
-size or delivery. The code is written; none of it is live. Behaviour, design and
-evidence: `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+size or delivery. The code is written. Behaviour, design and evidence:
+`docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+
+**Progress: 41.1 is DONE (2026-09-20); 41.2-41.8 remain.** The subscription
+store exists and is empty, there is still no VAPID key, the sender is not
+deployed and the queue is not applied — so nothing can be sent and nobody is
+subscribed.
 
 **Nothing below sends anything by itself.** Each step makes a notification more
 possible; the first real one arrives when a branch closes something after all of
@@ -2998,13 +3003,24 @@ re-added while the VAPID key is still missing installs an app that *can* receive
 push but has nothing to subscribe to — and you would have to delete and re-add it
 again. Do it last.
 
-### 41.1 Apply `20260927120000_admin_push_subscriptions`
+### 41.1 Apply `20260927120000_admin_push_subscriptions` — ✅ DONE 2026-09-20
 
-Name it by version, as always. It creates one empty table, one nullable
-`app_settings` column and three `is_admin()`-gated RPCs. **Applying it subscribes
-nobody and sends nothing.** It asserts the money-path pair is unmoved
-(`12b6816d…` / `22e2d429…`) and refuses to apply otherwise. Detail:
-`docs/MIGRATIONS.md` §49.
+**Applied 05:04:34 UTC on explicit owner approval ("apply 20260927120000"), live
+version `20260920050434`, ledger row 101.** History moved 145 → 146. It created
+one empty table, one nullable `app_settings` column and three
+`is_admin()`-gated RPCs; the money-path pair is unmoved (`12b6816d…` /
+`22e2d429…`) and the file asserted that itself.
+
+**It subscribed nobody and can send nothing:** `admin_push_subscriptions` holds
+0 rows and `app_settings.admin_push_vapid_public_key` is NULL — which is exactly
+what 41.2 and 41.3 are for. All three RPCs were called and refused at their gate
+(`42501`), `anon` cannot execute any of them and `authenticated` can, and
+`push_devices` is untouched at 5 customer rows.
+
+**The first attempt, on 2026-09-19, was REFUSED by the file's own assertion**
+(`anon can execute save_admin_push_subscription(…)`), nothing landed, and the
+file was corrected in PR #400 before this apply. Detail: `docs/MIGRATIONS.md`
+§49.
 
 ### 41.2 Generate the VAPID key pair
 

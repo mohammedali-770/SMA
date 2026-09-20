@@ -1,13 +1,16 @@
 # Admin push notifications — closures on the phone
 
-**Status: ALL FOUR STEPS ARE BUILT. Nothing sends yet, and that is now entirely
-a statement about CONFIGURATION rather than about missing code.** The console is
-installable, a service worker is registered, an admin can subscribe from the
-header, the sender exists, and a branch closing an item now queues a
-notification for it. What does not exist is two applied migrations, a VAPID key
-pair and a deployed function — so today there is still no path by which a
-notification reaches a phone. Every one of those is a separate owner action
-under CLAUDE.md §5, listed in §5 below and step by step in
+**Status: ALL FOUR STEPS ARE BUILT, and the FIRST of the four configuration
+actions is done. Nothing sends yet, and that remains entirely a statement about
+CONFIGURATION rather than about missing code.** The console is installable, a
+service worker is registered, an admin can subscribe from the header, the sender
+exists, and a branch closing an item now queues a notification for it.
+**`20260927120000` was APPLIED 2026-09-20** (live version `20260920050434`), so
+the subscription store now exists — empty, with a NULL VAPID key. What still does
+not exist is a VAPID key pair, a deployed `admin-push-dispatch`, and the applied
+queue migration `20260928120000` — so today there is still no path by which a
+notification reaches a phone, and nobody is subscribed. Every one of those is a
+separate owner action under CLAUDE.md §5, listed in §5 below and step by step in
 `docs/OWNER_ACTIONS.md` §41.
 
 ## What this is for
@@ -137,7 +140,7 @@ staff alert could navigate a customer's open tab away and discard its state.
 
 | File | Role |
 | --- | --- |
-| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **Written, not applied.** Detail: `docs/MIGRATIONS.md` §49. |
+| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — the table is empty and the VAPID column is NULL, so nobody is subscribed and nothing can be sent. Detail: `docs/MIGRATIONS.md` §49. |
 | `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases / 23 assertions pinning the closed table, the refusals and the endpoint-reassignment rule. |
 | `src/lib/adminPushApi.ts` | The console's side. Reads fail soft; writes throw, because the admin pressed a button and is owed a truthful answer. |
 | `src/lib/pwa/adminPushState.ts` | The seven-state resolver. |
@@ -389,7 +392,8 @@ next.
 
 Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
 
-1. Apply `20260927120000_admin_push_subscriptions` (step 2).
+1. ~~Apply `20260927120000_admin_push_subscriptions` (step 2).~~ **DONE
+   2026-09-20**, live version `20260920050434`, ledger row 101.
 2. Generate a VAPID key pair — `node scripts/generate-vapid-keys.mjs`.
 3. Store both halves as Edge Function secrets, and the **public** half in
    `app_settings.admin_push_vapid_public_key` (a live write, so its own §5
