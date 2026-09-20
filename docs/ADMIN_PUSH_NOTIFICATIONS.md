@@ -348,6 +348,43 @@ database would have to write `sent` at the moment it posted, which is a claim it
 cannot support. Pulling means the process that actually talks to the push
 service is the one that records the outcome.
 
+### The deployed bundle is NOT byte-identical to this repository
+
+**`admin-push-dispatch` version 1 was deployed 2026-09-20 from commit
+`38c50f7`, and its comments were stripped in transport.** Every executable
+statement is present and identical; the doc comments in `index.ts`,
+`adminAuth.ts`, `adminPush.ts`, `webPush.ts`, `publicHost.ts` and
+`supabaseClient.ts` are not. `cors.ts` went whole.
+
+**Why it happened.** The MCP deploy tool takes file contents inline, so the
+bundle is hand-transcribed. The seven files total ≈ 61 KB and the comments were
+dropped to fit them into one call. That was a poor trade and is recorded rather
+than quietly left.
+
+**Why it was not corrected by redeploying.** A second hand-transcription of
+61 KB to restore comments would risk a mistyped operator reaching production, on
+a function whose behaviour is currently verified. That trades a documentation
+problem for a correctness one. The comments do not execute; a typo does.
+
+**Nothing automated will ever notice this**, which is the reason it is written
+down. `deploy-functions.yml` cannot run — it needs `SUPABASE_ACCESS_TOKEN`,
+which has never existed and which `docs/OWNER_ACTIONS.md` §15 recommends against
+creating, because a Supabase token cannot be scoped to one project and this
+repository is public. `function-drift.yml` compares NAMES only and says so in
+its own header: *"the Supabase CLI exposes no content hash"*. So a future
+session fetching the bundle with `get_edge_function` would find a mismatch and,
+without this note, could not tell transport from tampering.
+
+**What was verified instead of byte-equality:** `deno check` clean on the
+repository source before deploying; the deployed function probed live — `GET`
+→ 405, unauthenticated `POST` → 401, and a scheduler-header `POST` → **401 rather
+than 500**, which is the documented fail-closed branch for the signature RPC not
+yet existing. The #402 fix is present: one guarded `parseNotificationRequest`.
+
+**The durable fix is a deploy path that sends exact bytes**, not a more careful
+retype. That is an owner decision about tooling, and §15's safer alternative is
+the place to start.
+
 ### A queue drain must not be judged by direct-mode rules
 
 **Fixed 2026-09-20, found while deploying rather than in review.** The handler

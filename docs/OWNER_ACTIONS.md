@@ -2984,10 +2984,15 @@ You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
 size or delivery. The code is written. Behaviour, design and evidence:
 `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
-**Progress: 41.1 is DONE (2026-09-20); 41.2-41.8 remain.** The subscription
-store exists and is empty, there is still no VAPID key, the sender is not
-deployed and the queue is not applied — so nothing can be sent and nobody is
-subscribed.
+**Progress: 41.1-41.4 are DONE (2026-09-20); 41.5-41.8 remain.** The
+subscription store exists and is empty, the VAPID public key is in
+`app_settings`, and `admin-push-dispatch` is deployed as version 1 and probed
+inert. The queue migration `20260928120000` is NOT applied, and nobody is
+subscribed — so nothing can be sent yet.
+
+**One caveat carried forward:** the deployed bundle is functionally identical to
+commit `38c50f7` but NOT byte-identical — comments were stripped in transport.
+Recorded, with the reasoning, in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
 **Nothing below sends anything by itself.** Each step makes a notification more
 possible; the first real one arrives when a branch closes something after all of
@@ -3072,7 +3077,7 @@ send is refused with a 403. The sender checks this itself and answers
 `misconfigured` rather than sending — but it is cheaper to paste the same value
 twice than to debug it.
 
-### 41.4 Deploy `admin-push-dispatch`
+### 41.4 Deploy `admin-push-dispatch` — ✅ DONE 2026-09-20
 
 `verify_jwt = false` (it is already in `supabase/config.toml`), because the
 service-role path carries no user JWT and the function's own caller check is the
