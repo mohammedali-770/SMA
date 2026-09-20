@@ -206,6 +206,52 @@ export const BranchDetailPanel: React.FC<{
           )}
         </div>
 
+        {/* Closed SIZES, named rather than counted.
+            The board tile shows a number; review caught on #408 that clicking
+            it landed an operator on a panel that never read `closedTiers`, so
+            the one question they opened it to answer -- WHICH size, and when
+            does it come back -- had no answer anywhere. */}
+        {summary.closedTiers.length > 0 ? (
+          <div className="space-y-2 border-t border-con-line pt-3">
+            <Text variant="label" as="h3">
+              {t('closedSizesLabel')} ({summary.closedTiers.length})
+            </Text>
+            <div className="space-y-1">
+              {summary.closedTiers.map(({ variant, product, snoozedUntil, reasonCode }) => {
+                const remaining = returnLabel(snoozedUntil, now);
+                const why = reasonKey(reasonCode);
+                return (
+                  <div
+                    key={variant.id}
+                    className="flex items-center justify-between gap-2"
+                    data-testid={`detail-closed-size-${variant.id}`}
+                  >
+                    <div className="min-w-0">
+                      <Text variant="caption" as="span">
+                        {isRTL ? product.nameAr : product.nameEn}
+                        {' \u2014 '}
+                        {isRTL ? variant.nameAr : variant.nameEn}
+                      </Text>
+                      {why ? (
+                        <Text variant="caption" tone="tertiary" as="p">{t(why)}</Text>
+                      ) : null}
+                    </div>
+                    <Text variant="caption" tone="tertiary" as="span" numeric>
+                      {!snoozedUntil ? t('untimed') : remaining ? `${t('backIn')} ${remaining}` : t('reopeningNow')}
+                    </Text>
+                  </div>
+                );
+              })}
+            </div>
+            {summary.sizeBlockedProducts.length > 0 ? (
+              <Text variant="caption" tone="danger" as="p">
+                {t('sizeBlockedLabel')}: {summary.sizeBlockedProducts
+                  .map((b) => (isRTL ? b.product.nameAr : b.product.nameEn)).join('\u060C ')}
+              </Text>
+            ) : null}
+          </div>
+        ) : null}
+
         {/* Options closed here that still leave every item orderable. One line,
             because it answers a question ("can I still get garlic sauce?")
             rather than reporting a problem. */}

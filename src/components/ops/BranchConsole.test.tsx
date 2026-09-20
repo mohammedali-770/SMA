@@ -545,6 +545,20 @@ describe('BranchConsole — per-size closing', () => {
     expect(screen.getByText(/some sizes are closed/i)).toBeTruthy();
   });
 
+  it('does NOT say "every item is available" when every size of one is closed', async () => {
+    // Review caught this on #408: the sizes-only wording claims the menu is
+    // intact, over a product already in `blockedIds` that checkout refuses
+    // outright. The headline was contradicting the tile directly below it.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    expect(await screen.findByText(/every size is closed/i)).toBeTruthy();
+    expect(screen.queryByText(/Every item is available/i)).toBeNull();
+  });
+
   it('still says everything is available when nothing at all is closed', async () => {
     // The third state must not swallow the second: an all-clear branch still
     // reads as an all-clear branch.

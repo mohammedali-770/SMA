@@ -296,7 +296,12 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
               const soonest = s.closedProducts[0];
               // One triage number, and it is the one the sort uses. Two numbers
               // to add up is one number too many for someone scanning a wall.
-              const unavailable = s.closedProducts.length + s.blockedProducts.length;
+              // Size-blocked products ARE unavailable -- every size of them is
+              // closed, so checkout refuses the item outright. They belong in
+              // this number; the closed-TIER count below is separate, because a
+              // product with one size closed is still orderable.
+              const unavailable = s.closedProducts.length + s.blockedProducts.length
+                + s.sizeBlockedProducts.length;
               return (
                 <button
                   key={s.branch.id}

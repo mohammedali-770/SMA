@@ -98,6 +98,21 @@ export interface BlockedProduct {
   earliestReturn: string | null;
 }
 
+/**
+ * A product nobody can order because EVERY active size of it is closed.
+ *
+ * The exact twin of a required option group running out, and modelled
+ * separately from `BlockedProduct` only because that type names the groups that
+ * caused it. Review caught its absence on #408: counting the tiers and stopping
+ * there let the board report "2 sizes closed, 0 items unavailable" about a
+ * product `place_order` refuses outright.
+ */
+export interface SizeBlockedProduct {
+  product: Product;
+  /** Latest of its closed tiers' return times; null if any is untimed. */
+  earliestReturn: string | null;
+}
+
 export interface BranchClosureSummary {
   branch: Branch;
   /** Products closed at this branch right now, with the branch's stated reason. */
@@ -122,6 +137,13 @@ export interface BranchClosureSummary {
    * this list the board has no way to know the branch is degraded at all.
    */
   closedTiers: ClosedTier[];
+  /**
+   * Products unorderable because every active size is closed.
+   *
+   * Never overlaps `closedProducts`: a product already closed outright is one
+   * disappointment, not two.
+   */
+  sizeBlockedProducts: SizeBlockedProduct[];
   deliveryPaused: boolean;
   /**
    * When a timed pause resumes itself, or null for the admin's untimed one.
@@ -316,6 +338,30 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     const closedProducts = (closedByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
     const closedOptions = (closedOptionsByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
     const closedTiers = (closedTiersByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
+    // Every ACTIVE size closed => the item itself is unorderable. Inactive tiers
+    // are ignored on both sides: a delisted size is not something a customer
+    // could have ordered, so it neither holds the product open nor counts as
+    // closed.
+    const closedTierIds = new Set(closedTiers.map((c) => c.variant.id));
+    const closedOutright = new Set(closedProducts.map((c) => c.product.id));
+    const sizeBlockedProducts: SizeBlockedProduct[] = [];
+    for (const p of products) {
+      if (closedOutright.has(p.id)) continue;
+      const tiers = p.variants.filter((v) => v.isActive);
+      if (tiers.length === 0) continue;
+      if (!tiers.every((v) => closedTierIds.has(v.id))) continue;
+      const times = closedTiers
+        .filter((c) => c.product.id === p.id)
+        .map((c) => c.snoozedUntil);
+      sizeBlockedProducts.push({
+        product: p,
+        // Null if ANY is untimed: the item returns when the LAST size does, and
+        // an untimed size has no return to promise.
+        earliestReturn: times.some((t) => !t)
+          ? null
+          : times.reduce((a2, b2) => (Date.parse(a2 as string) > Date.parse(b2 as string) ? a2 : b2), times[0]),
+      });
+    }
     const closedOptionIds = closedOptionIdsByBranch.get(branch.id) ?? new Set<string>();
     const disabledAreas = disabledByBranch.get(branch.id) ?? [];
     const deliveryPaused = branch.deliveryTemporarilyClosed ?? false;
@@ -334,7 +380,7 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     // board: it is asking for something. Omitting it would make the one item
     // that needs an operator the one item the board never shows.
     if (closedProducts.length === 0 && blockedProducts.length === 0
-        && closedTiers.length === 0
+        && closedTiers.length === 0 && sizeBlockedProducts.length === 0
         && !deliveryPaused && disabledAreas.length === 0
         && pendingRequests.length === 0) continue;
 
@@ -345,6 +391,7 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       blockingIncidents,
       closedOptions,
       closedTiers,
+      sizeBlockedProducts,
       deliveryPaused,
       deliveryUntil,
       disabledAreas,
@@ -355,7 +402,7 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       // wanted that size it is the same disappointment, and a branch whose only
       // fault is one closed size still belongs on the board.
       severity: closedProducts.length + blockedProducts.length + closedTiers.length
-        + disabledAreas.length
+        + sizeBlockedProducts.length + disabledAreas.length
         + (deliveryPaused ? 5 : 0) + (pendingRequests.length > 0 ? 6 : 0),
     });
   }

@@ -122,6 +122,54 @@ describe('buildClosureSummaries and closed price tiers', () => {
     expect(out).toEqual([]);
   });
 
+  /**
+   * EVERY SIZE CLOSED MEANS THE ITEM IS UNORDERABLE, and the first version of
+   * this change counted the tiers and stopped there -- so the board said "2
+   * sizes closed, 0 items unavailable" about a product checkout rejects
+   * outright. Caught in review on #408. It is the same shape as a required
+   * option group running out, which `blockedProducts` already models.
+   */
+  it('reports a product whose every active size is closed as size-blocked', () => {
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', false), varAvail('a', 'v2', false)],
+    });
+    expect(out[0].sizeBlockedProducts.map((b) => b.product.id)).toEqual(['p1']);
+  });
+
+  it('does NOT call a product size-blocked while one size is still open', () => {
+    const out = buildClosureSummaries({
+      ...withTiers, availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', false)],
+    });
+    expect(out[0].sizeBlockedProducts).toEqual([]);
+  });
+
+  it('ignores INACTIVE tiers when deciding whether every size is closed', () => {
+    // A delisted tier is not something a customer could have ordered, so it must
+    // not hold a product open -- nor count as closed.
+    const withDead = product('p1', {
+      variants: [tier('v1', 'p1'), tier('v2', 'p1', { isActive: false })],
+    });
+    const out = buildClosureSummaries({
+      ...base, products: [withDead], availability: [], areas: [],
+      variantAvailability: [varAvail('a', 'v1', false)],
+    });
+    expect(out[0].sizeBlockedProducts.map((b) => b.product.id)).toEqual(['p1']);
+  });
+
+  it('never double-counts a product that is ALSO closed outright', () => {
+    // Closing the product and all its sizes is one disappointment, not two.
+    const out = buildClosureSummaries({
+      ...withTiers,
+      availability: [avail('a', 'p1', false)],
+      areas: [],
+      variantAvailability: [varAvail('a', 'v1', false), varAvail('a', 'v2', false)],
+    });
+    expect(out[0].closedProducts).toHaveLength(1);
+    expect(out[0].sizeBlockedProducts).toEqual([]);
+  });
+
   it('orders closed tiers soonest-returning first, untimed last', () => {
     const out = buildClosureSummaries({
       ...withTiers, availability: [], areas: [],
@@ -649,7 +697,7 @@ describe('pending delivery requests on the board', () => {
 describe('severityBand', () => {
   const summary = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], closedTiers: [], deliveryPaused: false,
+    closedOptions: [], closedTiers: [], sizeBlockedProducts: [], deliveryPaused: false,
     deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity: 0, ...over,
   });
 
@@ -682,7 +730,7 @@ describe('severityBand', () => {
 describe('compareSummaries', () => {
   const at = (over: Partial<BranchClosureSummary>): BranchClosureSummary => ({
     branch: branch('a'), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], closedTiers: [], deliveryPaused: false, deliveryUntil: null, disabledAreas: [],
+    closedOptions: [], closedTiers: [], sizeBlockedProducts: [], deliveryPaused: false, deliveryUntil: null, disabledAreas: [],
     pendingRequests: [], severity: 0, ...over,
   });
 
@@ -730,7 +778,7 @@ describe('newlyClosedBranchIds', () => {
     id: string, severity: number, over: Partial<BranchClosureSummary> = {},
   ): BranchClosureSummary => ({
     branch: branch(id), closedProducts: [], blockedProducts: [], blockingIncidents: [],
-    closedOptions: [], closedTiers: [], deliveryPaused: false,
+    closedOptions: [], closedTiers: [], sizeBlockedProducts: [], deliveryPaused: false,
     deliveryUntil: null, disabledAreas: [], pendingRequests: [], severity, ...over,
   });
 

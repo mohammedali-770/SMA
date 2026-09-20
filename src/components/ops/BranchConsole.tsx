@@ -185,6 +185,18 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     ),
     [products, modifierGroups, closedOptionIds, closedTierIds],
   );
+  /**
+   * Is any product unorderable because EVERY size of it is closed?
+   *
+   * Derived separately from `optionBlocked`, which folds the option cause and
+   * the size cause together because the TILE treats them alike. The headline
+   * cannot: "some sizes are closed" is false comfort over an item nobody can
+   * order at all.
+   */
+  const anySizeBlocked = useMemo(
+    () => products.some((p) => productBlockedBySizes(p, closedTierIds)),
+    [products, closedTierIds],
+  );
   const closedOpts = useMemo(
     () => closedOptions(modifierGroups, modRows), [modifierGroups, modRows]);
   const closedTiers = useMemo<ClosedVariant[]>(
@@ -375,6 +387,7 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
             rows={rows}
             closed={closed}
             closedTierCount={closedTiers.length}
+            anySizeBlocked={anySizeBlocked}
             blockedIds={optionBlocked}
             now={now}
             loading={loading}

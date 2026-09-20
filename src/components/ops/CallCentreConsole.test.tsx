@@ -513,6 +513,34 @@ describe('CallCentreConsole', () => {
       expect(screen.queryByText(/items unavailable/i)).toBeNull();
     });
 
+    it('names WHICH size is closed in the detail panel, not just a count', async () => {
+      // Review caught this on #408: the tile showed a number and clicking it
+      // opened a panel that never read `closedTiers`, so the one question an
+      // operator opens it to answer had no answer anywhere.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false,
+          snoozedUntil: null, reasonCode: 'out_of_stock' },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      fireEvent.click(await screen.findByText('Riyadh'));
+      const row = await screen.findByTestId('detail-closed-size-v-reg');
+      expect(within(row).getByText(/Dinner/)).toBeTruthy();
+      expect(within(row).getByText(/Regular/)).toBeTruthy();
+    });
+
+    it('counts a product whose EVERY size is closed as unavailable', async () => {
+      // "2 sizes closed, 0 items unavailable" was the wrong answer about a
+      // product `place_order` refuses outright.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false, snoozedUntil: null, reasonCode: null },
+        { branchId: 'b1', variantId: 'v-spicy', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      expect(await screen.findByText(/1 items unavailable/i)).toBeTruthy();
+    });
+
     it('survives the tier read being unavailable', async () => {
       // `allVariantAvailability` degrades to [] rather than throwing, so a board
       // is never replaced by a blocking error over a table of exceptions.

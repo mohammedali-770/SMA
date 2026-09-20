@@ -40,6 +40,17 @@ export const ItemsTab: React.FC<{
    */
   closedTierCount: number;
   /**
+   * Whether any product is unorderable because EVERY one of its sizes is closed.
+   *
+   * A separate signal from `closedTierCount`, because the two say opposite
+   * things about the menu: one size off leaves the item on sale, every size off
+   * takes it away. Review caught the first version claiming "Every item is
+   * available, but some sizes are closed" over a product already in
+   * `blockedIds` -- the headline contradicting the tile directly below it, on
+   * #408.
+   */
+  anySizeBlocked: boolean;
+  /**
    * Products a cashier would read as open that a customer cannot order —
    * because a REQUIRED option group has been emptied, or because every SIZE is
    * closed. Both render as `partial`, because to the cashier they are the same
@@ -58,6 +69,7 @@ export const ItemsTab: React.FC<{
   rows,
   closed,
   closedTierCount,
+  anySizeBlocked,
   blockedIds,
   now,
   loading,
@@ -138,16 +150,20 @@ export const ItemsTab: React.FC<{
                 ? t('loading')
                 : closed.length > 0
                   ? `${closed.length} ${t(closed.length === 1 ? 'closedCountOne' : 'closedCount')}`
-                  : closedTierCount > 0
-                    ? t('closedSizesOnlyTitle')
-                    : t('closedNoneTitle')}
+                  : anySizeBlocked
+                    ? t('sizeBlockedTitle')
+                    : closedTierCount > 0
+                      ? t('closedSizesOnlyTitle')
+                      : t('closedNoneTitle')}
             </Text>
             <Text variant="caption" tone="tertiary" as="p">
               {closed.length > 0
                 ? t('autoReopenNote')
-                : closedTierCount > 0
-                  ? t('closedSizesOnlyBody')
-                  : t('closedNoneBody')}
+                : anySizeBlocked
+                  ? t('sizeBlockedBody')
+                  : closedTierCount > 0
+                    ? t('closedSizesOnlyBody')
+                    : t('closedNoneBody')}
             </Text>
           </div>
         </div>

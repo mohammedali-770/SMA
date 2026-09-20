@@ -1629,6 +1629,38 @@ every monitor, dashboard and summary for the subjects they already name, and add
 the new one to each. Passing tests will not find it: every one of them was
 written before the subject existed.
 
+#### Four more defects review found in the fix itself
+
+Worth recording, because the first three are the SAME defect the fix exists to
+remove, reappearing inside it.
+
+1. **The board's new read swallowed every error**, turning "could not read the
+   table" into "no sizes closed" — so an unread table would have printed the
+   all-clear notice. It now suppresses only a missing relation (`42P01`,
+   `PGRST205`) and raises on anything else.
+2. **A product whose every active size is closed is unorderable**, and the first
+   version counted its tiers and stopped, so the board read *"2 sizes closed, 0
+   items unavailable"* about a product `place_order` refuses. It is now derived
+   as `sizeBlockedProducts` and counted as unavailable — never double-counted
+   with a product already closed outright.
+3. **The branch headline still said "every item is available"** over a product
+   already in `blockedIds` for that reason. It now has a fourth state.
+4. **The board tile showed a count and the detail panel behind it showed
+   nothing**, so an operator could see that a size was off and never learn
+   which. The panel now names product, size, reason and return time.
+
+**THE ASYMMETRY BETWEEN THE TWO TIER READS IS DELIBERATE, and an existing test
+caught the draft that removed it.** `allVariantAvailability` (the board) raises
+on a refused read; `branchVariantAvailability` (the cashier's console) still
+swallows it. The trades genuinely run opposite ways: a board that reports
+all-clear over a read it was refused is the worst output it can produce, while
+the branch console's `refresh()` is one `Promise.all`, so any rejection blanks
+the whole screen — products, delivery, reference sheet — for a cashier
+mid-service (#395). The residual risk on the console half is stated rather than
+hidden, in a comment on the method: a refused read there shows "no sizes closed"
+when sizes are closed, and fixing it properly means a per-read non-blocking
+error notice.
+
 Details of the availability model itself — the keystone that keeps
 `is_available` authoritative, and why `begin_checkout_session` and
 `compute_order_snapshot` were never touched — are in `docs/ARCHITECTURE.md` §4.

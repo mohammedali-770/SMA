@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**198 TypeScript test files declaring 3129 test blocks, plus 80 SQL suites.**
+**198 TypeScript test files declaring 3140 test blocks, plus 80 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -201,7 +201,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-102 files, 1440 declared test blocks.
+102 files, 1451 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -239,11 +239,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
-| `src/components/ops/BranchConsole.test.tsx` | 42 | BranchConsole |
+| `src/components/ops/BranchConsole.test.tsx` | 43 | BranchConsole |
 | `src/components/ops/branchReference.test.ts` | 20 | delivery request state |
 | `src/components/ops/BranchReferenceCard.test.tsx` | 9 | BranchReferenceCard |
-| `src/components/ops/callCentre.test.ts` | 62 | buildClosureSummaries and closed price tiers |
-| `src/components/ops/CallCentreConsole.test.tsx` | 32 | CallCentreConsole |
+| `src/components/ops/callCentre.test.ts` | 66 | buildClosureSummaries and closed price tiers |
+| `src/components/ops/CallCentreConsole.test.tsx` | 34 | CallCentreConsole |
 | `src/components/ops/opsRefreshQueue.test.ts` | 5 | makeRefreshQueue |
 | `src/components/ops/opsStrings.test.ts` | 4 | ops console copy |
 | `src/components/ops/RequestsWaitingCard.test.tsx` | 7 | RequestsWaitingCard |
@@ -290,7 +290,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/operationsAlertsCapability.test.ts` | 6 | classifyOperationsAlertsProbe |
 | `src/lib/operationsHealthApi.test.ts` | 10 | pushFailureMetrics |
 | `src/lib/operationsHealthCapability.test.ts` | 12 | classifyOperationsHealthProbe |
-| `src/lib/opsApiResilience.test.ts` | 5 | opsApi.branchReference — missing-table resilience |
+| `src/lib/opsApiResilience.test.ts` | 9 | opsApi.branchReference — missing-table resilience |
 | `src/lib/opsVariantClosing.test.ts` | 11 | branchVariantAvailability |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
