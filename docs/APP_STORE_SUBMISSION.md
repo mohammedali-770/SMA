@@ -20,8 +20,10 @@
 | App Store Connect app record | exists — ASC App ID **6800210683**, bundle `com.spicymeal.app` |
 | ASC API key in EAS | working — `W7LY8D9FKX` (`[Expo] EAS Submit kROBQixX90`), read and write both exercised 2026-09-16 |
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
-| newest iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
-| **build 24 uploaded to App Store Connect** | **YES, 2026-09-16 11:05:33 UTC** — see §3a, and note EAS reported the submission ERRORED anyway |
+| newest iOS build | **1.0.0 (25)**, `8df309aa-434b-46ad-8bfa-4566c68e6763`, commit `b7868e2`, FINISHED 2026-09-20 06:54 UTC |
+| **build 25 uploaded to App Store Connect** | **YES, 2026-09-20 07:19:28 UTC** — and EAS reported the submission ERRORED again, for the same reason. §3a |
+| **build 25 live in TestFlight** | **not yet confirmed.** The upload completed and Apple was processing; confirm by INSTALLING it, not by reading a status |
+| previous iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
 | **build 24 live in TestFlight** | **YES** — installed and exercised on a real device at 11:11:40 UTC. Confirmed by USE, not by an API read; see §8 |
 | internal testers | **already configured.** Internal testing needs no Beta App Review |
 | build 23 | **SUPERSEDED, do not submit** — it is the one Apple refused. §3 |
@@ -32,6 +34,18 @@ binary, not the config: its `Info.plist` holds **two** usage descriptions,
 when-in-use and motion, with no `UIBackgroundModes`. Build 24 is uploaded.
 **What remains is entirely App Store Connect console work** (§8), none of which
 needs another build.
+
+**BUILD 25 EXISTS FOR A FEATURE, NOT FOR A BLOCKER, and the distinction decides
+what happens if it is delayed.** Nothing Apple refused is fixed in it. It carries
+the **customer half of per-size closing** (`OWNER_ACTIONS.md` §40): without it, a
+customer whose app predates `b7868e2` who orders a size a branch has closed gets
+a **generic error at the payment step** rather than the server's sentence,
+because `failureMessage` returns a translated key
+(`apps/mobile/src/lib/errors/reportFailure.ts:65-71`). That is why
+`app_settings.variant_closing_enabled` is still FALSE — the switch exists to hold
+the branch console's per-size controls back until a build that understands them
+is on real phones. **Build 25 is the build; flipping the switch is a separate
+§5 decision that should follow it, not precede it.**
 
 **"Needs another build" means NOTHING KNOWN NEEDS ONE — it is not a promise that
 App Review will not force one**, and the distinction is worth keeping because
@@ -209,6 +223,30 @@ motion — and no `UIBackgroundModes`.
 
 This is the most useful operational fact on this page, because the obvious
 response to it is wrong.
+
+**IT HAPPENED AGAIN ON BUILD 25, 2026-09-20, LINE FOR LINE — so treat it as the
+NORMAL behaviour of this path rather than as an Apple outage.** That is the
+single most important amendment this section has had. Two for two is not a
+coincidence, and the practical consequence is that **an `ERRORED` iOS submission
+here is the expected outcome, and reading it as a failure is the mistake**:
+
+| | build 24 (2026-09-16) | build 25 (2026-09-20) |
+| --- | --- | --- |
+| chunks uploaded | 6/6 | 6/6 |
+| `File upload … completed!` | 11:05:33 | **07:19:28** |
+| `status = PROCESSING` polls | ~3 min | ~1 min 13 s, 8 polls |
+| Apple's answer | HTTP 500 `UNEXPECTED_ERROR` | **HTTP 500 `UNEXPECTED_ERROR`, identical body** |
+| structured error | `UNKNOWN_ERROR` **with** a log | `UNKNOWN_ERROR` **with** a log |
+| where the 500 landed | the status poll | the status poll |
+| the transfer itself | succeeded | **succeeded** |
+
+The polling window differing by a factor of two while the outcome is identical is
+itself evidence: the 500 is not a timeout on a slow processing run, it is what
+that endpoint returns.
+
+**Build 25 was submitted knowing this**, and the failure was predicted out loud
+before the command ran, which is the point of writing it down. Nothing was
+resubmitted on reflex; the log was read first and it said what this table says.
 
 | UTC | what the log says |
 | --- | --- |
@@ -478,9 +516,22 @@ update both, and Play in particular reuses them for every future review.
 
    **This is the argument for a device test rather than a green pipeline, in one
    sentence: every gate passed on a build whose main screen could not load.**
-3. **Enter the App Privacy answers** from §4 in the console.
-4. **Enter the test information** from §6.
-5. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
+3. ~~Build and submit 1.0.0 (25), the per-size customer half.~~ **DONE
+   2026-09-20.** Built from `b7868e2` (06:54 UTC), submitted 07:19, upload
+   completed **07:19:28**, EAS reported ERRORED for the second-consecutive
+   status-poll 500 — §3a. **Not resubmitted**, per the rule that section exists
+   to state.
+4. **Confirm build 25 in TestFlight by INSTALLING it**, the same way build 24 was
+   confirmed — nothing in the pipeline can answer "is it installable?", and the
+   one time it was answered by opening the app it found a three-week outage
+   (item 2). Then exercise per-size closing end to end: close a size in the
+   branch console, and check the customer app refuses that size with the
+   server's sentence rather than a generic payment error.
+5. **Then flip `app_settings.variant_closing_enabled`** — §5, owner approval,
+   after step 4 and not before. `OWNER_ACTIONS.md` §40.
+6. **Enter the App Privacy answers** from §4 in the console.
+7. **Enter the test information** from §6.
+8. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
 
 **Not gating TestFlight, but gating an App Store release:** the §1
 physical-device validation gate, which has run on neither platform.
