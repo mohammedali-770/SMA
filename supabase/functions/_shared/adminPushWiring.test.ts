@@ -282,6 +282,33 @@ describe('the queue-drain mode', () => {
     expect(code()).toMatch(/if \(error\) return json\(\{ error: 'unauthorized'/);
   });
 
+  it('does not demand direct-mode copy from a queue drain', () => {
+    /*
+     * THE DEFECT THIS PINS, found while deploying rather than in review.
+     * The handler parsed the body TWICE. The first call was correctly guarded
+     * by `if (mode === 'direct')`; the second sat at top level and returned 400
+     * on failure -- and a queue body carries no `title`/`body`, because its
+     * copy comes from the rows it claims. So EVERY scheduler call answered
+     * `400 title is required` before reaching the claim, and the cron job would
+     * have ticked every minute against a drain that could never run while
+     * notices expired in the outbox after two hours.
+     *
+     * Nothing else could see it: `deno check` is a typecheck and an unused
+     * const is legal, and the handler cannot be imported here, so no test
+     * executed the branch. The one durable assertion is that the parse happens
+     * ONCE, inside the direct-mode guard.
+     */
+    const c = code();
+    const calls = c.match(/parseNotificationRequest\(/g) ?? [];
+    expect(calls).toHaveLength(1);
+    // And that single call is inside the direct-mode branch, not after it.
+    const guard = c.indexOf("if (mode === 'direct')");
+    const parse = c.indexOf('parseNotificationRequest(');
+    expect(guard).toBeGreaterThan(-1);
+    expect(parse).toBeGreaterThan(guard);
+    expect(c.slice(guard, parse)).not.toContain('}');
+  });
+
   it('refuses a queue drain from an admin', () => {
     const c = code();
     expect(c).toContain("mode === 'queue' && !mayDrainQueue(caller)");

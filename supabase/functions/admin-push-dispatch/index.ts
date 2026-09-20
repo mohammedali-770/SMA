@@ -205,9 +205,6 @@ Deno.serve(async (req: Request) => {
     directRequest = parsed.request;
   }
 
-  const parsed = parseNotificationRequest(rawBody);
-  if (!parsed.ok) return json({ error: parsed.reason, code: 'bad_request' }, 400);
-  const request = parsed.request;
   // OPTIONAL: narrow the send to ONE of the caller's devices. The console uses
   // it so its confirmation reaches the browser that was just enabled rather
   // than every device that admin owns — otherwise a notification arriving on an
