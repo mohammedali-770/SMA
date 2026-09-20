@@ -142,6 +142,16 @@ export function HomeMenuScreen({
     }
     dispatchCatFocus({ kind: 'settled' });
   }, []);
+  // The user putting a finger down outranks their last tap. `onScrollBeginDrag`
+  // fires ONLY for real drags — a programmatic `scrollToLocation` never emits
+  // it — so releasing the hold here cannot reintroduce the lag this fixes.
+  const dragBegan = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    dispatchCatFocus({ kind: 'drag' });
+  }, []);
   // A pending timer outliving the screen would dispatch into an unmounted
   // reducer on every navigation away mid-scroll.
   useEffect(
@@ -371,6 +381,7 @@ export function HomeMenuScreen({
               onViewableItemsChanged={onViewableItemsChanged}
               viewabilityConfig={VIEWABILITY_CONFIG}
               onMomentumScrollEnd={settleNow}
+              onScrollBeginDrag={dragBegan}
               onScrollToIndexFailed={onScrollToIndexFailed}
               initialNumToRender={8}
               maxToRenderPerBatch={8}

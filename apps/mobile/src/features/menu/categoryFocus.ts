@@ -37,6 +37,22 @@ export type CategoryFocusEvent =
   /** The scroll spy reported the section now in view. */
   | { kind: 'spy'; catId: string }
   /**
+   * The user put a finger on the list.
+   *
+   * THIS OUTRANKS THE TAP AND ENDS THE HOLD AT ONCE. Without it, a drag started
+   * inside the hold had every one of its reports discarded, and a SLOW drag
+   * emits no momentum event — so only the timer ended the hold, and the timer
+   * merely unmutes the spy rather than replaying what it missed. Viewability
+   * reports fire on CHANGE, so once the user stopped there were no more, and
+   * the chip stayed on the tapped category until the next scroll. Caught in
+   * review on #409.
+   *
+   * Cancelling is the right repair rather than replaying the last report on
+   * settle: the last in-flight report is exactly the wrong section, which is
+   * the bug this reducer exists to fix.
+   */
+  | { kind: 'drag' }
+  /**
    * The list stopped moving.
    *
    * Sent on momentum end AND on a timer, because `scrollToLocation` has no
@@ -57,6 +73,12 @@ export function categoryFocusReducer(state: CategoryFocus, event: CategoryFocusE
       if (state.awaitingSettle) return state;
       if (state.activeCatId === event.catId) return state;
       return { ...state, activeCatId: event.catId };
+    case 'drag':
+      // Releases the spy WITHOUT touching the chip. Resetting it here would
+      // make the highlight jump backwards before the user has scrolled
+      // anywhere; the first report of their drag will move it honestly.
+      if (!state.awaitingSettle) return state;
+      return { ...state, awaitingSettle: false };
     case 'settled':
       if (!state.awaitingSettle) return state;
       return { ...state, awaitingSettle: false };

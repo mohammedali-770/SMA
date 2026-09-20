@@ -74,6 +74,51 @@ describe('categoryFocusReducer', () => {
     expect(out.activeCatId).toBe('sides');
   });
 
+  /**
+   * A DRAG IS THE USER TAKING OVER, AND IT OUTRANKS THE TAP IMMEDIATELY.
+   *
+   * Review caught this on #409, and it is the failure mode this reducer was
+   * most at risk of creating: tap a category, then start dragging inside the
+   * 700 ms hold. Every report from that drag was discarded, and a SLOW drag
+   * produces no momentum event, so nothing but the timer ended the hold -- and
+   * the timer only unmutes the spy, it does not replay what was missed.
+   * Viewability reports fire on CHANGE, so once the user stops there are no
+   * more, and the chip stayed on the tapped category until they scrolled again.
+   *
+   * The narrow fix is to cancel the hold the moment a drag begins rather than
+   * to replay reports on settle. Replaying would re-introduce the original bug:
+   * the last in-flight report is precisely the wrong section.
+   */
+  it('a user drag cancels the hold immediately', () => {
+    const out = run([{ kind: 'tap', catId: 'sides' }, { kind: 'drag' }, { kind: 'spy', catId: 'drinks' }]);
+    expect(out.activeCatId).toBe('drinks');
+    expect(out.awaitingSettle).toBe(false);
+  });
+
+  it('a drag with no momentum event still leaves the spy live', () => {
+    // The exact reported sequence: tap, drag, spy, and only then the timer.
+    const out = run([
+      { kind: 'tap', catId: 'sides' },
+      { kind: 'drag' },
+      { kind: 'spy', catId: 'drinks' },
+      { kind: 'settled' },
+      { kind: 'spy', catId: 'sauces' },
+    ]);
+    expect(out.activeCatId).toBe('sauces');
+  });
+
+  it('a drag BEFORE any tap changes nothing', () => {
+    const idle: CategoryFocus = { activeCatId: 'meals', awaitingSettle: false };
+    expect(categoryFocusReducer(idle, { kind: 'drag' })).toBe(idle);
+  });
+
+  it('does not let a drag undo the tapped category itself', () => {
+    // Cancelling the hold releases the spy; it must not also reset the chip,
+    // or the highlight would jump back before the user has scrolled anywhere.
+    const out = run([{ kind: 'tap', catId: 'sides' }, { kind: 'drag' }]);
+    expect(out.activeCatId).toBe('sides');
+  });
+
   it('returns the SAME object when a spy report changes nothing', () => {
     // Identity matters: this feeds a chip-strip effect that scrolls the strip
     // sideways, and a new object every scroll frame would re-run it constantly.
