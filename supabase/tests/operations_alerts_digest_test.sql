@@ -68,18 +68,18 @@ declare
   r record;
   v_expected constant jsonb := '{
     "operations_health_snapshot_internal()":                              {"vol":"s","secdef":true,  "anon":false,"auth":false,"svc":true},
-    "operations_health_summary()":                                        {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
+    "operations_health_summary()":                                        {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
     "operations_alerts_derive(jsonb,jsonb)":                              {"vol":"s","secdef":false, "anon":false,"auth":false,"svc":true},
     "operations_alerts_evaluate()":                                       {"vol":"v","secdef":true,  "anon":false,"auth":false,"svc":true},
     "operations_digest_build(text,timestamp with time zone,timestamp with time zone,date,text,boolean)": {"vol":"s","secdef":true,"anon":false,"auth":false,"svc":true},
     "operations_digest_generate(timestamp with time zone)":               {"vol":"v","secdef":true,  "anon":false,"auth":false,"svc":true},
-    "operations_digest_preview(text)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_alerts_admin_summary()":                                  {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_alerts_list(text,text,text,integer)":                     {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_alert_timeline(uuid)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_digest_list(integer)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_alert_settings_get()":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":false},
-    "operations_alert_settings_update(jsonb)":                            {"vol":"v","secdef":true,  "anon":false,"auth":true, "svc":false}
+    "operations_digest_preview(text)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_alerts_admin_summary()":                                  {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_alerts_list(text,text,text,integer)":                     {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_alert_timeline(uuid)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_digest_list(integer)":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_alert_settings_get()":                                    {"vol":"s","secdef":true,  "anon":false,"auth":true, "svc":true },
+    "operations_alert_settings_update(jsonb)":                            {"vol":"v","secdef":true,  "anon":false,"auth":true, "svc":true }
   }'::jsonb;
   v_key text;
   v_spec jsonb;
