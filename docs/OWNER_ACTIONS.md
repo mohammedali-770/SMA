@@ -2878,9 +2878,17 @@ Four migrations make it possible for a branch to close **one price tier** —
 Three are server work; the fourth is the switch that decides when cashiers see
 the buttons.
 
-**All four are APPLIED as of 2026-09-17, so 40.1 is DONE and nothing is asked of
-you there.** The two steps still outstanding are **40.2** (the EAS build) and
-then **40.3** (the switch), in that order.
+**40.1, 40.2 AND 40.3 ARE ALL DONE.** The four migrations were applied
+2026-09-17; both binaries were built from `b7868e2` and iOS 1.0.0 (25) was
+submitted to TestFlight on 2026-09-20; and the switch was flipped the same day
+at 07:47:05 UTC. **Per-size closing is live in the branch console.**
+
+**What is left is not a step in this sequence.** 40.4 (a native Arabic read of
+five console strings) is optional and does not block anything. The one operational
+precondition that still binds is stated in 40.3 and is about CLOSING a size
+rather than about the switch: get build 25 onto every device that can order
+before a size is closed for real, because an older client accepts a closed size
+and then fails with a generic error at the payment step.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
@@ -2896,8 +2904,10 @@ Each was its own §5 action, applied on explicit approval in dependency order,
 | 4 | `20260926120000_variant_closing_flag` | `20260917124937` | added `app_settings.variant_closing_enabled`, **defaulting FALSE**. The live value was read back as `false`. |
 
 **Applying all four closed no size and changed nothing a customer sees, and that
-was measured rather than assumed:** `branch_variant_availability` holds 0 rows,
-`variant_closing_enabled` is false, and orders are unchanged at 76.
+was measured rather than assumed:** `branch_variant_availability` held 0 rows,
+`variant_closing_enabled` was false, and orders were unchanged at 76. **Those are
+the figures AT THE APPLY**; the switch was turned on separately on 2026-09-20 —
+see 40.3.
 
 **THE FLAG IS A UI GATE, NOT A SERVER INTERLOCK — an earlier version of this
 section said "nobody can write a closure until step 40.3", and that was false.**
@@ -2945,18 +2955,43 @@ which is when exposure actually starts, rather than before the flag is flipped.
 **Re-measure before relying on this: the moment either store goes to a public
 track, the bound stops holding.**
 
-### 40.3 Turn the switch on — after 40.1 and 40.2, and not before — OUTSTANDING
+### 40.3 Turn the switch on — ✅ DONE 2026-09-20 07:47:05 UTC
 
-**40.1 is done; this step is still gated on 40.2.** The column exists and reads
-`false`; applying the migration deliberately did not flip it.
+**Flipped on explicit owner approval ("flip the flag"), one statement, one row.**
+`app_settings.variant_closing_enabled` is now **true**, so the branch console
+shows a **Close** button beside each size and the message *"Closing a single size
+is not available yet"* is gone.
 
 ```
 update public.app_settings set variant_closing_enabled = true where id is true;
 ```
 
-or the equivalent in the admin settings surface. This is the step that puts a
-**Close** button beside each size in the branch console. It is reversible: set it
-back to false and the Close buttons disappear again.
+**The write was verified rather than assumed, before and after.** `id is true`
+was confirmed to match **exactly one** row before sending, so the predicate could
+not sweep more than intended. After: the flag reads `true`, and **nothing else
+moved** — `branch_variant_availability` still **0** rows, orders still **76**,
+147 variants (144 active) unchanged, and the money-path pair identical on both
+sides (`place_order` `12b6816d256c29b76edf947ae1a7ea77`,
+`compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`).
+
+**The console's read was performed, not merely permitted.** Checking
+`has_column_privilege` answers a different question from whether the read
+succeeds — the distinction ledger row 96 exists for — so the select was run under
+both client roles and both returned `true`: `anon` yes, `authenticated` yes. The
+console authenticates, so this is the value it now sees.
+
+**FLIPPING IT EXPOSED NOBODY, and that is a property of there being no closures
+rather than of the flag.** With `branch_variant_availability` at 0 rows, no
+client behaves differently whatever the flag says. The flag gates the CONSOLE,
+not the API. **Exposure begins when a branch actually closes a size** — so the
+precondition that still binds is that every device which can order is on build 25
+or later BEFORE a size is closed for real, not before this flip. Bound measured
+the same day: the app is not publicly distributed on either store, and **6
+distinct people have ever ordered, 3 of them in the last 30 days**. Re-measure
+before relying on that — it stops holding the moment either store goes to a
+public track.
+
+It is reversible: set it back to false and the Close buttons disappear again.
 
 **Server-side enforcement does not depend on it.** The flag hides a control; it
 does not soften the rule. A tier closed while the flag was on stays refused by
