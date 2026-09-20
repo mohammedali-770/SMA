@@ -524,14 +524,53 @@ update both, and Play in particular reuses them for every future review.
 4. **Confirm build 25 in TestFlight by INSTALLING it**, the same way build 24 was
    confirmed — nothing in the pipeline can answer "is it installable?", and the
    one time it was answered by opening the app it found a three-week outage
-   (item 2). Then exercise per-size closing end to end: close a size in the
-   branch console, and check the customer app refuses that size with the
-   server's sentence rather than a generic payment error.
-5. **Then flip `app_settings.variant_closing_enabled`** — §5, owner approval,
-   after step 4 and not before. `OWNER_ACTIONS.md` §40.
-6. **Enter the App Privacy answers** from §4 in the console.
-7. **Enter the test information** from §6.
-8. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
+   (item 2).
+5. **Flip `app_settings.variant_closing_enabled`** — §5, owner approval.
+   `OWNER_ACTIONS.md` §40.
+6. **Then** close a size in the branch console and check the customer app refuses
+   it with the server's sentence rather than a generic payment error. If
+   anything is wrong, flip the flag back: one statement, reversible, and with no
+   size closed the system is exactly where it started.
+
+**Steps 5 and 6 are in that order for a reason, and an earlier revision of this
+list had them the other way round — which was IMPOSSIBLE TO FOLLOW.** It said to
+close a size in the console and *then* flip the flag. The flag is what puts the
+per-size control in the console (`src/components/ops/BranchConsole.tsx:73-76`,
+`perSizeEnabled`, defaulting false and staying false on any read error), so
+while it is false there is no control to close a size with. Review caught the
+circularity on #406. **A runbook step whose precondition the previous step
+removes is not a cautious ordering, it is a dead end.**
+
+**FLIPPING THE FLAG IS NOT THE MOMENT OF EXPOSURE, and conflating the two is
+what made the bad ordering look prudent.** The flag gates the CONSOLE, not the
+API: `set_variant_snooze` and `clear_variant_snooze` authorize on `is_admin()
+or is_branch_operator(branch)` **without consulting it** (CLAUDE.md §8, measured
+on #396). And with **zero** sizes closed — `branch_variant_availability` held 0
+rows when this was written — no client behaves any differently whatever the flag
+says. **The exposure begins when a branch actually closes a size, not when the
+control appears.**
+
+**So the prerequisite that matters is about closing sizes in anger, not about
+flipping the flag:** before a branch closes a size for real, every device that
+can order should be on build 25 or later. Older clients accept a closed size and
+then show a generic error at the payment step, because `failureMessage` returns
+a translated key rather than the server's sentence.
+
+**The population that has to be on 25 is small and bounded, measured 2026-09-20
+rather than assumed:** the app is **not publicly distributed on either store** —
+Play is internal testing only (`PLAY_STORE_SUBMISSION.md` §2: *"Internal testing
+does not count"*, `track: "internal"`, `releaseStatus: "draft"`) and iOS is
+TestFlight internal only. Live: **6 distinct people have ever placed an order, 3
+in the last 30 days** (40 orders in 30 days, 76 all time, last one 2026-09-16),
+with 5 active push devices. Review's second finding on #406 asked for
+"rollout/adoption" as the gate, which is the right instinct and the wrong unit
+here: there is no public rollout to wait on, and the honest version of the rule
+is a checkable list of testers rather than an adoption curve. **Re-measure
+before relying on this — the moment either store goes to a public track, the
+bound stops holding.**
+7. **Enter the App Privacy answers** from §4 in the console.
+8. **Enter the test information** from §6.
+9. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
 
 **Not gating TestFlight, but gating an App Store release:** the §1
 physical-device validation gate, which has run on neither platform.
