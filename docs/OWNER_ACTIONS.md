@@ -2917,19 +2917,33 @@ ordering to be a guarantee rather than a convention, the fix is to make the two
 RPCs consult the flag — a further migration, not a setting change; say so and it
 can be written.
 
-### 40.2 Ship an EAS build carrying the customer half — BEFORE step 40.3 — OUTSTANDING
+### 40.2 Ship an EAS build carrying the customer half — ✅ BUILT AND SUBMITTED 2026-09-20
 
-This is the ordering that matters, and it is not a nicety. **It is now the next
-action in this section**, since 40.1 is done.
+**Both binaries are built from `b7868e2`**, the merged head carrying the customer
+half: iOS **1.0.0 (25)** and Android **versionCode 3**. iOS was submitted to
+TestFlight the same day — the upload completed 07:19:28 and EAS reported ERRORED
+anyway, which is the expected behaviour of that path and not a failure
+(`docs/APP_STORE_SUBMISSION.md` §3a). The Android AAB is built and **not**
+submitted. **What remains is installing 25 and opening it**, which nothing in the
+pipeline can do for you.
 
-The customer app in the store today does not know a size can be closed. A closed
-tier passes every client-side check, including the pre-submit re-read that exists
-so a customer never meets a raw server refusal; `place_order` then refuses, and
-the app shows a **generic error at the payment step** on a cart that looked fine.
+The reason the ordering exists, unchanged: the customer app **without** this half
+does not know a size can be closed. A closed tier passes every client-side check,
+including the pre-submit re-read that exists so a customer never meets a raw
+server refusal; `place_order` then refuses, and the app shows a **generic error
+at the payment step** on a cart that looked fine. The build greys out a closed
+size, blocks the item when every size is closed, and names the reason.
 
-The build carrying the customer half greys out a closed size, blocks the item
-when every size is closed, and names the reason. Until that build is live with
-customers, per-size closing must stay switched off.
+**"Until that build is live with customers" needed a sharper unit, and review
+supplied the push on #406.** There are no public customers to roll out to: the
+app is **not publicly distributed on either store** — Play is internal testing
+only, iOS is TestFlight internal only. Measured live 2026-09-20: **6 distinct
+people have ever placed an order, 3 of them in the last 30 days** (40 orders in
+30 days, 76 all time). So the real precondition is a checkable list of testers,
+not an adoption curve — and it binds **before a branch closes a size for real**,
+which is when exposure actually starts, rather than before the flag is flipped.
+**Re-measure before relying on this: the moment either store goes to a public
+track, the bound stops holding.**
 
 ### 40.3 Turn the switch on — after 40.1 and 40.2, and not before — OUTSTANDING
 
