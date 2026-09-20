@@ -2984,12 +2984,19 @@ You asked on 2026-09-18 to be told on your phone when a branch closes an item, a
 size or delivery. The code is written. Behaviour, design and evidence:
 `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
-**Progress: 41.1-41.5 are DONE (2026-09-20). ONLY 41.6 IS LEFT, and it is
-yours.** Both migrations are applied, the VAPID public key is in `app_settings`,
-`admin-push-dispatch` is deployed, and the pg_cron driver ticks every minute and
-succeeds. **The whole chain is live and idle: nothing sends because nobody is
-subscribed.** `admin_push_subscriptions` holds 0 rows, and only an administrator
-enabling the bell on their own installed console can add one — which is 41.6.
+**Progress: 41.1-41.6 are ALL DONE (2026-09-20). THE FEATURE IS LIVE AND
+DELIVERING.** The owner re-added the Home Screen icon, tapped the bell, and
+notifications arrive. Measured the same day: **1 subscription, 7 outbox rows,
+all 7 `sent`** — real closure notices delivered to a real phone, not just the
+confirmation tap.
+
+**That tap also answered the one thing no probe could reach:** the two halves of
+the VAPID key pair MATCH. `assertVapidKeyPair` runs only inside the deployed
+function after the caller gate, so every external probe stopped at 401; a
+successful delivery is the proof, and it is now in hand.
+
+Only 41.7 (two optional post-checks) and 41.8 (the kill switch, for if you ever
+want it off) remain, and neither is required.
 
 **Two caveats carried forward, both recorded in
 `docs/ADMIN_PUSH_NOTIFICATIONS.md`:** the deployed function bundle is
@@ -2998,24 +3005,20 @@ stripped in transport), and the applied migration text likewise had comments
 outside function bodies trimmed — though all ten stored function bodies were
 verified byte-identical against pre-computed hashes.
 
-**Still unproven until you do 41.6:** whether the two halves of the VAPID key
-pair match. `assertVapidKeyPair` runs only inside the deployed function after
-the caller gate, so no probe from outside can reach it. The bell tap is the
-test.
+**THE STEPS BELOW ARE A RECORD, NOT A TO-DO LIST.** Every one of 41.1-41.6 has
+been performed; they are kept because how each was done, and what went wrong on
+the way, is worth more than the instruction was. Each was its own §5 action at
+the time — approval for one was never approval for the next.
 
-**Nothing below sends anything by itself.** Each step makes a notification more
-possible; the first real one arrives when a branch closes something after all of
-41.1-41.5 are done. Before that, the only notification anyone receives is the
-single confirmation the console sends when an admin turns the control on. Each
-step is its own §5 action — approval for one is not approval for the next.
+### The order mattered, and this is why — kept as history
 
-### The order matters, and here is the one way to get it wrong
-
-**Do not delete and re-add the Home Screen icon (41.6) before 41.1-41.5 are
-done.** iOS fixes an installed web app's capabilities at install time, so an icon
-re-added while the VAPID key is still missing installs an app that *can* receive
-push but has nothing to subscribe to — and you would have to delete and re-add it
-again. Do it last.
+**41.6 had to come last**, and the reason survives the feature being finished
+because it governs any future re-install. iOS fixes an installed web app's
+capabilities at install time, so an icon re-added while the VAPID key was still
+missing would have installed an app that *can* receive push but has nothing to
+subscribe to — and it would have had to be deleted and re-added again. **If the
+icon is ever removed and restored, the bell must be re-enabled afterwards**; the
+subscription belongs to the install, not to the account.
 
 ### 41.1 Apply `20260927120000_admin_push_subscriptions` — ✅ DONE 2026-09-20
 
@@ -3025,9 +3028,10 @@ one empty table, one nullable `app_settings` column and three
 `is_admin()`-gated RPCs; the money-path pair is unmoved (`12b6816d…` /
 `22e2d429…`) and the file asserted that itself.
 
-**It subscribed nobody and can send nothing:** `admin_push_subscriptions` holds
-0 rows and `app_settings.admin_push_vapid_public_key` is NULL — which is exactly
-what 41.2 and 41.3 are for. All three RPCs were called and refused at their gate
+**Applying it subscribed nobody and could send nothing — measured at the time,
+and both figures have since moved:** `admin_push_subscriptions` held 0 rows and
+`app_settings.admin_push_vapid_public_key` was NULL, which is exactly what 41.2
+and 41.3 then supplied. All three RPCs were called and refused at their gate
 (`42501`), `anon` cannot execute any of them and `authenticated` can, and
 `push_devices` is untouched at 5 customer rows.
 
@@ -3036,7 +3040,7 @@ what 41.2 and 41.3 are for. All three RPCs were called and refused at their gate
 file was corrected in PR #400 before this apply. Detail: `docs/MIGRATIONS.md`
 §49.
 
-### 41.2 Generate the VAPID key pair
+### 41.2 Generate the VAPID key pair — ✅ DONE 2026-09-20
 
 ```
 node scripts/generate-vapid-keys.mjs
@@ -3057,7 +3061,37 @@ makes the secret and performs the HMAC. Signing a VAPID token is ECDSA on P-256,
 which `pgcrypto` cannot do, so the function must hold the key and the key must be
 created somewhere. Keeping it to one place is the achievable version.
 
-### 41.3 Store the two secrets and the public key
+**HOW IT WAS ACTUALLY DONE, 2026-09-20 — recorded because the command above was
+not the method used, and will not be the method next time either.** You have no
+terminal, so `node scripts/generate-vapid-keys.mjs` was never runnable for you.
+The key pair was generated in the **browser console** of the installed console,
+which has the same Web Crypto primitives the script uses:
+
+```js
+const p = await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'}, true, ['sign','verify']);
+const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const pub = b64(await crypto.subtle.exportKey('raw', p.publicKey));
+const {d: priv} = await crypto.subtle.exportKey('jwk', p.privateKey);
+console.log('ADMIN_PUSH_VAPID_PUBLIC_KEY=' + pub);
+console.log('ADMIN_PUSH_VAPID_PRIVATE_KEY=' + priv);
+```
+
+It prints the same two lines the script prints, in the same format, and it
+writes nothing anywhere. **The private line goes straight from that console into
+the Edge Function secret store and nowhere else** — in particular not into this
+chat, which is the one place it would be trivially recoverable afterwards. Only
+the public half was ever pasted into the conversation, and that is safe by
+design.
+
+**The first attempt was discarded rather than used, and that is the part worth
+carrying.** An earlier key pair was generated and its public half shared before
+the private half had been captured; the private half was then gone. Writing that
+public key into `app_settings` would have bound every future subscription to a
+key nothing could sign — every send refused 403, with the console showing a
+healthy subscription. It was discarded and the pair regenerated. **A VAPID
+public key is only usable if you still hold the private half that made it.**
+
+### 41.3 Store the two secrets and the public key — ✅ DONE 2026-09-20
 
 In the Supabase dashboard, **Edge Functions → Secrets**, add both lines the
 script printed:
@@ -3124,7 +3158,7 @@ the order between 41.4 and 41.5 does not matter — only that both happen.
 
 Detail: `docs/MIGRATIONS.md` §50.
 
-### 41.6 Delete the Home Screen icon and re-add it — LAST
+### 41.6 Delete the Home Screen icon and re-add it — ✅ DONE 2026-09-20, IT WORKS
 
 The console is already on your Home Screen as **تقفيل المنتجات**, and it was added
 before any of this existed. iOS will not grant that entry push capability
