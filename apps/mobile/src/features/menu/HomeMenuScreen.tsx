@@ -135,7 +135,12 @@ export function HomeMenuScreen({
   // are no active banners.
   const headerHeight = useRef(0);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True between `onScrollToIndexFailed` and the scroll it re-issues 120 ms
+  // later. A momentum event from the raw jump in between must NOT be read as
+  // "the list has arrived" — a second animated scroll is still coming.
+  const reissuePending = useRef(false);
   const settleNow = useCallback(() => {
+    if (reissuePending.current) return;
     if (settleTimer.current) {
       clearTimeout(settleTimer.current);
       settleTimer.current = null;
@@ -146,6 +151,9 @@ export function HomeMenuScreen({
   // fires ONLY for real drags — a programmatic `scrollToLocation` never emits
   // it — so releasing the hold here cannot reintroduce the lag this fixes.
   const dragBegan = useCallback(() => {
+    // The finger outranks a pending retry too, or the guard above would keep
+    // the hold alive through the user's own scroll.
+    reissuePending.current = false;
     if (settleTimer.current) {
       clearTimeout(settleTimer.current);
       settleTimer.current = null;
@@ -181,20 +189,44 @@ export function HomeMenuScreen({
     const pending = pendingScroll.current;
     if (pending && !pending.retried) {
       pending.retried = true;
-      setTimeout(
-        () =>
-          listRef.current?.scrollToLocation({
-            sectionIndex: pending.sectionIndex,
-            itemIndex: 0,
-            viewOffset: SECTION_HEADER_OFFSET,
-            animated: true,
-          }),
-        120,
-      );
+      // THE SECOND SCROLL NEEDS THE SAME PROTECTION AS THE FIRST. Without this
+      // the retry travelled with no hold — its in-flight reports moved the chip,
+      // which is why the very FIRST tap after opening the menu did not
+      // highlight while every later one did: `scrollToLocation` only fails
+      // while the target section is still unmeasured.
+      reissuePending.current = true;
+      dispatchCatFocus({ kind: 'rescroll' });
+      setTimeout(() => {
+        listRef.current?.scrollToLocation({
+          sectionIndex: pending.sectionIndex,
+          itemIndex: 0,
+          viewOffset: SECTION_HEADER_OFFSET,
+          animated: true,
+        });
+        reissuePending.current = false;
+        // The retry has its own animation, so the fallback timer starts again
+        // from here rather than from the tap that is now 120 ms old.
+        if (settleTimer.current) clearTimeout(settleTimer.current);
+        settleTimer.current = setTimeout(settleNow, CATEGORY_SETTLE_MS);
+      }, 120);
     }
   };
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
+  /**
+   * True while the customer is swiping the CHIP STRIP itself.
+   *
+   * The strip auto-centres on the active chip, and the active chip changes
+   * constantly while the menu scrolls — so a customer swiping the strip was
+   * fighting an animation that kept yanking it back to wherever the menu had
+   * got to. Reported on build 26 with a screenshot of the strip mid-fight,
+   * showing two scroll positions at once.
+   *
+   * A ref rather than state: this must not re-render the strip on every touch,
+   * and the effect below reads it at the moment it fires.
+   */
+  const chipStripHeld = useRef(false);
   useEffect(() => {
+    if (chipStripHeld.current) return;
     const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null;
     if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true });
   }, [activeCatIdResolved]);
@@ -325,8 +357,24 @@ export function HomeMenuScreen({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={[styles.chips, isRTL && styles.chipsRTL]}
+                // While the customer is swiping the strip, it is theirs. The
+                // hold is released on momentum end rather than on finger-up, so
+                // a flick is not yanked back mid-glide.
+                onScrollBeginDrag={() => {
+                  chipStripHeld.current = true;
+                }}
+                onMomentumScrollEnd={() => {
+                  chipStripHeld.current = false;
+                }}
+                onScrollEndDrag={() => {
+                  chipStripHeld.current = false;
+                }}
                 onContentSizeChange={() => {
-                  if (isRTL) chipScrollRef.current?.scrollToEnd({ animated: false });
+                  // Only the RTL initial placement. Doing this mid-swipe would
+                  // be the same fight in a different costume.
+                  if (isRTL && !chipStripHeld.current) {
+                    chipScrollRef.current?.scrollToEnd({ animated: false });
+                  }
                 }}
               >
                 {sections.map((s) => (

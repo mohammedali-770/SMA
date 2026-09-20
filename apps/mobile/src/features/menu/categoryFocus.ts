@@ -37,6 +37,21 @@ export type CategoryFocusEvent =
   /** The scroll spy reported the section now in view. */
   | { kind: 'spy'; catId: string }
   /**
+   * The scroll was RE-ISSUED for the same tap.
+   *
+   * `scrollToLocation` fails when the target section has not been measured yet
+   * -- true only until the list has scrolled once -- and the list then jumps
+   * raw and re-issues the animated scroll shortly after. That second scroll
+   * needs the same protection as the first, or its in-flight reports move the
+   * chip. Reported on build 26 as "the very first tap does not highlight, the
+   * second does, and after that the first always works".
+   *
+   * Only meaningful while a tap is being honoured: with no hold in place there
+   * is no destination to protect, and arming one would mute the spy for
+   * nothing.
+   */
+  | { kind: 'rescroll' }
+  /**
    * The user put a finger on the list.
    *
    * THIS OUTRANKS THE TAP AND ENDS THE HOLD AT ONCE. Without it, a drag started
@@ -73,6 +88,10 @@ export function categoryFocusReducer(state: CategoryFocus, event: CategoryFocusE
       if (state.awaitingSettle) return state;
       if (state.activeCatId === event.catId) return state;
       return { ...state, activeCatId: event.catId };
+    case 'rescroll':
+      if (state.activeCatId === null) return state;
+      if (state.awaitingSettle) return state;
+      return { ...state, awaitingSettle: true };
     case 'drag':
       // Releases the spy WITHOUT touching the chip. Resetting it here would
       // make the highlight jump backwards before the user has scrolled

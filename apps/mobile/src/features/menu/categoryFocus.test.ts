@@ -119,6 +119,62 @@ describe('categoryFocusReducer', () => {
     expect(out.activeCatId).toBe('sides');
   });
 
+  /**
+   * A RE-ISSUED SCROLL MUST RE-ARM THE HOLD.
+   *
+   * Reported on build 26: the very FIRST tap after opening the menu did not
+   * highlight, the second did, and from then on the first tap always worked.
+   * The cause is the virtualized list. `scrollToLocation` fails when the target
+   * section has not been measured yet -- which is true only until the list has
+   * scrolled once -- and `onScrollToIndexFailed` then jumps raw and re-issues
+   * the animated scroll 120 ms later. That second scroll was travelling with no
+   * hold in place, so its in-flight reports moved the chip: the original bug,
+   * surviving on the one path where the scroll happens twice.
+   */
+  it('a re-issued scroll re-arms the hold without changing the chip', () => {
+    const out = run([
+      { kind: 'tap', catId: 'sides' },
+      { kind: 'settled' },
+      { kind: 'rescroll' },
+      { kind: 'spy', catId: 'sandwich' },
+    ]);
+    expect(out.activeCatId).toBe('sides');
+    expect(out.awaitingSettle).toBe(true);
+  });
+
+  it('a rescroll with nothing selected at all is ignored', () => {
+    // Only `activeCatId === null` is genuinely "nothing to protect". A
+    // rescroll can ONLY follow a programmatic scroll, which can only follow a
+    // tap -- so a non-null category always has a destination worth holding,
+    // and the reducer cannot tell a tap-set value from a spy-set one anyway.
+    // An earlier version of this test asserted the opposite and was wrong
+    // about the semantics, not about the code.
+    expect(categoryFocusReducer(INITIAL_CATEGORY_FOCUS, { kind: 'rescroll' })).toBe(
+      INITIAL_CATEGORY_FOCUS,
+    );
+  });
+
+  it('re-arms even when the hold had already lapsed — the whole point', () => {
+    // The 700 ms timer can expire before a retry lands. Without re-arming, the
+    // retry travels unprotected and the spy steals the chip.
+    const lapsed: CategoryFocus = { activeCatId: 'sides', awaitingSettle: false };
+    expect(categoryFocusReducer(lapsed, { kind: 'rescroll' })).toEqual({
+      activeCatId: 'sides',
+      awaitingSettle: true,
+    });
+  });
+
+  it('a drag still beats a re-issued scroll', () => {
+    // The user's finger outranks the retry, exactly as it outranks the tap.
+    const out = run([
+      { kind: 'tap', catId: 'sides' },
+      { kind: 'rescroll' },
+      { kind: 'drag' },
+      { kind: 'spy', catId: 'drinks' },
+    ]);
+    expect(out.activeCatId).toBe('drinks');
+  });
+
   it('returns the SAME object when a spy report changes nothing', () => {
     // Identity matters: this feeds a chip-strip effect that scrolls the strip
     // sideways, and a new object every scroll frame would re-run it constantly.
