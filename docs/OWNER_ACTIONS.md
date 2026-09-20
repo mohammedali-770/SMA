@@ -3005,24 +3005,20 @@ stripped in transport), and the applied migration text likewise had comments
 outside function bodies trimmed — though all ten stored function bodies were
 verified byte-identical against pre-computed hashes.
 
-**Still unproven until you do 41.6:** whether the two halves of the VAPID key
-pair match. `assertVapidKeyPair` runs only inside the deployed function after
-the caller gate, so no probe from outside can reach it. The bell tap is the
-test.
+**THE STEPS BELOW ARE A RECORD, NOT A TO-DO LIST.** Every one of 41.1-41.6 has
+been performed; they are kept because how each was done, and what went wrong on
+the way, is worth more than the instruction was. Each was its own §5 action at
+the time — approval for one was never approval for the next.
 
-**Nothing below sends anything by itself.** Each step makes a notification more
-possible; the first real one arrives when a branch closes something after all of
-41.1-41.5 are done. Before that, the only notification anyone receives is the
-single confirmation the console sends when an admin turns the control on. Each
-step is its own §5 action — approval for one is not approval for the next.
+### The order mattered, and this is why — kept as history
 
-### The order matters, and here is the one way to get it wrong
-
-**Do not delete and re-add the Home Screen icon (41.6) before 41.1-41.5 are
-done.** iOS fixes an installed web app's capabilities at install time, so an icon
-re-added while the VAPID key is still missing installs an app that *can* receive
-push but has nothing to subscribe to — and you would have to delete and re-add it
-again. Do it last.
+**41.6 had to come last**, and the reason survives the feature being finished
+because it governs any future re-install. iOS fixes an installed web app's
+capabilities at install time, so an icon re-added while the VAPID key was still
+missing would have installed an app that *can* receive push but has nothing to
+subscribe to — and it would have had to be deleted and re-added again. **If the
+icon is ever removed and restored, the bell must be re-enabled afterwards**; the
+subscription belongs to the install, not to the account.
 
 ### 41.1 Apply `20260927120000_admin_push_subscriptions` — ✅ DONE 2026-09-20
 
@@ -3032,9 +3028,10 @@ one empty table, one nullable `app_settings` column and three
 `is_admin()`-gated RPCs; the money-path pair is unmoved (`12b6816d…` /
 `22e2d429…`) and the file asserted that itself.
 
-**It subscribed nobody and can send nothing:** `admin_push_subscriptions` holds
-0 rows and `app_settings.admin_push_vapid_public_key` is NULL — which is exactly
-what 41.2 and 41.3 are for. All three RPCs were called and refused at their gate
+**Applying it subscribed nobody and could send nothing — measured at the time,
+and both figures have since moved:** `admin_push_subscriptions` held 0 rows and
+`app_settings.admin_push_vapid_public_key` was NULL, which is exactly what 41.2
+and 41.3 then supplied. All three RPCs were called and refused at their gate
 (`42501`), `anon` cannot execute any of them and `authenticated` can, and
 `push_devices` is untouched at 5 customer rows.
 

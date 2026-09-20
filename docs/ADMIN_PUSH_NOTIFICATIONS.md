@@ -151,7 +151,7 @@ staff alert could navigate a customer's open tab away and discard its state.
 
 | File | Role |
 | --- | --- |
-| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — the table is empty and the VAPID column is NULL, so nobody is subscribed and nothing can be sent. Detail: `docs/MIGRATIONS.md` §49. |
+| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — at apply time the table was empty and the VAPID column NULL, so nothing could be sent; both have since moved and the channel delivers (§1). Detail: `docs/MIGRATIONS.md` §49. |
 | `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases / 23 assertions pinning the closed table, the refusals and the endpoint-reassignment rule. |
 | `src/lib/adminPushApi.ts` | The console's side. Reads fail soft; writes throw, because the admin pressed a button and is owed a truthful answer. |
 | `src/lib/pwa/adminPushState.ts` | The seven-state resolver. |
