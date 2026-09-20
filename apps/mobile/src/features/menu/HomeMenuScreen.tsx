@@ -49,6 +49,13 @@ const SECTION_HEADER_OFFSET = 40;
  * momentum event costs at most this much spy latency.
  */
 const CATEGORY_SETTLE_MS = 700;
+/**
+ * How long after the finger lifts the chip strip waits to see whether a glide
+ * follows. Long enough for `onMomentumScrollBegin` to arrive on a flick, short
+ * enough that a plain drag-and-stop hands the strip back without a visible
+ * pause.
+ */
+const CHIP_RELEASE_GRACE_MS = 80;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen({
@@ -135,7 +142,23 @@ export function HomeMenuScreen({
   // are no active banners.
   const headerHeight = useRef(0);
   const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // True between `onScrollToIndexFailed` and the scroll it re-issues 120 ms
+  // later. A momentum event from the raw jump in between must NOT be read as
+  // "the list has arrived" — a second animated scroll is still coming.
+  const reissuePending = useRef(false);
+  // The retry's own handle, so a newer intention can cancel it. Without this,
+  // a drag or a second chip tap inside the 120 ms window still had the old
+  // retry fire underneath it and scroll to the PREVIOUS category.
+  const reissueTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelReissue = useCallback(() => {
+    if (reissueTimer.current) {
+      clearTimeout(reissueTimer.current);
+      reissueTimer.current = null;
+    }
+    reissuePending.current = false;
+  }, []);
   const settleNow = useCallback(() => {
+    if (reissuePending.current) return;
     if (settleTimer.current) {
       clearTimeout(settleTimer.current);
       settleTimer.current = null;
@@ -146,21 +169,19 @@ export function HomeMenuScreen({
   // fires ONLY for real drags — a programmatic `scrollToLocation` never emits
   // it — so releasing the hold here cannot reintroduce the lag this fixes.
   const dragBegan = useCallback(() => {
+    // The finger outranks a pending retry too, or the guard above would keep
+    // the hold alive through the user's own scroll — and the retry itself must
+    // not land mid-gesture.
+    cancelReissue();
     if (settleTimer.current) {
       clearTimeout(settleTimer.current);
       settleTimer.current = null;
     }
     dispatchCatFocus({ kind: 'drag' });
   }, []);
-  // A pending timer outliving the screen would dispatch into an unmounted
-  // reducer on every navigation away mid-scroll.
-  useEffect(
-    () => () => {
-      if (settleTimer.current) clearTimeout(settleTimer.current);
-    },
-    [],
-  );
   const scrollToCategory = (catId: string) => {
+    // A newer tap retires any retry still queued for the previous one.
+    cancelReissue();
     dispatchCatFocus({ kind: 'tap', catId });
     if (settleTimer.current) clearTimeout(settleTimer.current);
     settleTimer.current = setTimeout(settleNow, CATEGORY_SETTLE_MS);
@@ -181,20 +202,95 @@ export function HomeMenuScreen({
     const pending = pendingScroll.current;
     if (pending && !pending.retried) {
       pending.retried = true;
-      setTimeout(
-        () =>
-          listRef.current?.scrollToLocation({
-            sectionIndex: pending.sectionIndex,
-            itemIndex: 0,
-            viewOffset: SECTION_HEADER_OFFSET,
-            animated: true,
-          }),
-        120,
-      );
+      // THE SECOND SCROLL NEEDS THE SAME PROTECTION AS THE FIRST. Without this
+      // the retry travelled with no hold — its in-flight reports moved the chip,
+      // which is why the very FIRST tap after opening the menu did not
+      // highlight while every later one did: `scrollToLocation` only fails
+      // while the target section is still unmeasured.
+      reissuePending.current = true;
+      dispatchCatFocus({ kind: 'rescroll' });
+      reissueTimer.current = setTimeout(() => {
+        reissueTimer.current = null;
+        // Belt to the cancel's braces: if a newer tap has replaced the request
+        // since this was scheduled, scrolling to the old one would fight the
+        // customer rather than help them.
+        if (pendingScroll.current !== pending) {
+          reissuePending.current = false;
+          return;
+        }
+        listRef.current?.scrollToLocation({
+          sectionIndex: pending.sectionIndex,
+          itemIndex: 0,
+          viewOffset: SECTION_HEADER_OFFSET,
+          animated: true,
+        });
+        reissuePending.current = false;
+        // The retry has its own animation, so the fallback timer starts again
+        // from here rather than from the tap that is now 120 ms old.
+        if (settleTimer.current) clearTimeout(settleTimer.current);
+        settleTimer.current = setTimeout(settleNow, CATEGORY_SETTLE_MS);
+      }, 120);
     }
   };
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
+  /**
+   * True while the customer is swiping the CHIP STRIP itself.
+   *
+   * The strip auto-centres on the active chip, and the active chip changes
+   * constantly while the menu scrolls — so a customer swiping the strip was
+   * fighting an animation that kept yanking it back to wherever the menu had
+   * got to. Reported on build 26 with a screenshot of the strip mid-fight,
+   * showing two scroll positions at once.
+   *
+   * A ref rather than state: this must not re-render the strip on every touch,
+   * and the effect below reads it at the moment it fires.
+   */
+  const chipStripHeld = useRef(false);
+  /**
+   * Releases the strip only if no momentum follows the finger lifting.
+   *
+   * `onScrollEndDrag` fires at finger-up, WHILE a flick is still gliding, so
+   * releasing there hands the strip back mid-glide — the exact yank this is
+   * meant to stop. Review caught that on #411, in code whose own comment
+   * claimed it released on momentum end. RN offers no "will momentum follow?"
+   * flag, so the drag end schedules a release that `onMomentumScrollBegin`
+   * cancels when a glide does start.
+   */
+  const chipReleaseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdChipStrip = useCallback(() => {
+    if (chipReleaseTimer.current) {
+      clearTimeout(chipReleaseTimer.current);
+      chipReleaseTimer.current = null;
+    }
+    chipStripHeld.current = true;
+  }, []);
+  const releaseChipStrip = useCallback(() => {
+    if (chipReleaseTimer.current) {
+      clearTimeout(chipReleaseTimer.current);
+      chipReleaseTimer.current = null;
+    }
+    chipStripHeld.current = false;
+  }, []);
+  /**
+   * Every timer this screen owns, cleared together.
+   *
+   * Placed AFTER all three refs rather than beside the first one: a cleanup
+   * that names a ref declared eighty lines below it works — the closure runs at
+   * unmount — but it reads like a mistake and invites one.
+   *
+   * A pending timer outliving the screen would dispatch into an unmounted
+   * reducer on every navigation away mid-scroll.
+   */
+  useEffect(
+    () => () => {
+      if (settleTimer.current) clearTimeout(settleTimer.current);
+      if (reissueTimer.current) clearTimeout(reissueTimer.current);
+      if (chipReleaseTimer.current) clearTimeout(chipReleaseTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
+    if (chipStripHeld.current) return;
     const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null;
     if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true });
   }, [activeCatIdResolved]);
@@ -325,8 +421,24 @@ export function HomeMenuScreen({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={[styles.chips, isRTL && styles.chipsRTL]}
+                // While the customer is swiping the strip, it is theirs. The
+                // hold is released on momentum end rather than on finger-up, so
+                // a flick is not yanked back mid-glide.
+                onScrollBeginDrag={holdChipStrip}
+                // Finger up. A flick is still gliding at this point, so the
+                // release is only PROVISIONAL — momentum starting cancels it.
+                onScrollEndDrag={() => {
+                  if (chipReleaseTimer.current) clearTimeout(chipReleaseTimer.current);
+                  chipReleaseTimer.current = setTimeout(releaseChipStrip, CHIP_RELEASE_GRACE_MS);
+                }}
+                onMomentumScrollBegin={holdChipStrip}
+                onMomentumScrollEnd={releaseChipStrip}
                 onContentSizeChange={() => {
-                  if (isRTL) chipScrollRef.current?.scrollToEnd({ animated: false });
+                  // Only the RTL initial placement. Doing this mid-swipe would
+                  // be the same fight in a different costume.
+                  if (isRTL && !chipStripHeld.current) {
+                    chipScrollRef.current?.scrollToEnd({ animated: false });
+                  }
                 }}
               >
                 {sections.map((s) => (
