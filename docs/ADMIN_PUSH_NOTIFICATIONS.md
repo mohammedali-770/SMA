@@ -1,24 +1,28 @@
 # Admin push notifications — closures on the phone
 
-**Status: THE SERVER SIDE IS COMPLETE AND IDLE. One step remains and it is
-physical — re-adding the Home Screen icon.** Both migrations are applied
+**Status: LIVE AND DELIVERING as of 2026-09-20.** Both migrations are applied
 (`20260927120000` → `20260920050434`, `20260928120000` → `20260920061858`), the
 VAPID public key is in `app_settings`, `admin-push-dispatch` is deployed as
-version 1, and the pg_cron driver ticks every minute and succeeds. A branch
-closing an item, a size or delivery now genuinely queues a notification.
+version 1, the pg_cron driver ticks every minute, and the owner's re-installed
+console is subscribed. A branch closing an item, a size or delivery queues a
+notification and it arrives.
 
-**Nothing sends, and that is now a statement about SUBSCRIBERS rather than about
-configuration.** `admin_push_subscriptions` holds **0 rows**. Only an
-administrator enabling the bell on their own installed console can add one, and
-iOS fixes a web app's push capability at install time — which is why
-`docs/OWNER_ACTIONS.md` §41.6 (delete the Home Screen icon and re-add it) is
-last, and is the only step left.
+**Measured rather than asserted, the same day:** 1 subscription, **7 outbox rows,
+all 7 `sent`** — real closure notices delivered to a real phone, not merely the
+confirmation tap.
 
-**Still unproven until that tap:** whether the two halves of the VAPID key pair
-match. `assertVapidKeyPair` runs only inside the deployed function, after the
-caller gate, so no probe from outside can reach it — every unauthenticated
-attempt stops at 401. The bell is the test, and one notification within a few
-seconds is the pass.
+**THE BELL TAP ANSWERED THE ONE QUESTION NO PROBE COULD REACH.**
+`assertVapidKeyPair` runs only inside the deployed function, AFTER the caller
+gate, so every external probe stopped at 401 and the key pairing stayed unproven
+through the whole build-out. A successful delivery is the proof. **Where a
+check sits behind an authorisation gate, the only evidence is a real authorised
+use** — worth remembering before designing the next verification around probes
+that cannot get past the door.
+
+**The customer Expo channel was untouched throughout**, and that is enforced
+rather than intended: `push_devices` is unchanged at 5 rows, and assertion 10.8
+in `20260928120000` fails the apply if any `%admin_push%` function ever
+references it.
 
 ## What this is for
 
@@ -147,7 +151,7 @@ staff alert could navigate a customer's open tab away and discard its state.
 
 | File | Role |
 | --- | --- |
-| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — the table is empty and the VAPID column is NULL, so nobody is subscribed and nothing can be sent. Detail: `docs/MIGRATIONS.md` §49. |
+| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — at apply time the table was empty and the VAPID column NULL, so nothing could be sent; both have since moved and the channel delivers (§1). Detail: `docs/MIGRATIONS.md` §49. |
 | `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases / 23 assertions pinning the closed table, the refusals and the endpoint-reassignment rule. |
 | `src/lib/adminPushApi.ts` | The console's side. Reads fail soft; writes throw, because the admin pressed a button and is owed a truthful answer. |
 | `src/lib/pwa/adminPushState.ts` | The seven-state resolver. |
@@ -468,9 +472,9 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
 4. Deploy `admin-push-dispatch`.
 5. ~~Apply `20260928120000_admin_push_closure_notifications` (step 4).~~ **DONE
    2026-09-20**, live version `20260920061858`, ledger row 102.
-6. **Delete the Home Screen icon and re-add it**, last. See §1 — iOS fixes an
-   installed web app's capabilities at install time, so re-adding it before the
-   rest is done means doing it twice.
+6. ~~**Delete the Home Screen icon and re-add it**, last.~~ **DONE 2026-09-20 —
+   the bell was tapped and notifications arrive.** See §1 — iOS fixes an
+   installed web app's capabilities at install time, which is why this was last.
 
 **CORRECTION, 2026-09-19.** An earlier revision of this list said to generate the
 key "so the private half never crosses the wire, the way the alert-dispatch
