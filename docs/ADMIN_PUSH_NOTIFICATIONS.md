@@ -348,6 +348,29 @@ database would have to write `sent` at the moment it posted, which is a claim it
 cannot support. Pulling means the process that actually talks to the push
 service is the one that records the outcome.
 
+### A queue drain must not be judged by direct-mode rules
+
+**Fixed 2026-09-20, found while deploying rather than in review.** The handler
+parsed the request body twice. The first parse was correctly guarded by
+`if (mode === 'direct')`; the second sat at top level and returned **400** when
+it failed. A queue body carries no `title`/`body` — its copy comes from the rows
+it claims, through `requestFromQueueRow` — so **every scheduler call was refused
+`400 title is required` before it could claim anything**, and the value the
+second parse produced was never read.
+
+Had it shipped, applying `20260928120000` would have scheduled a pg_cron job
+ticking every minute, refused every time, while closure notices accumulated in
+`admin_push_outbox` and expired after two hours. The symptom reads as "push does
+not work" rather than as one stray line, which is what makes it worth recording.
+
+**Nothing in CI could have caught it, and that is the generalisable part.**
+`deno check` is a typecheck and an unused `const` is legal; the handler ends in
+`Deno.serve` and imports Deno-only modules, so Vitest cannot load it and no test
+executed the branch. `adminPushWiring.test.ts` now asserts the shape instead:
+`parseNotificationRequest` is called **exactly once**, inside the direct-mode
+guard. It was written first and watched fail against the unfixed handler, which
+is the only thing that makes it evidence rather than decoration.
+
 ### A transient failure does not lose the notification
 
 `finalize_admin_push_notification` returns a failed row to the queue until its
