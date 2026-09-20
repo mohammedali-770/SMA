@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Branch, Modifier, ModifierGroup, Product } from '../../types';
+import type { Branch, Modifier, ModifierGroup, Product, ProductVariant } from '../../types';
 import type {
-  BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryRequestRow, OpsReasonCode,
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, BranchVariantAvailabilityRow,
+  DeliveryRequestRow, OpsReasonCode,
 } from '../../lib/opsApi';
 import type { DeliveryArea } from '../../lib/branchConfigApi';
 import { formatRemaining, groupsForProduct, requiredCount } from './branchConsole';
@@ -28,6 +29,24 @@ import { formatRemaining, groupsForProduct, requiredCount } from './branchConsol
  * Folding the two into one list would let an operator report the second as the
  * first, confidently and wrongly.
  */
+
+/**
+ * A price tier closed at one branch.
+ *
+ * THIS TYPE DID NOT EXIST UNTIL 2026-09-20 AND THAT WAS THE BUG. The board
+ * modelled closed products and closed options and nothing else, so when
+ * `20260923120000` added a third way for something to be off, a branch that had
+ * closed one size read "operating normally" cross-branch while its own console
+ * showed the size closed. It is carried separately from `closedProducts` for the
+ * same reason closed and blocked are separate: "Large is out" and "Dinner is
+ * out" are different answers to give on the phone.
+ */
+export interface ClosedTier {
+  variant: ProductVariant;
+  product: Product;
+  snoozedUntil: string | null;
+  reasonCode: OpsReasonCode | null;
+}
 
 export interface ClosedOption {
   modifier: Modifier;
@@ -79,6 +98,21 @@ export interface BlockedProduct {
   earliestReturn: string | null;
 }
 
+/**
+ * A product nobody can order because EVERY active size of it is closed.
+ *
+ * The exact twin of a required option group running out, and modelled
+ * separately from `BlockedProduct` only because that type names the groups that
+ * caused it. Review caught its absence on #408: counting the tiers and stopping
+ * there let the board report "2 sizes closed, 0 items unavailable" about a
+ * product `place_order` refuses outright.
+ */
+export interface SizeBlockedProduct {
+  product: Product;
+  /** Latest of its closed tiers' return times; null if any is untimed. */
+  earliestReturn: string | null;
+}
+
 export interface BranchClosureSummary {
   branch: Branch;
   /** Products closed at this branch right now, with the branch's stated reason. */
@@ -96,6 +130,20 @@ export interface BranchClosureSummary {
   blockingIncidents: BlockingIncident[];
   /** Every closed option at this branch, whether or not it blocks anything. */
   closedOptions: ClosedOption[];
+  /**
+   * Price tiers closed at this branch — "Large is out, Regular is not".
+   *
+   * A closed tier NEVER changes the product's own availability row, so without
+   * this list the board has no way to know the branch is degraded at all.
+   */
+  closedTiers: ClosedTier[];
+  /**
+   * Products unorderable because every active size is closed.
+   *
+   * Never overlaps `closedProducts`: a product already closed outright is one
+   * disappointment, not two.
+   */
+  sizeBlockedProducts: SizeBlockedProduct[];
   deliveryPaused: boolean;
   /**
    * When a timed pause resumes itself, or null for the admin's untimed one.
@@ -145,6 +193,12 @@ export interface BuildSummariesInput {
   modifierGroups: ModifierGroup[];
   modifierAvailability: (BranchModifierAvailabilityRow & { branchId: string })[];
   areas: DeliveryArea[];
+  /**
+   * Price-tier exceptions across every branch. Optional for the same reason as
+   * `pendingRequests` — absent means no size is closed anywhere, which is also
+   * what `opsApi.allVariantAvailability` returns when the table is unreachable.
+   */
+  variantAvailability?: (BranchVariantAvailabilityRow & { branchId: string })[];
   /**
    * Requests still waiting for an answer. Optional so every existing caller and
    * test keeps working unchanged; absent means none.
@@ -239,6 +293,31 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     closedOptionIdsByBranch.set(row.branchId, ids);
   }
 
+  // Closed price tiers, indexed by branch.
+  //
+  // Scoped to the catalog the board holds and to ACTIVE tiers, the same two
+  // filters `closedProducts` and `closedOptions` apply: a row naming a tier this
+  // board cannot see would otherwise be counted in the severity and rendered
+  // nameless.
+  const variantOwner = new Map<string, { variant: ProductVariant; product: Product }>();
+  for (const p of products) {
+    for (const v of p.variants) {
+      if (v.isActive) variantOwner.set(v.id, { variant: v, product: p });
+    }
+  }
+  const closedTiersByBranch = new Map<string, ClosedTier[]>();
+  for (const row of input.variantAvailability ?? []) {
+    if (row.isAvailable) continue;
+    const owner = variantOwner.get(row.variantId);
+    if (!owner) continue;                         // catalog row gone; nothing to name
+    const list = closedTiersByBranch.get(row.branchId) ?? [];
+    list.push({
+      variant: owner.variant, product: owner.product,
+      snoozedUntil: row.snoozedUntil, reasonCode: row.reasonCode,
+    });
+    closedTiersByBranch.set(row.branchId, list);
+  }
+
   const requestsByBranch = new Map<string, DeliveryRequestRow[]>();
   for (const req of input.pendingRequests ?? []) {
     const list = requestsByBranch.get(req.branchId) ?? [];
@@ -258,6 +337,31 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
   for (const branch of branches) {
     const closedProducts = (closedByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
     const closedOptions = (closedOptionsByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
+    const closedTiers = (closedTiersByBranch.get(branch.id) ?? []).sort(bySoonestReturn);
+    // Every ACTIVE size closed => the item itself is unorderable. Inactive tiers
+    // are ignored on both sides: a delisted size is not something a customer
+    // could have ordered, so it neither holds the product open nor counts as
+    // closed.
+    const closedTierIds = new Set(closedTiers.map((c) => c.variant.id));
+    const closedOutright = new Set(closedProducts.map((c) => c.product.id));
+    const sizeBlockedProducts: SizeBlockedProduct[] = [];
+    for (const p of products) {
+      if (closedOutright.has(p.id)) continue;
+      const tiers = p.variants.filter((v) => v.isActive);
+      if (tiers.length === 0) continue;
+      if (!tiers.every((v) => closedTierIds.has(v.id))) continue;
+      const times = closedTiers
+        .filter((c) => c.product.id === p.id)
+        .map((c) => c.snoozedUntil);
+      sizeBlockedProducts.push({
+        product: p,
+        // Null if ANY is untimed: the item returns when the LAST size does, and
+        // an untimed size has no return to promise.
+        earliestReturn: times.some((t) => !t)
+          ? null
+          : times.reduce((a2, b2) => (Date.parse(a2 as string) > Date.parse(b2 as string) ? a2 : b2), times[0]),
+      });
+    }
     const closedOptionIds = closedOptionIdsByBranch.get(branch.id) ?? new Set<string>();
     const disabledAreas = disabledByBranch.get(branch.id) ?? [];
     const deliveryPaused = branch.deliveryTemporarilyClosed ?? false;
@@ -276,6 +380,7 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     // board: it is asking for something. Omitting it would make the one item
     // that needs an operator the one item the board never shows.
     if (closedProducts.length === 0 && blockedProducts.length === 0
+        && closedTiers.length === 0 && sizeBlockedProducts.length === 0
         && !deliveryPaused && disabledAreas.length === 0
         && pendingRequests.length === 0) continue;
 
@@ -285,13 +390,19 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       blockedProducts,
       blockingIncidents,
       closedOptions,
+      closedTiers,
+      sizeBlockedProducts,
       deliveryPaused,
       deliveryUntil,
       disabledAreas,
       pendingRequests,
       // A waiting request weighs more than delivery already being off: the
       // paused branch has been dealt with, the waiting one has not.
-      severity: closedProducts.length + blockedProducts.length + disabledAreas.length
+      // A closed TIER weighs the same as a closed product: to the customer who
+      // wanted that size it is the same disappointment, and a branch whose only
+      // fault is one closed size still belongs on the board.
+      severity: closedProducts.length + blockedProducts.length + closedTiers.length
+        + sizeBlockedProducts.length + disabledAreas.length
         + (deliveryPaused ? 5 : 0) + (pendingRequests.length > 0 ? 6 : 0),
     });
   }

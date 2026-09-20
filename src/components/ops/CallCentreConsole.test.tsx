@@ -13,6 +13,7 @@ vi.mock('../../context/AppContext', () => ({
 const ops = vi.hoisted(() => ({
   allAvailability: vi.fn(),
   allModifierAvailability: vi.fn(),
+  allVariantAvailability: vi.fn(),
   branchDeliveryState: vi.fn(),
   resumeDelivery: vi.fn(),
   pauseDelivery: vi.fn(),
@@ -100,6 +101,7 @@ beforeEach(() => {
   mockApp();
   ops.allAvailability.mockResolvedValue([]);
   ops.allModifierAvailability.mockResolvedValue([]);
+  ops.allVariantAvailability.mockResolvedValue([]);
   // Empty means "no live override", so branches fall through to the context —
   // which is what every test that sets deliveryTemporarilyClosed relies on.
   ops.branchDeliveryState.mockResolvedValue([]);
@@ -455,5 +457,97 @@ describe('CallCentreConsole', () => {
     ops.allAvailability.mockRejectedValue(new Error('permission denied'));
     render(<CallCentreConsole i18n={i18n} />);
     expect(await screen.findByText(/permission denied/i)).toBeTruthy();
+  });
+
+  /**
+   * A closed SIZE must reach the board.
+   *
+   * Reported live 2026-09-20, the day per-size closing was switched on: a branch
+   * closed one tier of one item, its own console showed the size off, an admin
+   * push arrived -- and this board said "Every branch is running normally". The
+   * builder took products and options and had no notion of a tier, and the
+   * console never fetched one, so the board was blind by construction.
+   */
+  describe('closed price tiers', () => {
+    const dinner = product('p9', {
+      nameEn: 'Dinner', nameAr: 'دنر',
+      variants: [
+        { id: 'v-reg', productId: 'p9', nameEn: 'Regular', nameAr: 'عادي',
+          price: 23, calories: null, sortOrder: 1, isActive: true },
+        { id: 'v-spicy', productId: 'p9', nameEn: 'Spicy', nameAr: 'سبايسي',
+          price: 23, calories: null, sortOrder: 2, isActive: true },
+      ],
+    });
+
+    it('puts a branch on the board when its ONLY issue is a closed size', async () => {
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false,
+          snoozedUntil: null, reasonCode: null },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      expect(await screen.findByText('Riyadh')).toBeTruthy();
+      expect(screen.queryByText(/Every branch is running normally/i)).toBeNull();
+    });
+
+    it('names the closed-size count on the tile', async () => {
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false,
+          snoozedUntil: null, reasonCode: null },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      expect(await screen.findByText(/1 sizes closed/i)).toBeTruthy();
+    });
+
+    it('does NOT add closed sizes to the items-unavailable count', async () => {
+      // The other size is still on sale, so the ITEM is not unavailable. Folding
+      // the two numbers together would tell an operator the item is off.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false,
+          snoozedUntil: null, reasonCode: null },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      await screen.findByText('Riyadh');
+      expect(screen.queryByText(/items unavailable/i)).toBeNull();
+    });
+
+    it('names WHICH size is closed in the detail panel, not just a count', async () => {
+      // Review caught this on #408: the tile showed a number and clicking it
+      // opened a panel that never read `closedTiers`, so the one question an
+      // operator opens it to answer had no answer anywhere.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false,
+          snoozedUntil: null, reasonCode: 'out_of_stock' },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      fireEvent.click(await screen.findByText('Riyadh'));
+      const row = await screen.findByTestId('detail-closed-size-v-reg');
+      expect(within(row).getByText(/Dinner/)).toBeTruthy();
+      expect(within(row).getByText(/Regular/)).toBeTruthy();
+    });
+
+    it('counts a product whose EVERY size is closed as unavailable', async () => {
+      // "2 sizes closed, 0 items unavailable" was the wrong answer about a
+      // product `place_order` refuses outright.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([
+        { branchId: 'b1', variantId: 'v-reg', isAvailable: false, snoozedUntil: null, reasonCode: null },
+        { branchId: 'b1', variantId: 'v-spicy', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      ]);
+      render(<CallCentreConsole i18n={i18n} />);
+      expect(await screen.findByText(/1 items unavailable/i)).toBeTruthy();
+    });
+
+    it('survives the tier read being unavailable', async () => {
+      // `allVariantAvailability` degrades to [] rather than throwing, so a board
+      // is never replaced by a blocking error over a table of exceptions.
+      mockApp({ products: [dinner] });
+      ops.allVariantAvailability.mockResolvedValue([]);
+      render(<CallCentreConsole i18n={i18n} />);
+      expect(await screen.findByText(/Every branch is running normally/i)).toBeTruthy();
+    });
   });
 });

@@ -95,3 +95,54 @@ describe('opsApi.branchReference — missing-table resilience', () => {
     ]);
   });
 });
+
+/**
+ * THE SAME NARROWNESS, FOR THE TIER READS — and the wide version shipped here
+ * first, which is why this block exists.
+ *
+ * Both variant reads used `if (error) return []`, swallowing everything. Review
+ * caught it on #408: for the call-centre board that converts "could not read the
+ * table" into "no sizes are closed", so the board prints EVERY BRANCH IS RUNNING
+ * NORMALLY on an unread table — the exact monitor-blindness #408 exists to fix,
+ * reintroduced by its own fix.
+ */
+describe('opsApi variant-availability reads — narrow resilience', () => {
+  // ONLY the board's read. `branchVariantAvailability` deliberately keeps the
+  // wide swallow -- see the comment on it, and `opsVariantClosing.test.ts`,
+  // which pins that behaviour for the reason #395 established. The first draft
+  // of this change narrowed BOTH and that existing test caught it, which is the
+  // useful part: the two call sites want opposite things.
+  const cases = [
+    ['allVariantAvailability', () => opsApi.allVariantAvailability()],
+  ] as const;
+
+  for (const [name, call] of cases) {
+    it(`${name} returns [] when the table does not exist (42P01)`, async () => {
+      from.mockReturnValue(
+        builder({ data: null, error: { code: '42P01', message: 'relation does not exist' } }),
+      );
+      await expect(call()).resolves.toEqual([]);
+    });
+
+    it(`${name} returns [] on a PostgREST schema-cache miss (PGRST205)`, async () => {
+      from.mockReturnValue(
+        builder({ data: null, error: { code: 'PGRST205', message: 'Could not find the table' } }),
+      );
+      await expect(call()).resolves.toEqual([]);
+    });
+
+    it(`${name} STILL THROWS on a permission error`, async () => {
+      // "Not allowed to see this" is not "the feature is not live". Reporting an
+      // all-clear built on a read the operator was refused is the worst output.
+      from.mockReturnValue(
+        builder({ data: null, error: { code: '42501', message: 'permission denied' } }),
+      );
+      await expect(call()).rejects.toThrow(/permission denied/);
+    });
+
+    it(`${name} STILL THROWS on an error carrying no code at all`, async () => {
+      from.mockReturnValue(builder({ data: null, error: { message: 'network unreachable' } }));
+      await expect(call()).rejects.toThrow(/network unreachable/);
+    });
+  }
+});

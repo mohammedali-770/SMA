@@ -522,6 +522,69 @@ describe('BranchConsole — per-size closing', () => {
     await waitFor(() => expect(mocks.reopenVariant).toHaveBeenCalledWith('b1', 'v2'));
   });
 
+  /**
+   * THE HEADLINE SAID "EVERYTHING IS AVAILABLE" WITH A SIZE CLOSED, and the
+   * closed-sizes card sat directly below it saying otherwise. Reported live on
+   * 2026-09-20, the day per-size closing was switched on.
+   *
+   * The strip counts PRODUCTS, and a closed tier never touches a product's
+   * availability row -- so zero closed products was being read as "nothing is
+   * off". The count stays products-only on purpose (`reopenAllTargets` derives
+   * the Reopen-all ids from the same list, and #393 established the confirmed
+   * number must BE the number acted on); what changed is that it no longer
+   * licenses the claim.
+   */
+  it('does not claim everything is available when a SIZE is closed', async () => {
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    await screen.findByTestId('closed-size-v1');
+    expect(screen.queryByText(/Everything is available$/i)).toBeNull();
+    expect(screen.getByText(/some sizes are closed/i)).toBeTruthy();
+  });
+
+  it('does NOT say "every item is available" when every size of one is closed', async () => {
+    // Review caught this on #408: the sizes-only wording claims the menu is
+    // intact, over a product already in `blockedIds` that checkout refuses
+    // outright. The headline was contradicting the tile directly below it.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { variantId: 'v2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    expect(await screen.findByText(/every size is closed/i)).toBeTruthy();
+    expect(screen.queryByText(/Every item is available/i)).toBeNull();
+  });
+
+  it('still says everything is available when nothing at all is closed', async () => {
+    // The third state must not swallow the second: an all-clear branch still
+    // reads as an all-clear branch.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchVariantAvailability.mockResolvedValue([]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    expect(await screen.findByText(/Everything is available/i)).toBeTruthy();
+    expect(screen.queryByText(/some sizes are closed/i)).toBeNull();
+  });
+
+  it('prefers the closed-PRODUCT count when both a product and a size are closed', async () => {
+    // A closed product is the louder fact and keeps the Reopen-all control
+    // meaningful; the sizes-only wording is for the case it would otherwise
+    // report as healthy.
+    mocks.variantClosingEnabled.mockResolvedValue(true);
+    mocks.branchAvailability.mockResolvedValue([
+      { productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    mocks.branchVariantAvailability.mockResolvedValue([
+      { variantId: 'v1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    expect(await screen.findByText(/1 item closed now/i)).toBeTruthy();
+    expect(screen.queryByText(/some sizes are closed/i)).toBeNull();
+  });
+
   it('lists a closed size with its item and a reopen, like the closed-options card', async () => {
     mocks.variantClosingEnabled.mockResolvedValue(true);
     mocks.branchVariantAvailability.mockResolvedValue([

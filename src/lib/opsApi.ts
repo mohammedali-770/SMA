@@ -108,6 +108,23 @@ function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * True only for "this relation does not exist" — Postgres 42P01, or PostgREST's
+ * PGRST205 schema-cache miss.
+ *
+ * THE NARROWNESS IS THE POINT, and review caught the wide version on #408.
+ * Swallowing every error turns an UNKNOWN state into a confident "nothing is
+ * closed", which is precisely the monitor-blindness this module's callers exist
+ * to avoid: a board that could not read the table would print its all-clear
+ * notice. A permission error, a network failure or a malformed query means
+ * something an operator needs to see; only a table that has not shipped yet is
+ * safely equivalent to "no exceptions recorded".
+ */
+function isMissingRelation(error: { code?: string } | null): boolean {
+  const code = error?.code;
+  return code === '42P01' || code === 'PGRST205';
+}
+
 export const opsApi = {
   /** The signed-in operator's pinned branch id, or null when unassigned. */
   async myBranchId(): Promise<string | null> {
@@ -153,6 +170,37 @@ export const opsApi = {
     return (data ?? []).map((r) => ({
       branchId: r.branch_id as string,
       productId: r.product_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
+  /**
+   * Price-tier exceptions across EVERY branch, for the call-centre board.
+   *
+   * THE BOARD HAD NO SOURCE FOR THIS AT ALL UNTIL 2026-09-20, which is why a
+   * branch with a size closed read "operating normally" cross-branch while its
+   * own console showed the size off. `buildClosureSummaries` took products and
+   * options and nothing else, so the subject added by `20260923120000` was
+   * invisible to the one screen whose job is to answer "what is off anywhere?".
+   *
+   * IT DEGRADES TO `[]` RATHER THAN THROWING, for the same reason
+   * `branchVariantAvailability` does: the board's load is one `Promise.all`, so
+   * a missing relation would reject the whole thing and replace an operator's
+   * entire board with a blocking error over a table that holds only exceptions.
+   * No rows means no size is closed, which is exactly what a table that does
+   * not exist implies.
+   */
+  async allVariantAvailability(): Promise<(BranchVariantAvailabilityRow & { branchId: string })[]> {
+    const { data, error } = await supabase
+      .from('branch_variant_availability')
+      .select('branch_id, variant_id, is_available, snoozed_until, reason_code');
+    if (isMissingRelation(error)) return [];
+    fail(error);
+    return (data ?? []).map((r) => ({
+      branchId: r.branch_id as string,
+      variantId: r.variant_id as string,
       isAvailable: r.is_available as boolean,
       snoozedUntil: (r.snoozed_until as string | null) ?? null,
       reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
@@ -245,6 +293,17 @@ export const opsApi = {
       .from('branch_variant_availability')
       .select('variant_id, is_available, snoozed_until, reason_code')
       .eq('branch_id', branchId);
+    // DELIBERATELY WIDER THAN `allVariantAvailability`, and the asymmetry is the
+    // point rather than an oversight. #408 narrowed the BOARD's read to
+    // missing-relation only, because a board that prints "every branch is
+    // running normally" over a read it was refused is the worst possible
+    // output. Here the trade runs the other way: this console's `refresh()` is
+    // one `Promise.all`, so any rejection blanks the WHOLE screen -- products,
+    // delivery, reference sheet -- for a cashier mid-service (#395). Losing the
+    // closed-sizes card is the smaller harm, and the cashier is standing in the
+    // branch. The residual risk is stated rather than hidden: a refused read
+    // here shows "no sizes closed" when sizes are closed. Fixing that properly
+    // means a per-read non-blocking error notice, which is its own change.
     if (error) return [];
     return (data ?? []).map((r) => ({
       variantId: r.variant_id as string,

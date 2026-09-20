@@ -30,6 +30,27 @@ export const ItemsTab: React.FC<{
   rows: BranchAvailabilityRow[];
   closed: ClosedItem[];
   /**
+   * How many price tiers are closed at this branch.
+   *
+   * COUNTED SEPARATELY AND DELIBERATELY NOT ADDED TO `closed`. `reopenAllTargets`
+   * derives the Reopen-all ids from `closed`, and #393 established that the
+   * number a cashier confirms must BE the number of ids acted on -- so folding
+   * tiers into that count would make the confirm say four and clear two. This
+   * only decides what the headline is allowed to claim.
+   */
+  closedTierCount: number;
+  /**
+   * Whether any product is unorderable because EVERY one of its sizes is closed.
+   *
+   * A separate signal from `closedTierCount`, because the two say opposite
+   * things about the menu: one size off leaves the item on sale, every size off
+   * takes it away. Review caught the first version claiming "Every item is
+   * available, but some sizes are closed" over a product already in
+   * `blockedIds` -- the headline contradicting the tile directly below it, on
+   * #408.
+   */
+  anySizeBlocked: boolean;
+  /**
    * Products a cashier would read as open that a customer cannot order —
    * because a REQUIRED option group has been emptied, or because every SIZE is
    * closed. Both render as `partial`, because to the cashier they are the same
@@ -47,6 +68,8 @@ export const ItemsTab: React.FC<{
   categories,
   rows,
   closed,
+  closedTierCount,
+  anySizeBlocked,
   blockedIds,
   now,
   loading,
@@ -102,7 +125,9 @@ export const ItemsTab: React.FC<{
       <div
         className={[
           'flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-ds-lg)] border p-4',
-          closed.length > 0 ? 'border-warn-line bg-warn-tint' : 'border-con-line bg-con-surface',
+          closed.length > 0 || closedTierCount > 0
+            ? 'border-warn-line bg-warn-tint'
+            : 'border-con-line bg-con-surface',
         ].join(' ')}
       >
         <div className="flex items-center gap-3">
@@ -111,14 +136,34 @@ export const ItemsTab: React.FC<{
           </div>
           <div>
             <Text variant="label" as="p">
+              {/*
+                THE THIRD STATE EXISTS BECAUSE THIS PANEL LIED. It had two
+                states -- N closed, or "Everything is available" -- and counted
+                PRODUCTS only. A branch that closed one size was told every item
+                was available while the closed-sizes card sat directly below
+                saying otherwise, reported live on 2026-09-20. The count is
+                deliberately still products-only (see `closedTierCount`); what
+                changed is that zero closed products no longer licenses the
+                claim that nothing is off.
+              */}
               {loading
                 ? t('loading')
-                : closed.length === 0
-                  ? t('closedNoneTitle')
-                  : `${closed.length} ${t(closed.length === 1 ? 'closedCountOne' : 'closedCount')}`}
+                : closed.length > 0
+                  ? `${closed.length} ${t(closed.length === 1 ? 'closedCountOne' : 'closedCount')}`
+                  : anySizeBlocked
+                    ? t('sizeBlockedTitle')
+                    : closedTierCount > 0
+                      ? t('closedSizesOnlyTitle')
+                      : t('closedNoneTitle')}
             </Text>
             <Text variant="caption" tone="tertiary" as="p">
-              {closed.length > 0 ? t('autoReopenNote') : t('closedNoneBody')}
+              {closed.length > 0
+                ? t('autoReopenNote')
+                : anySizeBlocked
+                  ? t('sizeBlockedBody')
+                  : closedTierCount > 0
+                    ? t('closedSizesOnlyBody')
+                    : t('closedNoneBody')}
             </Text>
           </div>
         </div>
