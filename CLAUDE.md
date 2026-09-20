@@ -228,20 +228,69 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-17, read live AFTER the per-size-closing run: 140
-repository files on the default branch / 145 live history rows / exactly ONE
-unapplied — Moyasar, unapplied on purpose.** Latest live version
-`20260917124937`; the most recent apply is `20260926120000` (ledger row 100,
-`docs/MIGRATIONS.md` §48). Reconciled **by name** against the default branch,
-because versions are apply-time stamps; the delta against the previous read is
-exactly +4 files and +4 rows, which is that run and nothing else.
+**Current position 2026-09-20, read live AFTER the admin-push-subscriptions
+apply: 142 repository files on the default branch / 146 live history rows / TWO
+unapplied — `20260824100000_moyasar_payment_provider` (frozen on purpose, §6) and
+`20260928120000_admin_push_closure_notifications` (written, validated, awaiting
+approval).** Latest live version `20260920050434`; the most recent apply is
+`20260927120000` (ledger row 101, `docs/MIGRATIONS.md` §49). Reconciled **by
+name** against the default branch, because versions are apply-time stamps; the
+delta against the previous read is exactly **+2 files** (the two admin-push
+files) and **+1 row** (this apply), which is that work and nothing else.
 
-**THE COUNT IS BACK TO THE DANGEROUS SHAPE, and that is worth saying at the top
+**TWO IS THE SHAPE THAT LOOKS SAFE AND IS NOT.** It restores the *appearance* of
+an innocent referent for "apply the outstanding migrations" without making a bulk
+apply any safer: `20260824100000` still sorts ahead of everything, so such an
+instruction takes the frozen payment file **FIRST**. **Name the target by
+version.** That is what makes the count irrelevant in either shape.
+
+**THE APPLY THAT PRODUCED THIS COUNT WAS REFUSED ON ITS FIRST ATTEMPT, BY THE
+FILE'S OWN ASSERTION, AND THAT IS THE MOST USEFUL THING ABOUT IT.** On 2026-09-19
+`20260927120000` hashed correctly, had every live precondition verified, and was
+sent — and raised `anon can execute save_admin_push_subscription(…), which must
+never be true`. Nothing landed; the apply is transactional and history was
+confirmed still at 145 rather than assumed to be. The cause is worth carrying:
+**`revoke all on function … from public` does NOT remove `anon`'s grant** here,
+because this project's `pg_default_acl` grants EXECUTE on new functions in
+`public` to `anon`, `authenticated` and `service_role` **directly**. 85 of the 89
+`revoke all on function` statements in this tree already said `public, anon`;
+these three were the outlier, and `20260729091000_caller_can_read_order_anon_revoke`
+exists solely because the identical mistake was made once before. There was no
+exposure — all three gate on `is_admin()` first, so an anon caller reaches `42501`
+and nothing else — but least privilege belongs on the grant, not on what the body
+happens to do today.
+
+**A HARNESS THAT IS STRICTER THAN PRODUCTION IS NOT THE SAFE DIRECTION.** The
+usual worry is a harness too permissive, hiding a hole. `.github/sql-ci/bootstrap.sql`
+modelled default privileges for TABLES only, so on the local chain `from public`
+and `from public, anon` were indistinguishable: the chain, the paired suite and
+every CI check were green on a file that could not apply. It now models functions
+and sequences too, read live from `pg_default_acl`, and that was proven rather
+than asserted — with the original `from public` restored the chain fails at file
+141 with the exact Production message, and was green before the change. The cost
+of finding it the other way was an owner's approval and a Production apply
+attempt.
+
+**AND FIXING THE GRANT MEANT CHECKING BOTH HALVES, NOT ONE.** Revoking
+`authenticated` as well would have applied cleanly and shipped a feature the
+console cannot call. Measured live after the apply, on all three RPCs: `anon`
+**NO**, `authenticated` **YES**, `service_role` **YES**. This is the same shape
+as ledger row 85's note that a self-verification block should assert the exact
+regression its own history records — here the file asserts the `anon` half, and
+the `authenticated` half had to be measured separately.
+
+**Superseded, kept because the count is the point: 140 repository files / 145
+live history rows / exactly ONE unapplied — Moyasar, unapplied on purpose**,
+read 2026-09-17 after the per-size-closing run. Latest live version then
+`20260917124937`; most recent apply `20260926120000` (ledger row 100,
+`docs/MIGRATIONS.md` §48).
+
+**THE COUNT WAS THEN IN THE DANGEROUS SHAPE, and that is worth saying at the top
 rather than the bottom.** With a single file left, "apply the outstanding
 migrations" reads like a no-op and is in fact the one instruction that would
 break the §6 payment freeze — there is no other file it could plausibly mean.
 The guard that catches a bulk apply when a second, legitimate file is
-outstanding has run out of second files again. **Name the target by version.**
+outstanding had run out of second files again. **Name the target by version.**
 That is what makes the count irrelevant in either shape.
 
 **THE MONEY-PATH PAIR MOVED, ONCE, AT `20260924120000`, AND THAT IS THE INTENDED
@@ -388,6 +437,14 @@ break the §6 payment freeze — there is no other file it could plausibly mean.
 The guard that catches a bulk apply when a second, legitimate file is
 outstanding has run out of second files again. **Name the target by version.**
 That is what makes the count irrelevant in either shape.
+
+**SUPERSEDED 2026-09-20 — `20260927120000` IS NOW APPLIED (live version
+`20260920050434`, ledger row 101), so the outstanding set is TWO: Moyasar
+(frozen on purpose) and `20260928120000_admin_push_closure_notifications`
+(written, validated, awaiting approval).** The dependency note below still
+governs the one that is left, and the step-2 half of it is now history rather
+than a plan. The paragraph is kept as written because its reasoning about the
+pair is what matters.
 
 **AMENDED AGAIN 2026-09-19 — a third file is written, so on merge the
 outstanding set is THREE: Moyasar (frozen on purpose),

@@ -1480,8 +1480,32 @@ production.
 | 98 | 20260924120000 | place_order_variant_availability | `53c433d9cf82` | 20260917123545 | place_order_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:35:45 UTC** on explicit owner approval ("do the required migrations", given against a list naming each file by version), via MCP `apply_migration`, **one call, target named explicitly**. **THIS IS THE MONEY-PATH STEP**: `place_order` and `compute_order_snapshot` now refuse a closed price tier, so the server is the authority and no client can talk its way past it. §9-B.7: merged copy re-hashed (sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`, 1 110 lines / 55 033 bytes) and matched before sending. **THE PRE-IMAGES WERE PROVEN AGAINST LIVE BEFORE THE DERIVATION WAS TRUSTED** (rows 92 and 95's lesson): the file derives both bodies from the running ones, so the pre-image was reconstructed by removing the 1 461-character guard block and hashed against live — `place_order` `1c854febfa239dc93ee594e704fa18f1` / 24 827 chars and `compute_order_snapshot` `52490fe4d9b692c4b8631a28977c3d73` / 15 398 chars, **both matching exactly**, which bounds the change to precisely the intended region. Both resulting bodies **byte-identical** to the merged file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288 chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859 chars. **THE MONEY-PATH LEDGER PAIR MOVED, AND THAT IS THE INTENDED EFFECT OF THE WORK RATHER THAN AN ANOMALY** — record the new pair: `place_order` `bfd3f1f423e61c850ab6101e37431799` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c` → **`22e2d42935459e7bf93abb2941b56325`**. **APPLYING IT REFUSED NOTHING:** `branch_variant_availability` is empty, so no tier is closed and the new guard cannot fire; orders unchanged at 76. **NOT CALLED live** — `place_order` writes a real order and `orders` carries 12 triggers including POS-sync enrolment, so a probe would create a kitchen ticket and burn an `SM-2026-…` sequence number (row 93's correction). The paths are proven on the local chain harness instead. Moyasar re-verified absent. |
 | 99 | 20260925120000 | health_card_variant_coverage | `65dabf4f5096` | 20260917124256 | health_card_variant_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:42:56 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. **A MONITOR THAT ENUMERATES ITS SUBJECTS BY NAME IS CORRECT UNTIL A SUBJECT IS ADDED, AND THEN SILENTLY WRONG** — `operations_health_snapshot_internal` named the availability tables in three places, so a tier whose restore timer ran out and was never honoured would have read `idle`, the fail-quiet warm-up, with no alert at all. Same defect class as row 72. §9-B.7: merged copy re-hashed (sha256 `65dabf4f5096b985b2c0130589e39eabfcce54e1cf364d348fbc2850f5a7ca3a`, 1 735 lines / 82 365 bytes) and matched before sending. Both pre-images verified against live first, each with exactly one overload (cardinality checked BEFORE the body was read): `operations_health_snapshot_internal` `3f2f145ca1283e5ff8040a0b2b01ce81` / 46 688 chars, `operations_alerts_derive_pre_stranded` `19177f263090d96500a571a4bf6a1dd4` / 18 002 chars. Both new bodies **byte-identical** to hashes pre-computed from the merged file: `10265270ab70597cadc5e84134384051` / 47 919 chars and `dabd46192e37eaa69c5cfd2a765f6cbf` / 18 094 chars. **New ledger-basis pair for these two functions:** `operations_health_snapshot_internal` `aefe82538f13bc2d6fbf04d3f620506b` → **`47c7553a3acaf437f6d0dd30d8a760c6`**, `operations_alerts_derive_pre_stranded` `662ee646ea4ea9e89ff64203bcb542ee` → **`bc00fff87658de5f6d5321c6745744d9`**. **A HASH THAT LOOKED LIKE A MISMATCH WAS A MISREAD OF THE FILE'S OWN HEADER, WHICH IS WORTH RECORDING BECAUSE THE PREVIOUS THREE TRAPS OF THIS SHAPE WERE MEASUREMENT ERRORS AND THIS ONE IS NOT.** The header lists `aefe8253…` / `662ee646…` under "Ledger basis … which WILL move on apply" — those are the **pre-apply** values, not predictions of the post-apply ones, and reading them as predictions makes a correct apply look wrong. It was settled by reconstruction rather than by argument: both bodies were extracted from `20260820160000` and from the merged file, combined with the live prologue, and hashed — reproducing `662ee646…` / `aefe8253…` for the pre-images and `bc00fff8…` / `47c7553a…` for the posts, with `pg_get_functiondef` lengths 18 296 and 48 102 matching live exactly. **Read a header's hashes for WHICH SIDE OF THE APPLY they describe before calling a mismatch.** **MONEY PATH UNCHANGED** at `12b6816d…` / `22e2d429…`. **It was CALLED afterwards, independently of its own verification block** (row 86's lesson, and the specific reason mutation 12 exists): the `branch_availability` system reads **`healthy`** with `closed_sizes: 0`, `overdue_restores: 0` and **`safe_error_code: null`** — so the availability block's `exception when others` did not fire, which is the quiet failure a source-level assertion cannot see, because a `plpgsql` body is not name-resolved at creation. The sweeper then ran at 12:48 UTC and succeeded against the new definition. Moyasar re-verified absent. |
 | 100 | 20260926120000 | variant_closing_flag | `01a4c9ac95cf` | 20260917124937 | variant_closing_flag | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:49:37 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Adds `app_settings.variant_closing_enabled`, defaulting FALSE, which hides the branch console's per-size controls. It exists because the console deploys on merge while the customer app reaches a customer only in the next EAS build, and a build that does not understand a closed tier shows a **generic error at the payment step** — `failureMessage` returns a translated KEY rather than the server's sentence. §9-B.7: merged copy re-hashed (sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`, 135 lines / 7 622 bytes) and matched before sending. **APPLYING IT CHANGED NOTHING, WHICH IS THE WHOLE POINT** — contrast row 82, where the default was TRUE and applying the migration WAS the behaviour change. Live value **false**, column NOT NULL, default `false`, `app_settings` 34 → 35 columns, still 1 row; money path unchanged at `12b6816d…` / `22e2d429…`; **0 functions anywhere in `public` mention the flag**, so server-side refusal stays unconditional; orders 76; `branch_variant_availability` still 0 rows. **THE COLUMN-GRANT TRAP WAS CHECKED BY OUTCOME, NOT BY PREDICATE, BECAUSE THAT IS THE DISTINCTION ROW 96 TURNED ON.** `orders.is_comped` broke every My Orders list for three weeks because a new column landed on a table whose client grants are COLUMN-scoped. `app_settings` grants are TABLE-level — measured live before the apply in `information_schema.table_privileges` (SELECT for `anon` and `authenticated`, UPDATE for `authenticated`) — so a new column is covered automatically. Afterwards, rather than trusting `has_column_privilege`, the client-shaped read was actually performed under both roles: `set local role anon; select * from public.app_settings` **returns its row** instead of raising, and `anon` reads the new column directly as `false`; same under `authenticated`. **APPLIED IS NOT ENABLED.** Turning the flag on is a separate §5 decision that must follow the EAS build carrying the customer half — `docs/OWNER_ACTIONS.md` §40. Moyasar re-verified absent. |
+| 101 | 20260927120000 | admin_push_subscriptions | `26046da81644` | 20260920050434 | admin_push_subscriptions | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 05:04:34 UTC** on explicit owner approval ("apply 20260927120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 2 of the admin closure-notification work: `admin_push_subscriptions`, the nullable `app_settings.admin_push_vapid_public_key` column, and three `is_admin()`-gated RPCs. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`, 400 lines / 18 474 bytes) and matched the recorded value before anything was sent. **THIS IS THE SECOND ATTEMPT, AND THE FIRST ONE FAILING IS THE MOST USEFUL THING IN THIS ROW.** On 2026-09-19 the same file — then `9861df21…` / 365 lines — was approved, hashed correctly, had every live precondition verified, and was **REFUSED BY ITS OWN ASSERTION 5.5**: `anon can execute save_admin_push_subscription(text,text,text,text,text), which must never be true`. Nothing landed (the apply is transactional; history stayed at 145 / `20260917124937`, verified immediately afterwards rather than assumed). The cause: `revoke all on function … from public` does **not** remove `anon`'s grant, because this project's `pg_default_acl` grants EXECUTE on new functions in `public` to `anon`, `authenticated` and `service_role` **directly**. 85 of the 89 `revoke all on function` statements in this tree already said `public, anon`; these three were the outlier, and `20260729091000_caller_can_read_order_anon_revoke` exists solely because the identical mistake was made once before. Corrected in PR #400 as squash `182f670`. **A HARNESS THAT IS STRICTER THAN PRODUCTION IS NOT THE SAFE DIRECTION.** `.github/sql-ci/bootstrap.sql` modelled default privileges for TABLES only, so on the local chain `from public` and `from public, anon` were indistinguishable and every CI check was green on a file that could not apply. It now models functions and sequences too, read live from `pg_default_acl` — proven rather than asserted: with the original `from public` restored the chain fails at file 141 with the exact Production message, and was green before the change. Widening it required correcting 8 of the 13 `"svc"` expectations in `operations_alerts_digest_test.sql`, which had never described Production (measured live: all 13 are `svc=true`) and passed only because the harness was stricter. **THE GRANT FIX WAS VERIFIED ON BOTH HALVES, because removing `authenticated` as well would apply cleanly and ship a feature that cannot work:** all three RPCs now read `anon` **NO**, `authenticated` **YES**, `service_role` **YES**. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, each with exactly one overload (cardinality checked BEFORE the body was read); the file itself refuses to apply unless both still hash those values. **All three bodies byte-identical** against hashes pre-computed from the merged file: `save_admin_push_subscription` `7484f213f168257d40d773a1d1134836` / 1 376 chars, `delete_admin_push_subscription` `9240758de77959fc3e73955bb244e5ec` / 343, `admin_push_state` `37ae19fdb910ac8e804faf98b00e6b44` / 910. **APPLYING IT SUBSCRIBED NOBODY:** `admin_push_subscriptions` 0 rows, the VAPID column present and **NULL**, so no key pair exists and even a subscribed admin could not be sent to; `admin_push_outbox` absent, which is correct — it belongs to `20260928120000`. **The table is CLOSED, re-measured as an outcome rather than trusted to the `revoke`:** RLS enabled, **zero** policies, **zero** privileges for `anon` or `authenticated`. **ROW 86’S LESSON APPLIED — a clean apply proves storage, not execution.** All three were **called** and their outcomes read back as VALUES rather than notices (row 90): `42501 :: Only admins may subscribe to closure notifications`, `42501 :: Only admins may manage closure notifications`, `42501 :: Only admins may read closure notification state`. The probe ran inside a transaction aborted by a `RAISE` and the table was confirmed still empty afterwards. That proves them only as far as their gate, which is stated rather than glossed — driving deeper needs an admin session at AAL2. **THE TWO PUSH CHANNELS STAYED APART, measured on both sides:** `push_devices` unchanged at 5 rows / 5 active, and **0** functions mentioning `admin_push` reference `push_devices` — the property assertion 5.9 exists to enforce. Moyasar re-verified absent (0 functions, 0 history rows, `provider_name` still `tap`, still disabled). Live history **145 → 146**. **No deploy implied.** **Version NOT aligned** — live carries the apply-time stamp `20260920050434` (§9-D). **TWO repository files remain unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6, and `20260928120000_admin_push_closure_notifications.sql`, written and awaiting approval. Moyasar still sorts ahead of everything, so a bulk apply takes the frozen payment file FIRST — name the target by version.** |
 
-Reconciliation check: the rows above detail **88 repository / 89 live** rows.
+Reconciliation check: the rows above detail **101 repository rows, 99 of which
+carry a live version** — rows 8 and 9 are the two that do not, and both are
+class `—`. **Counted from the table itself, so it is reproducible:** every data
+row between the header and this paragraph, split on whether column 2 and column
+5 hold a 14-digit version.
+
+**CORRECTED 2026-09-20, and the correction is worth more than the number.** This
+line read **88 repository / 89 live** from 2026-09-09 (#355, the commit that
+added row 88) until row 101 was added — **stale by thirteen rows**, twelve of
+them predating the change that finally moved it. Review flagged it on #401 and
+proposed 89/90, which assumed the figure had been right at row 88 and needed a
++1; it had not been, and it did not. Measured against `c0f9c33`, the table then
+held 88 data rows with **86** live versions, so *"88 repository"* was a plain row
+count and *"89 live"* matched nothing in the table and has no recorded
+derivation. It is therefore **replaced rather than incremented**, by a figure
+whose derivation is stated above so the next reader can recompute it instead of
+carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
+from the artifact, never adopt from a working note — applied to this file's own
+summary line.
+
+Rows **89–101** are not described in the narrative below, which stops at 88.
+Each is recorded in its own row and in the section it names; the live totals for
+the whole repository are in `CLAUDE.md` §8, not here.
+
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
@@ -6225,30 +6249,75 @@ merge) waits for the customer app (which reaches a customer only in the next EAS
 build). Applying it changed nothing. Turning it on is a separate §5 decision that
 must follow that build: `docs/OWNER_ACTIONS.md` §40.
 
-## 49. Admin web-push subscriptions — WRITTEN, NOT APPLIED (2026-09-18)
+## 49. Admin web-push subscriptions — APPLIED 2026-09-20 (ledger row 101)
 
-`20260927120000_admin_push_subscriptions.sql`. **Written 2026-09-18, validated,
-awaiting owner approval.** Step 2 of the four-step admin closure-notification
-work; the whole feature is described in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
+`20260927120000_admin_push_subscriptions.sql`. **Applied 2026-09-20 05:04:34
+UTC**, live version `20260920050434`, on explicit owner approval ("apply
+20260927120000" — the target named by version), via MCP `apply_migration`, one
+call, target named explicitly. Live history **145 → 146**. Ledger row 101. Step 2
+of the four-step admin closure-notification work; the whole feature is described
+in `docs/ADMIN_PUSH_NOTIFICATIONS.md`.
 
 sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`,
-400 lines / 18 474 bytes — **re-hash the MERGED copy before applying**, per §15.
+400 lines / 18 474 bytes — the merged copy was re-hashed against this value
+before anything was sent, per §15, and matched.
 
 **CORRECTED 2026-09-20, AFTER AN APPLY ATTEMPT REFUSED IT.** The fingerprint
 above replaces `9861df21…` / 365 lines, which described the version that could
-not apply. The story is in the next section, and it is the most useful thing in
+not apply. The story is two sections down, and it is the most useful thing in
 this entry.
 
-**APPLYING IT SENDS NOTHING AND SUBSCRIBES NOBODY.** It creates one empty table,
-one nullable `app_settings` column, and three RPCs. The sender (step 3) and the
-trigger (step 4) do not exist, so the only reachable effect is an admin choosing
-to subscribe — which stores a row and still delivers nothing.
+**IT SUBSCRIBED NOBODY, measured rather than asserted.** `admin_push_subscriptions`
+holds **0 rows**, `app_settings.admin_push_vapid_public_key` exists and is
+**NULL**, and no VAPID key pair exists anywhere — so even a subscribed admin
+could not be sent to. The sender (step 3) is merged but **not deployed**, and the
+trigger and queue (step 4, `20260928120000`) are **not applied**, so nothing
+enqueues and nothing drains.
 
-**MONEY PATH UNTOUCHED, and the file asserts it rather than claiming it.** This
-is a new-objects-only migration; its closing block refuses to apply unless
-`place_order` still hashes `12b6816d256c29b76edf947ae1a7ea77` and
-`compute_order_snapshot` still hashes `22e2d42935459e7bf93abb2941b56325`.
-**No deploy implied** — nothing existing changes signature or behaviour.
+**MONEY PATH UNTOUCHED, and the file asserted it rather than this record
+claiming it.** This is a new-objects-only migration; its closing block refuses to
+apply unless `place_order` still hashes `12b6816d256c29b76edf947ae1a7ea77` and
+`compute_order_snapshot` still hashes `22e2d42935459e7bf93abb2941b56325`. Both
+were read live after the apply and are unchanged, each with exactly one overload
+(cardinality checked before the body was read). Moyasar re-verified absent: 0
+`%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still
+disabled. **No deploy implied** — nothing existing changed signature or
+behaviour.
+
+### THE GRANT FIX IS THE POINT OF THIS APPLY, AND IT WAS VERIFIED ON BOTH HALVES
+
+The refusal below was about `anon` holding EXECUTE. The correction is only
+correct if it removed `anon` **without** removing `authenticated`, which is the
+role the console actually calls as — revoking both would have produced a
+migration that applies cleanly and a feature that cannot work. Measured live
+after the apply, all three RPCs: `anon` **NO**, `authenticated` **YES**,
+`service_role` **YES**.
+
+**ROW 86'S LESSON APPLIED — a clean apply proves the text was stored, not that
+the function runs.** A `plpgsql` body is not name-resolved at creation, so all
+three were **called**, and their outcomes read back as VALUES rather than notices
+(row 90): `save_admin_push_subscription` → `42501 :: Only admins may subscribe to
+closure notifications`, `delete_admin_push_subscription` → `42501 :: Only admins
+may manage closure notifications`, `admin_push_state` → `42501 :: Only admins may
+read closure notification state`. The probe ran inside a transaction aborted by a
+`RAISE`, and the table was confirmed still empty afterwards. **That proves them
+only as far as their gate, and it is stated rather than glossed** — driving
+deeper needs an admin session at AAL2, which this connection is not.
+
+All three bodies are **byte-identical** to hashes pre-computed from the merged
+file before sending: `save_admin_push_subscription`
+`7484f213f168257d40d773a1d1134836` / 1 376 chars,
+`delete_admin_push_subscription` `9240758de77959fc3e73955bb244e5ec` / 343,
+`admin_push_state` `37ae19fdb910ac8e804faf98b00e6b44` / 910.
+
+**The separation held, measured on both sides:** `push_devices` is unchanged at
+**5 rows, 5 active**, and **0** functions mentioning `admin_push` reference
+`push_devices`. `admin_push_outbox` does **not** exist, which is the correct
+outcome — it belongs to `20260928120000`.
+
+**The table is CLOSED, re-measured after the apply rather than trusted to the
+`revoke`:** RLS enabled, **zero** policies, and **zero** privileges held by
+`anon` or `authenticated`.
 
 ### It was REFUSED BY ITS OWN ASSERTION on the first apply, and that is the record
 
