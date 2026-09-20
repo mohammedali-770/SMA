@@ -1,10 +1,11 @@
 /** Home + Menu on ONE page with virtualized sections and a sticky cart bar. */
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Pressable, ScrollView, SectionList, TextInput, View, type LayoutChangeEvent, type SectionListData, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerCarousel, useHomeBanners } from './BannerCarousel';
+import { categoryFocusReducer, INITIAL_CATEGORY_FOCUS } from './categoryFocus';
 import { buildMenuSections, buildSearchIndex, menuItemKey, type MenuSection, type MenuSectionItem } from './menuSections';
 import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
@@ -24,6 +25,15 @@ import type { Product } from '../../types/models';
 
 export { ProductCard };
 const SECTION_HEADER_OFFSET = 40; const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
+/**
+ * How long a tapped chip outranks the scroll spy when no momentum event
+ * arrives. `scrollToLocation` has no completion callback, and fires no momentum
+ * event at all when the target is already on screen — without this the spy
+ * would stay muted for good. Comfortably longer than the animation plus the
+ * 120 ms `onScrollToIndexFailed` retry, and short enough that a dropped
+ * momentum event costs at most this much spy latency.
+ */
+const CATEGORY_SETTLE_MS = 700;
 
 export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressInvalidRedirect?: boolean } = {}) {
   const colors = useThemeColors(); const insets = useSafeAreaInsets(); const { t, pick, lang, toggle, isRTL, rtlText, rtlRow } = useI18n(); const styles = useStyles();
@@ -36,10 +46,13 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
   // branch closed something. Cheap enough to run on every focus.
   useFocusEffect(useCallback(() => { void refreshAvailability(); }, [refreshAvailability]));
 
-  const [search, setSearch] = useState(''); const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null); const chipScrollRef = useRef<ScrollView>(null); const chipOffsets = useRef<Record<string, { x: number; width: number }>>({}); const [activeCatId, setActiveCatId] = useState<string | null>(null);
+  const [search, setSearch] = useState(''); const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null); const chipScrollRef = useRef<ScrollView>(null); const chipOffsets = useRef<Record<string, { x: number; width: number }>>({}); const [catFocus, dispatchCatFocus] = useReducer(categoryFocusReducer, INITIAL_CATEGORY_FOCUS); const activeCatId = catFocus.activeCatId;
   const branchOpen = branchIsOpen(selectedBranch); const searchIndex = useMemo(() => buildSearchIndex(products), [products]); const hasModifiers = useCallback((p: Product) => groupsForProduct(p).length > 0, [groupsForProduct]);
   const sections = useMemo(() => buildMenuSections({ products, categories, branchId: selectedBranchId, query: search, searchIndex, isOrderable, hasModifiers }), [products, categories, selectedBranchId, search, searchIndex, isOrderable, hasModifiers]);
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => { const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined; if (section) setActiveCatId((prev) => prev === section.category.id ? prev : section.category.id); }, []);
+  // `dispatch` has a stable identity, so this stays referentially stable — which
+  // SectionList requires; changing it at runtime throws. The reducer, not this
+  // callback, decides whether a report is allowed to move the chip.
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => { const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined; if (section) dispatchCatFocus({ kind: 'spy', catId: section.category.id }); }, []);
   // Fetched HERE rather than inside BannerCarousel so the request starts when
   // the screen mounts, concurrently with the menu load. The carousel is the
   // list header now, so it does not exist until the menu has rendered — a
@@ -54,7 +67,12 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
   // computed from the 16:6 ratio, since the header collapses to zero when there
   // are no active banners.
   const headerHeight = useRef(0);
-  const scrollToCategory = (catId: string) => { setActiveCatId(catId); const sectionIndex = sections.findIndex((s) => s.category.id === catId); if (sectionIndex < 0) return; pendingScroll.current = { sectionIndex, retried: false }; listRef.current?.scrollToLocation({ sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }); };
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleNow = useCallback(() => { if (settleTimer.current) { clearTimeout(settleTimer.current); settleTimer.current = null; } dispatchCatFocus({ kind: 'settled' }); }, []);
+  // A pending timer outliving the screen would dispatch into an unmounted
+  // reducer on every navigation away mid-scroll.
+  useEffect(() => () => { if (settleTimer.current) clearTimeout(settleTimer.current); }, []);
+  const scrollToCategory = (catId: string) => { dispatchCatFocus({ kind: 'tap', catId }); if (settleTimer.current) clearTimeout(settleTimer.current); settleTimer.current = setTimeout(settleNow, CATEGORY_SETTLE_MS); const sectionIndex = sections.findIndex((s) => s.category.id === catId); if (sectionIndex < 0) return; pendingScroll.current = { sectionIndex, retried: false }; listRef.current?.scrollToLocation({ sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }); };
   const onScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => { listRef.current?.getScrollResponder()?.scrollTo({ y: headerHeight.current + info.averageItemLength * info.index, animated: false }); const pending = pendingScroll.current; if (pending && !pending.retried) { pending.retried = true; setTimeout(() => listRef.current?.scrollToLocation({ sectionIndex: pending.sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }), 120); } };
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
   useEffect(() => { const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null; if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true }); }, [activeCatIdResolved]);
@@ -85,7 +103,7 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
       {sections.length > 0 ? <View style={styles.chipsWrap}><ScrollView ref={chipScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, isRTL && styles.chipsRTL]} onContentSizeChange={() => { if (isRTL) chipScrollRef.current?.scrollToEnd({ animated: false }); }}>
         {sections.map((s) => <SelectableChip key={s.category.id} label={pick(s.category.nameEn, s.category.nameAr)} selected={s.category.id === activeCatIdResolved} onPress={() => scrollToCategory(s.category.id)} onLayout={(e: LayoutChangeEvent) => { chipOffsets.current[s.category.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width }; }} />)}
       </ScrollView></View> : null}
-      {sections.length === 0 ? <><BannerCarousel banners={banners} /><EmptyView icon={<DishIcon />} title={t('noProducts')} /></> : <SectionList ref={listRef} sections={sections} keyExtractor={menuItemKey} renderItem={renderItem} renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => <Text variant="title" style={styles.sectionTitle}>{pick(section.category.nameEn, section.category.nameAr)}</Text>} renderSectionFooter={SectionFooter} ItemSeparatorComponent={ItemSeparator} ListHeaderComponent={<View onLayout={(e: LayoutChangeEvent) => { headerHeight.current = e.nativeEvent.layout.height; }}><BannerCarousel banners={banners} inset={false} /></View>} stickySectionHeadersEnabled={false} onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={VIEWABILITY_CONFIG} onScrollToIndexFailed={onScrollToIndexFailed} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={9} contentContainerStyle={{ padding: space.s4, paddingBottom: cart.count > 0 ? 120 : space.s6 }} showsVerticalScrollIndicator={false} />}
+      {sections.length === 0 ? <><BannerCarousel banners={banners} /><EmptyView icon={<DishIcon />} title={t('noProducts')} /></> : <SectionList ref={listRef} sections={sections} keyExtractor={menuItemKey} renderItem={renderItem} renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => <Text variant="title" style={styles.sectionTitle}>{pick(section.category.nameEn, section.category.nameAr)}</Text>} renderSectionFooter={SectionFooter} ItemSeparatorComponent={ItemSeparator} ListHeaderComponent={<View onLayout={(e: LayoutChangeEvent) => { headerHeight.current = e.nativeEvent.layout.height; }}><BannerCarousel banners={banners} inset={false} /></View>} stickySectionHeadersEnabled={false} onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={VIEWABILITY_CONFIG} onMomentumScrollEnd={settleNow} onScrollToIndexFailed={onScrollToIndexFailed} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={9} contentContainerStyle={{ padding: space.s4, paddingBottom: cart.count > 0 ? 120 : space.s6 }} showsVerticalScrollIndicator={false} />}
     </>}
     {cart.count > 0 ? <View style={[styles.cartBar, { paddingBottom: insets.bottom + space.s2 }]}><Pressable style={[styles.cartBtn, rtlRow]} onPress={() => router.push('/cart')} accessibilityRole="button"><View style={styles.cartCount}><Text variant="label" tone="onEmber" align="center">{cart.count}</Text></View><Text variant="heading" tone="onEmber" style={{ flex: 1 }}>{t('myCart')}</Text><Price amount={cart.subtotal} size={typeScale.body.size} color={colors.onEmber} weight="700" /></Pressable></View> : null}
   </View>;
