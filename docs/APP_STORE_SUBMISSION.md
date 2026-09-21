@@ -598,13 +598,7 @@ a translated key rather than the server's sentence.
 rather than assumed:** the app is **not publicly distributed on either store** —
 Play is internal testing only (`PLAY_STORE_SUBMISSION.md` §2: *"Internal testing
 does not count"*, `track: "internal"`) and iOS is TestFlight internal only.
-**Corrected 2026-09-21: this parenthetical also cited `releaseStatus: "draft"`,
-and that stopped being true the same day** — it is now `completed`. The claim it
-supports is unaffected, because an internal track is not public distribution
-whatever its release status; but the citation had stopped describing the file,
-and a `completed` internal release is precisely the route by which a tester
-receives build 25 instead of a draft nobody can install. A retraction that leaves
-its own citations standing has not retracted anything. Live: **6 distinct people have ever placed an order, 3
+Live: **6 distinct people have ever placed an order, 3
 in the last 30 days** (40 orders in 30 days, 76 all time, last one 2026-09-16),
 with 5 active push devices. Review's second finding on #406 asked for
 "rollout/adoption" as the gate, which is the right instinct and the wrong unit
@@ -612,6 +606,18 @@ here: there is no public rollout to wait on, and the honest version of the rule
 is a checkable list of testers rather than an adoption curve. **Re-measure
 before relying on this — the moment either store goes to a public track, the
 bound stops holding.**
+
+**Corrected 2026-09-21: the citation above also listed `releaseStatus: "draft"`,
+and that stopped being true the same day** — it is now `completed`. The claim it
+supports is unaffected, because an internal track is not public distribution
+whatever its release status. But the citation had stopped describing the file,
+and a reader checking it would have found it false with no way to tell a stale
+record from a wrong conclusion. There is a second-order point worth keeping: a
+`completed` internal release is precisely the route by which a tester receives
+build 25 instead of a draft nobody can install, so the change makes this
+precondition easier to satisfy rather than harder. **A retraction that leaves its
+own citations standing has not retracted anything** — the same defect recorded
+against `OWNER_ACTIONS` §40.2, caught here in a different document.
 7. **Enter the App Privacy answers** from §4 in the console.
 8. **Enter the test information** from §6.
 9. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
