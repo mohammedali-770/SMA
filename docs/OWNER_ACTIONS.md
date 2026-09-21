@@ -2765,9 +2765,24 @@ list is the whole job. Detail, and the `eas.json` consequence:
    is settled: it does. Evidence in
    [`PLAY_STORE_SUBMISSION.md`](PLAY_STORE_SUBMISSION.md) §4a.
 5. **Create a Google Cloud service account, grant it Play Developer API access,
-   download the JSON key, and upload it to EAS** — **OPEN.** `eas credentials
-   --platform android`, or a path in `eas.json`. **Do not commit the key itself**
-   (§9). This is what makes every release *after* the first unattended.
+   download the JSON key, and upload it to EAS** — **OPEN, and now MEASURED
+   rather than predicted.** On 2026-09-21 a submission of Android versionCode 4
+   to the internal track was attempted and refused at the credential step:
+
+   ```
+   Looking up credentials configuration for sa.com.spicymeal.app...
+   Google Service Account Keys cannot be set up in --non-interactive mode.
+       Error: submit command failed.
+   ```
+
+   **So `eas submit -p android` cannot run at all today** — not merely "every
+   release after the first is attended". The AAB exists and is uploadable by hand
+   in Play Console; nothing automated can place it there.
+
+   `eas credentials --platform android`, or a path in `eas.json`. **Do not commit
+   the key itself** (§9) — and note that this one genuinely cannot pass through
+   an agent session: it is a private key, and the only safe handling is for it to
+   go from Google Cloud straight to EAS.
 
 **That prerequisite is now satisfied, and the ordering it warned about was
 already reversed.** §34's map-processor correction is published as `privacy_policy`

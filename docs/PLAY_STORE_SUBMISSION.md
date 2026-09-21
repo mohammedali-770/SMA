@@ -109,30 +109,54 @@ as soon as the listing is complete.
 ### What this means for `eas.json`
 
 `apps/mobile/eas.json`'s `submit.production.android` carried
-`{ "track": "internal", "releaseStatus": "draft" }`. Both values are wrong for
-this path, and neither fails loudly:
+`{ "track": "internal", "releaseStatus": "draft" }`. Both values were wrong for
+this path, and neither failed loudly — though, as the amendment below records,
+they were not wrong in the same way, and only one of them has been changed:
 
 - **`track: "internal"`** puts every automated submission on internal testing,
   which does not count toward the requirement. You could run it for a month and
   be no closer to production.
 - **`releaseStatus: "draft"`** is not distributed to testers at all, so even on
   the right track it would not start the clock. Testers need a `completed`
-  release.
+  release. **CHANGED 2026-09-21 to `completed`** — see the amendment below.
 
-**`eas.json` IS UNCHANGED, and an earlier draft of this paragraph claimed
-otherwise.** It said "the file now carries a comment saying so". It does not, and
-Codex caught the false claim on #385 by reading the file. The correction is worth
-more than the sentence it replaces: a document asserting a safeguard that is not
-there is worse than one that admits the gap, because the next reader stops
-looking.
+**`eas.json` CARRIES NO COMMENT SAYING ANY OF THIS, and an earlier draft of this
+paragraph claimed it did.** It said "the file now carries a comment saying so".
+It does not, and Codex caught the false claim on #385 by reading the file. The
+correction is worth more than the sentence it replaces: a document asserting a
+safeguard that is not there is worse than one that admits the gap, because the
+next reader stops looking.
 
-**Nothing is changed there yet, deliberately.** `track: "internal"` is correct
-for the track actually in use today, and wrong only for the closed track — which
-does not exist yet. **Do not hardcode a replacement from memory:** Google's own
-API documentation says closed tracks "are created manually and they have custom
-names", so `alpha` is only the legacy well-known one and may not be what your
-track is called. Create the closed test in Play Console, read the track name it
-gives you, then set `track` to that and `releaseStatus` to `completed`.
+**That headline read "`eas.json` IS UNCHANGED" until 2026-09-21, when it stopped
+being true and was not updated in the same edit** — the amendment immediately
+below changed `releaseStatus` while this paragraph went on asserting, in bold,
+that the file had not moved. Codex caught that one too, on #414. The part that
+survives is narrower and still worth stating: `track` is unchanged, and the file
+carries no explanatory comment either way.
+
+**AMENDED 2026-09-21 — `releaseStatus` IS NOW `completed`; `track` is still
+`internal` and still deliberately unchanged.**
+
+The two values were never wrong in the same way, and treating them as a pair was
+the mistake. `track: "internal"` is correct for the track actually in use and
+wrong only for a closed track that does not exist yet. `releaseStatus: "draft"`
+was wrong for **every** track, including the one in use: a draft release reaches
+nobody, so an automated submission produced an artifact no tester could install.
+
+**It was changed when the gap became concrete rather than theoretical.** Asked to
+submit versionCode 4 to internal testing, submitting as configured would have
+uploaded a draft — consuming the version code on a release only a manual Play
+Console rollout could rescue, since version codes are unique and cannot be
+resubmitted. That is the cost this paragraph's "nothing is changed yet" was
+quietly carrying.
+
+**`track` still needs the closed-track treatment when that track exists, and the
+warning that follows stands unchanged. Do not hardcode a replacement from
+memory:** Google's own API documentation says closed tracks "are created
+manually and they have custom names", so `alpha` is only the legacy well-known
+one and may not be what your track is called. Create the closed test in Play
+Console, read the track name it gives you, then set `track` to that and
+`releaseStatus` to `completed`.
 
 The reasoning could not live in the file either — `eas.json` is JSON and comment
 support is undocumented for it, so a `//` key is a guess. It lives here and as a
