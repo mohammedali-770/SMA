@@ -2878,17 +2878,35 @@ Four migrations make it possible for a branch to close **one price tier** —
 Three are server work; the fourth is the switch that decides when cashiers see
 the buttons.
 
-**40.1, 40.2 AND 40.3 ARE ALL DONE.** The four migrations were applied
-2026-09-17; both binaries were built from `b7868e2` and iOS 1.0.0 (25) was
-submitted to TestFlight on 2026-09-20; and the switch was flipped the same day
-at 07:47:05 UTC. **Per-size closing is live in the branch console.**
+**§40 IS COMPLETE. VERIFIED END TO END ON A REAL DEVICE, 2026-09-21.** The four
+migrations were applied 2026-09-17; the switch was flipped 2026-09-20 07:47:05
+UTC; and the whole chain was exercised by the owner against iOS build 27 — close
+a size in the branch console, and every surface behaves:
+
+| surface | verified |
+| --- | --- |
+| branch console headline | names the closed size instead of "كل الأصناف متاحة" |
+| call-centre board | the branch appears, the size is named with its reason and countdown |
+| admin push | arrives |
+| customer app | the closed size is greyed out with a reason; other sizes still order |
+| **checkout** | **refuses with the server's sentence, not the generic payment error** |
+| every size closed | the item reports as unorderable rather than "sizes closed" |
+
+**THE CHECKOUT ROW IS THE ONE THAT MATTERED.** It is the entire reason builds 25,
+26 and 27 exist, and until this test it had never been observed working by a
+human — only asserted from the code. The two console surfaces in that table were
+fixed the same morning (#408) and had likewise never been seen working.
 
 **What is left is not a step in this sequence.** 40.4 (a native Arabic read of
-five console strings) is optional and does not block anything. The one operational
-precondition that still binds is stated in 40.3 and is about CLOSING a size
-rather than about the switch: get build 25 onto every device that can order
-before a size is closed for real, because an older client accepts a closed size
-and then fails with a generic error at the payment step.
+five console strings) is optional and blocks nothing.
+
+**The precondition in 40.3 has been DISCHARGED for iOS and still binds for
+Android.** It was: get a build carrying the customer half onto every device that
+can order, before a size is closed for real. iOS build 27 is installed. The
+Android artifact on EAS is versionCode 3, built from `b7868e2` — it carries the
+per-size customer half but predates the category-chip fixes, and no Android
+device is in the hands of a customer, so nothing is exposed today. Ship a current
+Android build before that changes.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 

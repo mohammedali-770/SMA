@@ -20,9 +20,11 @@
 | App Store Connect app record | exists — ASC App ID **6800210683**, bundle `com.spicymeal.app` |
 | ASC API key in EAS | working — `W7LY8D9FKX` (`[Expo] EAS Submit kROBQixX90`), read and write both exercised 2026-09-16 |
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
-| newest iOS build | **1.0.0 (25)**, `8df309aa-434b-46ad-8bfa-4566c68e6763`, commit `b7868e2`, FINISHED 2026-09-20 06:54 UTC |
-| **build 25 uploaded to App Store Connect** | **YES, 2026-09-20 07:19:28 UTC** — and EAS reported the submission ERRORED again, for the same reason. §3a |
-| **build 25 live in TestFlight** | **not yet confirmed.** The upload completed and Apple was processing; confirm by INSTALLING it, not by reading a status |
+| newest iOS build | **1.0.0 (27)**, `c285ee99-5566-41bf-9832-fe15175795ce`, commit `0969b1f8`, FINISHED 2026-09-20 17:05 UTC |
+| **build 27 uploaded to App Store Connect** | **YES** — and the submission reported SUCCESS, unlike 24 and 25. §3a |
+| **build 27 live in TestFlight** | **YES** — installed and exercised on a real device 2026-09-21. Confirmed by USE, not by an API read |
+| what 27 proved | per-size closing end to end, including **checkout naming the closed size**, plus all three category-chip fixes |
+| superseded builds | 25 (`b7868e2`, per-size customer half) and 26 (`47ab0221`, first chip fix). Both were installed and used; neither is current |
 | previous iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
 | **build 24 live in TestFlight** | **YES** — installed and exercised on a real device at 11:11:40 UTC. Confirmed by USE, not by an API read; see §8 |
 | internal testers | **already configured.** Internal testing needs no Beta App Review |
@@ -229,11 +231,27 @@ motion — and no `UIBackgroundModes`.
 This is the most useful operational fact on this page, because the obvious
 response to it is wrong.
 
-**IT HAPPENED AGAIN ON BUILD 25, 2026-09-20, LINE FOR LINE — so treat it as the
-NORMAL behaviour of this path rather than as an Apple outage.** That is the
-single most important amendment this section has had. Two for two is not a
-coincidence, and the practical consequence is that **an `ERRORED` iOS submission
-here is the expected outcome, and reading it as a failure is the mistake**:
+**IT HAPPENED AGAIN ON BUILD 25, 2026-09-20, LINE FOR LINE.** Two for two, which
+at the time read as "this is simply how this path behaves".
+
+**CORRECTED 2026-09-21 — THAT CONCLUSION WAS OVERSTATED, AND THE OVERSTATEMENT IS
+THE MORE USEFUL RECORD.** Builds **26 and 27 both submitted CLEANLY**, reporting
+success with no `ERRORED` status at all. The tally is **2 of 4**, so the failure
+is **INTERMITTENT, not normal**. The sentence this replaces said to treat
+`ERRORED` as "the expected outcome" — a rule induced from two consecutive
+observations, stated as a property of the system, and falsified by the next two.
+**Two samples in a row is a pattern to watch, not a law**; the file should have
+said so.
+
+**What survives the correction is the part that actually matters, and it is
+unchanged: an `ERRORED` submission does not mean the upload failed.** Read the
+log timeline before resubmitting. If `File upload ... completed!` appears, the
+binary is at Apple and the next step is App Store Connect, not another
+submission — build numbers are unique per version train, so a resubmit can only
+be refused. That rule held on all four builds regardless of which status they
+reported.
+
+The two failures were identical to each other:
 
 | | build 24 (2026-09-16) | build 25 (2026-09-20) |
 | --- | --- | --- |
@@ -245,13 +263,18 @@ here is the expected outcome, and reading it as a failure is the mistake**:
 | where the 500 landed | the status poll | the status poll |
 | the transfer itself | succeeded | **succeeded** |
 
-The polling window differing by a factor of two while the outcome is identical is
-itself evidence: the 500 is not a timeout on a slow processing run, it is what
-that endpoint returns.
+The polling window differing by a factor of two while the outcome is identical
+says the 500 is not a timeout on a slow processing run — but note what that does
+and does not support. It rules out "Apple was just slow that day". It does NOT
+establish that the endpoint always answers 500, which is the inference drawn
+here originally and disproved by builds 26 and 27.
 
 **Build 25 was submitted knowing this**, and the failure was predicted out loud
 before the command ran, which is the point of writing it down. Nothing was
 resubmitted on reflex; the log was read first and it said what this table says.
+**The same prediction was made before build 26 and was WRONG** — it succeeded.
+A prediction that holds twice and then fails twice was never a prediction; it
+was a description of the sample.
 
 | UTC | what the log says |
 | --- | --- |
@@ -526,18 +549,23 @@ update both, and Play in particular reuses them for every future review.
    completed **07:19:28**, EAS reported ERRORED for the second-consecutive
    status-poll 500 — §3a. **Not resubmitted**, per the rule that section exists
    to state.
-4. **Confirm build 25 in TestFlight by INSTALLING it**, the same way build 24 was
-   confirmed — nothing in the pipeline can answer "is it installable?", and the
-   one time it was answered by opening the app it found a three-week outage
-   (item 2).
+4. ~~**Confirm the build in TestFlight by INSTALLING it.**~~ **DONE.** Build 25
+   was installed, then 26, then **27** on 2026-09-21 — each confirmed by use
+   rather than by an API read, which is the only answer available here and the
+   one that found a three-week outage the first time (item 2).
 5. ~~**Flip `app_settings.variant_closing_enabled`**~~ — **DONE 2026-09-20
    07:47:05 UTC** on explicit owner approval. It reads `true`, nothing else
    moved, and both client roles were confirmed to read it by performing the
    select rather than checking the grant. `OWNER_ACTIONS.md` §40.3.
-6. **Then** close a size in the branch console and check the customer app refuses
-   it with the server's sentence rather than a generic payment error. If
-   anything is wrong, flip the flag back: one statement, reversible, and with no
-   size closed the system is exactly where it started.
+6. ~~**Then close a size and check checkout names it.**~~ **DONE 2026-09-21,
+   AND THIS IS THE ROW THAT MATTERED.** Verified on build 27 across every
+   surface: branch console headline, call-centre board, admin push, the greyed
+   size in the app, and — the point of the whole exercise — **checkout refusing
+   with the server's sentence rather than the generic payment error**. Closing
+   every size of an item reports it as unorderable rather than merely "sizes
+   closed". Until this test, none of the checkout behaviour and neither console
+   surface had been observed working by a human; they were asserted from the
+   code. `OWNER_ACTIONS.md` §40.
 
 **Steps 5 and 6 are in that order for a reason, and an earlier revision of this
 list had them the other way round — which was IMPOSSIBLE TO FOLLOW.** It said to
