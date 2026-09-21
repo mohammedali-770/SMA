@@ -2920,11 +2920,28 @@ two console surfaces need re-testing because they were broken when last observed
 checkout and the all-sizes-closed case have never been observed at all. 40.4 (a
 native Arabic read of five console strings) remains optional and blocks nothing.
 
-**The precondition in 40.3 is discharged for iOS and still binds for Android.**
-iOS build 27 is installed. The Android artifact on EAS is versionCode 3, built
-from `b7868e2` — it carries the per-size customer half but predates the
-category-chip fixes, and no Android device is in a customer's hands, so nothing
-is exposed today. Ship a current Android build before that changes.
+**THE PRECONDITION IN 40.3 IS NOT DISCHARGED, AND A DRAFT OF THIS SECTION SAID
+IT WAS FOR iOS.** The precondition is that **every device that can order** carries
+the customer half — not that one does. Review caught the overstatement, and the
+live inventory settles it: `push_devices` holds **5 active iOS devices belonging
+to 5 distinct customers, last seen 2026-09-16**. Build 25, the first to carry the
+customer half, was not produced until 2026-09-20. **So four devices besides the
+owner's are on a build that predates it**, and a real closure would give each of
+them the generic payment-step error.
+
+One device having the fix is evidence about that device. The precondition is
+about the set.
+
+**What would actually discharge it:** confirm each of the five customers is on
+build 25 or later, or accept that a closure exposes the others. The device rows
+carry no app-version column, so this cannot be read from the database — it needs
+either a TestFlight tester-by-tester check or a deliberate decision that the four
+dormant accounts do not matter. **Neither has been done.**
+
+**Android is the same shape, one step earlier.** versionCode 4 (`9db239ed`)
+carries both the customer half and the chip fixes, but no Android device has ever
+registered a push token, so nothing is exposed there today — and that is a fact
+about there being no Android users at all, not about readiness.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
@@ -2968,10 +2985,17 @@ can be written.
 **Both binaries are built from `b7868e2`**, the merged head carrying the customer
 half: iOS **1.0.0 (25)** and Android **versionCode 3**. iOS was submitted to
 TestFlight the same day — the upload completed 07:19:28 and EAS reported ERRORED
-anyway, which is the expected behaviour of that path and not a failure
-(`docs/APP_STORE_SUBMISSION.md` §3a). The Android AAB is built and **not**
-submitted. **What remains is installing 25 and opening it**, which nothing in the
-pipeline can do for you.
+anyway. **That is INTERMITTENT, not expected**: builds 26 and 27 both submitted
+cleanly, so the tally is 2 of 4 and a future `ERRORED` must be investigated
+rather than waved through (`docs/APP_STORE_SUBMISSION.md` §3a, corrected
+2026-09-21 — an earlier version of this sentence said "the expected behaviour of
+that path", which is exactly the dismissal the correction exists to prevent).
+What survives unchanged: an `ERRORED` status does not mean the upload failed, so
+read the log before resubmitting.
+
+**Superseded by later builds.** iOS is now on **1.0.0 (27)** (commit `0969b1f8`,
+carrying the category-chip fixes as well) and the Android artifact is
+**versionCode 4** (commit `9db239ed`, with the SDK patch drift resolved).
 
 The reason the ordering exists, unchanged: the customer app **without** this half
 does not know a size can be closed. A closed tier passes every client-side check,
