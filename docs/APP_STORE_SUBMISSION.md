@@ -23,7 +23,7 @@
 | newest iOS build | **1.0.0 (27)**, `c285ee99-5566-41bf-9832-fe15175795ce`, commit `0969b1f8`, FINISHED 2026-09-20 17:05 UTC |
 | **build 27 uploaded to App Store Connect** | **YES** — and the submission reported SUCCESS, unlike 24 and 25. §3a |
 | **build 27 live in TestFlight** | **YES** — installed and exercised on a real device 2026-09-21. Confirmed by USE, not by an API read |
-| what 27 proved | per-size closing end to end, including **checkout naming the closed size**, plus all three category-chip fixes |
+| what 27 carries | all three category-chip fixes and the per-size customer half. **What it has PROVED is narrower** — see §8 item 6; the checkout refusal remains unobserved |
 | superseded builds | 25 (`b7868e2`, per-size customer half) and 26 (`47ab0221`, first chip fix). Both were installed and used; neither is current |
 | previous iOS build | **1.0.0 (24)**, `91dfe52c-03a1-4846-8401-7c28e60bed9d`, commit `8e4cd8a1`, FINISHED 2026-09-16 |
 | **build 24 live in TestFlight** | **YES** — installed and exercised on a real device at 11:11:40 UTC. Confirmed by USE, not by an API read; see §8 |
@@ -557,15 +557,18 @@ update both, and Play in particular reuses them for every future review.
    07:47:05 UTC** on explicit owner approval. It reads `true`, nothing else
    moved, and both client roles were confirmed to read it by performing the
    select rather than checking the grant. `OWNER_ACTIONS.md` §40.3.
-6. ~~**Then close a size and check checkout names it.**~~ **DONE 2026-09-21,
-   AND THIS IS THE ROW THAT MATTERED.** Verified on build 27 across every
-   surface: branch console headline, call-centre board, admin push, the greyed
-   size in the app, and — the point of the whole exercise — **checkout refusing
-   with the server's sentence rather than the generic payment error**. Closing
-   every size of an item reports it as unorderable rather than merely "sizes
-   closed". Until this test, none of the checkout behaviour and neither console
-   surface had been observed working by a human; they were asserted from the
-   code. `OWNER_ACTIONS.md` §40.
+6. **Close a size and check checkout names it. STILL OUTSTANDING — and a draft
+   of this list claimed it was done.** Of the six surfaces, two are confirmed
+   (the app greys the size; admin push arrives — owner, 2026-09-20), two were
+   observed BROKEN on 2026-09-20 and fixed by #408 without being re-tested (the
+   branch console headline and the call-centre board), and two have never been
+   observed at all: **checkout refusing by name**, and an item with every size
+   closed reporting as unorderable.
+
+   **The checkout row is the point of builds 25, 26 and 27** and is asserted from
+   the code, never seen. The correction and how the false claim arose — a short
+   "all works" read as covering a six-row test, against a live audit trail
+   showing ZERO writes that day — are recorded in `OWNER_ACTIONS.md` §40.
 
 **Steps 5 and 6 are in that order for a reason, and an earlier revision of this
 list had them the other way round — which was IMPOSSIBLE TO FOLLOW.** It said to

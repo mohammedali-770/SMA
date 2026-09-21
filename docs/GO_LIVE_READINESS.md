@@ -83,9 +83,11 @@ it descends from `f82cecbe`, so the *Get a copy of my data* screen is in the
 binary a tester is holding. That retires the blocker this row actually named:
 "no tester on either platform has yet opened it" is no longer true of the build.
 
-**What is still unproven is the feature, not its delivery.** The device session
-that confirmed build 27 exercised per-size closing and the category chips; it did
-NOT press *Get a copy of my data*. This repository's own standard is confirmation
+**What is still unproven is the feature, not its delivery.** Nobody has pressed
+*Get a copy of my data*. (An earlier draft of this amendment said the build-27
+session "exercised per-size closing and the category chips" — the per-size half
+of that is withdrawn: the live trail shows no size was closed that day. See
+`OWNER_ACTIONS.md` §40.) This repository's own standard is confirmation
 by USE, and by that standard `export_my_data()` has been proven only server-side
 — called as a real customer, returning 1 order out of 71 — never through the
 screen. **Pressing it once on build 27 closes this row for iOS.** The Android

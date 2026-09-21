@@ -2878,35 +2878,53 @@ Four migrations make it possible for a branch to close **one price tier** —
 Three are server work; the fourth is the switch that decides when cashiers see
 the buttons.
 
-**§40 IS COMPLETE. VERIFIED END TO END ON A REAL DEVICE, 2026-09-21.** The four
-migrations were applied 2026-09-17; the switch was flipped 2026-09-20 07:47:05
-UTC; and the whole chain was exercised by the owner against iOS build 27 — close
-a size in the branch console, and every surface behaves:
+**§40 IS NOT COMPLETE, AND AN EARLIER DRAFT OF THIS SECTION SAID IT WAS.**
+The four migrations were applied 2026-09-17 and the switch was flipped 2026-09-20
+07:47:05 UTC, so the mechanism is live. **What has NOT been demonstrated is the
+customer-facing half.**
 
-| surface | verified |
-| --- | --- |
-| branch console headline | names the closed size instead of "كل الأصناف متاحة" |
-| call-centre board | the branch appears, the size is named with its reason and countdown |
-| admin push | arrives |
-| customer app | the closed size is greyed out with a reason; other sizes still order |
-| **checkout** | **refuses with the server's sentence, not the generic payment error** |
-| every size closed | the item reports as unorderable rather than "sizes closed" |
+**Where the evidence actually stands**, from the owner's own report on 2026-09-20
+and from the live audit trail:
 
-**THE CHECKOUT ROW IS THE ONE THAT MATTERED.** It is the entire reason builds 25,
-26 and 27 exist, and until this test it had never been observed working by a
-human — only asserted from the code. The two console surfaces in that table were
-fixed the same morning (#408) and had likewise never been seen working.
+| surface | status | evidence |
+| --- | --- | --- |
+| customer app greys the closed size | ✅ | owner, 2026-09-20, on build 25 |
+| admin push arrives | ✅ | owner, and 8 `admin_push_outbox` rows, newest 2026-09-20 08:00 |
+| branch console headline | ❌ then FIXED, **not re-tested** | reported wrong 2026-09-20; fixed by #408 the same day |
+| call-centre board | ❌ then FIXED, **not re-tested** | reported wrong 2026-09-20; fixed by #408 the same day |
+| **checkout refuses by name** | **NEVER TESTED** | no evidence of any kind |
+| every size closed ⇒ item unorderable | **NEVER TESTED** | no evidence of any kind |
 
-**What is left is not a step in this sequence.** 40.4 (a native Arabic read of
-five console strings) is optional and blocks nothing.
+**THE CHECKOUT ROW IS THE ONE THAT MATTERS AND IT IS STILL OPEN.** It is the
+entire reason builds 25, 26 and 27 exist. It has been asserted from the code and
+never observed.
 
-**The precondition in 40.3 has been DISCHARGED for iOS and still binds for
-Android.** It was: get a build carrying the customer half onto every device that
-can order, before a size is closed for real. iOS build 27 is installed. The
-Android artifact on EAS is versionCode 3, built from `b7868e2` — it carries the
-per-size customer half but predates the category-chip fixes, and no Android
-device is in the hands of a customer, so nothing is exposed today. Ship a current
-Android build before that changes.
+**HOW THIS SECTION CAME TO CLAIM OTHERWISE IS WORTH MORE THAN THE CORRECTION.**
+On 2026-09-21 the owner installed build 27 and said "all works". A draft of this
+section read that as covering a six-row test proposed in chat and wrote the whole
+table as verified fact. **The live audit trail refutes it: ZERO writes on
+2026-09-21** — no `branch_variant_availability` change (newest is 2026-09-20
+08:31), no `admin_push_outbox` row (newest 2026-09-20 08:00), no order (newest
+2026-09-16). Closing a size writes a row; none was written; so no size was
+closed. The most likely referent of "all works" is the category-chip fixes, which
+leave no trace at all — and which were the first thing the chat message asked
+about.
+
+**The rule, stated because this repository keeps paying for it: a short
+affirmation does not inherit the scope of the question that preceded it.** Ask
+which surfaces were exercised, or read the trail. An agreement is not a
+measurement.
+
+**What is left.** Close a size on build 27 and check the four untested rows. The
+two console surfaces need re-testing because they were broken when last observed;
+checkout and the all-sizes-closed case have never been observed at all. 40.4 (a
+native Arabic read of five console strings) remains optional and blocks nothing.
+
+**The precondition in 40.3 is discharged for iOS and still binds for Android.**
+iOS build 27 is installed. The Android artifact on EAS is versionCode 3, built
+from `b7868e2` — it carries the per-size customer half but predates the
+category-chip fixes, and no Android device is in a customer's hands, so nothing
+is exposed today. Ship a current Android build before that changes.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
