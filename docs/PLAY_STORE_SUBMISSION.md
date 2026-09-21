@@ -151,11 +151,12 @@ resubmitted. That is the cost this paragraph's "nothing is changed yet" was
 quietly carrying.
 
 **`track` still needs the closed-track treatment when that track exists, and the
-warning below stands unchanged:** do not hardcode a replacement from memory. **Do not hardcode a replacement from memory:** Google's own
-API documentation says closed tracks "are created manually and they have custom
-names", so `alpha` is only the legacy well-known one and may not be what your
-track is called. Create the closed test in Play Console, read the track name it
-gives you, then set `track` to that and `releaseStatus` to `completed`.
+warning that follows stands unchanged. Do not hardcode a replacement from
+memory:** Google's own API documentation says closed tracks "are created
+manually and they have custom names", so `alpha` is only the legacy well-known
+one and may not be what your track is called. Create the closed test in Play
+Console, read the track name it gives you, then set `track` to that and
+`releaseStatus` to `completed`.
 
 The reasoning could not live in the file either — `eas.json` is JSON and comment
 support is undocumented for it, so a `//` key is a guess. It lives here and as a
