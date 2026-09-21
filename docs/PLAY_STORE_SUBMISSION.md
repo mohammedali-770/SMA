@@ -117,7 +117,7 @@ this path, and neither fails loudly:
   be no closer to production.
 - **`releaseStatus: "draft"`** is not distributed to testers at all, so even on
   the right track it would not start the clock. Testers need a `completed`
-  release.
+  release. **CHANGED 2026-09-21 to `completed`** — see the amendment below.
 
 **`eas.json` IS UNCHANGED, and an earlier draft of this paragraph claimed
 otherwise.** It said "the file now carries a comment saying so". It does not, and
@@ -126,9 +126,24 @@ more than the sentence it replaces: a document asserting a safeguard that is not
 there is worse than one that admits the gap, because the next reader stops
 looking.
 
-**Nothing is changed there yet, deliberately.** `track: "internal"` is correct
-for the track actually in use today, and wrong only for the closed track — which
-does not exist yet. **Do not hardcode a replacement from memory:** Google's own
+**AMENDED 2026-09-21 — `releaseStatus` IS NOW `completed`; `track` is still
+`internal` and still deliberately unchanged.**
+
+The two values were never wrong in the same way, and treating them as a pair was
+the mistake. `track: "internal"` is correct for the track actually in use and
+wrong only for a closed track that does not exist yet. `releaseStatus: "draft"`
+was wrong for **every** track, including the one in use: a draft release reaches
+nobody, so an automated submission produced an artifact no tester could install.
+
+**It was changed when the gap became concrete rather than theoretical.** Asked to
+submit versionCode 4 to internal testing, submitting as configured would have
+uploaded a draft — consuming the version code on a release only a manual Play
+Console rollout could rescue, since version codes are unique and cannot be
+resubmitted. That is the cost this paragraph's "nothing is changed yet" was
+quietly carrying.
+
+**`track` still needs the closed-track treatment when that track exists, and the
+warning below stands unchanged:** do not hardcode a replacement from memory. **Do not hardcode a replacement from memory:** Google's own
 API documentation says closed tracks "are created manually and they have custom
 names", so `alpha` is only the legacy well-known one and may not be what your
 track is called. Create the closed test in Play Console, read the track name it
