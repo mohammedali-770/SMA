@@ -597,8 +597,14 @@ a translated key rather than the server's sentence.
 **The population that has to be on 25 is small and bounded, measured 2026-09-20
 rather than assumed:** the app is **not publicly distributed on either store** —
 Play is internal testing only (`PLAY_STORE_SUBMISSION.md` §2: *"Internal testing
-does not count"*, `track: "internal"`, `releaseStatus: "draft"`) and iOS is
-TestFlight internal only. Live: **6 distinct people have ever placed an order, 3
+does not count"*, `track: "internal"`) and iOS is TestFlight internal only.
+**Corrected 2026-09-21: this parenthetical also cited `releaseStatus: "draft"`,
+and that stopped being true the same day** — it is now `completed`. The claim it
+supports is unaffected, because an internal track is not public distribution
+whatever its release status; but the citation had stopped describing the file,
+and a `completed` internal release is precisely the route by which a tester
+receives build 25 instead of a draft nobody can install. A retraction that leaves
+its own citations standing has not retracted anything. Live: **6 distinct people have ever placed an order, 3
 in the last 30 days** (40 orders in 30 days, 76 all time, last one 2026-09-16),
 with 5 active push devices. Review's second finding on #406 asked for
 "rollout/adoption" as the gate, which is the right instinct and the wrong unit
