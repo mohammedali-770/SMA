@@ -2878,17 +2878,70 @@ Four migrations make it possible for a branch to close **one price tier** —
 Three are server work; the fourth is the switch that decides when cashiers see
 the buttons.
 
-**40.1, 40.2 AND 40.3 ARE ALL DONE.** The four migrations were applied
-2026-09-17; both binaries were built from `b7868e2` and iOS 1.0.0 (25) was
-submitted to TestFlight on 2026-09-20; and the switch was flipped the same day
-at 07:47:05 UTC. **Per-size closing is live in the branch console.**
+**§40 IS NOT COMPLETE, AND AN EARLIER DRAFT OF THIS SECTION SAID IT WAS.**
+The four migrations were applied 2026-09-17 and the switch was flipped 2026-09-20
+07:47:05 UTC, so the mechanism is live. **What has NOT been demonstrated is the
+customer-facing half.**
 
-**What is left is not a step in this sequence.** 40.4 (a native Arabic read of
-five console strings) is optional and does not block anything. The one operational
-precondition that still binds is stated in 40.3 and is about CLOSING a size
-rather than about the switch: get build 25 onto every device that can order
-before a size is closed for real, because an older client accepts a closed size
-and then fails with a generic error at the payment step.
+**Where the evidence actually stands**, from the owner's own report on 2026-09-20
+and from the live audit trail:
+
+| surface | status | evidence |
+| --- | --- | --- |
+| customer app greys the closed size | ✅ | owner, 2026-09-20, on build 25 |
+| admin push arrives | ✅ | owner, and 8 `admin_push_outbox` rows, newest 2026-09-20 08:00 |
+| branch console headline | ❌ then FIXED, **not re-tested** | reported wrong 2026-09-20; fixed by #408 the same day |
+| call-centre board | ❌ then FIXED, **not re-tested** | reported wrong 2026-09-20; fixed by #408 the same day |
+| **checkout refuses by name** | **NEVER TESTED** | no evidence of any kind |
+| every size closed ⇒ item unorderable | **NEVER TESTED** | no evidence of any kind |
+
+**THE CHECKOUT ROW IS THE ONE THAT MATTERS AND IT IS STILL OPEN.** It is the
+entire reason builds 25, 26 and 27 exist. It has been asserted from the code and
+never observed.
+
+**HOW THIS SECTION CAME TO CLAIM OTHERWISE IS WORTH MORE THAN THE CORRECTION.**
+On 2026-09-21 the owner installed build 27 and said "all works". A draft of this
+section read that as covering a six-row test proposed in chat and wrote the whole
+table as verified fact. **The live audit trail refutes it: ZERO writes on
+2026-09-21** — no `branch_variant_availability` change (newest is 2026-09-20
+08:31), no `admin_push_outbox` row (newest 2026-09-20 08:00), no order (newest
+2026-09-16). Closing a size writes a row; none was written; so no size was
+closed. The most likely referent of "all works" is the category-chip fixes, which
+leave no trace at all — and which were the first thing the chat message asked
+about.
+
+**The rule, stated because this repository keeps paying for it: a short
+affirmation does not inherit the scope of the question that preceded it.** Ask
+which surfaces were exercised, or read the trail. An agreement is not a
+measurement.
+
+**What is left.** Close a size on build 27 and check the four untested rows. The
+two console surfaces need re-testing because they were broken when last observed;
+checkout and the all-sizes-closed case have never been observed at all. 40.4 (a
+native Arabic read of five console strings) remains optional and blocks nothing.
+
+**THE PRECONDITION IN 40.3 IS NOT DISCHARGED, AND A DRAFT OF THIS SECTION SAID
+IT WAS FOR iOS.** The precondition is that **every device that can order** carries
+the customer half — not that one does. Review caught the overstatement, and the
+live inventory settles it: `push_devices` holds **5 active iOS devices belonging
+to 5 distinct customers, last seen 2026-09-16**. Build 25, the first to carry the
+customer half, was not produced until 2026-09-20. **So four devices besides the
+owner's are on a build that predates it**, and a real closure would give each of
+them the generic payment-step error.
+
+One device having the fix is evidence about that device. The precondition is
+about the set.
+
+**What would actually discharge it:** confirm each of the five customers is on
+build 25 or later, or accept that a closure exposes the others. The device rows
+carry no app-version column, so this cannot be read from the database — it needs
+either a TestFlight tester-by-tester check or a deliberate decision that the four
+dormant accounts do not matter. **Neither has been done.**
+
+**Android is the same shape, one step earlier.** versionCode 4 (`9db239ed`)
+carries both the customer half and the chip fixes, but no Android device has ever
+registered a push token, so nothing is exposed there today — and that is a fact
+about there being no Android users at all, not about readiness.
 
 ### 40.1 Apply the four migrations, in order, each named by version — DONE 2026-09-17
 
@@ -2932,10 +2985,17 @@ can be written.
 **Both binaries are built from `b7868e2`**, the merged head carrying the customer
 half: iOS **1.0.0 (25)** and Android **versionCode 3**. iOS was submitted to
 TestFlight the same day — the upload completed 07:19:28 and EAS reported ERRORED
-anyway, which is the expected behaviour of that path and not a failure
-(`docs/APP_STORE_SUBMISSION.md` §3a). The Android AAB is built and **not**
-submitted. **What remains is installing 25 and opening it**, which nothing in the
-pipeline can do for you.
+anyway. **That is INTERMITTENT, not expected**: builds 26 and 27 both submitted
+cleanly, so the tally is 2 of 4 and a future `ERRORED` must be investigated
+rather than waved through (`docs/APP_STORE_SUBMISSION.md` §3a, corrected
+2026-09-21 — an earlier version of this sentence said "the expected behaviour of
+that path", which is exactly the dismissal the correction exists to prevent).
+What survives unchanged: an `ERRORED` status does not mean the upload failed, so
+read the log before resubmitting.
+
+**Superseded by later builds.** iOS is now on **1.0.0 (27)** (commit `0969b1f8`,
+carrying the category-chip fixes as well) and the Android artifact is
+**versionCode 4** (commit `9db239ed`, with the SDK patch drift resolved).
 
 The reason the ordering exists, unchanged: the customer app **without** this half
 does not know a size can be closed. A closed tier passes every client-side check,
