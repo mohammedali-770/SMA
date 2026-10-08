@@ -121,7 +121,7 @@ has, so it is a verification list rather than an aspiration.
 | D2 | RLS on customer data, deny-by-default | ✅ | Enforced per table; `otp_send_reservations` is the recent example — RLS on, **zero policies**, service-role only. |
 | D3 | Admin actions require role **and** AAL2 | ⚠️ one exception, corrected 2026-09-03 | `public.is_admin()` checks both, and the **four** admin Edge Functions were corrected **and deployed**. This row previously also claimed `payment-test-config`; that is **false in Production** and was corrected here after reading the deployed bundle: `payment-test-config` v3 (deployed 2026-07-12) still runs `if (!profile \|\| profile.role !== 'admin')` — role only, no AAL2. The repository version calls `is_admin()`; the deploy was consciously not done (CLAUDE.md §6 says so explicitly), and this table said otherwise. It matters because that function's `verify_order` reaches `confirm_order_payment` through the service-role client, bypassing RLS. Practically unreachable today — online payment is off, so no CAPTURED charge can exist, and the one admin holds a verified TOTP factor — but it is a live AAL1 hole, and it cannot be shipped alone (see the addendum, payment bundles). |
 | D4 | Authentication rate limiting | ✅ | Live since 2026-09-02: `auth-send-sms-whatsapp` v2 reserves against a shared per-phone budget before every send — 60 s cooldown, 5/hour, 10/day ([`WHATSAPP_LOGIN.md`](WHATSAPP_LOGIN.md)). **Not yet exercised by a real customer login.** |
-| D5 | Dependency advisories gated in CI | ⚠️ | `Dependency audit (high+)` runs on every PR. One standing exception — two `image-size` advisories with no patched release — **expires 2026-10-02** ([`DEPENDENCY_ADVISORIES.md`](DEPENDENCY_ADVISORIES.md)). If it lapses, every merge blocks. |
+| D5 | Dependency advisories gated in CI | ⚠️ | `Dependency audit (high+)` runs on every PR. **Two standing exceptions — `braces` and `node-forge`, both with no patched release, both build/CLI-only and absent from the customer bundle — expire 2026-11-07** ([`DEPENDENCY_ADVISORIES.md`](DEPENDENCY_ADVISORIES.md) §3.2–3.3). **This row's own warning came true:** the previous `image-size` exception lapsed on 2026-10-02 and every merge blocked, and its expiry message hid five newer root advisories including a **CRITICAL** (`shell-quote`) until 2026-10-08. All five with a published fix are now fixed; `image-size` is gone from the tree (§4.5); and the gate now names every advisory before any verdict, so an expired date can no longer be the only thing it reports. **Re-review before 2026-11-07 — set a reminder rather than relying on this row**, which predicted the last lapse and did not prevent it. |
 | D6 | No orphan privileged accounts | ✅ | `admin@spicymeal.app` — an admin on an **unregistered domain**, never signed in, no TOTP — was deleted 2026-09-02. `customer@spicymeal.app` is banned with its session revoked. |
 | D7 | Transport security | ✅ | Verified 2026-09-03. `app.json` sets **no** `usesCleartextTraffic`, `networkSecurityConfig` or `NSAppTransportSecurity`/`NSAllowsArbitraryLoads` key, so both platforms' secure defaults apply — and on Expo SDK 57 / React Native 0.86 the Android target SDK is well past 28, where cleartext is denied by default. No `http://` endpoint exists in shipped mobile source; the only occurrences are comments, tests, and `webviewPolicy.ts`, which **blocks** `http://` explicitly. |
 
@@ -398,6 +398,13 @@ gate passes, the ancestry is unchanged by the SDK bump, and the expiry stays
 **2026-10-02** — `DEPENDENCY_ADVISORIES.md` says not to extend it merely to keep
 CI green.
 
+> **Superseded 2026-10-08 — kept as written, because it was accurate on the day.**
+> The exception lapsed on 2026-10-02 as predicted and was retired on 2026-10-08
+> by removing `image-size` from the tree rather than by extending it.
+> `DEPENDENCY_ADVISORIES.md` §4.5 records one thing this note's re-review missed:
+> `metro@0.84.5`, which had already dropped `image-size`, was published on
+> 2026-08-19 — the escape was one patch release away the whole time.
+
 ## Go / no-go summary
 
 **Revised 2026-09-03 by the addendum above. The 2026-09-02 list had three items; it
@@ -505,7 +512,8 @@ time, and automatic refund *enrolment* against disabled refund *processing*.
 **Accepted or decided risks, recorded rather than re-argued:** A4/B2 (opt-out
 marketing push, accepted 2026-08-20 — note the live audience is 4 devices, 1 opted
 into promos), C2 (`ACCESS_FINE_LOCATION` breadth), E2 (single admin — break-glass
-exists), D5 (`image-size` exception until 2026-10-02), G6 (campaigns built but
+exists), D5 (`braces` and `node-forge` exceptions until 2026-11-07 — no patched
+release, build/CLI-only), G6 (campaigns built but
 unreachable), G7 (no operator view of failed refunds — costless for a cash launch).
 
 **The largest unknowns are still legal, not technical.** Everything in section A
