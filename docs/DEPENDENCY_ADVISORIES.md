@@ -204,6 +204,42 @@ confirmed before its verdict was counted:**
 | a real critical (lockfile-confirmed: 6 critical records) | killed |
 | a critical plus an expired date — the state of 2026-10-02 to 2026-10-08 | killed — and names the critical |
 
+### What the gate cannot see — stated rather than implied
+
+**The gate bounds the dependency graph, and the graph cannot tell build-time
+from runtime use.** That is a real limit, and a third review pass on #416 reached
+it. Its finding: a *new* customer-runtime dependency that itself depends on
+`@expo/code-signing-certificates` would be absorbed into the approved closure,
+and the gate would pass.
+
+It cannot be closed by bounding one more hop, and that was measured rather than
+argued. `node-forge`'s chain runs
+`node-forge ← @expo/cli ← expo ← @sentry/react-native` — and `expo` and
+`@sentry/react-native` are packages that **ship in the customer app** and
+legitimately list the CLI as a dependency. Any bound strict enough to reject a
+hypothetical runtime consumer also rejects that legitimate edge, i.e. today's
+tree. Each additional bound only moves the open edge one hop higher. The review
+findings went 3 → 1 → 1, each the same class one level up; the gate stopped being
+extended there on purpose.
+
+**So what the gate does and does not guarantee:**
+
+- **Guaranteed:** no listed package or approved parent is declared by the app or
+  imported by its source; no unapproved parent reaches the excepted packages; no
+  other high or any critical passes; code signing cannot be switched on silently;
+  and a stale or expired entry fails loudly.
+- **Not guaranteed:** that a *new* third-party dependency does not pull `node-forge`
+  or `braces` into the customer bundle through a CLI library it depends on. Adding
+  such a dependency is a deliberate act the gate does not detect.
+
+**The question that actually matters — does this code reach a customer? — is a
+property of the built bundle, not the graph.** It was answered by measurement on
+2026-10-08: zero `node-forge`, `micromatch` or `braces` library code in the
+deployed `/app` bundle. Enforcing it continuously means asserting it against the
+bundle the Production build job emits, which is a CI change of its own and is not
+in this one. Until then, the residual exposure is bounded by **the 2026-11-07
+expiry**, which forces this review again within a month.
+
 **The stale-entry check was weakened, then restored.** The original `image-size`
 gate failed unconditionally on any unobserved allowlisted advisory. The first
 version of this rewrite added a guard that skipped the check when the package was
