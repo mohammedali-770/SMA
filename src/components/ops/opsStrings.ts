@@ -161,6 +161,21 @@ export const OPS_STRINGS = {
     authWorking: 'جارٍ المتابعة…',
     authFailed: 'تعذّر تسجيل الدخول',
 
+    // signed in, but not with a staff account (console shows this instead of
+    // silently forwarding to the customer app)
+    notStaffTitle: 'هذا الحساب ليس حساب عمل',
+    notStaffBody:
+      'أنت مسجَّل الدخول بحساب عميل. لوحة التحكم مخصّصة لحسابات الإدارة والفروع ومركز الاتصال. للمتابعة كعميل افتح تطبيق سبايسي ميل، أو سجّل الخروج ثم ادخل بحساب عمل.',
+    notStaffSignedInAs: 'مسجَّل الدخول باسم',
+    notStaffOpenApp: 'افتح تطبيق سبايسي ميل',
+    notStaffSignOutHint: 'سجّل الخروج للدخول بحساب عمل',
+
+    // the profile row could not be read at all — role unknown, so no surface
+    // can be chosen
+    profileUnavailableTitle: 'تعذّر تحميل حسابك',
+    profileUnavailableBody:
+      'سجّلنا دخولك، لكن لم نتمكّن من قراءة ملف حسابك، ولذلك لا نعرف صلاحياتك. هذا خطأ لا يعني أنك عميل. أعد المحاولة، وإن تكرّر فسجّل الخروج ثم ادخل من جديد.',
+
     // delivery-closure requests (branch asks, call centre answers)
     deliveryRequestSection: 'إغلاق التوصيل',
     requestCloseDelivery: 'طلب إغلاق التوصيل',
@@ -364,6 +379,21 @@ export const OPS_STRINGS = {
     authPassword: 'Password',
     authWorking: 'Working…',
     authFailed: 'Authentication failed',
+
+    // signed in, but not with a staff account (console shows this instead of
+    // silently forwarding to the customer app)
+    notStaffTitle: 'This is not a staff account',
+    notStaffBody:
+      'You are signed in with a customer account. This console is for admin, branch and call-centre accounts. To carry on as a customer, open the Spicy Meal app — or sign out and sign in with a staff account.',
+    notStaffSignedInAs: 'Signed in as',
+    notStaffOpenApp: 'Open the Spicy Meal app',
+    notStaffSignOutHint: 'Sign out to use a staff account',
+
+    // the profile row could not be read at all — role unknown, so no surface
+    // can be chosen
+    profileUnavailableTitle: "We couldn't load your account",
+    profileUnavailableBody:
+      "You are signed in, but your account profile could not be read, so we do not know your permissions. This is an error, not a sign that you are a customer. Try again, and if it keeps happening sign out and sign back in.",
 
     // delivery-closure requests (branch asks, call centre answers)
     deliveryRequestSection: 'Delivery closure',

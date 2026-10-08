@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**199 TypeScript test files declaring 3157 test blocks, plus 80 SQL suites.**
+**200 TypeScript test files declaring 3169 test blocks, plus 80 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -202,7 +202,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-102 files, 1451 declared test blocks.
+103 files, 1463 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -271,6 +271,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
 | `src/lib/branchImport.test.ts` | 47 | splitRows |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
+| `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |

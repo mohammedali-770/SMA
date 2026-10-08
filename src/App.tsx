@@ -10,7 +10,8 @@ import { StaffMfaGate } from './components/StaffMfaGate';
 import { ThemeProvider } from './components/ThemeProvider';
 import { AppearanceToggle } from './components/AppearanceToggle';
 import { BrandMark } from './design-system/ui/BrandMark';
-import { isAdminConsoleRole, isOpsConsoleRole } from './lib/roles';
+import { chooseConsoleAudience } from './lib/consoleAudience';
+import { NonStaffNotice, ProfileUnavailableNotice } from './components/AccessNotices';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 const AdminDashboard = lazy(() =>
@@ -101,16 +102,6 @@ const WriteErrorBanner: React.FC = () => {
   );
 };
 
-const CustomerApp: React.FC = () => {
-  React.useEffect(() => { window.location.replace('/app'); }, []);
-  return (
-    <main className="flex-grow p-6 max-w-md mx-auto w-full text-center space-y-3">
-      <p className="text-sm font-black text-con-text-2">Opening the Spicy Meal app…</p>
-      <a href="/app" className="text-ember text-sm font-black underline">/app</a>
-    </main>
-  );
-};
-
 const StaffApp: React.FC = () => {
   const { currentUser } = useApp();
   const isAdmin = currentUser.role === 'admin';
@@ -132,25 +123,37 @@ const StaffApp: React.FC = () => {
 };
 
 function AppContent() {
-  const { authReady, isAuthenticated, currentUser, dataLoading, dataError } = useApp();
+  const { authReady, isAuthenticated, currentUser, dataLoading, dataError, profileUnavailable } = useApp();
 
-  if (!authReady) return <FullScreenLoader label="Starting…" />;
-  if (!isAuthenticated) return <AuthScreen />;
-
-  const identityKnown = Boolean(currentUser.id);
   // Routing used to be `role !== 'customer'`, i.e. "anyone who is not a customer
   // gets the admin console behind the TOTP gate". With the branch-operations
   // roles that is no longer the right question — a cashier signing in on shared
   // shop-floor hardware has no authenticator app and no permission to read the
   // admin dataset. Each surface is now chosen explicitly.
-  const adminConsole = identityKnown && isAdminConsoleRole(currentUser.role);
-  const opsConsole = identityKnown && isOpsConsoleRole(currentUser.role);
+  //
+  // The choice itself lives in `chooseConsoleAudience` rather than in these
+  // ternaries, because the arm that used to sit LAST here was the customer app:
+  // anything unrecognised became `customer` and was redirected to /app, so an
+  // administrator whose profile could not be read was locked out of the
+  // dashboard. That ordering is now a pure function with its own exhaustive
+  // tests (`src/lib/consoleAudience.test.ts`).
+  const audience = chooseConsoleAudience({
+    authReady,
+    isAuthenticated,
+    profileUnavailable,
+    identityKnown: Boolean(currentUser.id),
+    dataLoading,
+    role: currentUser.role,
+  });
+
+  if (audience === 'starting') return <FullScreenLoader label="Starting…" />;
+  if (audience === 'sign-in') return <AuthScreen />;
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <AppHeader />
       <WriteErrorBanner />
-      {adminConsole ? (
+      {audience === 'admin' ? (
         <StaffMfaGate>
           {dataError ? (
             <DataErrorPanel />
@@ -160,7 +163,7 @@ function AppContent() {
             <StaffApp />
           )}
         </StaffMfaGate>
-      ) : opsConsole ? (
+      ) : audience === 'ops' ? (
         dataError ? (
           <DataErrorPanel />
         ) : dataLoading ? (
@@ -168,12 +171,17 @@ function AppContent() {
         ) : (
           <Suspense fallback={<PanelFallback />}><OpsConsole /></Suspense>
         )
+      ) : audience === 'account-loading' ? (
+        dataError ? <DataErrorPanel /> : <FullScreenLoader label="Loading your account…" />
+      ) : audience === 'profile-unavailable' ? (
+        // The role is UNKNOWN here. A fatal load error still wins, because it
+        // carries a message worth reading; otherwise say the identity could not
+        // be determined rather than guessing it.
+        dataError ? <DataErrorPanel /> : <ProfileUnavailableNotice />
       ) : dataError ? (
         <DataErrorPanel />
-      ) : dataLoading && !currentUser.id ? (
-        <FullScreenLoader label="Loading your account…" />
       ) : (
-        <CustomerApp />
+        <NonStaffNotice />
       )}
       <footer className="backdrop-blur-md bg-con-surface/10 text-con-text-2 text-center py-5 border-t border-con-line mt-10 text-xs">
         <div className="max-w-7xl mx-auto px-6"><span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span></div>

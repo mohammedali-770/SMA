@@ -404,6 +404,40 @@ Do not assume those internal alerts page a human. Independent external monitorin
 - لا ترسل رموز التحقق أو كلمات المرور أو أسرار مزودي الخدمة في المحادثات.
 - عند فقدان الوصول، صعّد للمسار المعتمد ولا تتجاوز الصلاحيات أو التحقق الإضافي.
 
+### Signed in with the wrong account — الدخول بحساب غير صحيح
+
+**English**
+
+The console (`app.spicymeal.com.sa`) and the customer web app
+(`app.spicymeal.com.sa/app`) share **one sign-in per browser**. If you ever signed
+in to the customer app with your phone number, opening the console in that same
+browser signs you in as that customer.
+
+- **"This is not a staff account"** — you are signed in as a customer. Press
+  **Sign out to use a staff account**, then sign in with your staff email and
+  password. Admin accounts will then ask for the authenticator code.
+- **"We couldn't load your account"** — your account was found but its
+  permissions could not be read. Press **Retry**. If it keeps happening, sign out
+  and back in, and report it: this is an error, not a sign you have lost access.
+
+Until 2026-10-08 the console did neither. It sent a customer session straight to
+the customer app before the sign-in form could appear, so the dashboard looked
+like it was "redirecting to /app" and there was no way back from inside it.
+
+**العربية**
+
+لوحة التحكم (`app.spicymeal.com.sa`) وتطبيق العملاء على الويب
+(`app.spicymeal.com.sa/app`) يشتركان في **تسجيل دخول واحد لكل متصفح**. إذا سجّلت
+الدخول سابقاً إلى تطبيق العملاء برقم جوالك، فإن فتح لوحة التحكم في المتصفح نفسه
+يُدخلك بحساب العميل ذاك.
+
+- **«هذا الحساب ليس حساب عمل»** — أنت داخل بحساب عميل. اضغط **سجّل الخروج للدخول
+  بحساب عمل**، ثم ادخل ببريد العمل وكلمة المرور. حسابات الإدارة ستطلب بعدها رمز
+  تطبيق المصادقة.
+- **«تعذّر تحميل حسابك»** — وُجد حسابك لكن تعذّرت قراءة صلاحياته. اضغط **إعادة
+  المحاولة**، وإن تكرّر فسجّل الخروج ثم ادخل من جديد وأبلغ عن ذلك: هذا خطأ وليس
+  دليلاً على فقدان صلاحيتك.
+
 ## 8. Things staff must not do — ممنوعات مهمة
 
 **English**
