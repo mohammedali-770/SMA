@@ -30,7 +30,8 @@
  * but a routine-sounding message was hiding a critical. Now the annotations come
  * first, so an expired exception can never be the only thing a reader sees.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 // Reviewed 2026-10-08. Both packages are at their LATEST published version and
@@ -162,14 +163,70 @@ if (direct.length === 0) {
 if (critical > 0) failures.push(`${critical} CRITICAL vulnerability record(s); criticals are never excepted`);
 if (expired) failures.push(`the mobile audit exception expired on ${EXCEPTION_EXPIRES}; re-review the advisories annotated above before extending it`);
 
+// Every package on an approved path — each bounded package AND every approved
+// parent — must stay out of the app's own dependencies and its own source.
+//
+// THE APPROVED PARENTS ARE INCLUDED ON PURPOSE. A bound proves that the excepted
+// code is reached only THROUGH a build tool; it proves nothing if the app depends
+// on that build tool's library directly. `@expo/code-signing-certificates` is an
+// ordinary JS library whose only dependency is `node-forge`: declared directly
+// and imported, it would put the signature-verification flaw in the customer
+// bundle while `node-forge`'s parent list still showed the approved name and the
+// code-signing precondition still read clean. The first revision checked only
+// the bounded packages. Review caught it on #416.
+const ON_APPROVED_PATH = new Set(REACHABILITY_BOUNDS.keys());
+for (const parents of REACHABILITY_BOUNDS.values()) for (const parent of parents) ON_APPROVED_PATH.add(parent);
+
 for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-  // Every bounded package, including the generic intermediate: `micromatch`
-  // becoming a direct dependency is exactly the runtime path P1 is about.
-  for (const pkg of REACHABILITY_BOUNDS.keys()) {
+  for (const pkg of ON_APPROVED_PATH) {
     if (mobilePackage?.[field]?.[pkg]) {
       failures.push(`${pkg} became a direct mobile ${field} entry; the build-tool-only exception no longer applies`);
     }
   }
+}
+
+// A package need not be DECLARED to be used: npm hoists transitive packages into
+// node_modules, so app code can import one nobody listed. No package.json check
+// sees that. So the app's own source is scanned for any import of a package on
+// an approved path. Build configuration (metro.config.js and friends) is outside
+// `apps/mobile/src` and legitimately loads Metro packages, so it is not scanned.
+// Fails closed if the source tree cannot be read.
+function escapeRe(text) {
+  return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+}
+const IMPORT_PATTERNS = [...ON_APPROVED_PATH].map((pkg) => [
+  pkg,
+  new RegExp(`(?:\\bfrom\\s*|\\brequire\\s*\\(\\s*|\\bimport\\s*\\(\\s*|^\\s*import\\s+)['"\`]${escapeRe(pkg)}(?:/[^'"\`]*)?['"\`]`, 'm'),
+]);
+function sourceFiles(dir) {
+  const out = [];
+  for (const name of readdirSync(dir)) {
+    if (name === 'node_modules' || name.startsWith('.')) continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...sourceFiles(full));
+    else if (/\.(?:[cm]?[jt]sx?)$/.test(name)) out.push(full);
+  }
+  return out;
+}
+let appSource = [];
+try {
+  appSource = sourceFiles('apps/mobile/src');
+} catch {
+  fail('could not read apps/mobile/src to check that no app code imports a package on an approved path');
+}
+if (appSource.length === 0) {
+  // A scan over nothing would pass for ever. Fail rather than count it as evidence.
+  fail('found no source files under apps/mobile/src; the import scan would prove nothing');
+}
+const importers = [];
+for (const file of appSource) {
+  const text = readFileSync(file, 'utf8');
+  for (const [pkg, re] of IMPORT_PATTERNS) {
+    if (re.test(text)) importers.push(`${file} imports ${pkg}`);
+  }
+}
+if (importers.length > 0) {
+  failures.push(`app source imports a package the exceptions assume is build-tool-only: ${importers.join('; ')}`);
 }
 
 // Boundary 1 — exact advisory identity. A different HIGH on an excepted package

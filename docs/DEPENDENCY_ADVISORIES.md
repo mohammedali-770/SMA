@@ -165,11 +165,26 @@ code-signing precondition `node-forge` rests on; and fails if a listed advisory 
 no longer present, so a stale entry cannot sit waiting to accept its package
 again.
 
+**It also keeps every package on an approved path out of the app itself** — each
+bounded package *and every approved parent* — in two ways. None may be a direct
+mobile dependency; and the app's own source (`apps/mobile/src`) may not import
+any of them, which catches a hoisted package used without being declared, a path
+no `package.json` check can see. A bound proves the excepted code is reached only
+*through* a build tool, and proves nothing if the app uses that build tool's
+library directly: `@expo/code-signing-certificates` is an ordinary JS library
+whose only dependency is `node-forge`, so declaring and importing it would put the
+signature-verification flaw in the customer bundle while every graph check still
+passed. The import pattern was validated on ten known-positive import forms and
+six look-alike negatives before its clean result on the real source was trusted;
+an empty source tree fails rather than passing as a scan over nothing.
+
 **That heading was false when first written, for one precondition.** The
 `node-forge` exception rested on code signing being off, and only this document
 said so — the gate would have kept passing with code signing on. Review caught it
 on #416, together with the `micromatch` bound and a weakened stale-entry check
-(below). All three are now enforced in the gate.
+(below). A second review pass then found the approved parents unchecked for
+directness; that whole class — declared *or* imported — is now closed. All of it
+is enforced in the gate.
 
 **Mutation-tested against the real audit output, every mutant's precondition
 confirmed before its verdict was counted:**
@@ -181,6 +196,9 @@ confirmed before its verdict was counted:**
 | `micromatch` gains an unapproved parent | killed |
 | `micromatch` becomes a direct dependency | killed |
 | code signing configured in `app.json` | killed |
+| `@expo/code-signing-certificates` declared as a direct dependency | killed — and **survives** the revision before it |
+| `@expo/cli` declared as a direct dependency | killed |
+| app source imports `node-forge` **without declaring it** | killed |
 | a listed advisory whose package has left the tree | killed |
 | an expired date | killed — and still names every advisory |
 | a real critical (lockfile-confirmed: 6 critical records) | killed |
