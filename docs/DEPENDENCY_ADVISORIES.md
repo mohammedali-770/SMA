@@ -99,7 +99,7 @@ audit, and remove this exception when the advisories disappear.
 | **Severity** | High |
 | **Affected** | `<= 3.0.3` |
 | **Patched release as of review** | **None.** `3.0.3` is the latest published version and is itself affected |
-| **Reachability in SMA** | `braces` ← `micromatch` ← `metro-file-map` / `@expo/metro-file-map`: build-time file watching over the repository's own glob patterns |
+| **Reachability in SMA** | `braces` ← `micromatch` ← `metro-file-map` / `@expo/metro-file-map`: build-time file watching over the repository's own glob patterns. **The gate bounds `micromatch`'s parents, not only `braces`'** — see below |
 | **In the customer bundle?** | **No** — measured against the deployed `/app` entry bundle (4.4 MB): zero `micromatch`, zero `braces` library code. Its single `braces` hit is React Helmet's error text *"Did you forget to wrap your children in braces?"* |
 | **Reviewed** | 2026-10-08 |
 | **Exception expires** | **2026-11-07** |
@@ -108,6 +108,15 @@ audit, and remove this exception when the advisories disappear.
 A stack-exhaustion DoS on deeply nested brace patterns. Reaching it needs an
 attacker-supplied glob pattern fed to the bundler during a build; in SMA those
 patterns come from the repository's own Metro configuration.
+
+**Why the bound reaches two levels up.** `braces`' only parent is `micromatch`,
+a general-purpose glob library that any runtime package could use. The first
+version of this exception bounded only `braces`' parent — so a customer-runtime
+package depending on `micromatch` would have joined the approved closure and
+passed. The gate now also requires `micromatch`'s parents to be exactly the two
+Metro file-map packages, and rejects `micromatch` as a direct mobile dependency.
+Review caught this on #416. **A reachability bound has to reach a build tool; a
+bound that stops at a generic library proves nothing.**
 
 ### 3.3 `node-forge` — PKCS#1 v1.5 signature verification — HIGH (mobile CLI toolchain)
 
@@ -127,24 +136,62 @@ patterns come from the repository's own Metro configuration.
 **The flaw is in signature verification, so the deciding question was whether
 this app verifies anything with it.** It does not. The only place the Expo
 toolchain uses `node-forge` to sign or verify is **EAS Update code signing**, and
-that is not configured here: `app.json` has no `expo.updates` block and no
-`codeSigningCertificate`, and **`expo-updates` is not a dependency at all**. On a
+that is not configured here — checked against the **resolved** Expo config
+(`npx expo config`, which combines `app.json` with the dynamic `app.config.js`):
+no `updates` block, no `codeSigningCertificate`, no updates plugin. And
+**`expo-updates` is not in the mobile lockfile at all**, nor declared by anything
+in it. The first version of this entry cited `app.json` alone, which was
+incomplete: a dynamic `app.config.js` can enable code signing that `app.json`
+does not show. The conclusion held; the evidence did not cover it until the
+resolved config was read. On a
 device, update signatures are verified by native code in `expo-updates`, not by
-this library. If EAS Update code signing is ever turned on, re-review this entry
-before relying on it — that is the change that would give the flaw a live
-consumer.
+this library. **That precondition is now enforced by the gate, not by this paragraph.** The
+gate fails the `node-forge` exception if `expo-updates` appears anywhere in the
+mobile lockfile, or if any of `app.json` / `app.config.{js,ts,mjs,cjs}` mentions
+`codeSigningCertificate`, `codeSigningMetadata` or `expo-updates`. It is a static
+check because the audit job installs nothing, and it does not need the resolved
+config: EAS Update code signing cannot run without `expo-updates`, so that
+package's absence rules the feature out. Turning code signing on therefore fails
+CI and forces this review — which is the point, since it is the one change that
+would give the flaw a live consumer.
 
 ### Both exceptions are bounded by the gate, not by this document
 
 `scripts/audit-mobile-high.mjs` accepts only these two exact GHSAs on these two
-exact packages; requires each package's immediate parents to be the build tools
-listed above; and requires every HIGH record to belong to the union of the two
-packages' npm `effects` closures. Mutation-tested 2026-10-08 against the real
-audit output, six ways, every mutant killed: an unreviewed high, a new
-reachability path, a high outside the closure, an expired date (which still
-names every advisory), a real critical, and a critical with an expired date — the
-exact state of 2026-10-02 to 2026-10-08, which the previous gate reported as
-nothing but *"exception expired"*.
+exact packages; bounds the immediate parents of each excepted package **and of
+the generic `micromatch` between `braces` and Metro**; requires every HIGH record
+to belong to the union of the two packages' npm `effects` closures; enforces the
+code-signing precondition `node-forge` rests on; and fails if a listed advisory is
+no longer present, so a stale entry cannot sit waiting to accept its package
+again.
+
+**That heading was false when first written, for one precondition.** The
+`node-forge` exception rested on code signing being off, and only this document
+said so — the gate would have kept passing with code signing on. Review caught it
+on #416, together with the `micromatch` bound and a weakened stale-entry check
+(below). All three are now enforced in the gate.
+
+**Mutation-tested against the real audit output, every mutant's precondition
+confirmed before its verdict was counted:**
+
+| mutant | result |
+| --- | --- |
+| an unreviewed high | killed |
+| a new reachability path for `node-forge` | killed |
+| `micromatch` gains an unapproved parent | killed |
+| `micromatch` becomes a direct dependency | killed |
+| code signing configured in `app.json` | killed |
+| a listed advisory whose package has left the tree | killed |
+| an expired date | killed — and still names every advisory |
+| a real critical (lockfile-confirmed: 6 critical records) | killed |
+| a critical plus an expired date — the state of 2026-10-02 to 2026-10-08 | killed — and names the critical |
+
+**The stale-entry check was weakened, then restored.** The original `image-size`
+gate failed unconditionally on any unobserved allowlisted advisory. The first
+version of this rewrite added a guard that skipped the check when the package was
+absent from the tree — exactly the case that matters. Run against that version,
+the "listed advisory whose package has left the tree" mutant **survives**, which
+is the proof the defect was real rather than hypothetical.
 
 ## 4. Resolved
 

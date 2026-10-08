@@ -30,7 +30,7 @@
  * but a routine-sounding message was hiding a critical. Now the annotations come
  * first, so an expired exception can never be the only thing a reader sees.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 // Reviewed 2026-10-08. Both packages are at their LATEST published version and
@@ -51,13 +51,27 @@ const ALLOWED = new Map([
   }],
 ]);
 
-// Immediate reverse-dependency parents each excepted package may have. These
-// are build/CLI tools. A new parent — above all a customer-runtime package —
-// changes the reachability argument and must fail until it is re-reviewed.
-const ALLOWED_IMMEDIATE_PARENTS = new Map([
+// Reachability bounds: for each listed package, the ONLY immediate
+// reverse-dependency parents it may have. A new parent — above all a
+// customer-runtime package — changes the reachability argument and must fail
+// until it is re-reviewed.
+//
+// A BOUND MUST REACH A BUILD TOOL, NOT STOP AT A GENERIC LIBRARY. `braces`' only
+// parent is `micromatch`, a general-purpose glob library that any runtime
+// package could use. Bounding `braces` at `micromatch` alone therefore proved
+// nothing: a customer-runtime package depending on `micromatch` would have
+// joined the approved closure and passed. So `micromatch`'s own parents are
+// bounded too, to the two Metro file-map packages that are the actual build
+// tools. Review caught this on #416. `node-forge` stops at its immediate parents
+// because those ARE the Expo CLI and its code-signing helper, not generic code.
+const REACHABILITY_BOUNDS = new Map([
   ['braces', new Set(['micromatch'])],
+  ['micromatch', new Set(['metro-file-map', '@expo/metro-file-map'])],
   ['node-forge', new Set(['@expo/cli', '@expo/code-signing-certificates'])],
 ]);
+
+// The packages that carry an excepted advisory. Boundary 3's closure starts here.
+const EXCEPTED_PACKAGES = new Set([...ALLOWED.values()].map((m) => m.package));
 
 const failures = [];
 function fail(message) {
@@ -102,7 +116,10 @@ if (critical === 0 && high === 0) {
   // gets retired rather than silently carried.
   console.log('mobile dependency audit: no high/critical vulnerabilities');
   if (ALLOWED.size > 0) {
-    console.log('  note: the exception list is now unused; retire it in the same change that confirms this');
+    // A warning, not a failure: every advisory clearing is a good outcome and
+    // must not turn CI red. But a plain log line is never read, and a stale
+    // allowlist would accept its packages again if they returned before expiry.
+    console.error('::warning::the mobile audit exception list is now unused; retire it so a returning advisory is reviewed rather than silently accepted');
   }
   process.exit(0);
 }
@@ -146,7 +163,9 @@ if (critical > 0) failures.push(`${critical} CRITICAL vulnerability record(s); c
 if (expired) failures.push(`the mobile audit exception expired on ${EXCEPTION_EXPIRES}; re-review the advisories annotated above before extending it`);
 
 for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-  for (const pkg of ALLOWED_IMMEDIATE_PARENTS.keys()) {
+  // Every bounded package, including the generic intermediate: `micromatch`
+  // becoming a direct dependency is exactly the runtime path P1 is about.
+  for (const pkg of REACHABILITY_BOUNDS.keys()) {
     if (mobilePackage?.[field]?.[pkg]) {
       failures.push(`${pkg} became a direct mobile ${field} entry; the build-tool-only exception no longer applies`);
     }
@@ -168,13 +187,13 @@ for (const a of direct) {
 }
 if (unapproved.length > 0) failures.push(`unapproved direct high advisories: ${unapproved.join(', ')}`);
 
-// Boundary 2 — reachability. Each excepted package's immediate parents must be
-// approved build tools.
-const affected = new Set();
-for (const [pkg, parents] of ALLOWED_IMMEDIATE_PARENTS) {
+// Boundary 2 — reachability. Every bounded package that is present must have
+// only its approved immediate parents. This is checked for the generic
+// intermediate as well as for the excepted leaf — see REACHABILITY_BOUNDS.
+for (const [pkg, parents] of REACHABILITY_BOUNDS) {
   const v = vulnerabilities[pkg];
-  if (!v) continue; // not present: nothing to bound
-  if (String(v.severity) !== 'high') {
+  if (!v) continue; // not in the audit: nothing to bound
+  if (EXCEPTED_PACKAGES.has(pkg) && String(v.severity) !== 'high') {
     failures.push(`${pkg} audit record changed severity to ${v.severity}; re-review the exception`);
     continue;
   }
@@ -187,7 +206,12 @@ for (const [pkg, parents] of ALLOWED_IMMEDIATE_PARENTS) {
   if (stray.length > 0) {
     failures.push(`${pkg} is now reachable through an unapproved immediate parent: ${stray.join(', ')}`);
   }
-  // Collect this package's recursive effects closure for boundary 3.
+}
+
+// Collect the recursive effects closure of the EXCEPTED packages for boundary 3.
+const affected = new Set();
+for (const pkg of EXCEPTED_PACKAGES) {
+  if (!vulnerabilities[pkg]) continue;
   const queue = [pkg];
   affected.add(pkg);
   while (queue.length > 0) {
@@ -217,11 +241,69 @@ if (outside.length > 0) {
 }
 
 // A listed advisory that has disappeared is good news, but the list must then
-// be shortened, or it quietly grows into an unrecorded blanket allowance.
+// be shortened, or it quietly grows into an unrecorded blanket allowance: if the
+// package came back before expiry it would be accepted with no review at all.
+//
+// UNCONDITIONAL, deliberately. An earlier revision of this file guarded it with
+// `vulnerabilities[meta.package] &&`, which skipped exactly the case that
+// matters — the package removed entirely while the other exception still
+// produces highs — and so let a stale entry sit silently. The original
+// `image-size` gate had this right; that revision weakened it. Review caught it
+// on #416. The all-clear case never reaches here: it returns early above.
 for (const ghsa of ALLOWED.keys()) {
-  const meta = ALLOWED.get(ghsa);
-  if (vulnerabilities[meta.package] && !observed.has(ghsa)) {
-    failures.push(`allowlisted advisory ${ghsa} (${meta.package}) is no longer represented as expected; review the exception`);
+  if (!observed.has(ghsa)) {
+    const meta = ALLOWED.get(ghsa);
+    failures.push(`allowlisted advisory ${ghsa} (${meta.package}) is no longer present; remove it from the allowlist rather than carrying it`);
+  }
+}
+
+// Boundary 4 — the PRECONDITION an exception rests on, enforced here and not
+// only in the document.
+//
+// `node-forge`'s flaw is in signature verification, and the exception is
+// justified by one fact: EAS Update code signing is OFF, so nothing in this app
+// verifies a signature with it. That was originally recorded only in
+// docs/DEPENDENCY_ADVISORIES.md — so turning code signing on would have left
+// every graph check above still passing (same package, same parents) while the
+// reason for accepting the flaw had quietly stopped being true. The document's
+// own heading said these exceptions were "bounded by the gate, not by this
+// document", which was false for this precondition. Review caught it on #416.
+//
+// The check is STATIC because the audit job installs nothing (`npm audit` reads
+// the lockfile), so resolving the Expo config is not available here. It does not
+// need to be: EAS Update code signing cannot operate without the `expo-updates`
+// package, so its absence from the lockfile rules the feature out. The config
+// scan is belt and braces, catching code signing configured before the package
+// lands. Both fail closed on an unreadable file.
+const NODE_FORGE_GHSA = 'GHSA-86w9-cpqp-85rv';
+if (observed.has(NODE_FORGE_GHSA)) {
+  const reasons = [];
+  let lock;
+  try {
+    lock = JSON.parse(readFileSync('apps/mobile/package-lock.json', 'utf8'));
+  } catch {
+    reasons.push('apps/mobile/package-lock.json could not be read');
+  }
+  const lockedPaths = Object.keys(lock?.packages ?? {});
+  if (lockedPaths.some((k) => k === 'node_modules/expo-updates' || k.endsWith('/node_modules/expo-updates'))) {
+    reasons.push('expo-updates is in the mobile lockfile');
+  }
+  for (const file of ['app.json', 'app.config.js', 'app.config.ts', 'app.config.mjs', 'app.config.cjs']) {
+    const path = `apps/mobile/${file}`;
+    if (!existsSync(path)) continue;
+    let text;
+    try {
+      text = readFileSync(path, 'utf8');
+    } catch {
+      reasons.push(`${path} could not be read`);
+      continue;
+    }
+    if (/codeSigningCertificate|codeSigningMetadata|expo-updates/.test(text)) {
+      reasons.push(`${path} configures code signing or expo-updates`);
+    }
+  }
+  if (reasons.length > 0) {
+    failures.push(`the node-forge exception (${NODE_FORGE_GHSA}) rests on EAS Update code signing being OFF, and it may now be on: ${reasons.join('; ')}. Re-review docs/DEPENDENCY_ADVISORIES.md §3.3 before relying on it`);
   }
 }
 
