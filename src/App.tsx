@@ -39,6 +39,13 @@ const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
 
 const AppHeader: React.FC = () => {
   const { currentUser, signOut } = useApp();
+  // Until a profile has loaded, `currentUser` is GUEST_USER, whose role is the
+  // placeholder `customer`. Rendering it labelled every admin "Customer" for the
+  // length of each sign-in, and — worse — sat a "Customer" badge directly above
+  // the notice explaining that an unreadable profile is NOT a sign you are a
+  // customer. Identity details appear only once there is an identity to show.
+  // Sign out stays, because it is the way out of every one of those states.
+  const identityKnown = Boolean(currentUser.id);
   const roleLabel = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
   return (
     <header className="sticky top-0 backdrop-blur-md bg-con-surface/30 border-b border-con-line text-con-text py-3 px-6 z-40">
@@ -49,10 +56,12 @@ const AppHeader: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <AppearanceToggle />
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
-          </div>
+          {identityKnown && (
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
+            </div>
+          )}
           <button
             onClick={() => { void signOut(); }}
             className="flex items-center gap-1.5 text-xs font-bold bg-con-surface/50 hover:bg-con-surface text-con-text-2 hover:text-ember border border-con-line py-1.5 px-3 rounded-xl transition-colors"
@@ -122,7 +131,8 @@ const StaffApp: React.FC = () => {
   );
 };
 
-function AppContent() {
+/** Exported for `App.test.tsx`; the default export below is what ships. */
+export function AppContent() {
   const { authReady, isAuthenticated, currentUser, dataLoading, dataError, profileUnavailable } = useApp();
 
   // Routing used to be `role !== 'customer'`, i.e. "anyone who is not a customer
@@ -172,12 +182,17 @@ function AppContent() {
           <Suspense fallback={<PanelFallback />}><OpsConsole /></Suspense>
         )
       ) : audience === 'account-loading' ? (
-        dataError ? <DataErrorPanel /> : <FullScreenLoader label="Loading your account…" />
+        dataError ? <ProfileUnavailableNotice /> : <FullScreenLoader label="Loading your account…" />
       ) : audience === 'profile-unavailable' ? (
-        // The role is UNKNOWN here. A fatal load error still wins, because it
-        // carries a message worth reading; otherwise say the identity could not
-        // be determined rather than guessing it.
-        dataError ? <DataErrorPanel /> : <ProfileUnavailableNotice />
+        // NEVER DataErrorPanel here. Its Retry calls `reload()`, which is a
+        // no-op without `currentUser.id` — and the identity is exactly what is
+        // missing. An earlier revision of this arm preferred DataErrorPanel when
+        // `dataError` was set, so a thrown profile read (which `myProfile()` now
+        // raises deliberately) landed on a dead Retry button: the very failure
+        // `retryProfile` was written to prevent. The notice retries through
+        // `retryProfile` and shows `dataError` as its detail line, so the
+        // message is not lost either.
+        <ProfileUnavailableNotice />
       ) : dataError ? (
         <DataErrorPanel />
       ) : (

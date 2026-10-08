@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**200 TypeScript test files declaring 3169 test blocks, plus 80 SQL suites.**
+**201 TypeScript test files declaring 3181 test blocks, plus 80 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -202,10 +202,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-103 files, 1463 declared test blocks.
+104 files, 1475 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
+| `src/App.test.tsx` | 12 | console shell — unknown identity (#415 P1) |
 | `src/components/admin/BranchDataImportPanel.test.tsx` | 12 | BranchDataImportPanel — working hours |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
 | `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |

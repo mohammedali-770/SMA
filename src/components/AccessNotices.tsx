@@ -105,7 +105,7 @@ export const NonStaffNotice: React.FC = () => {
  */
 export const ProfileUnavailableNotice: React.FC = () => {
   const { t, dir } = useOpsLang('en');
-  const { retryProfile, signOut } = useApp();
+  const { retryProfile, signOut, dataError } = useApp();
   const [busy, setBusy] = React.useState(false);
 
   const retry = async () => {
@@ -119,6 +119,16 @@ export const ProfileUnavailableNotice: React.FC = () => {
 
   return (
     <NoticeCard dir={dir} tone="warn" title={t('profileUnavailableTitle')} body={t('profileUnavailableBody')}>
+      {/* A thrown profile read arrives here with its reason in `dataError`.
+          It is shown rather than swallowed: this screen replaced DataErrorPanel
+          for that case only because DataErrorPanel's Retry could not work, not
+          because the message stopped being worth reading. Rendered as text —
+          React escapes it — and LTR, since it is usually an English error. */}
+      {dataError && (
+        <p dir="ltr" className="text-[11px] text-con-text-3 font-medium break-words">
+          {dataError}
+        </p>
+      )}
       <button
         type="button"
         onClick={() => {
