@@ -6,7 +6,12 @@ import { join, resolve } from 'node:path';
 import { build } from 'esbuild';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { FORBIDDEN_LIBS, findForbiddenLibs, scanDirectory } from '../../scripts/bundle-forbidden-libs.mjs';
+import {
+  FORBIDDEN_LIBS,
+  findForbiddenLibs,
+  matchesSignature,
+  scanDirectory,
+} from '../../scripts/bundle-forbidden-libs.mjs';
 
 /*
  * scripts/bundle-forbidden-libs.mjs recognises a library in a shipped bundle by
@@ -75,7 +80,10 @@ describe('forbidden-library signatures — positive control', () => {
       // the library-level test pass, while quietly shrinking what is caught.
       const text = bundles.get(lib) ?? '';
       for (const signature of FORBIDDEN_LIBS[lib as keyof typeof FORBIDDEN_LIBS]) {
-        expect(text, `"${signature}" no longer appears in minified ${lib}`).toContain(signature);
+        expect(
+          matchesSignature(text, signature),
+          `${JSON.stringify(signature)} no longer appears in minified ${lib}`,
+        ).toBe(true);
       }
     });
   }
@@ -97,7 +105,7 @@ describe('forbidden-library signatures — positive control', () => {
  */
 const VULNERABLE_MODULES: ReadonlyArray<readonly [lib: keyof typeof FORBIDDEN_LIBS, specifier: string]> = [
   ['node-forge', 'node-forge/lib/rsa'], // the PKCS#1 v1.5 verifier GHSA-86w9 is about
-  ['braces', 'braces/lib/compile'], // the advisory's named sink; contains no literal of its own
+  ['braces', 'braces/lib/compile'], // the advisory's named sink; one literal of its own, a debug line
   ['braces', 'braces/lib/expand'],
   ['braces', 'braces/lib/parse'],
 ];
@@ -122,6 +130,26 @@ describe('forbidden-library signatures — each vulnerable module imported alone
 });
 
 describe('forbidden-library signatures — negative control', () => {
+  it('does not report fill-range used without braces', async (ctx) => {
+    // fill-range is a separate package with no advisory. compile.js and expand.js
+    // load it, and the first fix for #417's review matched its message — which
+    // would have failed the build for an app using fill-range on its own, as
+    // though braces had shipped. Every signature must come from an excepted
+    // library's own source.
+    if (!installed('fill-range')) ctx.skip('fill-range is not installed');
+    const text = await minifiedBundleOf('fill-range');
+    expect(text.length, 'bundling fill-range produced nothing').toBeGreaterThan(1000);
+    expect(findForbiddenLibs(text)).toEqual([]);
+  });
+
+  it('matches a literal signature only as a whole quoted string', () => {
+    // Bare, `node.isClose` is ordinary code in xmlbuilder and plist.
+    expect(findForbiddenLibs('if(node.isClose===true)return')).toEqual([]);
+    expect(findForbiddenLibs(`x='node.isClosed'`)).toEqual([]);
+    for (const quoted of [`'node.isClose'`, `"node.isClose"`, '`node.isClose`'])
+      expect(findForbiddenLibs(`console.log(${quoted},p)`).map((f) => f.lib)).toEqual(['braces']);
+  });
+
   it('ignores the generic phrases that were rejected as signatures', () => {
     // Any library may say these; matching them would turn CI red for nothing.
     expect(findForbiddenLibs('throw new TypeError("Expected a string")')).toEqual([]);
@@ -141,10 +169,21 @@ describe('forbidden-library signatures — negative control', () => {
     const FLOOR = 24;
     expect('Expected a string'.length).toBeLessThan(FLOOR);
     expect('No matches found for'.length).toBeLessThan(FLOOR);
+    // A whole-literal signature is held to a different rule, because it cannot
+    // collide with a phrase INSIDE other text: it must be a single code-shaped
+    // token — no whitespace, so neither rejected phrase could be admitted this
+    // way either — of at least LITERAL_FLOOR characters.
+    const LITERAL_FLOOR = 12;
+    const codeShaped = (t: string) => t.length >= LITERAL_FLOOR && !/\s/.test(t);
+    expect(codeShaped('Expected a string')).toBe(false);
+    expect(codeShaped('No matches found for')).toBe(false);
     for (const [lib, signatures] of Object.entries(FORBIDDEN_LIBS)) {
       expect(signatures.length, `${lib} has no signatures`).toBeGreaterThan(0);
-      for (const s of signatures)
-        expect(s.length, `${lib}: "${s}" is too short to be distinctive`).toBeGreaterThanOrEqual(FLOOR);
+      for (const s of signatures) {
+        if (typeof s === 'string')
+          expect(s.length, `${lib}: "${s}" is too short to be distinctive`).toBeGreaterThanOrEqual(FLOOR);
+        else expect(codeShaped(s.literal), `${lib}: '${s.literal}' is not a distinctive token`).toBe(true);
+      }
     }
   });
 });

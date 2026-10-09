@@ -265,20 +265,34 @@ by libraries that are neither, and matching it would turn CI red for nothing.
 version chose them per package and missed one.** Neither `braces` nor
 `node-forge` has an `exports` map, so a dependency can import a single module by
 its subpath and bundle nothing else from the library. `braces/lib/compile` — the
-advisory's named sink — contains no distinctive literal of its own, and imported
-alone it matched **nothing**: the only `braces` signature lived in
-`lib/expand.js`. Review caught that on #417. Each vulnerable module was then
-bundled alone and its closure read from esbuild's metafile:
+advisory's named sink — imported alone matched **nothing**: the only `braces`
+signature lived in `lib/expand.js`. Review caught that on #417. Each vulnerable
+module was then bundled alone and its closure read from esbuild's metafile, and
+each is now recognised by a literal from **its own source**:
 
 | imported alone | modules in its closure | signatures that match |
 | --- | --- | --- |
-| `braces/lib/compile` | `compile`, `utils`, `fill-range` | `fill-range`'s `Invalid range arguments: ` |
-| `braces/lib/expand` | `expand`, `utils`, `stringify`, `fill-range` | `expand`'s `rangeLimit` message, and `fill-range`'s |
+| `braces/lib/compile` | `compile`, `utils`, `fill-range` | `compile`'s own `'node.isClose'` |
+| `braces/lib/expand` | `expand`, `utils`, `stringify`, `fill-range` | `expand`'s `rangeLimit` message |
 | `braces/lib/parse` | `parse`, `utils`, `stringify`, `constants` | `parse`'s `), exceeds max characters (` |
 | `node-forge/lib/rsa` | 17 modules, including `asn1`, `random`, `aes`, `cipherModes` | `rsa`'s own `RSASSA-PKCS1-v1_5` message, `asn1`'s, and `cipherModes`' |
 
-`fill-range` is a separate package that `braces` requires. Distinctiveness was
-measured over all 19 284 installed JavaScript files in both trees: each `braces`
+**`compile`'s only literal is a debug line upstream left in** —
+`console.log('node.isClose', …)`. It survives minification, but in whichever
+quote style the minifier picks (Metro keeps single quotes, esbuild emits double),
+so it is matched as a *whole string literal*, quotes included: bare,
+`node.isClose` is ordinary code in `xmlbuilder` and `plist`. Proven against
+Metro's real output by planting `require("braces/lib/compile")` in the app and
+building: the scan names the shipped entry file on `'node.isClose'`.
+
+**Nothing in the table may come from a library that is not itself excepted —
+and the first fix broke that rule.** It recognised `compile` by `fill-range`'s
+`Invalid range arguments: `, since `compile` always loads it. But `fill-range` is
+a separate package with no advisory, so an app using it *without* `braces` would
+have failed the build as though `braces` had shipped. Review caught that on #417
+too; the suite now bundles `fill-range` alone and requires **no** finding.
+
+Distinctiveness was measured over all 19 284 installed JavaScript files in both trees: each `braces`
 signature occurs in exactly six — the library's own module, and five build/dev
 tools that **vendor a full copy of `braces`**: `vite`, two `rollup` bundles,
 `prettier`, and `resolve-workspace-root` (under `@expo/config`). No unrelated
@@ -308,8 +322,12 @@ rather than passing on nothing.
 Native iOS and Android JavaScript is built by EAS, not by that script; the web export comes from the same
 source and Metro configuration and is a strong proxy, but a library imported only
 from a platform-specific file (`*.native.ts`, `*.ios.ts`, `*.android.ts`) would
-not appear in it. That is narrower than the gap it replaces, and the
-**2026-11-07 expiry** still forces this review within a month.
+not appear in it. And `compile` on its own is recognised only through a
+`console.log` call, so a build that strips console calls (`drop_console`,
+`babel-plugin-transform-remove-console` — neither configured today) would
+silently lose that one module; `parse` and `expand` would still be caught. That
+is narrower than the gap it replaces, and the **2026-11-07 expiry** still forces
+this review within a month.
 
 **The stale-entry check was weakened, then restored.** The original `image-size`
 gate failed unconditionally on any unobserved allowlisted advisory. The first

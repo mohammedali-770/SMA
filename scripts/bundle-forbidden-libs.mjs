@@ -28,10 +28,11 @@
  * found for"): any library may say them, and a false positive here turns CI red
  * for no reason.
  *
- * Signatures are chosen per vulnerable MODULE CLOSURE, not per package: a
- * package without an `exports` map can be imported piecemeal, so a dependency
- * may bundle one vulnerable module and none of the others. Each closure that can
- * reach a flaw carries a signature it always loads.
+ * Signatures are chosen per vulnerable MODULE, not per package: a package
+ * without an `exports` map can be imported piecemeal, so a dependency may bundle
+ * one vulnerable module and none of the others. Each vulnerable module is
+ * recognised by a literal from its OWN source — never from a dependency it
+ * loads, since that dependency can ship without it (see `braces` below).
  *
  * IT RUNS INSIDE `npm run build`, NOT BESIDE IT, so it checks the artifact that is
  * actually deployed. `npm run build` is Vercel's `buildCommand`, which makes it
@@ -74,19 +75,28 @@ export const FORBIDDEN_LIBS = Object.freeze({
   // vendor micromatch along with braces. Measured: nowhere else.
   micromatch: Object.freeze(['Expected the first argument to be an object']),
   braces: Object.freeze([
-    // ONE SIGNATURE PER VULNERABLE MODULE CLOSURE, not per package. `braces` has
-    // no `exports` map, so a dependency may import `braces/lib/compile` on its
-    // own, and the package-entry signature lives only in lib/expand.js. Review
-    // caught that on #417: a compile-only bundle would have passed.
+    // ONE SIGNATURE PER VULNERABLE MODULE, each from that module's OWN source.
+    // `braces` has no `exports` map, so a dependency may import one module on
+    // its own; the package-entry signature lives only in lib/expand.js, and
+    // review caught on #417 that a compile-only bundle would have passed.
     'Use options.rangeLimit to increase or disable the limit', // lib/expand.js
     '), exceeds max characters (', // lib/parse.js (static text of a template literal)
-    // fill-range — required by BOTH vulnerable walkers, compile.js and
-    // expand.js, so it catches a bundle that never loads parse.js or expand.js.
-    // compile.js itself contains no distinctive literal.
-    'Invalid range arguments: ',
+    // lib/compile.js — the advisory's named sink. Its one literal of its own is
+    // a debug line upstream left in, `console.log('node.isClose', …)`, which
+    // survives minification (Metro keeps the single quotes, esbuild emits
+    // double). It is matched as a WHOLE string literal: bare, `node.isClose` is
+    // ordinary code in xmlbuilder and plist.
+    //
+    // The first fix matched fill-range's `Invalid range arguments: ` here
+    // instead, since compile.js always loads it. But fill-range is a separate
+    // package with no advisory of its own, so an app using it WITHOUT braces
+    // would have failed the build as though braces had shipped. Review caught
+    // that on #417. Nothing here may come from a library that is not itself
+    // excepted.
+    Object.freeze({ literal: 'node.isClose' }),
     // Measured across all 19 284 installed JS files in both trees: each of these
-    // three occurs in exactly six — braces' (or fill-range's) own module, and
-    // five build/dev tools that VENDOR a full copy of braces: vite, rollup (two
+    // three occurs in exactly six — the braces module it names, and five
+    // build/dev tools that VENDOR a full copy of braces: vite, rollup (two
     // bundles), prettier, and resolve-workspace-root (under @expo/config). No
     // unrelated library says any of them, so a match is always braces' code —
     // including a vendored copy, which carries the same flaw and which npm audit
@@ -94,12 +104,29 @@ export const FORBIDDEN_LIBS = Object.freeze({
   ]),
 });
 
+const QUOTES = ["'", '"', '`'];
+
+/**
+ * A signature is a substring of the library's own source text, or
+ * `{ literal }`: one whole string literal, matched in whichever quote style the
+ * minifier chose — quotes included, so the same characters written as code do
+ * not match.
+ */
+export function matchesSignature(text, signature) {
+  if (typeof signature === 'string') return text.includes(signature);
+  return QUOTES.some((q) => text.includes(q + signature.literal + q));
+}
+
+function describeSignature(signature) {
+  return typeof signature === 'string' ? signature : `'${signature.literal}'`;
+}
+
 /** Libraries whose code appears in `text`, with the signature that matched. */
 export function findForbiddenLibs(text, table = FORBIDDEN_LIBS) {
   const found = [];
   for (const [lib, signatures] of Object.entries(table)) {
-    const hit = signatures.find((sig) => text.includes(sig));
-    if (hit) found.push({ lib, signature: hit });
+    const hit = signatures.find((sig) => matchesSignature(text, sig));
+    if (hit) found.push({ lib, signature: describeSignature(hit) });
   }
   return found;
 }
