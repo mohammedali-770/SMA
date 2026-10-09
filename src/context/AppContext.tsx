@@ -109,6 +109,8 @@ interface AppContextType {
   // Data load lifecycle
   dataLoading: boolean;
   dataError: string | null;      // fatal INITIAL-load failure (full-screen retry)
+  profileUnavailable: boolean;   // the signed-in user's profile row could not be read
+  retryProfile: () => Promise<void>;
   writeError: string | null;     // non-fatal mutation failure (dismissible banner)
   dismissWriteError: () => void;
   reload: () => Promise<void>;
@@ -290,6 +292,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // must never do that — it surfaces via writeError as a dismissible banner so
   // the admin keeps their place and unsaved edits.
   const [dataError, setDataError] = useState<string | null>(null);
+  // Set when the signed-in user's profile row could not be read at all. Kept
+  // apart from dataError because it must be handled BEFORE role routing in
+  // `App.tsx` — the role is the unknown, so it cannot be used to choose a
+  // surface. See `bootstrap`.
+  const [profileUnavailable, setProfileUnavailable] = useState(false);
   const [writeError, setWriteError] = useState<string | null>(null);
   const dismissWriteError = useCallback(() => setWriteError(null), []);
 
@@ -530,7 +537,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedBranch(null); setCart([]); setCouponCode(''); setDiscountAmount(0);
     setIntegrationSettings([]); setIntegrationsError(null);
     setOrdersLiveMode('off'); setOrdersLastUpdated(null);
-    setDataError(null); setDataLoading(false);
+    setDataError(null); setDataLoading(false); setProfileUnavailable(false);
   }, []);
 
   /** Load the signed-in user's profile then all their data. */
@@ -540,9 +547,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     setDataLoading(true);
     setDataError(null);
+    setProfileUnavailable(false);
     try {
       const dbProfile = await auth.myProfile();
-      const user = dbProfile ? mapProfile(dbProfile) : { ...GUEST_USER, id: userId };
+      if (!dbProfile) {
+        // A SIGNED-IN USER ALWAYS HAS A PROFILE ROW, so its absence is a fault
+        // rather than a role. This used to substitute `{ ...GUEST_USER, id }`,
+        // whose role is `customer` — and because the id was non-empty,
+        // `App.tsx` treated the identity as KNOWN and routed the user to the
+        // customer app. An administrator whose profile row could not be read
+        // was therefore told, in effect, that they were a customer, and sent
+        // to /app with no error anywhere.
+        //
+        // `profileUnavailable` is a separate signal from `dataError` on
+        // purpose: the surface it drives has to be reachable BEFORE role
+        // routing, because the role is exactly what is not known here.
+        setProfileUnavailable(true);
+        setDataLoading(false);
+        return;
+      }
+      const user = mapProfile(dbProfile);
       setCurrentUser(user);
       await loadEverything(user);
     } catch (e) {
@@ -596,6 +620,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (data.session?.user) void bootstrap(data.session.user.id);
     }).catch(() => setAuthReady(true));
     return () => sub.subscription.unsubscribe();
+  }, [bootstrap, resetToGuest]);
+
+  /**
+   * Re-run the profile bootstrap after a `profileUnavailable` fault.
+   *
+   * `bootstrap` latches on `loadedUserRef` so that a TOKEN_REFRESHED event
+   * cannot reload the screen, which means a retry that simply called it again
+   * would return immediately and present as a dead button. The latch is
+   * therefore cleared first. The session is re-read rather than assumed,
+   * because the fault may itself have been a rejected token.
+   */
+  const retryProfile = useCallback(async () => {
+    const session = await auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) { resetToGuest(); return; }
+    loadedUserRef.current = null;
+    await bootstrap(userId);
   }, [bootstrap, resetToGuest]);
 
   const reload = useCallback(async () => {
@@ -1276,6 +1317,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       profiles,
 
       currentUser,
+      profileUnavailable,
+      retryProfile,
       selectedBranch,
       setSelectedBranch,
 

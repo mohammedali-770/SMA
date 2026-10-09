@@ -10,7 +10,8 @@ import { StaffMfaGate } from './components/StaffMfaGate';
 import { ThemeProvider } from './components/ThemeProvider';
 import { AppearanceToggle } from './components/AppearanceToggle';
 import { BrandMark } from './design-system/ui/BrandMark';
-import { isAdminConsoleRole, isOpsConsoleRole } from './lib/roles';
+import { chooseConsoleAudience } from './lib/consoleAudience';
+import { NonStaffNotice, ProfileUnavailableNotice } from './components/AccessNotices';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 const AdminDashboard = lazy(() =>
@@ -38,6 +39,13 @@ const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
 
 const AppHeader: React.FC = () => {
   const { currentUser, signOut } = useApp();
+  // Until a profile has loaded, `currentUser` is GUEST_USER, whose role is the
+  // placeholder `customer`. Rendering it labelled every admin "Customer" for the
+  // length of each sign-in, and — worse — sat a "Customer" badge directly above
+  // the notice explaining that an unreadable profile is NOT a sign you are a
+  // customer. Identity details appear only once there is an identity to show.
+  // Sign out stays, because it is the way out of every one of those states.
+  const identityKnown = Boolean(currentUser.id);
   const roleLabel = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
   return (
     <header className="sticky top-0 backdrop-blur-md bg-con-surface/30 border-b border-con-line text-con-text py-3 px-6 z-40">
@@ -48,10 +56,12 @@ const AppHeader: React.FC = () => {
         </div>
         <div className="flex items-center gap-3">
           <AppearanceToggle />
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
-          </div>
+          {identityKnown && (
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
+              <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
+            </div>
+          )}
           <button
             onClick={() => { void signOut(); }}
             className="flex items-center gap-1.5 text-xs font-bold bg-con-surface/50 hover:bg-con-surface text-con-text-2 hover:text-ember border border-con-line py-1.5 px-3 rounded-xl transition-colors"
@@ -101,16 +111,6 @@ const WriteErrorBanner: React.FC = () => {
   );
 };
 
-const CustomerApp: React.FC = () => {
-  React.useEffect(() => { window.location.replace('/app'); }, []);
-  return (
-    <main className="flex-grow p-6 max-w-md mx-auto w-full text-center space-y-3">
-      <p className="text-sm font-black text-con-text-2">Opening the Spicy Meal app…</p>
-      <a href="/app" className="text-ember text-sm font-black underline">/app</a>
-    </main>
-  );
-};
-
 const StaffApp: React.FC = () => {
   const { currentUser } = useApp();
   const isAdmin = currentUser.role === 'admin';
@@ -131,26 +131,39 @@ const StaffApp: React.FC = () => {
   );
 };
 
-function AppContent() {
-  const { authReady, isAuthenticated, currentUser, dataLoading, dataError } = useApp();
+/** Exported for `App.test.tsx`; the default export below is what ships. */
+export function AppContent() {
+  const { authReady, isAuthenticated, currentUser, dataLoading, dataError, profileUnavailable } = useApp();
 
-  if (!authReady) return <FullScreenLoader label="Starting…" />;
-  if (!isAuthenticated) return <AuthScreen />;
-
-  const identityKnown = Boolean(currentUser.id);
   // Routing used to be `role !== 'customer'`, i.e. "anyone who is not a customer
   // gets the admin console behind the TOTP gate". With the branch-operations
   // roles that is no longer the right question — a cashier signing in on shared
   // shop-floor hardware has no authenticator app and no permission to read the
   // admin dataset. Each surface is now chosen explicitly.
-  const adminConsole = identityKnown && isAdminConsoleRole(currentUser.role);
-  const opsConsole = identityKnown && isOpsConsoleRole(currentUser.role);
+  //
+  // The choice itself lives in `chooseConsoleAudience` rather than in these
+  // ternaries, because the arm that used to sit LAST here was the customer app:
+  // anything unrecognised became `customer` and was redirected to /app, so an
+  // administrator whose profile could not be read was locked out of the
+  // dashboard. That ordering is now a pure function with its own exhaustive
+  // tests (`src/lib/consoleAudience.test.ts`).
+  const audience = chooseConsoleAudience({
+    authReady,
+    isAuthenticated,
+    profileUnavailable,
+    identityKnown: Boolean(currentUser.id),
+    dataLoading,
+    role: currentUser.role,
+  });
+
+  if (audience === 'starting') return <FullScreenLoader label="Starting…" />;
+  if (audience === 'sign-in') return <AuthScreen />;
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <AppHeader />
       <WriteErrorBanner />
-      {adminConsole ? (
+      {audience === 'admin' ? (
         <StaffMfaGate>
           {dataError ? (
             <DataErrorPanel />
@@ -160,7 +173,7 @@ function AppContent() {
             <StaffApp />
           )}
         </StaffMfaGate>
-      ) : opsConsole ? (
+      ) : audience === 'ops' ? (
         dataError ? (
           <DataErrorPanel />
         ) : dataLoading ? (
@@ -168,12 +181,22 @@ function AppContent() {
         ) : (
           <Suspense fallback={<PanelFallback />}><OpsConsole /></Suspense>
         )
+      ) : audience === 'account-loading' ? (
+        dataError ? <ProfileUnavailableNotice /> : <FullScreenLoader label="Loading your account…" />
+      ) : audience === 'profile-unavailable' ? (
+        // NEVER DataErrorPanel here. Its Retry calls `reload()`, which is a
+        // no-op without `currentUser.id` — and the identity is exactly what is
+        // missing. An earlier revision of this arm preferred DataErrorPanel when
+        // `dataError` was set, so a thrown profile read (which `myProfile()` now
+        // raises deliberately) landed on a dead Retry button: the very failure
+        // `retryProfile` was written to prevent. The notice retries through
+        // `retryProfile` and shows `dataError` as its detail line, so the
+        // message is not lost either.
+        <ProfileUnavailableNotice />
       ) : dataError ? (
         <DataErrorPanel />
-      ) : dataLoading && !currentUser.id ? (
-        <FullScreenLoader label="Loading your account…" />
       ) : (
-        <CustomerApp />
+        <NonStaffNotice />
       )}
       <footer className="backdrop-blur-md bg-con-surface/10 text-con-text-2 text-center py-5 border-t border-con-line mt-10 text-xs">
         <div className="max-w-7xl mx-auto px-6"><span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span></div>

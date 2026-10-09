@@ -451,6 +451,36 @@ credential somewhere a backup does not reach, and S-2 stops the backup for the
 data that remains (cart, language, first-run flags, the pending checkout-session
 marker). Neither depends on the other being correct.
 
+## S-3 The console and the customer web app share one session — INFO — MITIGATED, NOT REMOVED
+
+Found 2026-10-08 while diagnosing an owner report that the dashboard "redirects
+to /app". The staff console is served at `/` and the Expo web export of the
+customer app at `/app` — **the same origin**. Neither client sets a custom
+`storageKey`, and both deployed bundles were measured deriving the identical
+default, `sb-${hostname.split(".")[0]}-auth-token`, in `localStorage`: the
+console through supabase-js's default storage, the web export through
+AsyncStorage's web backend, which writes the raw key with no prefix. **So one
+sign-in is shared between the two apps in a given browser.**
+
+This is not a privilege boundary. Authorization is enforced by RLS and by the
+`is_admin()`/`is_staff()` predicates server-side, and a customer session carries
+a customer's JWT whichever app reads it. The consequence was a **lockout**: the
+console read a customer session, routed it to the customer app from a mount
+effect, and never rendered the sign-in form, so a staff member who had once used
+the customer app in that browser could not reach the dashboard at all. A live
+customer session on the owner's desktop did exactly that.
+
+What changed: the console no longer redirects. It shows the account it found and
+offers **Sign out** or **Open the Spicy Meal app** (`src/components/AccessNotices.tsx`),
+and an unreadable profile is now a fault screen rather than being reported as the
+`customer` role (`src/lib/consoleAudience.ts`, with exhaustive tests).
+
+**What did not change, deliberately:** the session is still shared. Separating it
+means a distinct `storageKey` per app, which would sign every current web user
+out of one of the two on deploy — a user-visible change worth its own decision,
+not a side effect of a lockout fix. Native builds are unaffected: they keep the
+session in the device keystore (S-1).
+
 ## What the audit deliberately did not touch
 
 - **`apps/mobile/src/app/payment/return.tsx`.** A deep-link finding was confirmed

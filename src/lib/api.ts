@@ -335,8 +335,20 @@ export const auth = {
     if (error) throw new Error(error.message);
   },
   async signOut() { await supabase.auth.signOut(); },
+  /**
+   * The signed-in user's profile row, or `null` when there is genuinely no row
+   * for them.
+   *
+   * A `getUser()` failure is THROWN rather than folded into that `null`. It
+   * used to be discarded, which made a transport or token failure
+   * indistinguishable from "this account has no profile" — and `bootstrap`
+   * read that absence as `role: 'customer'`, so a network blip could route an
+   * administrator to the customer app. The two cases are now distinct: a fault
+   * raises, and `null` means only what it says.
+   */
   async myProfile(): Promise<DbProfile | null> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw new Error(error.message);
     if (!user) return null;
     return ok(await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   },
