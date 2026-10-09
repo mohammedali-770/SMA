@@ -228,17 +228,106 @@ extended there on purpose.
   imported by its source; no unapproved parent reaches the excepted packages; no
   other high or any critical passes; code signing cannot be switched on silently;
   and a stale or expired entry fails loudly.
-- **Not guaranteed:** that a *new* third-party dependency does not pull `node-forge`
-  or `braces` into the customer bundle through a CLI library it depends on. Adding
-  such a dependency is a deliberate act the gate does not detect.
+- **Not guaranteed by the audit gate:** that a *new* third-party dependency does
+  not pull `node-forge` or `braces` into the customer bundle through a CLI library
+  it depends on. Adding such a dependency is a deliberate act the graph cannot
+  distinguish from today's legitimate edges.
 
 **The question that actually matters — does this code reach a customer? — is a
-property of the built bundle, not the graph.** It was answered by measurement on
-2026-10-08: zero `node-forge`, `micromatch` or `braces` library code in the
-deployed `/app` bundle. Enforcing it continuously means asserting it against the
-bundle the Production build job emits, which is a CI change of its own and is not
-in this one. Until then, the residual exposure is bounded by **the 2026-11-07
-expiry**, which forces this review again within a month.
+property of the built bundle, not the graph, and since 2026-10-09 it is checked
+there, inside the build itself.** `npm run build` ends with
+`node scripts/bundle-forbidden-libs.mjs dist`, which fails if code from
+`node-forge`, `micromatch` or `braces` is in any JavaScript it just emitted — the
+admin console and the Expo web export alike. The owner accepted merging #416
+with the gap open on the condition that this follow-up close it.
+
+**It lives in the build script, not in a CI step, because a CI step would have
+checked the wrong artifact.** The first version of this check was a separate step
+in the Production build job, scanning CI's own temporary `dist`. But production is
+not deployed from that `dist`: it is rebuilt by Vercel's Git integration, or by
+`vercel build --prod` in the gated deploy job, with production environment
+settings — so the bundle customers receive was never the one scanned. Review
+caught that on #417. `npm run build` is Vercel's `buildCommand` (`vercel.json`),
+which makes it the build in all three places one happens: the CI build job,
+Vercel's Git deploys and the gated deploy. A failing scan fails that build, so a
+deploy that would ship one of these libraries does not happen and the previous
+deploy keeps serving.
+
+**How it recognises a library.** Minifiers rename identifiers but keep string
+literals, so each library is identified by error messages from its *own* source.
+Every signature was proven three ways before it was trusted: it survives
+minification (present in a real minified bundle of its library), it is absent
+from what this project ships, and it is distinctive. Generic phrases were rejected
+on purpose — `"Expected a string"` is said by both `braces` and `micromatch` and
+by libraries that are neither, and matching it would turn CI red for nothing.
+
+**Signatures are chosen per vulnerable module, not per package — the first
+version chose them per package and missed one.** Neither `braces` nor
+`node-forge` has an `exports` map, so a dependency can import a single module by
+its subpath and bundle nothing else from the library. `braces/lib/compile` — the
+advisory's named sink — imported alone matched **nothing**: the only `braces`
+signature lived in `lib/expand.js`. Review caught that on #417. Each vulnerable
+module was then bundled alone and its closure read from esbuild's metafile, and
+each is now recognised by a literal from **its own source**:
+
+| imported alone | modules in its closure | signatures that match |
+| --- | --- | --- |
+| `braces/lib/compile` | `compile`, `utils`, `fill-range` | `compile`'s own `'node.isClose'` |
+| `braces/lib/expand` | `expand`, `utils`, `stringify`, `fill-range` | `expand`'s `rangeLimit` message |
+| `braces/lib/parse` | `parse`, `utils`, `stringify`, `constants` | `parse`'s `), exceeds max characters (` |
+| `node-forge/lib/rsa` | 17 modules, including `asn1`, `random`, `aes`, `cipherModes` | `rsa`'s own `RSASSA-PKCS1-v1_5` message, `asn1`'s, and `cipherModes`' |
+
+**`compile`'s only literal is a debug line upstream left in** —
+`console.log('node.isClose', …)`. It survives minification, but in whichever
+quote style the minifier picks (Metro keeps single quotes, esbuild emits double),
+so it is matched as a *whole string literal*, quotes included: bare,
+`node.isClose` is ordinary code in `xmlbuilder` and `plist`. Proven against
+Metro's real output by planting `require("braces/lib/compile")` in the app and
+building: the scan names the shipped entry file on `'node.isClose'`.
+
+**Nothing in the table may come from a library that is not itself excepted —
+and the first fix broke that rule.** It recognised `compile` by `fill-range`'s
+`Invalid range arguments: `, since `compile` always loads it. But `fill-range` is
+a separate package with no advisory, so an app using it *without* `braces` would
+have failed the build as though `braces` had shipped. Review caught that on #417
+too; the suite now bundles `fill-range` alone and requires **no** finding.
+
+Distinctiveness was measured over all 19 284 installed JavaScript files in both trees: each `braces`
+signature occurs in exactly six — the library's own module, and five build/dev
+tools that **vendor a full copy of `braces`**: `vite`, two `rollup` bundles,
+`prettier`, and `resolve-workspace-root` (under `@expo/config`). No unrelated
+library says any of them, so a match always means `braces`' code. Those vendored
+copies are a gap the audit gate cannot see at all — npm audits declared packages,
+not code inlined into another package — and the bundle check catches them if one
+ever ships. `micromatch`'s signature occurs only in `micromatch` and the two of
+those tools that vendor it too (`prettier`, `resolve-workspace-root`); each
+`node-forge` signature only in `node-forge`'s own module and its two prebuilt
+`dist` bundles. `rsa` is caught three times over because it loads `random → aes →
+cipherModes`; that is why removing both its own and `asn1`'s signature still
+passed under mutation, and it was traced to that closure rather than assumed.
+The suite bundles each of these four modules alone on every run and requires it
+to be recognised; restoring the original single `braces` signature fails it on
+`compile` and `parse`.
+
+**A signature that stops matching does not fail anything — the check would just
+pass for ever.** So `src/lib/bundleForbiddenLibs.test.ts` re-bundles each library
+minified on every run and requires each signature to survive, *individually*:
+mutation testing showed that rewording one of a library's messages is caught only
+by the per-signature assertion, because the library-level check still passes on
+the others. A dead signature beside a live one would silently shrink what is
+caught. The same suite proves the scan fails closed on a missing or empty build
+rather than passing on nothing.
+
+**What the bundle check does not see.** It scans what `npm run build` emits.
+Native iOS and Android JavaScript is built by EAS, not by that script; the web export comes from the same
+source and Metro configuration and is a strong proxy, but a library imported only
+from a platform-specific file (`*.native.ts`, `*.ios.ts`, `*.android.ts`) would
+not appear in it. And `compile` on its own is recognised only through a
+`console.log` call, so a build that strips console calls (`drop_console`,
+`babel-plugin-transform-remove-console` — neither configured today) would
+silently lose that one module; `parse` and `expand` would still be caught. That
+is narrower than the gap it replaces, and the **2026-11-07 expiry** still forces
+this review within a month.
 
 **The stale-entry check was weakened, then restored.** The original `image-size`
 gate failed unconditionally on any unobserved allowlisted advisory. The first

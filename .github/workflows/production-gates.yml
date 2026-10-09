@@ -44,6 +44,13 @@ jobs:
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
+      # `npm run build` ends by failing if code from an excepted vulnerable
+      # library (braces, node-forge) is in what it just built. That check lives
+      # IN the build script rather than as a step here because the same script
+      # is Vercel's buildCommand: production is rebuilt by Vercel's Git
+      # integration and by `vercel build --prod` below, with production settings,
+      # and a step here would only ever scan CI's own temporary dist. See
+      # scripts/bundle-forbidden-libs.mjs and docs/DEPENDENCY_ADVISORIES.md §3.
       - name: Build (exactly what Vercel runs)
         run: npm run build
 
