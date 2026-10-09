@@ -228,17 +228,43 @@ extended there on purpose.
   imported by its source; no unapproved parent reaches the excepted packages; no
   other high or any critical passes; code signing cannot be switched on silently;
   and a stale or expired entry fails loudly.
-- **Not guaranteed:** that a *new* third-party dependency does not pull `node-forge`
-  or `braces` into the customer bundle through a CLI library it depends on. Adding
-  such a dependency is a deliberate act the gate does not detect.
+- **Not guaranteed by the audit gate:** that a *new* third-party dependency does
+  not pull `node-forge` or `braces` into the customer bundle through a CLI library
+  it depends on. Adding such a dependency is a deliberate act the graph cannot
+  distinguish from today's legitimate edges.
 
 **The question that actually matters — does this code reach a customer? — is a
-property of the built bundle, not the graph.** It was answered by measurement on
-2026-10-08: zero `node-forge`, `micromatch` or `braces` library code in the
-deployed `/app` bundle. Enforcing it continuously means asserting it against the
-bundle the Production build job emits, which is a CI change of its own and is not
-in this one. Until then, the residual exposure is bounded by **the 2026-11-07
-expiry**, which forces this review again within a month.
+property of the built bundle, not the graph, and since 2026-10-09 it is checked
+there on every PR.** The Production build job runs
+`scripts/bundle-forbidden-libs.mjs dist` after building, and fails if code from
+`node-forge`, `micromatch` or `braces` is in any shipped JavaScript — the admin
+console and the Expo web export alike. That closes the residual gap above for
+everything CI builds. The owner accepted merging #416 with the gap open on the
+condition that this follow-up close it.
+
+**How it recognises a library.** Minifiers rename identifiers but keep string
+literals, so each library is identified by error messages from its *own* source.
+Every signature was proven three ways before it was trusted: it survives
+minification (present in a real minified bundle of its library), it is absent
+from what this project ships, and it is distinctive. Generic phrases were rejected
+on purpose — `"Expected a string"` is said by both `braces` and `micromatch` and
+by libraries that are neither, and matching it would turn CI red for nothing.
+
+**A signature that stops matching does not fail anything — the check would just
+pass for ever.** So `src/lib/bundleForbiddenLibs.test.ts` re-bundles each library
+minified on every run and requires each signature to survive, *individually*:
+mutation testing showed that rewording one of `node-forge`'s three messages is
+caught only by the per-signature assertion, because the library-level check still
+passes on the other two. A dead signature beside a live one would silently shrink
+what is caught. The same suite proves the scan fails closed on a missing or empty
+build rather than passing on nothing.
+
+**What the bundle check does not see.** It scans what CI builds. Native iOS and
+Android JavaScript is built by EAS, not in CI; the web export comes from the same
+source and Metro configuration and is a strong proxy, but a library imported only
+from a platform-specific file (`*.native.ts`, `*.ios.ts`, `*.android.ts`) would
+not appear in it. That is narrower than the gap it replaces, and the
+**2026-11-07 expiry** still forces this review within a month.
 
 **The stale-entry check was weakened, then restored.** The original `image-size`
 gate failed unconditionally on any unobserved allowlisted advisory. The first

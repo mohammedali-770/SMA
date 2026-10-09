@@ -65,6 +65,16 @@ jobs:
           fi
           echo "no .map files in dist/"
 
+      # The dependency audit accepts two advisories with no patched release
+      # (braces, node-forge) on the argument that they never ship. It reasons
+      # over npm's dependency graph, which cannot tell build-time from runtime
+      # use, so it cannot prove that argument. The bundle can: this fails if code
+      # from an excepted library is in anything we ship. Signatures are kept
+      # able to fail by src/lib/bundleForbiddenLibs.test.ts, which re-bundles
+      # each library minified. See docs/DEPENDENCY_ADVISORIES.md §3.
+      - name: Excepted vulnerable libraries are absent from the shipped bundles
+        run: node scripts/bundle-forbidden-libs.mjs dist
+
   edge-functions:
     name: Edge Function typecheck (Deno)
     runs-on: ubuntu-latest
