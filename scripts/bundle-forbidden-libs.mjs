@@ -26,12 +26,26 @@
  *
  * Generic phrases were rejected on purpose ("Expected a string", "No matches
  * found for"): any library may say them, and a false positive here turns CI red
- * for no reason. Metro bundles whole modules, so one distinctive message is
- * enough to see a library that is present.
+ * for no reason.
  *
- * WHAT IT DOES NOT SEE, stated rather than implied. It scans what CI builds: the
- * admin console and the Expo WEB export. Native iOS/Android JavaScript is built
- * by EAS, not here. The web export is produced from the same source and the same
+ * Signatures are chosen per vulnerable MODULE CLOSURE, not per package: a
+ * package without an `exports` map can be imported piecemeal, so a dependency
+ * may bundle one vulnerable module and none of the others. Each closure that can
+ * reach a flaw carries a signature it always loads.
+ *
+ * IT RUNS INSIDE `npm run build`, NOT BESIDE IT, so it checks the artifact that is
+ * actually deployed. `npm run build` is Vercel's `buildCommand`, which makes it
+ * the build in all three places one happens: the CI build job, Vercel's
+ * Git-integration deploys, and the gated `vercel build --prod`. A separate CI
+ * step would have scanned only CI's own temporary `dist` while production was
+ * rebuilt elsewhere with production settings and shipped unscanned — review
+ * caught that on #417. A failing scan fails the build, so a deploy that would
+ * ship one of these libraries does not happen and the previous deploy keeps
+ * serving.
+ *
+ * WHAT IT DOES NOT SEE, stated rather than implied. It scans what those builds
+ * emit: the admin console and the Expo WEB export. Native iOS/Android
+ * JavaScript is built by EAS, not here. The web export is produced from the same source and the same
  * Metro configuration, so it is a strong proxy — but a library imported only
  * from a platform-specific file (`*.native.ts`, `*.ios.ts`, `*.android.ts`)
  * would not appear in it.
@@ -48,12 +62,36 @@ import { pathToFileURL } from 'node:url';
  */
 export const FORBIDDEN_LIBS = Object.freeze({
   'node-forge': Object.freeze([
-    'ASN.1 parsing error: Max depth exceeded.',
+    // rsa.js — the vulnerable PKCS#1 v1.5 verifier itself. Present in every
+    // bundle that can reach the flaw, including `node-forge/lib/rsa` imported
+    // on its own. Unique to node-forge across both installed trees.
+    'Unknown RSASSA-PKCS1-v1_5 DigestAlgorithm identifier.',
+    'ASN.1 parsing error: Max depth exceeded.', // asn1.js, required by rsa.js
     'Cannot encrypt private key. Unknown encryption algorithm.',
     'Authentication tag does not match tag length.',
   ]),
+  // micromatch/index.js; also in prettier and resolve-workspace-root, which
+  // vendor micromatch along with braces. Measured: nowhere else.
   micromatch: Object.freeze(['Expected the first argument to be an object']),
-  braces: Object.freeze(['Use options.rangeLimit to increase or disable the limit']),
+  braces: Object.freeze([
+    // ONE SIGNATURE PER VULNERABLE MODULE CLOSURE, not per package. `braces` has
+    // no `exports` map, so a dependency may import `braces/lib/compile` on its
+    // own, and the package-entry signature lives only in lib/expand.js. Review
+    // caught that on #417: a compile-only bundle would have passed.
+    'Use options.rangeLimit to increase or disable the limit', // lib/expand.js
+    '), exceeds max characters (', // lib/parse.js (static text of a template literal)
+    // fill-range — required by BOTH vulnerable walkers, compile.js and
+    // expand.js, so it catches a bundle that never loads parse.js or expand.js.
+    // compile.js itself contains no distinctive literal.
+    'Invalid range arguments: ',
+    // Measured across all 19 284 installed JS files in both trees: each of these
+    // three occurs in exactly six — braces' (or fill-range's) own module, and
+    // five build/dev tools that VENDOR a full copy of braces: vite, rollup (two
+    // bundles), prettier, and resolve-workspace-root (under @expo/config). No
+    // unrelated library says any of them, so a match is always braces' code —
+    // including a vendored copy, which carries the same flaw and which npm audit
+    // cannot see at all.
+  ]),
 });
 
 /** Libraries whose code appears in `text`, with the signature that matched. */

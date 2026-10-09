@@ -44,6 +44,13 @@ jobs:
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
+      # `npm run build` ends by failing if code from an excepted vulnerable
+      # library (braces, node-forge) is in what it just built. That check lives
+      # IN the build script rather than as a step here because the same script
+      # is Vercel's buildCommand: production is rebuilt by Vercel's Git
+      # integration and by `vercel build --prod` below, with production settings,
+      # and a step here would only ever scan CI's own temporary dist. See
+      # scripts/bundle-forbidden-libs.mjs and docs/DEPENDENCY_ADVISORIES.md §3.
       - name: Build (exactly what Vercel runs)
         run: npm run build
 
@@ -64,16 +71,6 @@ jobs:
             exit 1
           fi
           echo "no .map files in dist/"
-
-      # The dependency audit accepts two advisories with no patched release
-      # (braces, node-forge) on the argument that they never ship. It reasons
-      # over npm's dependency graph, which cannot tell build-time from runtime
-      # use, so it cannot prove that argument. The bundle can: this fails if code
-      # from an excepted library is in anything we ship. Signatures are kept
-      # able to fail by src/lib/bundleForbiddenLibs.test.ts, which re-bundles
-      # each library minified. See docs/DEPENDENCY_ADVISORIES.md §3.
-      - name: Excepted vulnerable libraries are absent from the shipped bundles
-        run: node scripts/bundle-forbidden-libs.mjs dist
 
   edge-functions:
     name: Edge Function typecheck (Deno)

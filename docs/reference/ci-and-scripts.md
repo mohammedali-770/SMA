@@ -32,7 +32,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 
 | Command | Runs |
 | --- | --- |
-| `npm run build` | `npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web` |
+| `npm run build` | `npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web && node scripts/bundle-forbidden-libs.mjs dist` |
 | `npm run clean` | `rm -rf dist` |
 | `npm run design-system:check` | `node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs` |
 | `npm run design-system:sync` | `node scripts/sync-design-system.mjs` |

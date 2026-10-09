@@ -235,12 +235,23 @@ extended there on purpose.
 
 **The question that actually matters — does this code reach a customer? — is a
 property of the built bundle, not the graph, and since 2026-10-09 it is checked
-there on every PR.** The Production build job runs
-`scripts/bundle-forbidden-libs.mjs dist` after building, and fails if code from
-`node-forge`, `micromatch` or `braces` is in any shipped JavaScript — the admin
-console and the Expo web export alike. That closes the residual gap above for
-everything CI builds. The owner accepted merging #416 with the gap open on the
-condition that this follow-up close it.
+there, inside the build itself.** `npm run build` ends with
+`node scripts/bundle-forbidden-libs.mjs dist`, which fails if code from
+`node-forge`, `micromatch` or `braces` is in any JavaScript it just emitted — the
+admin console and the Expo web export alike. The owner accepted merging #416
+with the gap open on the condition that this follow-up close it.
+
+**It lives in the build script, not in a CI step, because a CI step would have
+checked the wrong artifact.** The first version of this check was a separate step
+in the Production build job, scanning CI's own temporary `dist`. But production is
+not deployed from that `dist`: it is rebuilt by Vercel's Git integration, or by
+`vercel build --prod` in the gated deploy job, with production environment
+settings — so the bundle customers receive was never the one scanned. Review
+caught that on #417. `npm run build` is Vercel's `buildCommand` (`vercel.json`),
+which makes it the build in all three places one happens: the CI build job,
+Vercel's Git deploys and the gated deploy. A failing scan fails that build, so a
+deploy that would ship one of these libraries does not happen and the previous
+deploy keeps serving.
 
 **How it recognises a library.** Minifiers rename identifiers but keep string
 literals, so each library is identified by error messages from its *own* source.
@@ -250,17 +261,51 @@ from what this project ships, and it is distinctive. Generic phrases were reject
 on purpose — `"Expected a string"` is said by both `braces` and `micromatch` and
 by libraries that are neither, and matching it would turn CI red for nothing.
 
+**Signatures are chosen per vulnerable module, not per package — the first
+version chose them per package and missed one.** Neither `braces` nor
+`node-forge` has an `exports` map, so a dependency can import a single module by
+its subpath and bundle nothing else from the library. `braces/lib/compile` — the
+advisory's named sink — contains no distinctive literal of its own, and imported
+alone it matched **nothing**: the only `braces` signature lived in
+`lib/expand.js`. Review caught that on #417. Each vulnerable module was then
+bundled alone and its closure read from esbuild's metafile:
+
+| imported alone | modules in its closure | signatures that match |
+| --- | --- | --- |
+| `braces/lib/compile` | `compile`, `utils`, `fill-range` | `fill-range`'s `Invalid range arguments: ` |
+| `braces/lib/expand` | `expand`, `utils`, `stringify`, `fill-range` | `expand`'s `rangeLimit` message, and `fill-range`'s |
+| `braces/lib/parse` | `parse`, `utils`, `stringify`, `constants` | `parse`'s `), exceeds max characters (` |
+| `node-forge/lib/rsa` | 17 modules, including `asn1`, `random`, `aes`, `cipherModes` | `rsa`'s own `RSASSA-PKCS1-v1_5` message, `asn1`'s, and `cipherModes`' |
+
+`fill-range` is a separate package that `braces` requires. Distinctiveness was
+measured over all 19 284 installed JavaScript files in both trees: each `braces`
+signature occurs in exactly six — the library's own module, and five build/dev
+tools that **vendor a full copy of `braces`**: `vite`, two `rollup` bundles,
+`prettier`, and `resolve-workspace-root` (under `@expo/config`). No unrelated
+library says any of them, so a match always means `braces`' code. Those vendored
+copies are a gap the audit gate cannot see at all — npm audits declared packages,
+not code inlined into another package — and the bundle check catches them if one
+ever ships. `micromatch`'s signature occurs only in `micromatch` and the two of
+those tools that vendor it too (`prettier`, `resolve-workspace-root`); each
+`node-forge` signature only in `node-forge`'s own module and its two prebuilt
+`dist` bundles. `rsa` is caught three times over because it loads `random → aes →
+cipherModes`; that is why removing both its own and `asn1`'s signature still
+passed under mutation, and it was traced to that closure rather than assumed.
+The suite bundles each of these four modules alone on every run and requires it
+to be recognised; restoring the original single `braces` signature fails it on
+`compile` and `parse`.
+
 **A signature that stops matching does not fail anything — the check would just
 pass for ever.** So `src/lib/bundleForbiddenLibs.test.ts` re-bundles each library
 minified on every run and requires each signature to survive, *individually*:
-mutation testing showed that rewording one of `node-forge`'s three messages is
-caught only by the per-signature assertion, because the library-level check still
-passes on the other two. A dead signature beside a live one would silently shrink
-what is caught. The same suite proves the scan fails closed on a missing or empty
-build rather than passing on nothing.
+mutation testing showed that rewording one of a library's messages is caught only
+by the per-signature assertion, because the library-level check still passes on
+the others. A dead signature beside a live one would silently shrink what is
+caught. The same suite proves the scan fails closed on a missing or empty build
+rather than passing on nothing.
 
-**What the bundle check does not see.** It scans what CI builds. Native iOS and
-Android JavaScript is built by EAS, not in CI; the web export comes from the same
+**What the bundle check does not see.** It scans what `npm run build` emits.
+Native iOS and Android JavaScript is built by EAS, not by that script; the web export comes from the same
 source and Metro configuration and is a strong proxy, but a library imported only
 from a platform-specific file (`*.native.ts`, `*.ios.ts`, `*.android.ts`) would
 not appear in it. That is narrower than the gap it replaces, and the
