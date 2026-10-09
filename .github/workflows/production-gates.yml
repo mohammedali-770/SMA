@@ -105,10 +105,11 @@ jobs:
         run: node scripts/audit-web-high.mjs
 
       # Do not weaken this to `|| true`, `--omit`, or a lower audit level.
-      # The script is fail-closed and permits only the two reviewed image-size
-      # HIGH advisories that currently have no patched release and are reachable
-      # solely through Metro/Expo build tooling. It expires automatically and
-      # any other high/critical advisory still fails the job.
+      # The script is fail-closed and permits only the reviewed HIGH advisories in
+      # docs/DEPENDENCY_ADVISORIES.md §3 (braces, node-forge): packages with no
+      # patched release, reachable solely through Expo/Metro build and CLI
+      # tooling. It names every advisory before any verdict, expires
+      # automatically, and any other high/critical advisory still fails the job.
       - name: Audit mobile dependencies
         run: node scripts/audit-mobile-high.mjs
 
