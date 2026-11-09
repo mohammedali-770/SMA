@@ -228,6 +228,16 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-09 — `20260930120000_product_variants_guest_read` is
+written, validated and awaiting approval.** It repairs one RLS policy:
+`product_variants` read `(is_active OR is_staff())` for anon, and anon cannot
+execute `is_staff()`, so every signed-out read of the menu's price tiers was
+refused with 401. It is a regression of `20260810143000`. **It must be applied
+before any build that lets a signed-out user reach the menu.** No function, no
+data, no deploy; money path self-asserted. With this file the outstanding set
+grows by one, and Moyasar still sorts ahead of everything. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §52.
+
 **Current position 2026-09-20, read live AFTER the admin-push closure-queue
 apply: 142 repository files on the default branch / 147 live history rows /
 exactly ONE unapplied — `20260824100000_moyasar_payment_provider`, frozen on
