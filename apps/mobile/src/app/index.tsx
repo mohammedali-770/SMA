@@ -1,4 +1,10 @@
-/** Entry route: branded startup moment, then tabs or login. */
+/**
+ * Entry route: branded startup moment, then the tabs — signed in or as a guest.
+ *
+ * A signed-out customer is NOT sent to login. The menu is browsable without an
+ * account (App Store 5.1.1(v)); sign-in is asked for where an account is needed
+ * — checkout, delivery, orders, profile — and returns there afterwards.
+ */
 import { Image } from 'expo-image';
 import { Redirect } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -81,7 +87,7 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
   if (status === 'loading' || !introDone) return <BrandIntro />;
-  return <Redirect href={status === 'signed_in' ? '/(tabs)' : '/(auth)/login'} />;
+  return <Redirect href="/(tabs)" />;
 }
 const useStyles = makeStyles((colors) => ({
   introRoot: {
