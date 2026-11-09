@@ -28,9 +28,13 @@ import {
   type Lang,
   type PublicLegalDoc,
 } from './legalPage';
+import { publicRestHeaders, publicSupabaseKey } from '../lib/supabaseKey';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const SUPABASE_ANON_KEY = publicSupabaseKey({
+  VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined,
+});
 
 const SELECT = 'document_type,title_en,title_ar,content_en,content_ar,version,effective_date';
 
@@ -120,7 +124,7 @@ async function load(): Promise<void> {
   render();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/legal_documents?select=${SELECT}&is_active=eq.true`, {
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      headers: publicRestHeaders(SUPABASE_ANON_KEY),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     docs = orderDocs((await res.json()) as PublicLegalDoc[]);
