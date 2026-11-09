@@ -19,20 +19,40 @@ lists deletion as "Late 2026, TBC". The replacements are opaque keys:
 **The new keys are not JWTs, and three things this codebase relied on change
 with that:**
 
-1. **They travel on `apikey` only.** The guide: "Send publishable and secret
-   keys on the `apikey` header only … the platform tries to parse it as a JWT
-   and rejects the request with `Invalid JWT`." The API-keys page excepts a
-   bearer that exactly equals `apikey`, and the self-hosted gateway docs say
-   that case is rebuilt from `apikey` — but the hosted page also says such a
-   request "will be rejected as the value is not a JWT". **The pages disagree,
-   and the one behaviour they all agree on is apikey-only, so that is what this
-   code sends.** It can be settled by measurement once the keys exist (§4).
+1. **Our own server-side calls send them on `apikey` only.** The guide: "Send
+   publishable and secret keys on the `apikey` header only … the platform
+   tries to parse it as a JWT and rejects the request with `Invalid JWT`." The
+   API-keys page excepts a bearer that exactly equals `apikey`, but the same
+   hosted page also says such a request "will be rejected as the value is not a
+   JWT". **The pages disagree, and the one behaviour they all agree on is
+   apikey-only, so that is what every call our functions make sends.** Clients
+   cannot do the same, because supabase-js adds the bearer itself (point 3).
 2. **`verify_jwt` only understands the legacy keys.** For the new ones the
    gateway "does not verify the `apikey` header" — a function must check it
    itself. Every function one of ours calls is already `verify_jwt = false`, so
    no flag changes; the receivers now check the key in code.
 3. **supabase-js sends `Authorization: Bearer <key>` whenever there is no user
-   session**, so a client built with an opaque key would put it on both headers.
+   session.** Measured in the installed 2.110 (`dist/index.mjs`):
+   `fetchWithAuth` falls back to the key when there is no access token, and the
+   Auth client always sets it. So a client built with a publishable key puts
+   `Bearer sb_publishable_…` on every signed-out request, **including the
+   app's login**.
+
+   What makes that work is the gateway. Supabase's self-hosted docs ("New API
+   Keys and Asymmetric Authentication") say that on **REST, Auth and Storage**
+   a missing `Authorization`, or one starting `Bearer sb_`, is replaced with the
+   role's internal JWT. **That replacement is skipped on `/functions/v1/`.**
+   For a client the rule is therefore:
+   - a signed-out REST, Auth or Storage call is fine;
+   - a signed-out Edge Function call is not.
+
+   Checked 2026-11-09: the app (`order-intake`, `account-delete-request`, the
+   frozen payment functions) and the console (seven admin functions) call Edge
+   Functions **only while signed in**, so the bearer there is the user's JWT.
+   **Any future signed-out feature, such as the planned guest menu, must read
+   through REST, not through an Edge Function.** Inside our functions,
+   `withoutOpaqueBearer()` drops the copied bearer, so server-side calls stay
+   apikey-only either way.
 
 ## 2. What the code does
 
@@ -79,8 +99,9 @@ with that:**
   user access tokens Supabase Auth issues are still signed by the project's JWT
   secret; rotating that secret would invalidate every session at once. Out of
   scope here.
-- **The web console and the mobile app** (PR-S1b / PR-S1c) are separate PRs,
-  each with its own deploy and rollback.
+- **The web console and the mobile app** are separate PRs, each with its own
+  deploy and rollback: #420 (console, legal pages, prerender) and #421 (the app
+  and its `/app` web export).
 
 ## 3. Owner steps, in order (each is a separate §5 action)
 
@@ -94,8 +115,8 @@ depends on them.
 | 2 | Dashboard → Settings → API Keys → **create** publishable + secret keys | additive: legacy keys keep working | Edge Functions → Secrets lists `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` |
 | 3 | Deploy the **receivers**: `push-dispatch`, `admin-push-dispatch`, `operations-alert-dispatch`, `account-delete-process` | they must accept the new format before anything sends it | each function's logs; a POS-sync push still arrives |
 | 4 | Deploy the **senders** and shared-client users: `lazywait-sync`, `account-delete-request`, `account-delete-scheduler`, `order-intake` (all four bundle files, see `ORDER_CONFIRMATION_FLOW.md`), then the rest | senders switch to `apikey`-only on this deploy | place a test order: the POS kick and the confirmation push both happen; the scheduler's next run succeeds |
-| 5 | Vercel env (Production **and** Preview): publishable key, then a gated redeploy — **after PR-S1b** | the console must send `apikey` only first | console sign-in and reads work |
-| 6 | **December EAS build pair** with the publishable key (PR-S1c), distributed to every tester | installed binaries carry the old key until replaced | the app signs in and orders on the new build |
+| 5 | Vercel env (Production **and** Preview), then a gated redeploy — **after #420 and #421, and after the §4 check passes**. **Two** variables, same value: `VITE_SUPABASE_PUBLISHABLE_KEY` (console, legal pages, prerender) and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the `/app` web export, built by the same `npm run build`) | the console must send `apikey` only first; with only the `VITE_` variable set, `/app` would keep shipping the legacy key and break at step 8 | console sign-in and reads work; `/app` loads the menu and reaches the login screen |
+| 6 | **December EAS build pair** with the publishable key, distributed to every tester. Needs `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` added to the three `apps/mobile/eas.json` profiles first: a small PR, and the value is public | installed binaries carry the old key until replaced | the app signs in and orders on the new build |
 | 7 | Logs: confirm no remaining legacy-key traffic | a remaining caller would break at step 8 | — |
 | 8 | Verify `online_payment_enabled = false`, then **deactivate** the legacy keys (reversible) | the payment functions go dark here, by decision | smoke test: order, push, deletion request, alerts |
 | 9 | Cleanup PR removes the legacy fallbacks | only once step 8 has held | — |
@@ -106,9 +127,19 @@ re-deploying an older bundle is never needed.
 
 ## 4. What is not yet known, stated rather than glossed
 
-- Whether the hosted gateway accepts `Authorization: Bearer sb_…` when it equals
-  `apikey` (§1 point 1). The code never sends it, so the answer does not change
-  correctness; it only decides whether `withoutOpaqueBearer` is necessary or
-  belt-and-braces. Settle it after step 2 by reading one function's logs.
+- **Whether the hosted gateway replaces `Bearer sb_publishable_…` on REST and
+  Auth, as the self-hosted docs describe (§1 point 3).** This decides whether the
+  clients work signed out, and the app's login screen is a signed-out Auth call.
+  supabase-js is Supabase's own client and sends exactly this, which is strong
+  evidence that it is accepted — but it is not a measurement.
+
+  **Settle it read-only straight after step 2, before step 5 or 6.** Send the
+  publishable key on **both** `apikey` and `Authorization: Bearer` to:
+  - `GET /auth/v1/settings`
+  - `GET /rest/v1/legal_documents?select=document_type&is_active=eq.true`
+
+  Each must return 200. **Do not set the Vercel variables or build the December
+  binaries until both do.** Our functions never send this bearer, so their
+  correctness does not depend on the answer.
 - Supabase's exact deletion date ("Late 2026, TBC"). Steps 2-8 should therefore
   finish in December, not wait for an announcement.

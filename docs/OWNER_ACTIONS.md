@@ -3359,13 +3359,19 @@ then, and receivers accept both. **The steps, in this order, each a separate
 `docs/SUPABASE_API_KEYS.md` §3:
 
 1. Merge the functions PR (inert until step 2).
-2. Create the publishable and secret keys in the dashboard (additive).
+2. Create the publishable and secret keys in the dashboard (additive). Then run
+   the read-only signed-out check in `docs/SUPABASE_API_KEYS.md` §4. **Steps 5
+   and 6 wait until it passes**, because the app's login screen depends on it.
 3. Deploy the receivers: `push-dispatch`, `admin-push-dispatch`,
    `operations-alert-dispatch`, `account-delete-process`.
 4. Deploy the senders: `lazywait-sync`, `account-delete-request`,
    `account-delete-scheduler`, `order-intake`, then the rest.
-5. After the console PR: Vercel env (Production and Preview) + gated redeploy.
-6. After the mobile PR: the **December** EAS build pair, to every tester.
+5. After the console PR (#420) and the mobile PR (#421): Vercel env
+   (Production and Preview) + gated redeploy. Set **both**
+   `VITE_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
+   the second is what the `/app` web export reads.
+6. Add the key to `apps/mobile/eas.json` (small PR), then the **December** EAS
+   build pair, to every tester.
 7. Confirm no legacy-key traffic remains.
 8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
    (reversible). **The five frozen payment functions stop working here — owner
