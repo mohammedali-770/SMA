@@ -238,6 +238,21 @@ data, no deploy; money path self-asserted. With this file the outstanding set
 grows by one, and Moyasar still sorts ahead of everything. **Name the target by
 version.** Detail: `docs/MIGRATIONS.md` §52.
 
+**AMENDED 2026-11-09 — a second file is written, so on merge the outstanding set
+is TWO: Moyasar (frozen on purpose) and `20260929120000_db_advisor_hardening`
+(written, validated, awaiting approval).** It changes privileges and one
+policy's role, nothing else:
+- `search_path` on two helpers;
+- client EXECUTE revoked on the two admin-push enqueue triggers;
+- TRUNCATE/TRIGGER/REFERENCES revoked from anon and authenticated on eleven
+  tables (TRUNCATE ignores RLS);
+- `push_devices_select_own` scoped to `authenticated`.
+
+No function body, no data, no deploy. **Money path untouched, and
+self-asserted** (`12b6816d…` / `22e2d429…`). Two outstanding is the shape that
+looks safe and is not: `20260824100000` still sorts ahead of everything.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §51.
+
 **Current position 2026-09-20, read live AFTER the admin-push closure-queue
 apply: 142 repository files on the default branch / 147 live history rows /
 exactly ONE unapplied — `20260824100000_moyasar_payment_provider`, frozen on
