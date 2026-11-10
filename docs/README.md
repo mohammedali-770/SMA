@@ -67,6 +67,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Submit to TestFlight or the App Store, or look up an Apple declaration | [App Store submission](APP_STORE_SUBMISSION.md) |
 | Write or change store listing copy | [Listing copy](store/LISTING_COPY.md) |
 | Check dependency advisories | [Dependency advisories](DEPENDENCY_ADVISORIES.md) |
+| Move off the legacy Supabase API keys (end-2026) | [Supabase API keys](SUPABASE_API_KEYS.md) |
 | Know the Node version | [Node version](NODE_VERSION.md) |
 | Follow branch policy | [Git branches](GIT_BRANCHES.md) |
 

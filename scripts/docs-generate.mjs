@@ -277,8 +277,12 @@ function generateEdgeFunctions() {
     //                    heuristic printed `caller JWT` for the function that
     //                    deletes accounts — the one row a security reviewer
     //                    using this column as an index could least afford to
-    //                    skip.
-    const usesAdmin = /\badminClient\b|\bserviceTarget\b|\bSUPABASE_SERVICE_ROLE_KEY\b/.test(src)
+    //                    skip;
+    //   secretKey()      the key-migration helper (_shared/apiKeys.ts, added
+    //                    2026-11-09), which `account-delete-scheduler` now
+    //                    uses instead of the env var — the same function, the
+    //                    same mislabel waiting to happen a third time.
+    const usesAdmin = /\badminClient\b|\bserviceTarget\b|\bsecretKey\b|\bSUPABASE_SERVICE_ROLE_KEY\b/.test(src)
       ? 'service role'
       : 'caller JWT';
     return `| \`${cell(name)}\` | ${cell(summary || '—')} | ${automated} | ${usesAdmin} |`;
@@ -297,7 +301,7 @@ function generateEdgeFunctions() {
     [
       '**Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list; it cannot compare content. It runs on demand only — the schedule was removed on 2026-09-02 — and needs a `SUPABASE_ACCESS_TOKEN` that `docs/OWNER_ACTIONS.md` §15 recommends against creating.',
       '',
-      '**Privilege column.** *service role* means the function can obtain the service-role key — through `adminClient()`, through `serviceTarget()` on the dependency-free PostgREST path, or by reading `SUPABASE_SERVICE_ROLE_KEY` itself — and can therefore bypass RLS. Those functions are the ones to read first in a security review: the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.',
+      '**Privilege column.** *service role* means the function can obtain the service-role key — through `adminClient()`, through `serviceTarget()` on the dependency-free PostgREST path, through `secretKey()` (the API-key migration helper), or by reading `SUPABASE_SERVICE_ROLE_KEY` itself — and can therefore bypass RLS. Those functions are the ones to read first in a security review: the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.',
       '',
       '| Function | Purpose | Deployment | Highest privilege |',
       '| --- | --- | --- | --- |',
@@ -496,8 +500,19 @@ function generateEnvironment() {
   for (const f of walk(join(ROOT, 'apps', 'mobile', 'src'), (x) => /\.tsx?$/.test(x))) {
     for (const m of read(f).matchAll(/process\.env\.(EXPO_PUBLIC_[A-Z0-9_]+)/g)) clientVars.add(m[1]);
   }
-  for (const f of walk(join(ROOT, 'supabase', 'functions'), (x) => x.endsWith('.ts'))) {
-    for (const m of read(f).matchAll(/Deno\.env\.get\(\s*['"]([A-Z0-9_]+)['"]/g)) serverVars.add(m[1]);
+  for (const f of walk(join(ROOT, 'supabase', 'functions'), (x) => x.endsWith('.ts') && !x.endsWith('.test.ts'))) {
+    // `Deno.env.get('X')` directly, and the pure-module readers that keep a file
+    // executable under Vitest: `env('X')` (rest.ts, apiKeys.ts), `keyMap('X')`
+    // and `pick('NEW', 'LEGACY')` (apiKeys.ts). Before the API-key migration
+    // only the first form was matched, and moving the service key behind the
+    // helper silently dropped SUPABASE_SERVICE_ROLE_KEY from this reference —
+    // a secret the functions still read, missing from the list of secrets.
+    const src = read(f);
+    for (const m of src.matchAll(/\b(?:Deno\.env\.get|env|keyMap)\(\s*['"]([A-Z0-9_]+)['"]/g)) serverVars.add(m[1]);
+    for (const m of src.matchAll(/\bpick\(\s*['"]([A-Z0-9_]+)['"]\s*,\s*['"]([A-Z0-9_]+)['"]/g)) {
+      serverVars.add(m[1]);
+      serverVars.add(m[2]);
+    }
   }
 
   return (
