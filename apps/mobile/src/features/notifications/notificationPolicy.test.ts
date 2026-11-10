@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan, NOTIFICATION_FALLBACK_ROUTE,
-  notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute, shouldHandleResponse,
-  shouldRegisterOnSignIn, toggleRequiresPermission,
+  consentScreenVisible, DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan,
+  NOTIFICATION_FALLBACK_ROUTE, notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute,
+  shouldHandleResponse, shouldRegisterOnSignIn, shouldShowConsentNotice, toggleRequiresPermission,
 } from './notificationPolicy';
 
 const OID = 'a1b2c3d4-0000-4000-8000-000000000001';
@@ -134,6 +134,51 @@ describe('shouldRegisterOnSignIn — surviving sign-out, and shared phones', () 
     // dropped request would reactivate a silenced device and flip promotions
     // back on. Only a definite absence may cause a write.
     expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'indeterminate' })).toBe(false);
+  });
+});
+
+describe('shouldShowConsentNotice — offers never reach a customer who was not told', () => {
+  const offersOn = { is_active: true, promos_enabled: true };
+
+  it('shows once where this device is registered for me with offers on and I have not seen the text', () => {
+    // Android 12 and older (the OS never asks), or a second account on a shared
+    // phone: the sign-in claim registers the device with offers on, and nobody
+    // would otherwise have said so.
+    expect(shouldShowConsentNotice({ seen: false, device: offersOn })).toBe(true);
+  });
+
+  it('never twice', () => {
+    expect(shouldShowConsentNotice({ seen: true, device: offersOn })).toBe(false);
+  });
+
+  it('not when nothing is registered here, or the claim has not settled', () => {
+    expect(shouldShowConsentNotice({ seen: false, device: null })).toBe(false);
+    expect(shouldShowConsentNotice({ seen: false, device: undefined })).toBe(false);
+  });
+
+  it('not when offers are already off — there is nothing to disclose', () => {
+    expect(shouldShowConsentNotice({ seen: false, device: { is_active: true, promos_enabled: false } })).toBe(false);
+  });
+
+  it('not when the device is switched off', () => {
+    expect(shouldShowConsentNotice({ seen: false, device: { is_active: false, promos_enabled: true } })).toBe(false);
+  });
+});
+
+describe('consentScreenVisible — on a tab, never over anything the customer came for', () => {
+  it.each(['/', '/orders', '/profile'])('shows on the %s tab', (pathname) => {
+    expect(consentScreenVisible({ pathname, blocked: false })).toBe(true);
+  });
+
+  it.each(['/checkout', '/cart', '/select', '/receipt/a1b2c3d4-0000-4000-8000-000000000001', '/profile/notifications', '/login'])(
+    'never over %s',
+    (pathname) => {
+      expect(consentScreenVisible({ pathname, blocked: false })).toBe(false);
+    },
+  );
+
+  it('never over the order-type pop-up — two native modals do not stack reliably on iOS', () => {
+    expect(consentScreenVisible({ pathname: '/', blocked: true })).toBe(false);
   });
 });
 

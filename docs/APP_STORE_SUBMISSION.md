@@ -62,14 +62,21 @@ read: TestFlight does not make a build installable until processing succeeds.
 So processing cannot retroactively invalidate it, and no *console* step in §8
 requires a binary.
 
-**The known exception is guideline 4.5.4.** Apple expects an explicit in-app
-opt-in before marketing push; here the opt-out toggle is the consent surface, a
-deliberate decision the owner accepted on 2026-08-20 (CLAUDE.md §7). If App
-Review rejects on it, the fix is one line — `promosEnabled: false` in
-`DEFAULT_DEVICE_PREFS` — but a one-line fix still ships as a **new build with a
-higher number**, because build numbers are unique per version train (§3a). That
-is a review risk, not a processing risk, and it is the only one currently
-identified.
+**The known exception is guideline 4.5.4.** Apple expects consent *"via consent
+language displayed in your app's UI"* before marketing push, plus an in-app
+opt-out. **Since 2026-11-10 the language is there**: the first run shows a
+consent screen before the OS prompt, stating order updates **and** occasional
+offers and where to turn offers off, and the OS prompt is raised only from its
+Allow button. The Profile toggle remains the opt-out. Marketing is still
+opt-OUT — offers come on with the grant — which is the deliberate decision the
+owner accepted on 2026-08-20 and re-confirmed on 2026-11-09 (CLAUDE.md §7), and
+the residual risk. If App Review rejects on it, the fix is one line —
+`promosEnabled: false` in `DEFAULT_DEVICE_PREFS` — but a one-line fix still ships
+as a **new build with a higher number**, because build numbers are unique per
+version train (§3a). That is a review risk, not a processing risk, and it is the
+only one currently identified. **The consent screen first ships in the next
+build**: every build already uploaded predates it, so a reviewer of one of those
+sees no in-app text.
 
 ---
 
@@ -215,6 +222,19 @@ caveat as `OWNER_ACTIONS.md` §29, §33a and §35. Fold it into that review.
 string non-empty, both Always props `false`, the when-in-use string present, every
 purpose string in both locales, and the Arabic file not holding the English
 sentence. Mutation-tested three ways, all three killed.
+
+**The when-in-use string was rewritten again on 2026-11-10**, because it described
+one use of three. It said location was used *"while you are choosing a delivery
+point"*. The pickup tab also asks, to list the nearest branches
+(`OrderTypeSelectScreen.tsx`), and checkout reads an existing grant to warn when
+the delivery pin is far from the customer (`CheckoutScreen.tsx`, which never
+asks). It now names all three, says it is used only while the app is open, and
+keeps "never used in the background". The same change removed the OS location
+prompt that the first run used to raise straight after sign-in, with nothing on
+screen to explain it; location is now asked only on the pickup tab and at "Use
+my location". Two cases were added to the test: the base string must equal the
+English locale (the 2026-09-09 rewrite reached one and not the other), and both
+languages must name the branch list. The Arabic joins `OWNER_ACTIONS.md` §35.
 
 ---
 
@@ -634,9 +654,12 @@ physical-device validation gate, which has run on neither platform.
   "Advertising or marketing"; Apple's taxonomy differs and the honest answer may
   be "Third-Party Advertising: No, Developer's Advertising or Marketing: Yes".
   Decide before entering the form, and keep it consistent with C5.
-- **Will Apple query B2 / guideline 4.5.4** — marketing push is opt-OUT here, with
-  the OS permission dialog as the consent moment (owner decision 2026-08-20, risk
-  accepted). If App Review rejects, the revert is one line:
-  `promosEnabled: false` in `DEFAULT_DEVICE_PREFS`.
+- **Will Apple query B2 / guideline 4.5.4** — marketing push is opt-OUT here
+  (owner decision 2026-08-20, risk accepted, re-confirmed 2026-11-09). Since
+  2026-11-10 an in-app consent screen states it before the OS prompt, which is
+  the "consent language displayed in your app's UI" the guideline names; the
+  remaining question is whether Apple accepts offers coming on with the grant.
+  If App Review rejects, the revert is one line: `promosEnabled: false` in
+  `DEFAULT_DEVICE_PREFS`.
 - **`supportsTablet: false`** — iPad screenshots are therefore not required, but
   confirm the App Store listing is iPhone-only before uploading assets.

@@ -4,8 +4,8 @@ import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
-import { usePushDeviceSync } from '../../features/notifications/usePushDeviceSync';
-import { useFirstRunPermissions } from '../../features/onboarding/useFirstRunPermissions';
+import { NotificationConsentModal } from '../../features/notifications/NotificationConsentModal';
+import { useNotificationOnboarding } from '../../features/onboarding/useNotificationOnboarding';
 import { LaunchOrderTypeModal } from '../../features/order/LaunchOrderTypeModal';
 import { useI18n } from '../../i18n/I18nProvider';
 import { accountDeletion } from '../../services/api';
@@ -15,17 +15,17 @@ import { useThemeColors } from '../../theme/ThemeProvider';
 export default function TabsLayout() {
   const colors = useThemeColors();
   const pathname = usePathname();
-  const { status } = useAuth();
+  const { status, userId } = useAuth();
   const { loading: catalogLoading, error: catalogError } = useCatalog();
   const orderCtx = useOrderContext();
   const { t, pick, lang } = useI18n();
-  // The OS raises its own permission dialogs once, on the first run after
-  // sign-in. Nothing is rendered for this and nothing is blocked by it.
-  useFirstRunPermissions(status === 'signed_in', lang);
-  // And on EVERY sign-in, claim this device's push token for the customer who
-  // just signed in — the half of "notifications survive a sign-out" that a
-  // one-shot first run cannot cover. Never prompts.
-  usePushDeviceSync(status === 'signed_in', lang);
+  // Notifications after sign-in (useNotificationOnboarding): on the first run,
+  // the consent screen before the OS prompt — never the OS prompt on its own;
+  // on EVERY sign-in, the claim of this device's push token for the customer who
+  // just signed in, the half of "notifications survive a sign-out" that a
+  // one-shot first run cannot cover; and a one-time notice where the OS never
+  // asks. Location is not asked here at all: it is asked where it is used.
+  const consent = useNotificationOnboarding(status === 'signed_in', userId, lang);
   const [deletionPending, setDeletionPending] = useState(false);
 
 
@@ -53,6 +53,8 @@ export default function TabsLayout() {
         <Tabs.Screen name="profile" options={{ title: t('profile'), tabBarIcon: ({ color, size }) => <PersonIcon color={color} size={size} /> }} />
       </Tabs>
       {requireOrderChoice ? <LaunchOrderTypeModal onChoose={(type) => router.push({ pathname: '/select', params: { type } })} /> : null}
+      {/* Never over the order-type pop-up, and only on a tab (consentScreenVisible). */}
+      <NotificationConsentModal consent={consent} blocked={requireOrderChoice} />
     </>
   );
 }
