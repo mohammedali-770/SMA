@@ -3382,9 +3382,11 @@ the rules.
    registration certificate, so an unregistered controller cannot meet the
    72-hour rule through it (`INCIDENT_RESPONSE.md` §10b).
 2. **Name the breach notifier and a deputy** in `INCIDENT_RESPONSE.md` §10b.
-3. **Decide two retention periods** (`RECORD_OF_PROCESSING.md`, Findings):
+3. **Decide three retention periods** (`RECORD_OF_PROCESSING.md`, Findings):
    - sign-in send records (`whatsapp_message_logs`), which today are kept until
      the account is deleted, with no time limit;
+   - inactive push device records. Turning notifications off stops sending but
+     keeps the token until the account is deleted;
    - the figure behind "the period required by tax and accounting law" for
      orders.
 
