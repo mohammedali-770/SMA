@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * Fail if code from an EXCEPTED vulnerable library reaches a shipped bundle.
+ * Fail if code from a build-tool library that must never ship reaches a bundle.
  *
  *   node scripts/bundle-forbidden-libs.mjs [dir]      (default: dist)
  *
+ * STATUS 2026-11-09: the audit exceptions this was written to bound are RETIRED
+ * (node-forge 1.4.3 fixed its advisories; the braces advisory is no longer
+ * reported) — and the scan is KEPT. These are Expo/Metro CLI and build libraries
+ * that have no business in a customer bundle, excepted or not, and node-forge
+ * alone took six HIGH advisories in a year: the next one should find it already
+ * proven absent. docs/DEPENDENCY_ADVISORIES.md "What the gate cannot see".
+ *
  * WHY THIS EXISTS, AND WHY THE AUDIT GATE COULD NOT DO IT.
- * `scripts/audit-mobile-high.mjs` accepts two advisories that have no patched
+ * `scripts/audit-mobile-high.mjs` accepted two advisories that had no patched
  * release — `braces` and `node-forge` — on the argument that they are reached
  * only through build/CLI tooling and never ship to a customer. That gate reasons
  * over npm's reverse-dependency graph, and the graph cannot tell build-time from
