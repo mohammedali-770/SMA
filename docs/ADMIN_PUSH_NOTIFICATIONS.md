@@ -496,3 +496,15 @@ control will show the subscription is gone and re-granting is one tap, but this
 is **not** as reliable as a native app push. For an operational alert acted on
 the same day that is the right trade; it would be the wrong one for anything
 safety-critical.
+
+## 7. Service-caller check — Supabase API-key migration (2026-11-09)
+
+`admin-push-dispatch` recognises a service caller (the queue-drain driver)
+through `isServiceCall` in `supabase/functions/_shared/apiKeys.ts`, not a
+hand-rolled comparison: the legacy `Authorization: Bearer <service_role>` or an
+opaque `sb_secret_…` key on `apikey`, compared in constant time. Both are
+accepted during the cut-over so deploys need not be atomic. Nothing about the
+admin-only audience, the subscription store or the customer-channel separation
+changes. Steps: `docs/SUPABASE_API_KEYS.md`; pinned by
+`adminPushWiring.test.ts` ("accepts the service role only through the shared
+constant-time check").

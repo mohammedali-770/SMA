@@ -7,6 +7,7 @@ import {
   resolveLazywaitBaseUrl, shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES,
   timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
+import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
 
 /**
  * lazywait-sync — server-side POS sync worker (invoked by a schedule/cron, NOT
@@ -722,7 +723,7 @@ async function dispatchPendingPosSync(
   const out = { found: 0, dispatched: 0 };
   try {
     const url = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const serviceKey = secretKey();
     if (!url || !serviceKey) return out;
 
     // Oldest first: a customer waiting on a failure message should not be
@@ -743,7 +744,7 @@ async function dispatchPendingPosSync(
       try {
         const res = await fetch(`${url}/functions/v1/push-dispatch`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+          headers: { 'Content-Type': 'application/json', ...serviceCallHeaders(serviceKey) },
           body: JSON.stringify({ action: 'pos_sync', orderId: row.order_id, status: row.status }),
           signal: AbortSignal.timeout(8000),
         });

@@ -3352,6 +3352,42 @@ belongs in the sender and can be added without touching the triggers.
 
 ---
 
+## 42. Supabase API keys — move off the legacy `anon` / `service_role` keys before end-2026
+
+**Open, and dated by Supabase rather than by us.** The legacy keys "keep working
+until the end of 2026"; deletion is "Late 2026, TBC". The installed customer
+app and the admin console carry the legacy `anon` key, and Edge Functions use
+the legacy `service_role` key, so doing nothing means the app, the console and
+every scheduled job stop working on a date Supabase picks.
+
+The code is ready to move without an outage (`docs/SUPABASE_API_KEYS.md` §2):
+it prefers the new keys once they exist and falls back to the legacy ones until
+then, and receivers accept both. **The steps, in this order, each a separate
+§5 action** — full detail and the verification for each in
+`docs/SUPABASE_API_KEYS.md` §3:
+
+1. Merge the functions PR (inert until step 2).
+2. Create the publishable and secret keys in the dashboard (additive). Then run
+   the read-only signed-out check in `docs/SUPABASE_API_KEYS.md` §4. **Steps 5
+   and 6 wait until it passes**, because the app's login screen depends on it.
+3. Deploy the receivers: `push-dispatch`, `admin-push-dispatch`,
+   `operations-alert-dispatch`, `account-delete-process`.
+4. Deploy the senders: `lazywait-sync`, `account-delete-request`,
+   `account-delete-scheduler`, `order-intake`, then the rest.
+5. After the console PR (#420) and the mobile PR (#421): Vercel env
+   (Production and Preview) + gated redeploy. Set **both**
+   `VITE_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
+   the second is what the `/app` web export reads.
+6. Add the key to `apps/mobile/eas.json` (small PR), then the **December** EAS
+   build pair, to every tester.
+7. Confirm no legacy-key traffic remains.
+8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
+   (reversible). **The five frozen payment functions stop working here — owner
+   decision 2026-11-09**, acceptable only while online payment is off.
+9. A cleanup PR removes the fallbacks.
+
+**Rollback:** reactivate the legacy keys; no redeploy needed.
+
 ## Owner-action closeout rule
 
 When an item is completed:
