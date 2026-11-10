@@ -3344,6 +3344,27 @@ belongs in the sender and can be added without touching the triggers.
 
 ---
 
+## 43. Privacy policy — device location is used for more than the delivery pin
+
+**Opened 2026-11-10.** `privacy_policy` v2.3 says the device location is used
+*"only while you are choosing a delivery point on the map"*. The app also uses
+it on the pickup tab, to list the nearest branches, and at checkout, to warn
+when the delivery pin is far from the customer. Neither of those sends the
+location anywhere, and both are in the app customers already have. So this is a
+disclosure gap that applies now, not something the next build introduces.
+
+The exact replacement text in both languages, the evidence, and the publishing
+steps are in `docs/legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md`. Publishing
+means editing a live `legal_documents` row, which is a §5 action: copy-paste in
+the admin console, bump to **v2.4**, set the effective date.
+
+**The English can go first.** The Arabic is engineering-drafted and joins §35.
+A correct English disclosure beside an unchanged Arabic one is better than both
+incomplete.
+
+**Done looks like:** v2.4 active in both languages, the public `/privacy` page
+showing the new line, and this section marked closed with the date.
+
 ## Owner-action closeout rule
 
 When an item is completed:
