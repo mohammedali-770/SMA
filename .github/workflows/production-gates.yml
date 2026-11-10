@@ -44,8 +44,8 @@ jobs:
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
-      # `npm run build` ends by failing if code from an excepted vulnerable
-      # library (braces, node-forge) is in what it just built. That check lives
+      # `npm run build` ends by failing if code from a build-tool library that
+      # must never ship (braces, micromatch, node-forge) is in what it just built. That check lives
       # IN the build script rather than as a step here because the same script
       # is Vercel's buildCommand: production is rebuilt by Vercel's Git
       # integration and by `vercel build --prod` below, with production settings,
@@ -112,11 +112,12 @@ jobs:
         run: node scripts/audit-web-high.mjs
 
       # Do not weaken this to `|| true`, `--omit`, or a lower audit level.
-      # The script is fail-closed and permits only the reviewed HIGH advisories in
-      # docs/DEPENDENCY_ADVISORIES.md §3 (braces, node-forge): packages with no
-      # patched release, reachable solely through Expo/Metro build and CLI
-      # tooling. It names every advisory before any verdict, expires
-      # automatically, and any other high/critical advisory still fails the job.
+      # The script is fail-closed and permits only the reviewed HIGH advisory in
+      # docs/DEPENDENCY_ADVISORIES.md §3.2 (decode-uri-component, shipped inside
+      # expo-router but proven never called by
+      # src/lib/decodeUriComponentReachability.test.ts, which the unit-test job
+      # runs). It names every advisory before any verdict, expires automatically,
+      # and any other high/critical advisory still fails the job.
       - name: Audit mobile dependencies
         run: node scripts/audit-mobile-high.mjs
 
