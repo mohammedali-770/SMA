@@ -143,7 +143,7 @@ Before native store submission, a real device must exercise the native bundle.
 - [ ] Menu, product, cart and checkout screens render correctly.
 - [ ] Map/location and saved-address flows work.
 - [ ] **Permissions arrive in context, on a fresh install.** After sign-in there is no OS location prompt and no OS notification prompt on their own. Choose an order type; back on Home, the notification consent screen appears and names order updates **and** offers. **Allow** brings up the OS prompt, and Profile › Notifications then shows both switches on. **Not now** brings up nothing. Location is asked on the pickup tab and at "Use my location", and nowhere else.
-- [ ] **Android 12 or older** (an emulator is enough): the same text appears once as a notice with **OK** and **Notification settings**, and no OS prompt is raised — there is none on that version.
+- [ ] **Android 12 or older** (an emulator is enough): the same text appears once as a notice with **OK** and **Notification settings**, and no OS prompt is raised — there is none on that version. **Then place an order and confirm a status notification is actually displayed.** `push-dispatch` sends on channel `default`, and Android shows nothing for a channel that does not exist; the channel is created at launch, not behind Allow, precisely because this version never shows the consent prompt.
 - [ ] Orders/history/receipt/profile/delete-account screens work.
 - [ ] No native dependency/framework launch crash occurs.
 - [ ] Sentry/native source-map path is verified for production builds.
