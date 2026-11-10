@@ -7,6 +7,7 @@ import {
   restSelectMaybeSingle,
   serviceTarget,
 } from '../_shared/rest.ts';
+import { publishableKey } from '../_shared/apiKeys.ts';
 
 /**
  * order-intake — authenticated "create order + sync to POS" orchestration.
@@ -353,7 +354,11 @@ Deno.serve(async (req: Request) => {
       const cfg = await cfgPromise;
       const secret = String((cfg?.secretConfig as Record<string, unknown>)?.sync_trigger_secret ?? '');
       const url = Deno.env.get('SUPABASE_URL');
-      const anon = Deno.env.get('SUPABASE_ANON_KEY');
+      // lazywait-sync is verify_jwt = false and authenticates on x-sync-secret;
+      // the apikey only identifies the project. The publishable key once one
+      // exists, else the legacy anon key — a deactivated legacy key here would
+      // be the one thing that could make the gateway refuse the instant kick.
+      const anon = publishableKey()?.value;
       if (cfg?.enabled && secret && url && anon) {
         await fetch(`${url}/functions/v1/lazywait-sync`, {
           method: 'POST',

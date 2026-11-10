@@ -823,8 +823,12 @@ rule, error mapping, retry — rather than source shape, which is what every oth
 guard around this function is limited to. `restNoSupabaseJs.test.ts` walks the
 import graph from `order-intake/index.ts` and fails if any file in it references
 the package in code, type-only imports included; that graph is also the deploy
-bundle, and the test pins it at three files
-(`order-intake/index.ts`, `_shared/cors.ts`, `_shared/rest.ts` — down from four).
+bundle, and the test pins it at **four** files (`order-intake/index.ts`,
+`_shared/cors.ts`, `_shared/rest.ts`, `_shared/apiKeys.ts`). It was three from
+2026-08-30 to 2026-11-09; `_shared/apiKeys.ts` joined for the Supabase API-key
+migration (`docs/SUPABASE_API_KEYS.md`) and is Web-standard-only, so the graph is
+still dependency-free. **A hand deploy of `order-intake` must send all four** —
+a missing file is a function that fails at boot.
 
 **A version caveat worth stating.** `npm:@supabase/supabase-js@2` is a *floating*
 specifier resolved at build time, so which 2.x the deployed function bundled is
