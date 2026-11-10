@@ -1223,3 +1223,20 @@ case asserting the guard was "shape only", listing `some-new-pos.example.com`,
 `localhost:54321` and `10.0.0.4:8443` as values that MUST resolve. That was a
 genuine contract and it is now wrong; it is rewritten in place with the reason
 recorded, because left alone it would have stood as an argument against the fix.
+
+## Supabase API keys in the POS path (2026-11-09)
+
+Two calls in the POS path carry a Supabase key, and both now come from
+`supabase/functions/_shared/apiKeys.ts` for the move off the legacy keys
+(`docs/SUPABASE_API_KEYS.md`):
+
+- `order-intake` → `lazywait-sync` (the instant kick) sends `publishableKey()`
+  as `apikey`. The call is authorized by `x-sync-secret`; the key only
+  identifies the project, but a deactivated legacy key there is the one thing
+  that could make the gateway refuse the kick and leave orders on the
+  once-a-minute cron.
+- `lazywait-sync` → `push-dispatch` (the POS-outcome push drain) sends
+  `serviceCallHeaders(secretKey())`: the old `apikey` + `Bearer` while only
+  legacy keys exist, `apikey` alone once a secret key does.
+
+The POS bearer token, the webhook HMAC and the `x-sync-secret` are untouched.

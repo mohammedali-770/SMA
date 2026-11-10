@@ -17,6 +17,7 @@ import {
   shouldPruneAfterFailure,
 } from '../_shared/adminPush.ts';
 import { assertVapidKeyPair, buildPushRequest, type VapidKeyPair } from '../_shared/webPush.ts';
+import { isServiceCall } from '../_shared/apiKeys.ts';
 
 /**
  * admin-push-dispatch — web push to the staff console installed on an admin's
@@ -97,11 +98,9 @@ interface SubscriptionRow {
   failure_count: number;
 }
 
-function isServiceRoleCall(req: Request): boolean {
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const auth = req.headers.get('Authorization') ?? '';
-  return Boolean(key) && auth === `Bearer ${key}`;
-}
+// Legacy `Bearer <service_role>` OR an opaque secret key on `apikey`, during the
+// Supabase key cut-over — see _shared/apiKeys.ts. Constant-time.
+const isServiceRoleCall = isServiceCall;
 
 /**
  * A push endpoint is a CAPABILITY URL — whoever holds it can address that

@@ -99,8 +99,16 @@ describe('the caller gate', () => {
     expect(c).toMatch(/if \(callerId === null\) return json\([^)]*401\)/);
   });
 
-  it('accepts the service role only by exact key comparison', () => {
-    expect(code()).toContain('auth === `Bearer ${key}`');
+  it('accepts the service role only through the shared constant-time check', () => {
+    // The comparison itself (legacy Bearer or opaque secret on `apikey`) is
+    // executed in apiKeys.test.ts; here it is pinned that this receiver uses it
+    // rather than a hand-rolled `===`.
+    // The import is read from the raw handler (code() strips imports, because an
+    // import alone proves nothing); the binding and its use are read from code().
+    expect(handler()).toContain("import { isServiceCall } from '../_shared/apiKeys.ts';");
+    expect(code()).toContain('const isServiceRoleCall = isServiceCall;');
+    expect(code()).toMatch(/\bisServiceRoleCall\(req\)/);
+    expect(code()).not.toMatch(/auth === `Bearer \$\{key\}`/);
   });
 });
 
