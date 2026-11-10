@@ -87,6 +87,8 @@
  * filter, so they cannot drift apart unnoticed.
  */
 
+import { publishableKey, secretKey } from './apiKeys.ts';
+
 // ===========================================================================
 // Environment — the ONLY place this module touches a runtime global
 // ===========================================================================
@@ -127,8 +129,12 @@ export interface RestTarget {
   baseUrl: string;
   /** PostgREST `apikey` header. */
   apikey: string;
-  /** Full `Authorization` header value, including the `Bearer ` prefix. */
-  authorization: string;
+  /**
+   * Full `Authorization` header value, including the `Bearer ` prefix — or
+   * null when the identity is an opaque `sb_secret_…` key, which must travel on
+   * `apikey` alone (apiKeys.ts).
+   */
+  authorization: string | null;
   /** True ONLY for the service-role identity. RLS is bypassed. */
   service: boolean;
 }
@@ -150,7 +156,7 @@ function requireEnv(url: string | undefined, key: string | undefined, message: s
  */
 export function callerTarget(authHeader: string): RestTarget {
   const [baseUrl, apikey] = requireEnv(
-    env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'),
+    env('SUPABASE_URL'), publishableKey()?.value,
     'Missing SUPABASE_URL / SUPABASE_ANON_KEY',
   );
   return { baseUrl, apikey, authorization: authHeader, service: false };
@@ -165,11 +171,13 @@ export function callerTarget(authHeader: string): RestTarget {
  * misconfigured environment have to keep the call inside their own try.
  */
 export function serviceTarget(): RestTarget {
+  const secret = secretKey();
   const [baseUrl, key] = requireEnv(
-    env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'),
+    env('SUPABASE_URL'), secret?.value,
     'Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY',
   );
-  return { baseUrl, apikey: key, authorization: `Bearer ${key}`, service: true };
+  // Legacy: unchanged wire format. Opaque: `apikey` only (apiKeys.ts point 1).
+  return { baseUrl, apikey: key, authorization: secret?.kind === 'opaque' ? null : `Bearer ${key}`, service: true };
 }
 
 // ===========================================================================
@@ -316,7 +324,7 @@ async function restFetch(
   const { body, maybeSingle = false } = opts;
   const headers: Record<string, string> = {
     apikey: target.apikey,
-    Authorization: target.authorization,
+    ...(target.authorization ? { Authorization: target.authorization } : {}),
     // supabase-js defaults `db.schema` to 'public' and postgrest-js turns that
     // into Accept-Profile on reads / Content-Profile on writes. 'public' is also
     // PostgREST's default, so this is belt and braces — kept because the point

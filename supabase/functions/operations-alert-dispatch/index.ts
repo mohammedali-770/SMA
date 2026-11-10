@@ -4,6 +4,7 @@ import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { parseSmtpTarget } from '../_shared/smtpTarget.ts';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
+import { isServiceCall } from '../_shared/apiKeys.ts';
 
 /**
  * operations-alert-dispatch — the thing that finally tells a human.
@@ -98,11 +99,9 @@ interface ClaimedRow {
  */
 const SMTP_ALLOWED_HOSTS = Deno.env.get('SMTP_ALLOWED_HOSTS') ?? null;
 
-function isServiceRoleCall(req: Request): boolean {
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const auth = req.headers.get('Authorization') ?? '';
-  return Boolean(key) && auth === `Bearer ${key}`;
-}
+// Legacy `Bearer <service_role>` OR an opaque secret key on `apikey`, during the
+// Supabase key cut-over — see _shared/apiKeys.ts. Constant-time.
+const isServiceRoleCall = isServiceCall;
 
 /** Strip anything that could carry configuration detail into a stored string. */
 function safeError(e: unknown): string {
