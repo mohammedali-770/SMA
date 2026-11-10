@@ -216,6 +216,14 @@ string non-empty, both Always props `false`, the when-in-use string present, eve
 purpose string in both locales, and the Arabic file not holding the English
 sentence. Mutation-tested three ways, all three killed.
 
+**Added 2026-11-10 for Expo SDK 58: `locationFullAccuracyPermission` is `false`.**
+expo-location 58's plugin began writing `NSLocationTemporaryUsageDescriptionDictionary`,
+a generic, English-only "temporary full accuracy" placeholder, unless that prop is
+`false`. Only the separate `expo-location/next` module can make that request, and
+nothing imports it. Measured on an SDK 58 prebuild: the key is present without the
+prop and absent with it, and the when-in-use and motion strings are unchanged. The
+test file pins the prop and the absence of any `expo-location/next` import.
+
 ---
 
 ## 3a. Build 24 — it uploaded, and EAS said it failed

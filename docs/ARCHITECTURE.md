@@ -45,8 +45,17 @@ One Expo application targets native iOS, native Android and React Native Web.
 
 Key properties:
 
-- Expo SDK 58 / React Native 0.88.1 / Expo Router (SDK 58 since 2026-11-10; SDK 57 / React Native 0.86.2 before that).
-- Arabic + English with RTL support.
+- Expo SDK 58 / React Native 0.88.1 / Expo Router (SDK 58 since 2026-11-10; SDK 57 / React Native 0.86.3 before that).
+- Arabic + English with RTL support. **The app mirrors its own layout for Arabic**
+  (`src/i18n/rtl.ts`, the design-system `Text`) and never asks React Native to mirror
+  natively, so native layout must stay left-to-right. On Android that is now pinned by
+  `plugins/withAndroidRtlLock.js`: React Native 0.88 started mirroring natively on
+  phones whose system language is Arabic, which would flip every screen twice.
+  Whether iOS already mirrors on an Arabic-language iPhone is an open check
+  (`RELEASE_CHECKLIST.md` §7).
+- On the web export (`/app`) every route ships in one bundle (`asyncRoutes: false`).
+  Expo Router 58 splits routes into lazy chunks by default, and after a deploy an
+  already-open tab cannot fetch a chunk it has not loaded yet.
 - System / Light / Dark runtime appearance.
 - Supabase Auth with WhatsApp delivery for the Saudi-phone login flow.
 - Order-type-first Pickup/Delivery context.

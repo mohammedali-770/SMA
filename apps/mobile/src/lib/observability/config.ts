@@ -54,6 +54,24 @@ export function sentrySampleRates(env: SentryEnvironment): {
   }
 }
 
+/**
+ * Default integrations this app turns OFF, by the name the SDK gives them.
+ *
+ * `ExpoRouter`: @sentry/react-native 8.x adds it by default whenever tracing is on
+ * (our sample rates are numbers, so it is). That contradicts the documented decision
+ * to keep Expo Router navigation instrumentation disabled (SENTRY_OBSERVABILITY.md).
+ * In 8.28.0 it happens to be inert, only because the expo-router module path it
+ * requires no longer exists in expo-router 58. Sentry 8.33 rewrote that lookup, so
+ * an upgrade would switch navigation spans and breadcrumbs on with no change here.
+ * The decision has to be held by our config, not by a missing file.
+ */
+export const DISABLED_DEFAULT_INTEGRATIONS: readonly string[] = ['ExpoRouter'];
+
+/** The `integrations` option for Sentry.init: the SDK defaults minus the ones above. */
+export function withoutDisabledIntegrations<T extends { name: string }>(defaults: T[]): T[] {
+  return defaults.filter((integration) => !DISABLED_DEFAULT_INTEGRATIONS.includes(integration.name));
+}
+
 /** True while running under a JS test runner (vitest/jest). */
 export function isTestRunner(env: Record<string, string | undefined> = process.env): boolean {
   return Boolean(env.VITEST) || Boolean(env.JEST_WORKER_ID) || env.NODE_ENV === 'test';

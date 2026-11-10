@@ -28,7 +28,19 @@ Coverage includes native/JS release crashes, unhandled JS errors/rejections, Rea
 
 Expo Router navigation-span integration is **intentionally disabled**. It stayed disabled through the move from 7.11 to 8.28 on 2026-11-10: the upgrade changed versions, not this decision. Do not re-add an API from a newer Sentry major just because an old example uses it.
 
-Restore navigation instrumentation only after upgrading to a Sentry version verified compatible with the installed Expo/RN stack.
+**Since 8.x the SDK turns it ON by default, so the decision is now enforced in code.**
+`@sentry/react-native` 8 adds its `ExpoRouter` integration whenever tracing is on, and
+ours is (the sample rates are numbers). In 8.28.0 it does nothing, but only by accident:
+it requires an expo-router internal path that expo-router 58 no longer ships. Sentry
+8.33 rewrote that lookup, so an upgrade would switch navigation spans and breadcrumbs on
+with no change here. So `Sentry.init` receives the SDK defaults minus `ExpoRouter`
+(`DISABLED_DEFAULT_INTEGRATIONS` in `src/lib/observability/config.ts`). `config.test.ts`
+pins the filter, the wiring and the integration's name in the installed SDK.
+
+Metro prints a warning about `expo-router/build/global-state/router-store` during
+native builds. It is that same missing path, and it is expected.
+
+Restore navigation instrumentation only after upgrading to a Sentry version verified compatible with the installed Expo/RN stack, by removing the name from that list.
 
 ## Android release builds are minified — added 2026-11-10
 
@@ -47,6 +59,19 @@ is uploaded.
   upload on is a follow-up decision, best tried on a preview build first. Without
   `SENTRY_AUTH_TOKEN` it would change nothing anyway, because `app.config.js`
   removes the whole Sentry plugin.
+- **Turning it on later does not help a build already shipped.** Sentry matches a
+  mapping to an event through a ProGuard UUID that the Gradle plugin builds into the
+  app (`io.sentry.proguard-uuid`). A build made without the plugin carries none, so
+  no later upload can de-obfuscate it. Decide before the first R8 build ships.
+- **A preview build cannot prove the upload as configured.** `eas.json` sets
+  `SENTRY_DISABLE_AUTO_UPLOAD=true` for preview, so a test of the plugin needs that
+  unset and the token present.
+- **Play Console still de-obfuscates production crashes.** AGP puts the mapping
+  inside each app bundle, so Android vitals and a manual retrace keep working.
+  Preview APKs keep no mapping once the EAS worker is gone.
+- **R8 is this repository's choice, not an SDK 58 default.** The SDK 58 template still
+  defaults `enableMinifyInReleaseBuilds` to false; only the `app.json` setting turns
+  it on.
 
 ## Environment behavior
 

@@ -1,7 +1,11 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 import {
-  buildSentryRelease, DEFAULT_SENTRY_DSN, isSentryEnabled, isTestRunner,
+  buildSentryRelease, DEFAULT_SENTRY_DSN, DISABLED_DEFAULT_INTEGRATIONS, isSentryEnabled, isTestRunner,
   resolveSentryEnvironment, SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT, sentrySampleRates,
+  withoutDisabledIntegrations,
 } from './config';
 
 describe('Sentry identity', () => {
@@ -104,5 +108,32 @@ describe('buildSentryRelease', () => {
     expect(buildSentryRelease({ appId: 'x', version: null, build: '1' })).toBeUndefined();
     expect(buildSentryRelease({ appId: null, version: '1', build: '1' })).toBeUndefined();
     expect(buildSentryRelease({ appId: 'x', version: '1', build: undefined })).toBeUndefined();
+  });
+});
+
+describe('Default integrations turned off', () => {
+  const MOBILE = resolve(__dirname, '../../..');
+
+  it('drops Expo Router navigation tracing and keeps every other default', () => {
+    const defaults = [{ name: 'ReactNativeTracing' }, { name: 'ExpoRouter' }, { name: 'ExpoContext' }];
+    expect(withoutDisabledIntegrations(defaults).map((i) => i.name)).toEqual([
+      'ReactNativeTracing',
+      'ExpoContext',
+    ]);
+    expect(DISABLED_DEFAULT_INTEGRATIONS).toEqual(['ExpoRouter']);
+  });
+
+  it('is what Sentry.init actually receives', () => {
+    // index.ts imports react-native, so it is checked at source level.
+    const src = readFileSync(resolve(__dirname, 'index.ts'), 'utf8').replace(/\/\/.*$/gm, '');
+    const init = src.slice(src.indexOf('Sentry.init({'));
+    expect(init).toMatch(/^\s*integrations: withoutDisabledIntegrations,$/m);
+  });
+
+  it('still matches the name the installed SDK gives the integration', (ctx) => {
+    // A rename upstream would make the filter silently match nothing.
+    const file = resolve(MOBILE, 'node_modules/@sentry/react-native/dist/js/tracing/expoRouterIntegration.js');
+    if (!existsSync(file)) return ctx.skip();
+    expect(readFileSync(file, 'utf8')).toMatch(/export const INTEGRATION_NAME = 'ExpoRouter';/);
   });
 });

@@ -207,6 +207,13 @@ both the DEX size and the 16 KB page-size field. The cost of R8 is in Sentry:
 native Android frames arrive obfuscated until the mapping is uploaded
 (`SENTRY_OBSERVABILITY.md`).
 
+**R8 is a choice, not an SDK 58 default.** The SDK 58 template still defaults
+`enableMinifyInReleaseBuilds` to false, and the rule above binds only where DEX
+exceeds 10 MB. Whether Sentry must read this bundle's native frames has to be decided
+before it ships, because a mapping uploaded later cannot be matched to a build made
+without Sentry's Gradle plugin. Play Console de-obfuscates either way, from the
+mapping inside the bundle.
+
 
 ---
 

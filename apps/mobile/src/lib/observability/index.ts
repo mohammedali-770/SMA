@@ -24,7 +24,7 @@ import { Platform } from 'react-native';
 
 import {
   isSentryEnabled, isTestRunner, resolveSentryEnvironment, sentrySampleRates,
-  SENTRY_DSN, type SentryEnvironment,
+  SENTRY_DSN, type SentryEnvironment, withoutDisabledIntegrations,
 } from './config';
 import { classifyError, errorMessage, formatComponentStack } from './classify';
 import {
@@ -113,6 +113,9 @@ export function initObservability(): boolean {
     enableCaptureFailedRequests: false, // no request/response capture
     enableUserInteractionTracing: false, // no user-interaction SPANS; the
     // touch BREADCRUMBS Sentry.wrap emits are dropped in beforeBreadcrumb
+    // SDK defaults minus Expo Router navigation tracing, which stays OFF by
+    // decision rather than by accident (config.DISABLED_DEFAULT_INTEGRATIONS).
+    integrations: withoutDisabledIntegrations,
     beforeSend(event, hint) {
       // Expected, UI-handled failures never become events — even when they
       // escape as unhandled rejections (e.g. an offline fetch).

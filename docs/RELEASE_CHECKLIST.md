@@ -166,8 +166,31 @@ builds. Before that build reaches testers, also check:
       `expo-secure-store` 58 now rejects a delete the keychain refuses.
 - [ ] The delivery map loads in its WebView (react-native-webview 14) and the pin
       moves.
-- [ ] On `/app` in a phone browser, opening each tab for the first time loads it.
-      Web routes now load as separate chunks.
+- [ ] **Android phone with its system language set to Arabic**, in BOTH in-app
+      languages: every screen must look exactly as it does on an English-language
+      phone. React Native 0.88 mirrors natively from the system language, and the
+      app mirrors itself, so a missing lock flips everything twice.
+      `plugins/withAndroidRtlLock.js` pins native layout left-to-right. Check the
+      phone field and OTP boxes (digit 1 on the left), the order-type modal, menu
+      chips, the banner carousel, the cart's suggestion rail, the tab bar, the
+      loyalty toggle and the address screens. Look at checkout and the payment
+      screens too, without paying. Nothing here can be caught off a device.
+- [ ] **iOS, the same check, as a question rather than a regression.** Every iOS
+      build, SDK 57 included, ships an Arabic localisation (`ar.lproj`), and on an
+      iPhone set to Arabic React Native's iOS check likely reports right-to-left,
+      so iOS may ALREADY be mirrored twice there. This build does not change it.
+      Compare an Arabic-language iPhone with an English one on the current
+      TestFlight build. If they differ, the fix is the iOS counterpart of the
+      Android lock, as its own change, because it changes shipped behaviour.
+- [ ] **`/app` across a deploy:** keep it open in a phone browser while a
+      production deploy lands, then open a screen not visited yet. It must open.
+      Routes ship as one bundle (`asyncRoutes: false` in `app.json`), because
+      Expo Router 58's lazy route chunks cannot be fetched by a tab opened before
+      the deploy.
+- [ ] **Sentry and R8:** decide BEFORE this build ships whether Sentry must be able
+      to read its native Android frames (`SENTRY_OBSERVABILITY.md`, "Android
+      release builds are minified"). Turning the upload on later does not help
+      builds already shipped.
 
 ## 8. App Store and Play submission
 
