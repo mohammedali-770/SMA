@@ -5,6 +5,7 @@ import { defineConfig, type Plugin } from 'vite';
 
 import type { PublicLegalDoc } from './src/legal/legalPage';
 import { injectPrerender, renderStaticLegal } from './src/legal/prerender';
+import { PUBLIC_KEY_ENV_NAMES, publicRestHeaders, publicSupabaseKey } from './src/lib/supabaseKey';
 
 const LEGAL_SELECT = 'document_type,title_en,title_ar,content_en,content_ar,version,effective_date';
 
@@ -42,16 +43,19 @@ function prerenderLegal(): Plugin {
         if (!ctx.filename.endsWith('legal.html')) return html;
 
         const url = process.env.VITE_SUPABASE_URL;
-        const key = process.env.VITE_SUPABASE_ANON_KEY;
+        const key = publicSupabaseKey({
+          VITE_SUPABASE_PUBLISHABLE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
+        });
         if (!url || !key) {
-          note('skipped: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not set');
+          note(`skipped: VITE_SUPABASE_URL / ${PUBLIC_KEY_ENV_NAMES} not set`);
           return html;
         }
 
         let docs: PublicLegalDoc[];
         try {
           const res = await fetch(`${url}/rest/v1/legal_documents?select=${LEGAL_SELECT}&is_active=eq.true`, {
-            headers: { apikey: key, Authorization: `Bearer ${key}` },
+            headers: publicRestHeaders(key),
             signal: AbortSignal.timeout(20_000),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
