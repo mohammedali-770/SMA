@@ -423,9 +423,54 @@ concluding a pod is missing one.
 
 **Stated rather than glossed: `ExpoLocation`, `ExpoImage`, `ExpoFileSystem`,
 `ExpoModulesCore` and the four `SDWebImage` frameworks ship no manifest of their
-own.** Apple's requirement lands on SDKs on its commonly-used list; none of these
-is on it today, and the app's own manifest covers the required-reason APIs it
-uses. Re-check this if Apple extends the list.
+own.** That is what build 23 showed. The paragraph that followed it was wrong,
+and the correction is below.
+
+### Corrected 2026-11-10 — two SDKs in this app are on Apple's list
+
+This section used to say *"Apple's requirement lands on SDKs on its
+commonly-used list; none of these is on it today."* That was false, and B4's ✅
+rested on it. Apple's [list of SDKs that require a privacy manifest and
+signature](https://developer.apple.com/support/third-party-SDK-requirements/),
+read 2026-11-10, names **`SDWebImage`** and **`hermes`**. The page says:
+
+> You must include the privacy manifest for any SDK listed below when you submit
+> new apps in App Store Connect that include those SDKs, or when you submit an
+> app update that adds one of the listed SDKs as part of the update. Signatures
+> are also required in these cases where the listed SDKs are used as binary
+> dependencies. Any version of a listed SDK, as well as any SDKs that repackage
+> those on the list, are included in the requirement.
+
+This app has never been submitted for App Review, so its first submission is a
+"new app" in that sentence, and it contains both SDKs.
+
+| SDK | How it reaches the binary | Its own manifest | Signature | Evidence, 2026-11-10 |
+| --- | --- | --- | --- | --- |
+| **SDWebImage** 5.21.x — `expo-image` 57 pins `~> 5.21.0` | Built from source by CocoaPods. Expo's precompiled path is opt-in (`EXPO_USE_PRECOMPILED_MODULES=1`), and nothing in this repository sets it | **Declared by the pod.** The `Core` subspec of 5.21.7 has `resource_bundles = {'SDWebImage': ['WebImage/PrivacyInfo.xcprivacy']}` | Not required for a source dependency | Podspec read from the CocoaPods CDN. **This contradicts build 23's measurement above**, which found no SDWebImage manifest. Only the next `.ipa` can say which is right |
+| **Hermes V1** — `hermesvm.framework`, bundle id `dev.hermesengine.iphoneos`, React Native 0.86 | Prebuilt binary, downloaded from Maven Central by the `hermes-engine` pod | **None** | **None** | The release artifact `hermes-ios-250829098.0.17-hermes-ios-release.tar.gz` (sha256 prefix `2967ee51b41bd433`) holds 116 entries, with no `PrivacyInfo.xcprivacy` and no `_CodeSignature`. The device slice holds only the binary and its `Info.plist`. The legacy Hermes 0.17.0 artifact has neither either |
+
+**What follows from that, stated in proportion:**
+
+- **Hermes is how React Native ships to every app that uses it.** The missing
+  manifest and signature are upstream, not something this repository chose.
+  What React Native does instead is write its core required-reason APIs into the
+  *app's* own manifest (`privacy_manifest_utils.rb`, `get_core_accessed_apis`).
+  Those are exactly the three entries this app's manifest carries. Hermes gets no
+  manifest of its own, and the page does not say whether Apple accepts that for a
+  listed binary SDK.
+- **The only evidence of Apple's practice is that builds 24–27 uploaded and were
+  processed.** That is TestFlight processing. Apple's sentence names
+  *submission*, and no build of this app has been submitted for review yet.
+- **What to check before the first submission:**
+  1. Search the App Store Connect email for **`ITMS-91061`** (missing privacy
+     manifest) and **`ITMS-91065`** (missing signature) against builds 24–27.
+  2. On the next `.ipa`, look for `SDWebImage.bundle/PrivacyInfo.xcprivacy` and
+     for any manifest inside `hermesvm.framework`.
+  3. Re-read the list when the Expo SDK 58 upgrade lands, because the Hermes
+     artifact changes with it.
+
+  If Apple has flagged either SDK, that is a release blocker to raise before
+  submitting, not after a rejection.
 
 ---
 
@@ -621,6 +666,22 @@ against `OWNER_ACTIONS` §40.2, caught here in a different document.
 7. **Enter the App Privacy answers** from §4 in the console.
 8. **Enter the test information** from §6.
 9. For **external** testing: the §7 Auth entry, then submit for Beta App Review.
+10. **Before the first App Review submission, run the §5 checks** (added
+    2026-11-10):
+    - search the App Store Connect email for `ITMS-91061` / `ITMS-91065`
+      against builds 24–27;
+    - look for the SDWebImage and Hermes manifests in the next `.ipa`.
+11. **Answer the two new age-rating descriptors** (§10) **by 12 January 2027**,
+    and on any update submitted before then.
+12. **Paste the review notes from §11**, with the switch values re-read on the
+    day of submission.
+13. **From April 2027, every submission needs iPhone Duo screenshots.** Apple's
+    [5 October 2026 news post](https://developer.apple.com/news/?id=kkphp5qo)
+    says: *"Starting April 2027, any apps or games submitted will need to include
+    screenshots for iPhone Duo."* The app is iPhone-only
+    (`supportsTablet: false`), and iPhone Duo is an iPhone, so this applies to
+    the first submission if it falls after March 2027. Producing them needs the
+    device in the simulator, which Xcode 27.1 adds.
 
 **Not gating TestFlight, but gating an App Store release:** the §1
 physical-device validation gate, which has run on neither platform.
@@ -640,3 +701,141 @@ physical-device validation gate, which has run on neither platform.
   `promosEnabled: false` in `DEFAULT_DEVICE_PREFS`.
 - **`supportsTablet: false`** — iPad screenshots are therefore not required, but
   confirm the App Store listing is iPhone-only before uploading assets.
+
+---
+
+## 10. Age rating — two new descriptors, due by 12 January 2027
+
+**Opened 2026-11-10. The answers are entered by you in App Store Connect; this
+section derives them from the code.** Apple announced on 2 November 2026
+([news](https://developer.apple.com/news/?id=yxkh08us)):
+
+> Starting November 16, 2026, App Store Connect will include new content
+> descriptors … When completing the age rating questionnaire in App Store
+> Connect, you'll need to declare whether your app includes:
+>
+> Shared Location: Sharing of real-world location with another person or group.
+>
+> Dating and Relationships: Features that enable dating or relationship
+> connections between real people and/or a virtual companion that engages a user
+> in sexual or romantic content.
+>
+> You must provide these declarations when submitting an app update or making
+> changes to your age rating questionnaire. All apps must have these declarations
+> completed by January 12, 2027.
+
+| Descriptor | Answer | Why |
+| --- | --- | --- |
+| Dating and Relationships | **No** | Nothing in the app connects one person with another. There is no chat, profile or companion of any kind. |
+| Shared Location | **No — recommended, and yours to decide** | Reasoning below. |
+
+**Shared Location, read against what the code does.** The device's position is
+read in three places, all while the app is open, and none of them sends it
+anywhere:
+
+- **Pickup tab:** sorts branches by distance on the phone
+  (`OrderTypeSelectScreen.tsx:44`).
+- **Checkout:** compares the position with the delivery pin, on the phone, to warn
+  when they are far apart (`CheckoutScreen.tsx:260-266`, read only by
+  `mismatchWarning`).
+- **"Use my location" on the delivery map:** moves the pin to the device's
+  position (`LocationPickerMap.tsx:217-226`).
+
+**What does leave the phone is the delivery address:** the pin the customer
+chooses, saved with the address and sent with a delivery order to the branch that
+cooks and delivers it. That is the destination of an order, given to the business
+fulfilling it. It is not a feature for showing someone's whereabouts to other
+people: no live location is shared, no customer sees another's location, and the
+app has no driver tracking.
+
+**Why this is a decision rather than a fact.** Read literally, "with another
+person" can be stretched to cover a delivery address. If you answer **Yes**:
+
+- Apple says it *"may not have an impact on their minimum age rating in some
+  regions."*
+- The one region Apple names is **Brazil, which requires A16**. That stops
+  mattering if App Store availability is limited to Saudi Arabia, which is on the
+  owner checklist.
+
+**Re-read the whole questionnaire while you are there.** Apple's
+[upcoming-requirements page](https://developer.apple.com/news/upcoming-requirements/)
+records that ratings moved to the new system (4+, 9+, 13+, 16+, 18+) and that
+every app had to answer the updated questions *"by January 31, 2026, to avoid an
+interruption when submitting your app updates"*. This app had not been submitted
+by then. Its first submission is the moment the whole questionnaire gets checked,
+not only these two lines.
+
+---
+
+## 11. App Review notes — name every feature a server switch controls
+
+**Opened 2026-11-10.** Guideline **2.5.19** was added on 16 October 2026
+([news](https://developer.apple.com/news/?id=92th7e5i)), and reads in full:
+
+> Don't include any hidden, dormant, or undocumented features in your app; your
+> app's functionality should be clear to end users and App Review. Attempting to
+> hide undocumented features in your app binary, such as through code obfuscation
+> or other methods, is grounds for removal of your app from the App Store and
+> termination of your developer account.
+
+This binary contains features that a database setting turns on and off without a
+new build. None of them is hidden from a customer once it is on. But a reviewer
+looking at the app on a given day sees only the ones that are on, and **card
+payment is compiled in and switched off**, which is the case the guideline
+describes. The safe reading is to name every switch in the review notes.
+
+**Live values, read-only, 2026-11-10.** Re-read them on the day of submission:
+they are switches precisely because they change.
+
+| Feature | Switch | Live value | What a customer sees when it is on |
+| --- | --- | --- | --- |
+| **Card payment at checkout** | `app_settings.online_payment_enabled` | **off** | A card option beside cash. **Dormant.** Turning it on is under the payment freeze (CLAUDE.md §6) |
+| Cash payment | `cash_payment_enabled`, `default_payment_method` | on, default `cash` | Pay when collecting, or on delivery |
+| Payment outage mode | `payment_outage_mode_enabled` | off | Nothing. The app reads it (`mappers.ts:410`) and no screen uses it |
+| Loyalty points | `loyalty_enabled` | on | Earn and redeem points |
+| Loyalty on pickup only | `loyalty_pickup_only` | on | Delivery orders neither earn nor redeem |
+| Points expiry | `loyalty_expiry_enabled` | off | An expiry date on the loyalty card |
+| Points campaigns | rows in `loyalty_multipliers` | none | Extra points on chosen items or dates |
+| Per-size availability | `variant_closing_enabled`, rows in `branch_variant_availability` | on, 1 closure | One size of an item shown as unavailable at a branch |
+| Delivery, per branch | `branches.delivery_enabled`, `delivery_temporarily_closed` | 1 active branch; delivery on, not paused | Delivery offered, or paused for a while |
+| Support contacts | `support_phone_enabled`, `support_whatsapp_enabled`, `support_email_enabled` | phone on, WhatsApp off, email on | The contact options in Profile |
+| WhatsApp sign-in | `whatsapp_login_enabled()` | on | The sign-in form; when off, a "sign-in unavailable" card |
+| Complimentary orders | active rows in `comp_members` | 2 accounts | For those accounts only, an order with nothing to pay |
+
+**Paste-ready notes (English).** Adjust any line whose switch reads differently on
+the day:
+
+```text
+Spicy Meal is the ordering app for Spicy Meal restaurants in Saudi Arabia.
+Customers browse the menu, order for pickup or delivery, and pay in cash when
+they collect or receive the order.
+
+Some features are switched on or off from our server without an app update.
+At the time of this submission:
+- Card payment: the app contains a card-payment option at checkout. It is
+  switched OFF, and no customer can use it. Customers pay cash.
+- Loyalty points: ON, earned and redeemed on pickup orders. Points do not
+  expire; expiry is switched off.
+- Availability: a branch can mark an item, or one size of an item, as
+  unavailable, and can pause delivery for a while.
+- Support: the phone, WhatsApp and email contacts in Profile can each be shown
+  or hidden.
+- Complimentary orders: a small number of accounts we choose can receive orders
+  at no charge.
+
+Sign-in is by a one-time code sent to the customer's WhatsApp. Reviewer access
+is described under Sign-In Information.
+
+Push notifications carry order updates and occasional offers. Offers can be
+turned off in Profile > Notifications.
+```
+
+**When the build submitted carries guest browsing (#424), add one line** saying
+the menu can be browsed without an account and sign-in is asked for at checkout.
+
+**The practice this record adopts** (from the 2026-11-09 compliance plan):
+
+- A dormant feature is turned on for customers only together with a submission
+  whose notes declare it.
+- For card payment, that is in addition to the freeze, not instead of it. Nothing
+  in this section changes any payment setting or behaviour.

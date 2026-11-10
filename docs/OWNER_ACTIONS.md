@@ -3380,6 +3380,29 @@ then, and receivers accept both. **The steps, in this order, each a separate
 
 **Rollback:** reactivate the legacy keys; no redeploy needed.
 
+## 45. Store deadlines, November 2026 to April 2027 — the console steps
+
+**Opened 2026-11-10.** These are answers you give in Play Console and App Store
+Connect; none of them is code. The answers are drafted in the store records, and
+each was checked against Google's or Apple's own page on 2026-11-10. (§43 and §44
+are taken by the PDPL work in an open pull request.)
+
+| By | Step | Where the answers are |
+| --- | --- | --- |
+| **Now** | **Play: declare trader status.** *"Starting in November 2026, you must declare your trader status in Play Console."* | `PLAY_STORE_SUBMISSION.md` §16 |
+| **Now** | **App Store Connect: answer DSA trader status.** Apple's upcoming-requirements page records that apps without it are removed from the EU storefront | — |
+| **Before the first App Review submission** | **Search the App Store Connect email for `ITMS-91061` and `ITMS-91065`** against builds 24–27. Two SDKs in the app are on Apple's privacy-manifest list | `APP_STORE_SUBMISSION.md` §5 |
+| **12 January 2027** (and on any update from 16 November 2026) | **App Store Connect: the two new age-rating descriptors.** Dating and Relationships: No. **Shared Location is your call**, with No recommended | `APP_STORE_SUBMISSION.md` §10 |
+| **27 January 2027** (30-day self-extension available) | **Play: the precise-location declaration**, two questions | `PLAY_STORE_SUBMISSION.md` §16 |
+| **1 February 2027** | **Play, App bundle explorer: read 16 KB support** on the uploaded bundle. Updates that fail cannot be released after this date | `PLAY_STORE_SUBMISSION.md` §16 |
+| **February 2027** | **Play, App bundle explorer: read the DEX size.** The DEX rule applies above 10 MB | `GO_LIVE_READINESS.md` C11 |
+| **When convenient** | **Decide tablets:** Android 16 shows the app full-width in landscape on screens of 600 dp and wider | `PLAY_STORE_SUBMISSION.md` §13 |
+| **When convenient** | **Decide App Store availability.** Limiting it to Saudi Arabia removes Brazil's A16 consequence of answering Shared Location "Yes" | `APP_STORE_SUBMISSION.md` §10 |
+
+**Done looks like:** each step done, with the date written back into the record it
+points at, and the matching `GO_LIVE_READINESS.md` row — B8, B10, C9 to C13 —
+moved off ⬜.
+
 ## Owner-action closeout rule
 
 When an item is completed:
