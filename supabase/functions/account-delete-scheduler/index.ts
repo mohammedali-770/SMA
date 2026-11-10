@@ -5,6 +5,7 @@
 // existing account-delete-process function with the built-in service-role bearer.
 // The service-role key never leaves the Edge Function environment.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { secretKey, serviceCallHeaders, withoutOpaqueBearer } from '../_shared/apiKeys.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,14 +25,15 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const url = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!url || !serviceRoleKey) return json({ error: 'scheduler_unavailable' }, 503);
+  const serviceKey = secretKey();
+  if (!url || !serviceKey) return json({ error: 'scheduler_unavailable' }, 503);
 
   const candidate = req.headers.get('x-process-secret');
   if (!candidate) return json({ error: 'Forbidden' }, 403);
 
-  const admin = createClient(url, serviceRoleKey, {
+  const admin = createClient(url, serviceKey.value, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(serviceKey.kind === 'opaque' ? { global: { fetch: withoutOpaqueBearer() } } : {}),
   });
 
   const { data: authorized, error: authError } = await admin.rpc(
@@ -44,8 +46,8 @@ Deno.serve(async (req: Request) => {
     const upstream = await fetch(`${url}/functions/v1/account-delete-process`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        apikey: serviceRoleKey,
+        // Legacy: Authorization + apikey, as before. Opaque: apikey only.
+        ...serviceCallHeaders(serviceKey),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ source: 'account-delete-scheduler' }),
