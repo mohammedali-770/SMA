@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
+import { isServiceCall } from '../_shared/apiKeys.ts';
 
 /**
  * push-dispatch — Expo Push sender (COMPLETE implementation; replaces the old
@@ -231,11 +232,9 @@ async function sendToDevices(
   return result;
 }
 
-function isServiceRoleCall(req: Request): boolean {
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const auth = req.headers.get('Authorization') ?? '';
-  return Boolean(key) && auth === `Bearer ${key}`;
-}
+// Legacy `Bearer <service_role>` OR an opaque secret key on `apikey`, during the
+// Supabase key cut-over — see _shared/apiKeys.ts. Constant-time.
+const isServiceRoleCall = isServiceCall;
 
 /** Either the caller's admin id, or the refusal to return verbatim. */
 type AdminCaller =

@@ -44,3 +44,13 @@ drop function if exists public.invoke_account_deletion_processor();
 ```
 
 Removing the dedicated Vault entries or the scheduler gateway is a separate operational action and should happen only after confirming no remaining scheduler or diagnostic path uses them. The account-deletion database migrations, queue, request function, and processor function are not removed by this scheduler rollback.
+
+## Supabase API keys (2026-11-09)
+
+The scheduler and the post-request kick reach `account-delete-process` with
+`serviceCallHeaders(secretKey())` from `supabase/functions/_shared/apiKeys.ts`,
+and the processor recognises them with the shared constant-time `isServiceCall`.
+While only legacy keys exist the wire format is unchanged; once a secret key
+exists it travels on `apikey` alone. The Vault-held `x-process-secret` path is
+untouched. Deploy order (processor before its callers) and rollback:
+`docs/SUPABASE_API_KEYS.md` §3.
