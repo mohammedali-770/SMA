@@ -6637,3 +6637,186 @@ the assertion and the suite now match `%admin_push%`.
 migration creates its own trigger secret at apply time, generated inside
 Postgres so the value never crosses the wire, so the chain needs it now. Both
 vault shims moved to `bootstrap.sql`.
+
+## 51. Database advisor hardening — WRITTEN, NOT APPLIED (2026-11-09)
+
+`20260929120000_db_advisor_hardening.sql`. **Written 2026-11-09, validated,
+awaiting owner approval.** Workstream S2 of the 2026-11-09 compliance plan.
+
+sha256 `24ed77fdce599d45c9507d0bfc864122d54b1411a0fb7b145d9c9b4a33664cf8`,
+232 lines / 13 093 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It changes privileges and one policy's role, and nothing else.** No function
+body is redefined, no row is written, and no deploy is implied.
+
+**MONEY PATH UNTOUCHED, and the file asserts it.** Its closing block refuses to
+apply unless `place_order` still hashes `12b6816d256c29b76edf947ae1a7ea77` and
+`compute_order_snapshot` still hashes `22e2d42935459e7bf93abb2941b56325`.
+
+### What it fixes, measured live before writing
+
+The Supabase security advisor, read 2026-11-09:
+
+| Lint | Count | After apply | What this file does |
+| --- | --- | --- | --- |
+| 0011 `function_search_path_mutable` | 2 | 0 | pins `search_path` on `admin_push_duration_ar` / `_en` with `ALTER`, so neither body is touched |
+| 0028 anon can execute a `SECURITY DEFINER` function | 3 | 1 | revokes client EXECUTE on the two enqueue **trigger** functions |
+| 0029 authenticated, the same | 87 | 85 | the same two |
+
+What stays, by design:
+- **`whatsapp_login_enabled()`** stays anon-executable, because the login screen asks it before sign-in. It is the one 0028 finding left.
+- **The other 85 entries under 0029** are RPCs gated on `is_admin()`, a staff predicate, or the caller's own rows.
+
+A grant read found anon and authenticated still holding **TRUNCATE, TRIGGER and
+REFERENCES** on eleven tables: the nine catalogue tables, `push_devices` and
+`notification_log`. These are the same eleven whose anon writes `20260919120000`
+removed. **TRUNCATE is the one that matters: Postgres does not apply RLS to it**,
+so the grant was the only barrier. No client path issues TRUNCATE or DDL;
+PostgREST exposes neither.
+
+`push_devices_select_own` applied to PUBLIC. It now applies to `authenticated`.
+A signed-out caller's `auth.uid()` is null, so it matched nothing anyway.
+
+### Three corrections to the first design, each caught before writing
+
+1. **The live ACL on the trigger functions held PUBLIC *and* direct `anon` and
+   `authenticated` grants.** `revoke ... from public` alone would have left two
+   of the three, the ledger row 101 trap. All three are named.
+2. **"Revoke all, then re-grant SELECT" would have broken the console.**
+   `authenticated` holds INSERT/UPDATE/DELETE on these tables for the menu
+   editor (`is_admin()` RLS). Only the three named privileges move.
+   **Mutant M5 is exactly that design, and both the block and the suite kill it.**
+3. **A NULL `proacl` is the default ACL, which grants PUBLIC execute.** A check
+   that exploded `proacl` directly would have passed on NULL. The check expands
+   `acldefault(...)` instead.
+
+### The one real risk, and how it is excluded
+
+If firing a trigger checked the writer's EXECUTE privilege, every branch closure
+would fail. It would fail **before** the trigger body runs, outside the
+`exception when others` that keeps a notification from blocking a closure, so §50's
+guarantee would not save it.
+
+PostgreSQL checks EXECUTE on a trigger function at `CREATE TRIGGER`, never at fire
+time. That is proven here, not assumed:
+- `db_advisor_hardening_test.sql` CASES 3 and 4 give `authenticated` a temporary
+  INSERT path onto both event tables, then write a closure and a delivery pause
+  **as `authenticated`, which holds no EXECUTE on either function**. Each still
+  queues exactly one notice.
+- CASE 5 is the negative control: with the trigger disabled, the same write
+  queues nothing. So the probe can tell "fired" from "did not fire".
+
+### The suite guards the future, not only this file
+
+CASE 6 asserts that **no table in `public` grants TRUNCATE, TRIGGER or
+REFERENCES to a client role**, across the whole schema on the full chain. The
+default ACL (`bootstrap.sql`, read live) grants ALL on every new table, so a
+future table created without an explicit revoke fails CI rather than shipping.
+
+Measured: the replayed chain leaves exactly the same eleven tables as Production,
+so the assertion behaves identically in both.
+
+### Validation
+
+- **Local chain harness** (`.github/sql-ci/run.sh`, Postgres 16 + PostGIS 3, CI's
+  extension stubs):
+  - base: 142 migrations, 80 suites, 78 passed, 2 quarantined;
+  - with this file: **143 migrations, 81 suites, 79 passed, 2 quarantined, 0 new
+    failures**;
+  - the idempotence report is identical to the base, and this file re-applies
+    cleanly.
+- **Mutation testing: 7 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by the paired suite:
+  - search_path dropped on one helper;
+  - trigger revoke `from public` only;
+  - delivery revoke dropped;
+  - `push_devices` revoke dropped;
+  - revoke-all-and-re-grant on `products`;
+  - policy left at PUBLIC;
+  - policy widened to `anon, authenticated`.
+
+**Applying it is a §5 action, named by version.** Afterwards, re-read the
+advisors: expect 0011 at 0, 0028 at 1 and 0029 at 85.
+
+## 52. Guest menu read on `product_variants` — WRITTEN, NOT APPLIED (2026-11-09)
+
+`20260930120000_product_variants_guest_read.sql`. **Written 2026-11-09, validated,
+awaiting owner approval.** This is the one database change that guest browsing
+(App Store guideline 5.1.1(v), plan item A4) needs. (§51 is the advisor-hardening
+file in #422; the two are independent and can be applied in either order.)
+
+sha256 `fbd5d5bfdfa6be2c99cbfa00d17cce58c5b75e458c0e87ffc3dfed4f7b80d2cd`,
+107 lines / 5 317 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It must be applied BEFORE any build that lets a signed-out user reach the
+menu.** Until then, nothing in Production reads this table signed out. The app
+sends a signed-out user to the login screen first, which is why the defect
+never surfaced.
+
+### The defect, measured live
+
+Every signed-out read of `product_variants` fails with **42501, which PostgREST
+returns as HTTP 401**. It is a refusal, not an empty list.
+
+The table grants anon SELECT; the policy is the problem:
+`product_variants_select_public` is `(is_active OR is_staff())` for
+`{anon, authenticated}`. anon has no EXECUTE on `is_staff()`, and Postgres checks
+EXECUTE on every function in a policy expression when the query starts, so the
+whole read is refused before `is_active` is evaluated.
+
+**It is a regression of a fix this repository already made.** `20260810143000`
+split exactly this shape on `branches`, `categories`, `products` and `modifiers`
+when it removed anon's access to the role helpers. `product_variants` arrived
+two weeks later (`20260824120000`) and brought the combined form back.
+
+Of all **17** SELECT policies that admit anon, this is the **only** one calling a
+function anon cannot execute (read live, 2026-11-09).
+
+### The fix
+
+The same split, with the same names:
+- **active tiers** for anon and authenticated;
+- **inactive tiers** for authenticated staff only.
+
+For a signed-in caller, the two permissive policies OR together into the old
+predicate, so **nothing changes for customers or staff**. For anon, the read now
+succeeds and returns active tiers only.
+
+The file drops the legacy name **and** its own names before creating them,
+because the harness's idempotence replay recreates the legacy policy (the
+`20260810143000` reasoning).
+
+**MONEY PATH UNTOUCHED** (no function is defined), and the file asserts the pair
+`12b6816d…` / `22e2d429…`. **No deploy implied.**
+
+### The suite turns the observation into a rule
+
+`product_variants_guest_read_test.sql`:
+- **CASES 1-2:** anon reads the table, and joins it to `products` as the menu's
+  embed does, seeing active tiers only.
+- **CASES 3-4:** a customer sees active only; staff still see inactive.
+- **CASE 5:** for **every** table in `public` where anon holds SELECT and a policy
+  admits anon, a read **under the anon role** must not raise. The next
+  `OR is_staff()` written for anon fails CI instead of breaking the guest menu.
+
+The migration's own block also checks the **outcome**: it performs the read as
+anon, rather than inspecting the policy text.
+
+### Validation
+
+- **Reproduced first:** on the chain *without* this file, the suite fails with
+  `permission denied for function is_staff (42501)`, the production error.
+- **Local chain harness, with the file:** 143 migrations, 81 suites, 79 passed,
+  2 quarantined, **0 new failures**. The idempotence report is identical to the
+  base, so the file re-applies cleanly.
+- **5 mutants, each killed twice**, by the file's own block and, with the block
+  removed, by the suite:
+  - `OR is_staff()` kept for anon;
+  - anon dropped from the active policy;
+  - the staff policy widened to anon;
+  - the staff policy dropped;
+  - the legacy policy left in place.
+
+**Applying it is a §5 action, named by version.** Afterwards, verify read-only as
+anon (`set local role anon; select count(*) from public.product_variants`): it
+must return a count, not an error.
