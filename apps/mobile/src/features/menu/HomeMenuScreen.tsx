@@ -10,7 +10,8 @@ import {
   View,
   type LayoutChangeEvent,
   type SectionListData,
-  type ViewToken,
+  type ListViewToken,
+  type ScrollViewInstance,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerCarousel, useHomeBanners } from './BannerCarousel';
@@ -100,7 +101,7 @@ export function HomeMenuScreen({
 
   const [search, setSearch] = useState('');
   const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null);
-  const chipScrollRef = useRef<ScrollView>(null);
+  const chipScrollRef = useRef<ScrollViewInstance>(null);
   const chipOffsets = useRef<Record<string, { x: number; width: number }>>({});
   const [catFocus, dispatchCatFocus] = useReducer(categoryFocusReducer, INITIAL_CATEGORY_FOCUS);
   const activeCatId = catFocus.activeCatId;
@@ -123,7 +124,7 @@ export function HomeMenuScreen({
   // `dispatch` has a stable identity, so this stays referentially stable — which
   // SectionList requires; changing it at runtime throws. The reducer, not this
   // callback, decides whether a report is allowed to move the chip.
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ListViewToken[] }) => {
     const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined;
     if (section) dispatchCatFocus({ kind: 'spy', catId: section.category.id });
   }, []);

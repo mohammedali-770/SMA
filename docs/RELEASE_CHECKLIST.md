@@ -148,6 +148,27 @@ Before native store submission, a real device must exercise the native bundle.
 
 PR #200 completed source retention; this physical-device validation remains a separate gate.
 
+### First build on Expo SDK 58 — added 2026-11-10
+
+The upgrade changes the native toolchain and turns on R8 for Android release
+builds. Before that build reaches testers, also check:
+
+- [ ] The EAS log's environment step names the SDK 58 image: Xcode 27.1 on iOS,
+      which is also what Apple requires for uploads from April 2027.
+- [ ] **Android, release build:** it launches, and sign-in, the menu, the delivery
+      map, checkout and a notification tap all work. R8 removes code reached only
+      by reflection, and that fails only at runtime.
+- [ ] A notification tap that cold-starts the app opens the right screen, on both
+      platforms. Expo Router 58 throws if the imperative router is used before its
+      first render. The bridge cannot reach that point by its timing, but this is
+      where it would show.
+- [ ] iOS sign-out returns to the sign-in screen, and a relaunch stays signed out.
+      `expo-secure-store` 58 now rejects a delete the keychain refuses.
+- [ ] The delivery map loads in its WebView (react-native-webview 14) and the pin
+      moves.
+- [ ] On `/app` in a phone browser, opening each tab for the first time loads it.
+      Web routes now load as separate chunks.
+
 ## 8. App Store and Play submission
 
 **Store *policy* readiness is a separate, one-time gate:

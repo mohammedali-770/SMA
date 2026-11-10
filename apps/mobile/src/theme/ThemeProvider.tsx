@@ -13,7 +13,9 @@ export function parseThemePreference(value: unknown): ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark' ? value : 'system';
 }
 
-export function resolveTheme(preference: ThemePreference, deviceScheme: ColorSchemeName): ResolvedTheme {
+// React Native 0.88 types `useColorScheme()` as `ColorSchemeName | null`, and
+// `ColorSchemeName` no longer includes null, so the absent case is named here.
+export function resolveTheme(preference: ThemePreference, deviceScheme: ColorSchemeName | null | undefined): ResolvedTheme {
   if (preference === 'light' || preference === 'dark') return preference;
   return deviceScheme === 'dark' ? 'dark' : 'light';
 }

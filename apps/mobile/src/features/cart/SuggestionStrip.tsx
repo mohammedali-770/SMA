@@ -8,7 +8,7 @@
  */
 import { Image } from 'expo-image';
 import React, { useRef, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View, type ScrollViewInstance } from 'react-native';
 
 import { DishIcon } from '../../components/Icons';
 import { Price } from '../../components/Price';
@@ -37,7 +37,7 @@ export function SuggestionStrip({ title, items, isRTL, onPress }: {
   onPress: (id: string) => void;
 }) {
   const styles = useStyles();
-  const railRef = useRef<ScrollView>(null);
+  const railRef = useRef<ScrollViewInstance>(null);
   if (items.length === 0) return null;
 
   return (

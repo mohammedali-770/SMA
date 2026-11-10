@@ -1,6 +1,6 @@
 # Spicy Meal — Mobile Sentry Observability
 
-> **Updated 2026-08-12.** Current mobile compatibility baseline: Expo SDK 57 / React Native 0.86.2 / `@sentry/react-native` 7.11.x.
+> **Updated 2026-11-10.** Current mobile compatibility baseline: Expo SDK 58 / React Native 0.88.1 / `@sentry/react-native` 8.28.x. Until then it was Expo SDK 57 / React Native 0.86.2 / 7.11.x (recorded 2026-08-12).
 
 ## Identity
 
@@ -16,7 +16,7 @@ The DSN may ship in a client bundle; the auth token may not.
 
 Mobile uses:
 
-- `@sentry/react-native` on the Expo SDK 57-compatible 7.11.x line;
+- `@sentry/react-native` on the Expo SDK 58-compatible 8.28.x line. It moved from 7.11.x with the SDK 58 upgrade. Sentry's [v7 to v8 guide](https://docs.sentry.io/platforms/react-native/migration/v7-to-v8/) lists only build-tooling and minimum-version changes (iOS 15+, Xcode 16.4+, Android Gradle Plugin 7.4+, Kotlin 1.8+), and no change to what is collected;
 - `@sentry/react-native/expo` config plugin;
 - Sentry-aware Metro configuration / Debug IDs;
 - initialization from the mobile root observability module;
@@ -26,9 +26,27 @@ Coverage includes native/JS release crashes, unhandled JS errors/rejections, Rea
 
 ### Expo Router navigation instrumentation
 
-Expo Router navigation-span integration is **intentionally disabled** on the current Sentry 7.11 compatibility line. Do not re-add an API from a newer Sentry major just because an old example uses it.
+Expo Router navigation-span integration is **intentionally disabled**. It stayed disabled through the move from 7.11 to 8.28 on 2026-11-10: the upgrade changed versions, not this decision. Do not re-add an API from a newer Sentry major just because an old example uses it.
 
 Restore navigation instrumentation only after upgrading to a Sentry version verified compatible with the installed Expo/RN stack.
+
+## Android release builds are minified — added 2026-11-10
+
+From the Expo SDK 58 upgrade, Android release builds run R8, set explicitly in
+`apps/mobile/app.json` (`expo-build-properties`,
+`android.enableMinifyInReleaseBuilds`). R8 renames Java and Kotlin classes, so
+**native Android stack frames in Sentry are obfuscated** unless R8's mapping file
+is uploaded.
+
+- **JavaScript stack traces are unaffected.** They come from the Hermes bundle
+  and its Debug IDs, not from R8.
+- **Uploading the mapping needs Sentry's Android Gradle Plugin.** The Expo plugin
+  applies it only with `experimental_android.enableAndroidGradlePlugin`, and Sentry
+  still calls that option experimental. It is **not** turned on.
+- **So, for now, a native Android crash reads as obfuscated names.** Turning the
+  upload on is a follow-up decision, best tried on a preview build first. Without
+  `SENTRY_AUTH_TOKEN` it would change nothing anyway, because `app.config.js`
+  removes the whole Sentry plugin.
 
 ## Environment behavior
 

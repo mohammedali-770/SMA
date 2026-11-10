@@ -10,13 +10,14 @@
  * reached only through Expo/Metro's CLI toolchain, never shipped, so the proof
  * was "nothing in the app reaches it". Both cleared — node-forge 1.4.3 fixed six
  * highs, and npm stopped reporting the braces advisory for 3.0.3 — and were
- * retired. The current entry is a RUNTIME exception: `decode-uri-component`
- * DOES ship, inside expo-router, so "never shipped" is not available as an
- * argument. What is
- * proven instead is that the vulnerable function is never CALLED, by a test that
- * reads the installed expo-router build (see PROOFS below). That is a weaker
- * guarantee, which is why its expiry is short and tied to the upgrade that
- * removes it.
+ * retired. The next was a RUNTIME exception: `decode-uri-component` shipped,
+ * inside expo-router 57 -> query-string 7, so "never shipped" was not available
+ * as an argument, and what was proven instead was that the vulnerable function
+ * was never CALLED. That is a weaker guarantee, which is why its expiry was short
+ * and tied to the upgrade that removes it. The Expo SDK 58 upgrade (2026-11-10)
+ * did: expo-router 58.0.13 and later no longer depend on query-string, and the
+ * package is absent from the installed tree. **The list is empty today**, and
+ * the machinery below stays so that the next exception is bounded the same way.
  *
  * npm audit v2 models a direct advisory in `via` and propagates its severity up
  * the reverse dependency graph in `effects`. Before accepting the exception we
@@ -47,28 +48,23 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-// Reviewed 2026-11-09. Short on purpose: the fix is the Expo SDK 58 upgrade
-// (expo-router 58 drops query-string entirely), which is planned before this
-// date. Extending it is a judgement that the reachability proof still holds and
-// that the upgrade is still coming — NOT a way to make CI green, the distinction
-// docs/DEPENDENCY_ADVISORIES.md §5 insists on.
+// The expiry applies only while ALLOWED holds an entry. Set it with the entry,
+// short on purpose: extending it is a judgement that the evidence still holds,
+// NOT a way to make CI green, the distinction docs/DEPENDENCY_ADVISORIES.md §5
+// insists on. The last value, 2026-12-31, belonged to the decode-uri-component
+// exception that the Expo SDK 58 upgrade retired on 2026-11-10.
 const EXCEPTION_EXPIRES = '2026-12-31';
 
-const ALLOWED = new Map([
-  ['GHSA-qr28-fpjm-wq7f', {
-    package: 'decode-uri-component',
-    reason: 'quadratic DoS on long percent-encoded runs; fixed only in 0.5.x, which is ESM-only and cannot replace the CommonJS require() in query-string 7; ships via expo-router 57 -> query-string 7, but the only decoding call site is the vendored react-navigation fallback parser that expo-router always overrides; removed by the Expo SDK 58 upgrade',
-  }],
-]);
+// Empty since 2026-11-10. An entry is a GHSA id mapped to
+// { package, reason }, reviewed in docs/DEPENDENCY_ADVISORIES.md §3.
+const ALLOWED = new Map([]);
 
 // Boundary 4's evidence: for each excepted advisory, the test that proves the
 // reachability argument against the INSTALLED tree. The audit job installs
 // nothing, so it cannot run the proof; the unit-test job does, on every PR. This
 // gate checks only that the proof still exists and still names the advisory, so
 // the exception cannot outlive the evidence it rests on.
-const PROOFS = new Map([
-  ['GHSA-qr28-fpjm-wq7f', 'src/lib/decodeUriComponentReachability.test.ts'],
-]);
+const PROOFS = new Map([]);
 
 // Reachability bounds: for each listed package, the ONLY immediate
 // reverse-dependency parents it may have. A new parent changes the reachability
@@ -80,16 +76,13 @@ const PROOFS = new Map([
 // parents are bounded too: a second consumer would call parse() with nobody
 // having checked, and must fail here. (The same lesson as #416, where bounding
 // `braces` only at `micromatch` proved nothing.)
-const REACHABILITY_BOUNDS = new Map([
-  ['decode-uri-component', new Set(['query-string'])],
-  ['query-string', new Set(['expo-router'])],
-]);
+const REACHABILITY_BOUNDS = new Map([]);
 
 // The top of an approved chain that is a DIRECT dependency by design. A
 // build-tool exception had none — every package on its path had to stay out of
 // the app — but a runtime exception's root is the app's own router. It is
 // exempt from the directness and import checks below, and nothing else is.
-const RUNTIME_ROOTS = new Set(['expo-router']);
+const RUNTIME_ROOTS = new Set([]);
 
 // The packages that carry an excepted advisory. Boundary 3's closure starts here.
 const EXCEPTED_PACKAGES = new Set([...ALLOWED.values()].map((m) => m.package));
@@ -129,7 +122,10 @@ const vulnerabilities = report.vulnerabilities;
 const counts = report.metadata?.vulnerabilities ?? {};
 const critical = Number(counts.critical ?? 0);
 const high = Number(counts.high ?? 0);
-const expired = new Date(`${EXCEPTION_EXPIRES}T23:59:59Z`) < new Date();
+// An expiry with nothing listed is not a failure: with an empty list, any high
+// already fails as unapproved below, and an "exception expired" line on top of it
+// would name an exception that does not exist.
+const expired = ALLOWED.size > 0 && new Date(`${EXCEPTION_EXPIRES}T23:59:59Z`) < new Date();
 
 if (critical === 0 && high === 0) {
   // Nothing to except. An expired date is irrelevant here, and saying so would
@@ -185,9 +181,8 @@ if (expired) failures.push(`the mobile audit exception expired on ${EXCEPTION_EX
 
 // Every package on an approved path — each bounded package AND every approved
 // parent, except a declared RUNTIME_ROOT — must stay out of the app's own
-// dependencies and its own source. Today that is `decode-uri-component` and
-// `query-string`: the app reaching either directly would be a call site the
-// reachability proof never looked at.
+// dependencies and its own source. Nothing is on such a path today; while the
+// decode-uri-component exception stood, it was that package and `query-string`.
 //
 // THE APPROVED PARENTS ARE INCLUDED ON PURPOSE. A bound proves that the excepted
 // code is reached only THROUGH a build tool; it proves nothing if the app depends

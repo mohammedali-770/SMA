@@ -45,7 +45,7 @@ One Expo application targets native iOS, native Android and React Native Web.
 
 Key properties:
 
-- Expo SDK 57 / React Native 0.86.2 / Expo Router.
+- Expo SDK 58 / React Native 0.88.1 / Expo Router (SDK 58 since 2026-11-10; SDK 57 / React Native 0.86.2 before that).
 - Arabic + English with RTL support.
 - System / Light / Dark runtime appearance.
 - Supabase Auth with WhatsApp delivery for the Saudi-phone login flow.

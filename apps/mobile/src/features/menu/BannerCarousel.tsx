@@ -29,7 +29,15 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type ScrollViewInstance,
+} from 'react-native';
 
 import { catalog } from '../../services/api';
 import { mapBanner } from '../../lib/mappers';
@@ -73,7 +81,7 @@ export function BannerCarousel({ banners, inset = true }: {
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
   const [focused, setFocused] = useState(true);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   // Pause auto-rotation while the home tab is not focused (expo-router focus).
   useFocusEffect(

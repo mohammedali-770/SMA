@@ -17,8 +17,9 @@ npm audit --audit-level=high
 
 The mobile tree runs `scripts/audit-mobile-high.mjs`, which itself executes
 `npm --prefix apps/mobile audit --audit-level=high --json` and fails closed.
-It permits only the exact, time-bounded HIGH exception recorded in §3.2, and
-only while that exception's reachability proof exists; any critical advisory, any other direct high advisory, any high record
+It permits only exact, time-bounded HIGH exceptions recorded in §3, and only
+while each one's evidence still holds. **There are none today**; §4.15 records the
+last. Any critical advisory, any other direct high advisory, any high record
 outside the approved dependency closure, malformed audit output, or an expired
 exception still fails CI.
 
@@ -39,12 +40,16 @@ Expo packages that have no non-breaking fix (§3.1). Gating at moderate would
 fail every PR on something this repository cannot fix, and a gate that is always
 red is a gate everybody learns to ignore.
 
-As of **2026-11-09**, the web tree is clean at high/critical. The mobile tree has
-no critical and **one** reviewed direct HIGH advisory — `decode-uri-component`
-(§3.2) — which npm propagates to 3 high records (`decode-uri-component`,
-`query-string`, `expo-router`). It is the first exception here that **ships**:
-it is accepted because the vulnerable function is proven never to be called,
-not because the code never reaches a phone.
+As of **2026-11-10**, both trees are clean at high/critical, and **the mobile
+gate holds no exception at all**. The last one, `decode-uri-component`, left with
+the Expo SDK 58 upgrade, which removed `query-string` from `expo-router`
+(§4.15). What remains are moderates, which the gate does not block (§3.1).
+
+*Superseded 2026-11-10:* as of 2026-11-09 the mobile tree had one reviewed direct
+HIGH advisory, `decode-uri-component`, propagating to 3 high records
+(`decode-uri-component`, `query-string`, `expo-router`). It was the first
+exception here that **shipped**. It was accepted because the vulnerable function
+was proven never to be called, not because the code never reached a phone.
 
 **On 2026-11-09 both gates were red, and every PR and every gated Vercel deploy
 with them.** The `braces`/`node-forge` exception expired on 2026-11-07 with five
@@ -83,11 +88,11 @@ Always inspect dependency diffs before committing them.
 
 | Field | Value |
 | --- | --- |
-| **Packages** | `@expo/fingerprint` → `glob` (GHSA-3g3m-2fjr-6pw4), `minimatch` (GHSA-g3hv-75wg-m249), propagating to `expo`; and `decode-uri-component`'s older moderate GHSA-vcc3-ghjq-m6fr (≤0.4.2), cleared by the same upgrade as §3.2 |
+| **Packages** | `glob` (GHSA-3g3m-2fjr-6pw4) and `minimatch` (GHSA-g3hv-75wg-m249). They are reached through `@expo/cli` and `@expo/fingerprint`, propagating to `expo`, and since the SDK 58 upgrade also through `@sentry/bundler-plugins` under `@sentry/react-native` 8.28. That is **7 moderate records, measured 2026-11-10**. `decode-uri-component`'s older moderate, GHSA-vcc3-ghjq-m6fr, left with §4.15 |
 | **Severity** | Moderate |
-| **Status** | Accepted — no non-breaking fix on the SDK 57 line (`npm audit` offers only a semver-major Expo change) |
-| **Reviewed** | 2026-11-09 (previously 2026-08-03, for a different set: `@expo/config`, `@expo/config-plugins`, `@expo/prebuild-config`, `expo-splash-screen`, which the Expo 57.0.32 patch line no longer reports) |
-| **Next review** | On the Expo SDK 58 upgrade, or 2026-12-31, whichever comes first |
+| **Status** | Accepted. There is no fix on the SDK 58 line either: `npm audit` offers only semver-major moves, which here are **downgrades** (`expo` 53.0.11, `@sentry/react-native` 8.20.0), not fixes |
+| **Reviewed** | 2026-11-10, on the SDK 58 upgrade (previously 2026-11-09 and 2026-08-03, for a different set: `@expo/config`, `@expo/config-plugins`, `@expo/prebuild-config`, `expo-splash-screen`, which the Expo 57.0.32 patch line no longer reports) |
+| **Next review** | On the next Expo SDK upgrade, or 2027-03-31, whichever comes first |
 
 `@expo/fingerprint` hashes the native project to decide whether a build needs
 a fresh native binary. It runs on a developer machine or EAS builder, not on a
@@ -99,103 +104,6 @@ for the high gate and should be read as covering this table too.
 **To clear:** upgrade the Expo SDK deliberately, rebuild all targets, re-run the
 audit, and remove this exception when the advisories disappear.
 
-### 3.2 `decode-uri-component` — quadratic DoS — HIGH (SHIPPED, function-unreachable)
-
-| Field | Value |
-| --- | --- |
-| **Package** | `decode-uri-component` 0.2.2 |
-| **Advisory** | `GHSA-qr28-fpjm-wq7f` |
-| **Severity** | High |
-| **Affected** | `<= 0.5.0` |
-| **Patched release** | `0.5.1` — **ESM-only** (`"type": "module"`), so it cannot replace the CommonJS `require()` in `query-string` 7 |
-| **Reachability in SMA** | `decode-uri-component` ← `query-string` 7.1.3 ← `expo-router` 57.0.30 — **ships in the customer app** |
-| **Why it is accepted anyway** | The vulnerable function is never **called**. Proven by `src/lib/decodeUriComponentReachability.test.ts` against the installed tree on every run — see below |
-| **Reviewed** | 2026-11-09 |
-| **Exception expires** | **2026-12-31** |
-| **Clear when** | The Expo SDK 58 upgrade lands: `expo-router` 58 no longer depends on `query-string` (measured: `expo-router@58.0.30` has no `query-string` dependency) |
-
-**This is a different kind of exception from every one before it, and the
-difference is the argument.** The build-tool exceptions it replaces (§4.10,
-§4.11) rested on *the code never ships*. This one ships, so that argument is not
-available. What is proven instead is narrower: **nothing calls a decoding
-function**. That is a weaker guarantee, which is why the expiry is seven weeks
-and tied to the upgrade that deletes the package.
-
-**An override was considered and rejected, because it would break the app
-instead of fixing it.** `0.5.1` exports `export default function`; `query-string`
-7 does `const decodeComponent = require('decode-uri-component')` and calls it.
-Metro would bundle that without complaint, but `require()` of a transformed ES
-module returns `{ default: fn }`, so the first call would throw a TypeError —
-at runtime, on a customer's phone. No `expo-router` 57.x patch drops
-`query-string`; every one through 57.0.30 keeps it.
-
-**What the proof checks, against the installed tree, on every run:**
-
-1. `query-string` is 7.1.3 and `decode-uri-component` 0.2.2 — the versions the
-   rest was derived from. In 7.1.3 the entry points that reach `decode()` are
-   `parse`, `parseUrl`, `stringifyUrl` (it calls `parse`), `pick` and `exclude`;
-   `stringify` and `extract` never decode.
-2. Exactly four `expo-router` build files import `query-string`, and of all
-   their calls on it, **exactly one decodes**: `queryString.parse()` in the
-   *vendored* `react-navigation/core/getStateFromPath.js`.
-3. That vendored parser is only ever a **default parameter**
-   (`linking?.getStateFromPath ?? core.getStateFromPath`). `expo-router`'s
-   linking config always supplies its own, which delegates to its fork
-   (`fork/getStateFromPath.js`); the fork imports no `query-string` (its own copy
-   of the parse is commented out) and never calls the vendored default; and
-   nothing in `expo-router` calls the vendored default directly.
-4. Nothing else in the installed mobile tree, and nothing in `apps/mobile/src`,
-   imports `query-string` or `decode-uri-component` — with a known positive
-   (`query-string`'s own `index.js`) asserted first, so a clean result cannot
-   mean a blind pattern.
-
-When the proof cannot run in CI (the mobile tree missing), it **fails** rather
-than skipping; it skips only on a developer machine without `apps/mobile`
-installed. Even on the path it rules out, the impact would be a slow parse of an
-attacker-crafted deep link on the customer's own device — a self-inflicted
-freeze, not data exposure.
-
-### The current exception is bounded by the gate and by a proof
-
-`scripts/audit-mobile-high.mjs` accepts only `GHSA-qr28-fpjm-wq7f` on
-`decode-uri-component`, and bounds the whole chain: `decode-uri-component` may
-have only `query-string` as its parent, and **`query-string` may have only
-`expo-router`** — `query-string` is a general-purpose library, and a second
-consumer would call `parse()` with nobody having checked (the same lesson as
-#416, where bounding `braces` only at `micromatch` proved nothing).
-
-`expo-router` is declared as the chain's **runtime root**: the one package on an
-approved path that is allowed to be a direct dependency, because it is the app's
-router. Nothing else on the path may be declared or imported by app source.
-
-**The proof is the precondition, and the gate enforces it** (boundary 4): it
-fails if `src/lib/decodeUriComponentReachability.test.ts` is missing or stops
-naming the advisory, so the exception cannot outlive its evidence. The retired
-`node-forge` exception taught that a precondition living only in this document
-is not a precondition (§4.11).
-
-**Mutation-tested, every mutant's precondition confirmed before its verdict was
-counted.** Proof (planted into the installed `expo-router` build, then restored
-byte-for-byte):
-
-| mutant | result |
-| --- | --- |
-| a fork file gains a `queryString.parse()` call | killed |
-| a fifth `expo-router` file starts importing `query-string` | killed |
-| the linking config stops supplying its own `getStateFromPath` | killed |
-| app source imports `query-string` | killed |
-| another installed package requires `decode-uri-component` | killed |
-| the fork delegates to the vendored default parser | killed |
-
-Gate:
-
-| mutant | result |
-| --- | --- |
-| the proof file deleted | killed |
-| the proof no longer names the advisory | killed |
-| `query-string` declared as a direct dependency | killed |
-| the exception date in the past | killed |
-
 ### What the gate cannot see — stated rather than implied
 
 > **Read with the date in mind.** This section was written for the build-tool
@@ -204,9 +112,9 @@ Gate:
 > answer "does this ship?" — still holds, and the bundle scan it describes is
 > **kept**: `braces`, `micromatch` and `node-forge` are build-tool libraries that
 > must never reach a customer, excepted or not, and `node-forge` alone took six
-> HIGH advisories in a year. The current exception (§3.2) is the opposite case —
-> a library that ships on purpose — and is bounded by a reachability proof
-> instead, not by the scan.
+> HIGH advisories in a year. The exception retired on 2026-11-10 (§4.15) was the
+> opposite case: a library that shipped on purpose, bounded by a reachability
+> proof instead of by the scan.
 
 **The gate bounds the dependency graph, and the graph cannot tell build-time
 from runtime use.** That is a real limit, and a third review pass on #416 reached
@@ -618,6 +526,119 @@ GHSA-qrxm-fqhp-jwvm, all fixed in 7.30.1. The root override moved `~7.29.1` →
 
 Affected `<= 6.4.3`; the range floor moved `^6.2.3` → `^6.4.5`, so a lockfile
 regeneration cannot fall back to a vulnerable 6.x. Build tool only.
+
+### 4.15 `decode-uri-component` — quadratic DoS (GHSA-qr28-fpjm-wq7f) — HIGH (SHIPPED, function-unreachable) — RETIRED 2026-11-10
+
+**Retired 2026-11-10 by the Expo SDK 58 upgrade, the fix this exception was
+waiting for.** `expo-router` dropped `query-string` in 58.0.13
+(expo/expo#50725, "Replace query-string with URLSearchParams"); SDK 58 pins
+`~58.0.30`. Measured after the upgrade:
+
+- `npm ls query-string decode-uri-component` in `apps/mobile` is empty.
+- The mobile gate reports no high or critical, and its exception tables are
+  empty. The expiry now applies only while an entry exists.
+- **The empty gate was mutation-tested.** Re-adding `decode-uri-component@0.2.2`
+  made it fail (exit 1); removing it again made it pass (exit 0).
+- The proof test, `src/lib/decodeUriComponentReachability.test.ts`, was deleted
+  with it, because it proved something about code that is no longer installed.
+
+The original review follows unchanged.
+
+
+| Field | Value |
+| --- | --- |
+| **Package** | `decode-uri-component` 0.2.2 |
+| **Advisory** | `GHSA-qr28-fpjm-wq7f` |
+| **Severity** | High |
+| **Affected** | `<= 0.5.0` |
+| **Patched release** | `0.5.1` — **ESM-only** (`"type": "module"`), so it cannot replace the CommonJS `require()` in `query-string` 7 |
+| **Reachability in SMA** | `decode-uri-component` ← `query-string` 7.1.3 ← `expo-router` 57.0.30 — **ships in the customer app** |
+| **Why it is accepted anyway** | The vulnerable function is never **called**. Proven by `src/lib/decodeUriComponentReachability.test.ts` against the installed tree on every run — see below |
+| **Reviewed** | 2026-11-09 |
+| **Exception expires** | **2026-12-31** |
+| **Clear when** | The Expo SDK 58 upgrade lands: `expo-router` 58 no longer depends on `query-string` (measured: `expo-router@58.0.30` has no `query-string` dependency) |
+
+**This is a different kind of exception from every one before it, and the
+difference is the argument.** The build-tool exceptions it replaces (§4.10,
+§4.11) rested on *the code never ships*. This one ships, so that argument is not
+available. What is proven instead is narrower: **nothing calls a decoding
+function**. That is a weaker guarantee, which is why the expiry is seven weeks
+and tied to the upgrade that deletes the package.
+
+**An override was considered and rejected, because it would break the app
+instead of fixing it.** `0.5.1` exports `export default function`; `query-string`
+7 does `const decodeComponent = require('decode-uri-component')` and calls it.
+Metro would bundle that without complaint, but `require()` of a transformed ES
+module returns `{ default: fn }`, so the first call would throw a TypeError —
+at runtime, on a customer's phone. No `expo-router` 57.x patch drops
+`query-string`; every one through 57.0.30 keeps it.
+
+**What the proof checks, against the installed tree, on every run:**
+
+1. `query-string` is 7.1.3 and `decode-uri-component` 0.2.2 — the versions the
+   rest was derived from. In 7.1.3 the entry points that reach `decode()` are
+   `parse`, `parseUrl`, `stringifyUrl` (it calls `parse`), `pick` and `exclude`;
+   `stringify` and `extract` never decode.
+2. Exactly four `expo-router` build files import `query-string`, and of all
+   their calls on it, **exactly one decodes**: `queryString.parse()` in the
+   *vendored* `react-navigation/core/getStateFromPath.js`.
+3. That vendored parser is only ever a **default parameter**
+   (`linking?.getStateFromPath ?? core.getStateFromPath`). `expo-router`'s
+   linking config always supplies its own, which delegates to its fork
+   (`fork/getStateFromPath.js`); the fork imports no `query-string` (its own copy
+   of the parse is commented out) and never calls the vendored default; and
+   nothing in `expo-router` calls the vendored default directly.
+4. Nothing else in the installed mobile tree, and nothing in `apps/mobile/src`,
+   imports `query-string` or `decode-uri-component` — with a known positive
+   (`query-string`'s own `index.js`) asserted first, so a clean result cannot
+   mean a blind pattern.
+
+When the proof cannot run in CI (the mobile tree missing), it **fails** rather
+than skipping; it skips only on a developer machine without `apps/mobile`
+installed. Even on the path it rules out, the impact would be a slow parse of an
+attacker-crafted deep link on the customer's own device — a self-inflicted
+freeze, not data exposure.
+
+#### How it was bounded (history)
+
+`scripts/audit-mobile-high.mjs` accepts only `GHSA-qr28-fpjm-wq7f` on
+`decode-uri-component`, and bounds the whole chain: `decode-uri-component` may
+have only `query-string` as its parent, and **`query-string` may have only
+`expo-router`** — `query-string` is a general-purpose library, and a second
+consumer would call `parse()` with nobody having checked (the same lesson as
+#416, where bounding `braces` only at `micromatch` proved nothing).
+
+`expo-router` is declared as the chain's **runtime root**: the one package on an
+approved path that is allowed to be a direct dependency, because it is the app's
+router. Nothing else on the path may be declared or imported by app source.
+
+**The proof is the precondition, and the gate enforces it** (boundary 4): it
+fails if `src/lib/decodeUriComponentReachability.test.ts` is missing or stops
+naming the advisory, so the exception cannot outlive its evidence. The retired
+`node-forge` exception taught that a precondition living only in this document
+is not a precondition (§4.11).
+
+**Mutation-tested, every mutant's precondition confirmed before its verdict was
+counted.** Proof (planted into the installed `expo-router` build, then restored
+byte-for-byte):
+
+| mutant | result |
+| --- | --- |
+| a fork file gains a `queryString.parse()` call | killed |
+| a fifth `expo-router` file starts importing `query-string` | killed |
+| the linking config stops supplying its own `getStateFromPath` | killed |
+| app source imports `query-string` | killed |
+| another installed package requires `decode-uri-component` | killed |
+| the fork delegates to the vendored default parser | killed |
+
+Gate:
+
+| mutant | result |
+| --- | --- |
+| the proof file deleted | killed |
+| the proof no longer names the advisory | killed |
+| `query-string` declared as a direct dependency | killed |
+| the exception date in the past | killed |
 
 ## 5. Adding or extending an exception
 
