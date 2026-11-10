@@ -1044,15 +1044,15 @@ assumption survives unchallenged.
 
 ## 16. Policy deadlines, November 2026 to April 2027 — added 2026-11-10
 
-Each row was read from Google's own pages on 2026-11-10, apart from the DEX row,
-which is from the 2026-11-09 research.
+Each row was read from Google's own pages on 2026-11-10.
 
 | When | Requirement, in Google's words | Applies here? | What it needs |
 | --- | --- | --- | --- |
 | **Now** | **Trader status:** *"Starting in November 2026, you must declare your trader status in Play Console in accordance with new Console requirements."* ([answer/18100766](https://support.google.com/googleplay/android-developer/answer/18100766), 29 Oct 2026) | Yes, every developer | **Owner:** declare it in Play Console |
 | **27 Jan 2027** (a 30-day self-extension is available) | **Precise-location declaration:** *"All apps requesting precise location (ACCESS_FINE_LOCATION) must complete a declaration in the Play Console to demonstrate access needs and justify why the location button or coarse location is insufficient."* ([answer/17033915](https://support.google.com/googleplay/android-developer/answer/17033915)) | Yes. The app requests `ACCESS_FINE_LOCATION` | **Owner:** submit the declaration below |
 | **1 Feb 2027** | **16 KB page sizes:** *"Starting February 1, 2027, if your app updates don't support 16 KB memory page sizes, you won't be able to release these updates."* ([page sizes](https://developer.android.com/guide/practices/page-sizes)) | Yes. The app targets API 36 and ships native code | **Measure it** on the uploaded bundle (below) |
-| **Feb 2027** | **Memory and DEX thresholds:** *"a February 2027 compliance deadline for new app quality requirements regarding memory and code optimization thresholds"* (answer/18100766). The DEX part, per the 2026-11-09 research of answer/17492799: *"minimum of 25% optimization, obfuscation and shrinking"*, enforced only above 10 MB of DEX | Only if the DEX exceeds 10 MB. **The app ships with no R8 shrinking today** | **Owner:** read the DEX size in App bundle explorer. R8 is planned with the Expo SDK 58 upgrade |
+| **Feb 2027** | **Memory thresholds:** *"Google Play has defined bad behavior thresholds for your app's core vitals. Memory usage is being introduced as new core vitals metrics"*: overall memory and bitmap memory, judged at the 90th percentile on the last 28 days ([answer/17492799](https://support.google.com/googleplay/android-developer/answer/17492799)) | **Yes, every app.** These have no size exemption. They are measured from real users' devices, so there is nothing to read until the app has users on Play | **Owner:** once the app is in production, check **Android vitals → Memory** |
+| **Feb 2027** | **DEX code optimisation:** *"a minimum of 25% optimization, obfuscation and shrinking for any app uploads to Play Console"*, which *"will only be enforced where you have non-negligible DEX sizes"*: more than 10 MB for an app (answer/17492799) | Only above 10 MB of DEX. **The app ships with no R8 shrinking today** | **Owner:** read the DEX size in App bundle explorer. R8 comes with the Expo SDK 58 upgrade (#430) |
 | **Apr 2027** | **Zero-Tap Sign-In restoration** for apps with sign-in (answer/17492799) | Yes | A design document first, then the native work (2026-11-09 compliance plan, phase 5) |
 
 ### The precise-location declaration — proposed answers
@@ -1100,12 +1100,20 @@ exposing it, and belongs to whichever change raises the target API.
 ### 16 KB — expected, not yet measured
 
 The bundle is built by React Native 0.86 on Expo SDK 57, and no one has read the
-result. Two ways to settle it:
+result. Android's [page-size guide](https://developer.android.com/guide/practices/page-sizes)
+treats compatibility as **two properties, and both must hold**:
 
-- Play Console, **App bundle explorer** for the uploaded bundle. Android's page
-  shows the compatibility warning Play raises when a bundle fails.
-- `zipalign -c -P 16 -v 4` on an APK built from the bundle, the check Android
-  documents.
+1. **The native libraries are built for 16 KB.** Every `LOAD` segment of every
+   `.so` shows `align 2**14` or more. Check with Android's
+   `check_elf_alignment.sh` on an APK, or with `llvm-objdump -p <lib>.so | grep LOAD`.
+2. **The package keeps them aligned.** `zipalign -c -P 16 -v 4` on the APK checks
+   this, and only this: Android's own docs say `-c` checks alignment of the
+   archive. **A pass here does not settle the first property**, so it cannot close
+   this item alone.
+
+Play Console's **App bundle explorer** reports the result for the uploaded bundle,
+and Android's page shows the compatibility warning Play raises when a bundle
+fails. Reading it there covers both properties at once.
 
 Record the result here when read. A failure blocks every update from 1 February
 2027.

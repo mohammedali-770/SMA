@@ -3396,6 +3396,7 @@ are taken by the PDPL work in an open pull request.)
 | **27 January 2027** (30-day self-extension available) | **Play: the precise-location declaration**, two questions | `PLAY_STORE_SUBMISSION.md` §16 |
 | **1 February 2027** | **Play, App bundle explorer: read 16 KB support** on the uploaded bundle. Updates that fail cannot be released after this date | `PLAY_STORE_SUBMISSION.md` §16 |
 | **February 2027** | **Play, App bundle explorer: read the DEX size.** The DEX rule applies above 10 MB | `GO_LIVE_READINESS.md` C11 |
+| **February 2027, once in production** | **Play, Android vitals → Memory.** The new memory thresholds apply to every app, with no size floor, and are judged on real users' devices | `PLAY_STORE_SUBMISSION.md` §16 |
 | **When convenient** | **Decide tablets:** Android 16 shows the app full-width in landscape on screens of 600 dp and wider | `PLAY_STORE_SUBMISSION.md` §13 |
 | **When convenient** | **Decide App Store availability.** Limiting it to Saudi Arabia removes Brazil's A16 consequence of answering Shared Location "Yes" | `APP_STORE_SUBMISSION.md` §10 |
 
