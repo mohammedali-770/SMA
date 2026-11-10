@@ -41,6 +41,11 @@ export function isSensitiveKey(key: string): boolean {
 const VALUE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   // JWT-like three-segment base64url tokens (Supabase access/refresh, anon key)
   [/eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]+/g, '[redacted-jwt]'],
+  // Supabase's opaque API keys (sb_publishable_… / sb_secret_…), which replace
+  // the JWT anon/service_role keys and do not match the pattern above. A
+  // publishable key is public, but a log is the wrong place for any key, and a
+  // secret key must never survive into one even by mistake.
+  [/\bsb_(?:publishable|secret)_[A-Za-z0-9_-]{8,}/g, '[redacted-api-key]'],
   // Authorization schemes with their value
   [/\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[redacted-auth]'],
   // Email addresses
