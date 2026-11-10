@@ -67,6 +67,24 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): Fi
     started.current = true;
 
     void (async () => {
+      // THE ANDROID CHANNEL, ON EVERY SIGNED-IN LAUNCH — never behind Allow.
+      // push-dispatch sends every notification on channel 'default', and Expo
+      // does not display a notification whose channel does not exist. On
+      // Android 12 and older the permission is granted from install, so there
+      // is no consent prompt and Allow is never tapped — but the sign-in claim
+      // still registers the device. Creating the channel only inside `allow`
+      // would leave those customers registered, with both switches on, and
+      // shown nothing (review finding on #425). Idempotent, a no-op on iOS, and
+      // on Android 13+ it does not raise the permission prompt for an app
+      // targeting SDK 33 or later.
+      if (PUSH_CLIENT_ENABLED) {
+        try {
+          await ensureAndroidChannel();
+        } catch {
+          /* a notification channel must never break app start */
+        }
+      }
+
       const state = await readFirstRun();
       if (!shouldRequestFirstRunPermissions(state, signedIn)) return;
 
@@ -89,7 +107,8 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): Fi
   const allow = useCallback(async () => {
     setOffered(false);
     try {
-      // The Android channel must exist before the prompt; a no-op on iOS.
+      // The Android channel must exist before the prompt (enableFlowPlan). The
+      // launch above already created it; this repeats it in case that failed.
       await ensureAndroidChannel();
 
       // ONLY register when the customer grants permission ON THIS RUN.

@@ -86,6 +86,19 @@ describe('the OS notification prompt sits behind an explicit tap', () => {
     expect(hook.slice(allowAt)).toContain('ensureNotificationPermission(');
   });
 
+  it('the Android channel is created on launch, not only behind Allow', () => {
+    // push-dispatch sends on channel 'default', and a notification for a
+    // channel that does not exist is not shown. Android 12 and older never see
+    // the consent prompt (granted at install), so a channel created only in
+    // allow() would leave them registered and shown nothing (review on #425).
+    const hook = code('features/onboarding/useFirstRunPermissions.ts');
+    const allowAt = hook.indexOf('const allow = useCallback');
+    const beforeAllow = hook.slice(0, allowAt);
+    expect(beforeAllow).toContain('ensureAndroidChannel()');
+    // ...and before the first-run flag can return early, so it runs every launch.
+    expect(beforeAllow.indexOf('ensureAndroidChannel()')).toBeLessThan(beforeAllow.indexOf('readFirstRun()'));
+  });
+
   it('allow() re-checks the grant before registering, so a choice made meanwhile stands', () => {
     const allow = code('features/onboarding/useFirstRunPermissions.ts').split('const allow = useCallback')[1];
     expect(allow.indexOf('shouldRegisterOnFirstRun(await hasNotificationPermission())')).toBeGreaterThan(-1);
