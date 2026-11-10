@@ -20,7 +20,7 @@ import 'react-native-url-polyfill/auto';
 import { AppState } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
-import { SUPABASE_URL, SUPABASE_ANON_KEY, isSupabaseConfigured } from './env';
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY, isSupabaseConfigured } from './env';
 import { sessionStorage } from './secureSessionStorage';
 
 if (!isSupabaseConfigured) {
@@ -28,13 +28,13 @@ if (!isSupabaseConfigured) {
   // UI shows a clear error state instead of crashing.
   console.warn(
     '[Spicy Meal] Supabase env not set (EXPO_PUBLIC_SUPABASE_URL / ' +
-      'EXPO_PUBLIC_SUPABASE_ANON_KEY). Copy .env.example to .env.local and fill it in.',
+      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY or EXPO_PUBLIC_SUPABASE_ANON_KEY). Copy .env.example to .env.local and fill it in.',
   );
 }
 
 export const supabase = createClient(
   SUPABASE_URL || 'http://localhost',
-  SUPABASE_ANON_KEY || 'public-anon-key',
+  SUPABASE_PUBLIC_KEY || 'public-anon-key',
   {
     auth: {
       storage: sessionStorage,
