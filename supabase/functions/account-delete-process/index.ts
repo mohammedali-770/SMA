@@ -20,6 +20,7 @@ import {
   type FailureStage,
   type TransitionOutcome,
 } from '../_shared/accountDeletion.ts';
+import { isServiceCall } from '../_shared/apiKeys.ts';
 
 // A request blocked (waiting) this long since it was requested is escalated to a
 // human instead of waiting forever — matches the "up to 30 days" completion SLA.
@@ -37,9 +38,9 @@ type Admin = ReturnType<typeof adminClient>;
  * allowing pg_cron/pg_net to invoke the worker securely.
  */
 async function authorized(req: Request, admin: Admin): Promise<boolean> {
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const auth = req.headers.get('Authorization') ?? '';
-  if (serviceRoleKey && auth === `Bearer ${serviceRoleKey}`) return true;
+  // Legacy `Bearer <service_role>` or an opaque secret key on `apikey`
+  // (_shared/apiKeys.ts), compared in constant time.
+  if (isServiceCall(req)) return true;
 
   const candidate = req.headers.get('x-process-secret');
   if (!candidate) return false;

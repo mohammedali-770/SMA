@@ -853,3 +853,11 @@ settings role split, **the enabled external toggle** (corrected 2026-09-13 —
 this said "disabled external toggle"; the test pinning that state was the #332
 defect and was revisited when the limitation was lifted), fail-visible errors,
 no-action-buttons guarantee).
+
+## Service-caller check — Supabase API-key migration (2026-11-09)
+
+`operations-alert-dispatch`'s service-caller check is now the shared
+`isServiceCall` (`supabase/functions/_shared/apiKeys.ts`): the legacy
+`Authorization: Bearer <service_role>` or an opaque secret key on `apikey`,
+constant-time. The pg_cron driver is unaffected — it authenticates with its own
+trigger secret and sends no Supabase key. Steps: `docs/SUPABASE_API_KEYS.md`.

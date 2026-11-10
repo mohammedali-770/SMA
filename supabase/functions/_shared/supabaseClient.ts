@@ -1,5 +1,7 @@
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
+import { publishableKey, secretKey, withoutOpaqueBearer } from './apiKeys.ts';
+
 /**
  * SERVER-SIDE ONLY service-role client. Bypasses RLS — used by webhooks / sync
  * workers to call the service-role-only RPCs (confirm_order_payment,
@@ -19,9 +21,15 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2';
  */
 export function adminClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  // The `default` secret key once the project has one, else the legacy
+  // service_role key — see apiKeys.ts for why both, and why an opaque key must
+  // not ride on `Authorization`.
+  const key = secretKey();
   if (!url || !key) throw new Error('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
-  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createClient(url, key.value, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    ...(key.kind === 'opaque' ? { global: { fetch: withoutOpaqueBearer() } } : {}),
+  });
 }
 
 /**
@@ -31,10 +39,15 @@ export function adminClient(): SupabaseClient {
  */
 export function userClient(authHeader: string | null): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL');
-  const anon = Deno.env.get('SUPABASE_ANON_KEY');
-  if (!url || !anon) throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY');
-  return createClient(url, anon, {
+  const key = publishableKey();
+  if (!url || !key) throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY');
+  return createClient(url, key.value, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: authHeader ? { Authorization: authHeader } : {} },
+    global: {
+      headers: authHeader ? { Authorization: authHeader } : {},
+      // Strips only a `Bearer sb_…` that supabase-js adds when there is no user
+      // header; a forwarded user JWT is untouched.
+      ...(key.kind === 'opaque' ? { fetch: withoutOpaqueBearer() } : {}),
+    },
   });
 }
