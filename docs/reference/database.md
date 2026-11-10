@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **143**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260929120000_db_advisor_hardening.sql`.
+Migration files in the repository: **144**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260930120000_product_variants_guest_read.sql`.
 
 ## Tables
 
@@ -78,7 +78,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `otp_send_reservations` | `20260831130000_otp_login_rate_limit.sql` | 0 | **none declared** |
 | `payment_records` | `20260707121300_payments_and_sync.sql` | 3 | 1 |
 | `product_modifier_groups` | `20260707120200_catalog.sql` | 0 | 1 |
-| `product_variants` | `20260824120000_product_variants.sql` | 0 | 2 |
+| `product_variants` | `20260824120000_product_variants.sql` | 0 | 4 |
 | `products` | `20260707120200_catalog.sql` | 3 | 3 |
 | `profiles` | `20260707120100_profiles.sql` | 2 | 2 |
 | `push_devices` | `20260714090000_push_notifications.sql` | 0 | 3 |

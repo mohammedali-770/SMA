@@ -6737,3 +6737,86 @@ so the assertion behaves identically in both.
 
 **Applying it is a §5 action, named by version.** Afterwards, re-read the
 advisors: expect 0011 at 0, 0028 at 1 and 0029 at 85.
+
+## 52. Guest menu read on `product_variants` — WRITTEN, NOT APPLIED (2026-11-09)
+
+`20260930120000_product_variants_guest_read.sql`. **Written 2026-11-09, validated,
+awaiting owner approval.** This is the one database change that guest browsing
+(App Store guideline 5.1.1(v), plan item A4) needs. (§51 is the advisor-hardening
+file in #422; the two are independent and can be applied in either order.)
+
+sha256 `fbd5d5bfdfa6be2c99cbfa00d17cce58c5b75e458c0e87ffc3dfed4f7b80d2cd`,
+107 lines / 5 317 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It must be applied BEFORE any build that lets a signed-out user reach the
+menu.** Until then, nothing in Production reads this table signed out. The app
+sends a signed-out user to the login screen first, which is why the defect
+never surfaced.
+
+### The defect, measured live
+
+Every signed-out read of `product_variants` fails with **42501, which PostgREST
+returns as HTTP 401**. It is a refusal, not an empty list.
+
+The table grants anon SELECT; the policy is the problem:
+`product_variants_select_public` is `(is_active OR is_staff())` for
+`{anon, authenticated}`. anon has no EXECUTE on `is_staff()`, and Postgres checks
+EXECUTE on every function in a policy expression when the query starts, so the
+whole read is refused before `is_active` is evaluated.
+
+**It is a regression of a fix this repository already made.** `20260810143000`
+split exactly this shape on `branches`, `categories`, `products` and `modifiers`
+when it removed anon's access to the role helpers. `product_variants` arrived
+two weeks later (`20260824120000`) and brought the combined form back.
+
+Of all **17** SELECT policies that admit anon, this is the **only** one calling a
+function anon cannot execute (read live, 2026-11-09).
+
+### The fix
+
+The same split, with the same names:
+- **active tiers** for anon and authenticated;
+- **inactive tiers** for authenticated staff only.
+
+For a signed-in caller, the two permissive policies OR together into the old
+predicate, so **nothing changes for customers or staff**. For anon, the read now
+succeeds and returns active tiers only.
+
+The file drops the legacy name **and** its own names before creating them,
+because the harness's idempotence replay recreates the legacy policy (the
+`20260810143000` reasoning).
+
+**MONEY PATH UNTOUCHED** (no function is defined), and the file asserts the pair
+`12b6816d…` / `22e2d429…`. **No deploy implied.**
+
+### The suite turns the observation into a rule
+
+`product_variants_guest_read_test.sql`:
+- **CASES 1-2:** anon reads the table, and joins it to `products` as the menu's
+  embed does, seeing active tiers only.
+- **CASES 3-4:** a customer sees active only; staff still see inactive.
+- **CASE 5:** for **every** table in `public` where anon holds SELECT and a policy
+  admits anon, a read **under the anon role** must not raise. The next
+  `OR is_staff()` written for anon fails CI instead of breaking the guest menu.
+
+The migration's own block also checks the **outcome**: it performs the read as
+anon, rather than inspecting the policy text.
+
+### Validation
+
+- **Reproduced first:** on the chain *without* this file, the suite fails with
+  `permission denied for function is_staff (42501)`, the production error.
+- **Local chain harness, with the file:** 143 migrations, 81 suites, 79 passed,
+  2 quarantined, **0 new failures**. The idempotence report is identical to the
+  base, so the file re-applies cleanly.
+- **5 mutants, each killed twice**, by the file's own block and, with the block
+  removed, by the suite:
+  - `OR is_staff()` kept for anon;
+  - anon dropped from the active policy;
+  - the staff policy widened to anon;
+  - the staff policy dropped;
+  - the legacy policy left in place.
+
+**Applying it is a §5 action, named by version.** Afterwards, verify read-only as
+anon (`set local role anon; select count(*) from public.product_variants`): it
+must return a count, not an error.

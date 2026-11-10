@@ -228,6 +228,21 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-09 — `20260930120000_product_variants_guest_read` is
+written, validated and awaiting approval.** It repairs one RLS policy:
+`product_variants` read `(is_active OR is_staff())` for anon, and anon cannot
+execute `is_staff()`, so every signed-out read of the menu's price tiers was
+refused with 401. It is a regression of `20260810143000`. **It must be applied
+before any build that lets a signed-out user reach the menu.** No function, no
+data, no deploy; money path self-asserted. Detail: `docs/MIGRATIONS.md` §52.
+
+**With it merged the outstanding set is THREE, which supersedes the count in the
+paragraph below:** Moyasar (frozen on purpose),
+`20260929120000_db_advisor_hardening` and this file. The two new files are
+independent and can be applied in either order, each on its own approval.
+Three is no safer than one: `20260824100000` still sorts ahead of both, so a
+bulk apply takes the frozen payment file first. **Name the target by version.**
+
 **AMENDED 2026-11-09 — a second file is written, so on merge the outstanding set
 is TWO: Moyasar (frozen on purpose) and `20260929120000_db_advisor_hardening`
 (written, validated, awaiting approval).** It changes privileges and one
