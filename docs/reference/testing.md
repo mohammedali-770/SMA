@@ -203,7 +203,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-105 files, 1487 declared test blocks.
+106 files, 1492 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -276,6 +276,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
+| `src/lib/decodeUriComponentReachability.test.ts` | 5 | decode-uri-component (GHSA-qr28-fpjm-wq7f) is shipped but never called |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |
