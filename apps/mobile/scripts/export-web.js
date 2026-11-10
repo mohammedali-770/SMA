@@ -12,6 +12,9 @@ const env = {
   ...process.env,
   EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL
     ?? 'https://wxfmmnihidsdyemasstf.supabase.co',
+  // The legacy anon key, as the fallback. Once Vercel sets
+  // EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY it arrives through the `process.env`
+  // spread above and wins in src/lib/env.ts — docs/SUPABASE_API_KEYS.md.
   EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
     ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4Zm1tbmloaWRzZHllbWFzc3RmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NzM3MzIsImV4cCI6MjA5OTA0OTczMn0.F4xEfsAXqvGfXvcaEqzdrbWi5RoTJBVYo4OophZYeKo',
   // Sentry (web) build metadata — PUBLIC values only. Vercel provides

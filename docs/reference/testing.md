@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**204 TypeScript test files declaring 3213 test blocks, plus 80 SQL suites.**
+**206 TypeScript test files declaring 3227 test blocks, plus 82 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -52,6 +52,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/comp_members_test.sql`
 - `supabase/tests/coupon_code_identity_guard_test.sql`
+- `supabase/tests/db_advisor_hardening_test.sql`
 - `supabase/tests/discounts_campaigns_test.sql`
 - `supabase/tests/erasure_phone_normalization_test.sql`
 - `supabase/tests/export_my_data_test.sql`
@@ -102,6 +103,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/place_order_variants_test.sql`
 - `supabase/tests/platform_rollup_suppression_test.sql`
+- `supabase/tests/product_variants_guest_read_test.sql`
 - `supabase/tests/promo_disclosure_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
@@ -125,7 +127,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-71 files, 1011 declared test blocks.
+72 files, 1017 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -176,11 +178,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
+| `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 7 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
 | `apps/mobile/src/lib/observability/config.test.ts` | 16 | Sentry identity |
-| `apps/mobile/src/lib/observability/sanitize.test.ts` | 24 | isSensitiveKey |
+| `apps/mobile/src/lib/observability/sanitize.test.ts` | 25 | isSensitiveKey |
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
@@ -203,7 +206,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-105 files, 1487 declared test blocks.
+106 files, 1495 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -309,6 +312,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
+| `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/tapAdminTest.test.ts` | 4 | canRunAdminTestCheckout |
 | `src/utils/calculations.test.ts` | 35 | getVATBreakdown |
