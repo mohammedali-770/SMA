@@ -18,6 +18,7 @@ import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { authOwnedFactors, passwordReauthUserMatches } from '../_shared/accountDeletion.ts';
 import { normalizePhoneE164, hashOtp, timingSafeEqual } from '../_shared/whatsapp.ts';
 import { getOtpPepper, sendOtpViaWhatsApp, type Language } from '../_shared/whatsappSend.ts';
+import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
 
 const OTP_PURPOSE = 'account_deletion';
 const GENERIC_FAIL = 'We could not verify your identity. Please try again.';
@@ -145,12 +146,12 @@ Deno.serve(async (req: Request) => {
 
     // Best-effort: kick the processor so a no-blocker request completes promptly.
     // Failure here never fails the request (the processor also runs on schedule).
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const serviceKey = secretKey();
     const fnBase = Deno.env.get('SUPABASE_URL');
     if (serviceKey && fnBase) {
       const kick = fetch(`${fnBase}/functions/v1/account-delete-process`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+        headers: { ...serviceCallHeaders(serviceKey), 'Content-Type': 'application/json' },
         body: JSON.stringify({ trigger: 'post_create' }),
       }).catch(() => { /* ignore — scheduled processor will pick it up */ });
       // Fire-and-forget without blocking the response.
