@@ -131,12 +131,20 @@ update public.integration_settings
 ```bash
 curl -sS -X POST "https://<PROJECT_REF>.supabase.co/functions/v1/lazywait-sync" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <SUPABASE_ANON_KEY>" \
   -H "x-sync-secret: <SYNC_TRIGGER_SECRET>" \
   -d '{"limit":5}'
 # → {"status":"ok","claimed":N,"synced":N,"failed":0,"blocked":0,"dead_letter":0,"reaped":{...}}
 # "status":"disabled" means the integration is not enabled yet (expected pre-GO).
 ```
+
+> **No Supabase key in either command — corrected 2026-11-09.** Both examples
+> used to send `Authorization: Bearer <SUPABASE_ANON_KEY>`. `lazywait-sync` is
+> `verify_jwt = false` and authorizes on `x-sync-secret` alone, and the live
+> `lazywait-sync` cron job sends no Supabase key at all (measured read-only
+> 2026-11-09: none of the 11 `cron.job` commands, none of the 5 `invoke_*`
+> wrappers and none of the 7 Vault secrets carries an `Authorization` or
+> `apikey`). Embedding the anon key would only have created a call that breaks
+> when Supabase retires the legacy keys — `docs/SUPABASE_API_KEYS.md`.
 
 ### 2.5 SQL/RPC checks (ops — direct table reads, no admin JWT needed)
 ```sql
@@ -294,7 +302,6 @@ update public.orders
     select net.http_post(
       url := 'https://<PROJECT_REF>.supabase.co/functions/v1/lazywait-sync',
       headers := jsonb_build_object('Content-Type','application/json',
-                                    'Authorization','Bearer <SUPABASE_ANON_KEY>',
                                     'x-sync-secret','<SYNC_TRIGGER_SECRET>'),
       body := jsonb_build_object('limit',5)) $$);
   ```

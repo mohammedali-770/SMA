@@ -35,6 +35,7 @@ Every environment variable the code reads, split by whether its value is visible
 - `VITE_SENTRY_DSN`
 - `VITE_SENTRY_ENV`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_VERCEL_ENV`
 - `VITE_VERCEL_GIT_COMMIT_SHA`
