@@ -76,7 +76,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Integration | Document |
 | --- | --- |
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
-| WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) |
+| WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
 | Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
 | Payments | [Payment postponement](PAYMENT_POSTPONEMENT.md) — **frozen**, read this first |
 | Maps | [Maps](MAPS.md) |
