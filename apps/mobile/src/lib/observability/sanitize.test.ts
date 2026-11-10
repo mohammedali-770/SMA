@@ -35,6 +35,15 @@ describe('sanitizeText', () => {
     expect(sanitizeText(`session ${jwt} rest`)).toBe('session [redacted-jwt] rest');
   });
 
+  it('redacts Supabase opaque API keys, bare or as a bearer', () => {
+    expect(sanitizeText('key sb_publishable_AbC123dEf456 used')).toBe('key [redacted-api-key] used');
+    expect(sanitizeText('sb_secret_ZyX987wvu654_-tail')).toBe('[redacted-api-key]');
+    expect(sanitizeText('Bearer sb_secret_ZyX987wvu654')).not.toContain('sb_secret_');
+    // A short or differently prefixed token is not a key and is left alone.
+    expect(sanitizeText('sb_publishable_x')).toBe('sb_publishable_x');
+    expect(sanitizeText('sb_other_abcdefghijkl')).toBe('sb_other_abcdefghijkl');
+  });
+
   it('redacts bearer authorization values', () => {
     expect(sanitizeText('Bearer abcdef1234567890')).toContain('[redacted-auth]');
   });
