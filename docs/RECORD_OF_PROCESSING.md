@@ -6,6 +6,18 @@
 > **lawful-basis column is engineering's reading of what each activity relies
 > on, not legal advice**; counsel's review is `OWNER_ACTIONS.md` §44.
 >
+> **Why it exists.** PDPL Art 31 and Implementing Regulation (IR) Art 33 require
+> the controller to keep a written record of its processing, keep it current,
+> give it to SDAIA on request, and keep it **for five years after the processing
+> ends**. IR Art 33(5) sets the minimum contents, and this file follows them:
+> - controller and contact details;
+> - purposes;
+> - categories of data and of data subjects;
+> - retention;
+> - recipients;
+> - transfers outside the Kingdom;
+> - security measures.
+>
 > **What this file owns, and what it does not.** It is the per-PURPOSE view:
 > why each kind of processing happens, who receives the data, where it goes and
 > how long it stays. The per-FIELD evidence, with the table and line each claim
@@ -20,8 +32,9 @@
 | --- | --- |
 | Controller | First Taste Trading Company, Kingdom of Saudi Arabia (as named in the privacy policy) |
 | Privacy contact | `info@spicymeal.com.sa`, 9200 31495 (as published in the privacy policy) |
-| Data protection officer | None appointed. Whether one is required is a question for counsel (§44) |
-| Registration with SDAIA | Not determinable from the repository (`GO_LIVE_READINESS.md` A2) |
+| Data protection officer | None appointed. IR Art 32 requires one where core activities involve regular and systematic monitoring of data subjects, or are based on sensitive data; whether either applies is counsel's call (`OWNER_ACTIONS.md` §44 item 4) |
+| Registration with SDAIA | Not determinable from the repository (`GO_LIVE_READINESS.md` A2). Needed in practice either way: the breach-notification e-service requires a registration certificate (§44 item 1) |
+| Security measures | Summarised in [`SECURITY_REVIEW.md`](SECURITY_REVIEW.md) and the go-live security rows. Row-level security on every table (65 of 65, measured 2026-11-09). No client holds the service key. Administrators need a second factor (AAL2). Sign-in codes are rate-limited. Telemetry goes out without default personal data and through a scrubber, and `PLAY_STORE_SUBMISSION.md` §6 records what can still remain |
 
 ## Processing activities
 
@@ -36,7 +49,7 @@
 | 4 | **Delivery addresses** | Deliver to the right door | Customers who order delivery | Address text, national short address, map coordinates | Supabase; **Google** draws the map, receives the coordinates of the point picked, and provides address search; turning a point into a street address is done by Google on web and Android and by **Apple** on iPhone | Until the customer deletes the address or the account | Contract |
 | 5 | **Device location, on the phone** | List the nearest branches on the pickup tab; place the delivery pin; warn at checkout when the pin is far from the customer | Customers who allow location | The device's position while the app is open | **None.** The branch list and the checkout warning are computed on the device and nothing is sent. A pin the customer then saves becomes activity 4 | Not stored | Consent — the OS permission, asked where it is used (#425). The privacy policy names only the pin, which is a gap: `docs/legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md` |
 | 6 | **Order-status notifications** | Tell the customer when their order is preparing, ready, out for delivery, delivered | Customers who allow notifications | Push token per device, platform, app language, the two channel switches; a log of what was sent | Supabase; Expo, then Apple (APNs) or Google (FCM), to reach the device | Until both switches are turned off (the device is deactivated) or the account is deleted | Contract (service messages about an order the customer placed), with the OS permission |
-| 7 | **Offers by notification** (marketing) | Send occasional offers | Customers who allow notifications and have not turned offers off | The same token, and the offers switch | Same as 6 | Same as 6 | **Consent, on an opt-out model** (CLAUDE.md §7). Since #425 the consent text is shown before the OS prompt, and once as a notice where the OS never asks. **No record of consent is kept** (`GO_LIVE_READINESS.md` A3; proposed fix in `docs/decisions/0002-consent-ledger.md`). Whether opt-out satisfies PDPL is counsel's question (§44) |
+| 7 | **Offers by notification** (marketing) | Send occasional offers | Customers who allow notifications and have not turned offers off | The same token, and the offers switch | Same as 6 | Same as 6 | **Consent, on an opt-out model** (CLAUDE.md §7). Since #425 the consent text is shown before the OS prompt, and once as a notice where the OS never asks. **No record of consent is kept** (`GO_LIVE_READINESS.md` A3; proposed fix in `docs/decisions/0002-consent-ledger.md`). Read against the texts on 2026-11-10, opt-out does not match their wording: PDPL Art 25 asks for *prior* consent, and IR Art 11 for a separate, documented consent per purpose (`OWNER_ACTIONS.md` §44 item 6) |
 | 8 | **Loyalty** | Run the points programme | Customers | Points balance, points earned and redeemed per order | Supabase | For as long as the account is open; the ledger is deleted with it | Contract (programme terms, `offers_loyalty_terms`) |
 | 9 | **Comped customers** | Let staff mark a customer's orders as free | Customers named by staff | Mobile number, a staff note, and an audit trail of who changed it | Supabase | Until staff remove the entry; erased on account deletion | Legitimate interest — counsel to confirm |
 | 10 | **Account deletion and data export** | Honour deletion and access requests | Customers | The request and its outcome; the exported copy is produced on demand and not kept | Supabase; Meta delivers the confirmation code for a deletion | Processed automatically; up to 30 days when an active order, a financial process or another exception must be completed first (the app's own wording) | Legal obligation (data-subject rights) |
@@ -62,10 +75,20 @@ protection commitments in our contract with that provider."*
 | Lazywait | **Unknown** — the POS vendor's hosting is not visible from here | 3 |
 | Email provider | **Unknown** — named in the policy only as "our email provider" | 13, 14 |
 
-Whether "the data protection commitments in our contract" is a basis PDPL
-recognises for each of these is the largest open legal item on this page
-(`GO_LIVE_READINESS.md` A1, `OWNER_ACTIONS.md` §44). Two rows are unknown
-because the repository cannot see them; the owner can.
+**What the law asks for each of these, read 2026-11-10.** Hosting with a
+foreign processor is a transfer (PDPL Art 1(9), Art 29). SDAIA has published
+**no list of adequate countries**, so no recipient above has an adequacy
+finding. Each needs one of the Transfer Regulation's Art 4(2) cases, with its
+safeguard: SDAIA's standard contractual clauses (v1.0, unedited), binding common
+rules, or an accreditation certificate. Each also needs a **risk assessment
+before** transferring (Art 7). Whether *"the data protection commitments in our
+contract"* meets that for each recipient is the largest open legal item on this
+page (`GO_LIVE_READINESS.md` A1, `OWNER_ACTIONS.md` §44 item 5).
+
+**There is no duty today to store personal data inside the Kingdom.** SDAIA's
+October 2026 consultation proposes one, and it is not law at the time of
+writing. Two recipients above are unknown because the repository cannot see
+them; the owner can.
 
 ## Findings made while building this record
 
@@ -95,3 +118,18 @@ Update this file in the same pull request as any change that adds a kind of
 personal data, a purpose, a recipient or a retention rule (CLAUDE.md §14). The
 recipients and their regions are the part most likely to drift: re-read them
 when a processor is added, removed or moves region.
+
+## Sources
+
+SDAIA's published texts, read 2026-11-10 from its National Data Governance
+Platform (DGP), in SDAIA's English translations. **The Arabic texts govern.**
+
+- PDPL: https://dgp.sdaia.gov.sa/wps/wcm/connect/ce84f976-2fdf-4a76-a8c4-638b7ca9e3ba/Personal+Data+English.pdf?MOD=AJPERES
+- Implementing Regulation: https://dgp.sdaia.gov.sa/wps/wcm/connect/2a9a4744-a2ae-444f-bad2-6dacde843637/The+impelementing+regulation+of+the+personal+data+protection+law.pdf?MOD=AJPERES
+- Transfer Regulation (Resolution 1840, Umm Al-Qura 1 Sep 2024): https://dgp.sdaia.gov.sa/wps/wcm/connect/e5bbede0-1119-4f70-b4ef-f043ce58d780/Regulation+on+Personal+Data+Transfer+Outside+the+Kingdom..pdf?MOD=AJPERES
+- Standard contractual clauses v1.0: https://dgp.sdaia.gov.sa/wps/wcm/connect/016534ff-df3b-4bf4-80d7-d7145f41a926/Standard+Contractual+Clauses+For+Personal+Data+Transfer.pdf?MOD=AJPERES
+- Transfer risk-assessment guideline: https://dgp.sdaia.gov.sa/wps/wcm/connect/16aec46f-ea3d-47f6-8e0d-e49ffa2349d5/Risk+Assessment+Guideline+for+Transferring+Personal+Data+Outside+the+Kingdom.pdf?MOD=AJPERES
+- Register Rules: https://dgp.sdaia.gov.sa/wps/wcm/connect/047a4149-ba11-4919-9341-260164125ba5/The+Rules+Governing+the+National+Register+of+Controllers+Within+the+Kingdom.pdf?MOD=AJPERES
+- Record-of-processing guideline (SDAIA template): https://dgp.sdaia.gov.sa/wps/wcm/connect/19ec3250-16a6-47c7-8e8c-b8e1d6f86633/Personal+Data+Processing+Activities+Records+Guideline.pdf?MOD=AJPERES
+- Breach-notification e-service: https://dgp.sdaia.gov.sa/wps/portal/pdp/services/personaldatabreachnotification
+- October 2026 consultation on amending the Implementing Regulation: https://www.uqn.gov.sa/news/reports/4002043. The draft's content is known only from law-firm summaries; its own text could not be read.

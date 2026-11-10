@@ -15,6 +15,13 @@ device, overwritten on every change. It has no history, no time, no record of
 what the customer was shown, and it moves to a new owner when a phone changes
 hands.
 
+**What the law asks for, read against SDAIA's texts on 2026-11-10.** Where
+consent is the basis, it must be documented *"with time and means"*, and *"a
+separate consent shall be obtained for each Processing purpose"* (Implementing
+Regulation Art 11). For advertising, evidence of consent must be kept (IR Art
+28). PDPL Art 25 requires the recipient's *prior* consent. Withdrawal must be as
+easy as giving it (IR Art 12). None of that can be shown today.
+
 **What the customer is shown has just become worth recording.** Since #425 the
 app shows consent text before the OS notification prompt, and once as a notice
 where the OS never asks (Android 12 and older, a second account on a shared
@@ -32,10 +39,11 @@ screen is a flag in the phone's own storage, which the server never sees.
   direct writes (`register_push_device`). A ledger should follow the same shape.
 - Account deletion anonymises retained orders and deletes the rest. What happens
   to consent evidence after erasure is a legal question, not an engineering one.
-- Whether PDPL accepts an opt-out model for marketing at all is counsel's
-  question (`OWNER_ACTIONS.md` §44). This design is useful under either answer.
-  Under opt-out it is the evidence of what the customer was told. Under opt-in it
-  becomes the gate itself.
+- Whether an opt-out model for marketing can stand is now a sharper question.
+  The texts above ask for prior, separate, documented consent, and the decision
+  belongs to the owner, with counsel (`OWNER_ACTIONS.md` §44 item 6). This design
+  is useful under either answer. Under opt-out it is the evidence of what the
+  customer was told. Under opt-in it becomes the gate itself.
 
 ## Options considered
 
