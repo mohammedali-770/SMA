@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**204 TypeScript test files declaring 3214 test blocks, plus 81 SQL suites.**
+**205 TypeScript test files declaring 3223 test blocks, plus 81 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -126,7 +126,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-70 files, 1007 declared test blocks.
+70 files, 1008 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -181,7 +181,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
 | `apps/mobile/src/lib/observability/config.test.ts` | 16 | Sentry identity |
-| `apps/mobile/src/lib/observability/sanitize.test.ts` | 24 | isSensitiveKey |
+| `apps/mobile/src/lib/observability/sanitize.test.ts` | 25 | isSensitiveKey |
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
@@ -203,7 +203,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-106 files, 1492 declared test blocks.
+107 files, 1500 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -310,6 +310,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
+| `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/tapAdminTest.test.ts` | 4 | canRunAdminTestCheckout |
 | `src/utils/calculations.test.ts` | 35 | getVATBreakdown |

@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Read from Vite env. The anon (public) key is safe in the client — RLS is the
-// real security boundary. The service_role key must NEVER appear here.
+import { PUBLIC_KEY_ENV_NAMES, publicSupabaseKey } from './supabaseKey';
+
+// Read from Vite env. The public key — the publishable key once configured,
+// else the legacy anon key (supabaseKey.ts) — is safe in the client: RLS is the
+// real security boundary. A secret / service_role key must NEVER appear here.
 const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const anonKey = publicSupabaseKey({
+  VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+});
 
 /** True only when both Supabase env vars are present. */
 export const isSupabaseConfigured = Boolean(url && anonKey);
@@ -11,7 +17,7 @@ export const isSupabaseConfigured = Boolean(url && anonKey);
 if (!isSupabaseConfigured) {
   // Surfaced once at startup; the app falls back to its bundled demo data.
   console.warn(
-    '[Spicy Meal] Supabase env not set (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). ' +
+    `[Spicy Meal] Supabase env not set (VITE_SUPABASE_URL / ${PUBLIC_KEY_ENV_NAMES}). ` +
     'Running against bundled demo data only.'
   );
 }
