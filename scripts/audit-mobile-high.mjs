@@ -2,21 +2,34 @@
 /**
  * Fail-closed mobile npm audit gate with a tiny, time-bounded exception list.
  *
- * The only accepted HIGH advisories are the reviewed findings below, each in a
- * package with NO patched release, each reached only through Expo/Metro's Node
- * build and CLI toolchain, and none present in the customer application bundle.
- * See docs/DEPENDENCY_ADVISORIES.md §3 for the review behind every entry.
+ * The only accepted HIGH advisories are the reviewed findings below. See
+ * docs/DEPENDENCY_ADVISORIES.md §3 for the review behind every entry.
+ *
+ * TWO KINDS OF EXCEPTION HAVE EXISTED, and the difference is the whole argument.
+ * Until 2026-11-09 the list held BUILD-TOOL exceptions (`braces`, `node-forge`):
+ * reached only through Expo/Metro's CLI toolchain, never shipped, so the proof
+ * was "nothing in the app reaches it". Both cleared — node-forge 1.4.3 fixed six
+ * highs, and npm stopped reporting the braces advisory for 3.0.3 — and were
+ * retired. The current entry is a RUNTIME exception: `decode-uri-component`
+ * DOES ship, inside expo-router, so "never shipped" is not available as an
+ * argument. What is
+ * proven instead is that the vulnerable function is never CALLED, by a test that
+ * reads the installed expo-router build (see PROOFS below). That is a weaker
+ * guarantee, which is why its expiry is short and tied to the upgrade that
+ * removes it.
  *
  * npm audit v2 models a direct advisory in `via` and propagates its severity up
  * the reverse dependency graph in `effects`. Before accepting the exception we
- * validate three independent boundaries:
+ * validate four independent boundaries:
  *   1. every direct HIGH advisory object is one of the exact allowlisted GHSAs,
  *      on the package it was reviewed for;
- *   2. no excepted package is a direct mobile dependency, and every immediate
- *      npm reverse-dependency parent of each one is an explicitly approved
- *      build/CLI tool;
+ *   2. every package on the approved chain has exactly its approved immediate
+ *      parents, and none but the declared runtime root is a direct mobile
+ *      dependency or imported by app source;
  *   3. every HIGH vulnerability record belongs to the union of the excepted
- *      packages' recursive `effects` closures.
+ *      packages' recursive `effects` closures;
+ *   4. the precondition each exception rests on still holds (here: its
+ *      reachability proof exists and names it).
  *
  * Any critical, another direct high advisory, a new immediate parent, any high
  * record outside that closure, malformed output, or expiry fails CI.
@@ -30,46 +43,53 @@
  * but a routine-sounding message was hiding a critical. Now the annotations come
  * first, so an expired exception can never be the only thing a reader sees.
  */
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-// Reviewed 2026-10-08. Both packages are at their LATEST published version and
-// that version is itself affected, so there is no release to move to. Extending
-// this date is a judgement that the reachability review in
-// docs/DEPENDENCY_ADVISORIES.md §3 still holds — NOT a way to make CI green, the
-// distinction §5 of that document insists on.
-const EXCEPTION_EXPIRES = '2026-11-07';
+// Reviewed 2026-11-09. Short on purpose: the fix is the Expo SDK 58 upgrade
+// (expo-router 58 drops query-string entirely), which is planned before this
+// date. Extending it is a judgement that the reachability proof still holds and
+// that the upgrade is still coming — NOT a way to make CI green, the distinction
+// docs/DEPENDENCY_ADVISORIES.md §5 insists on.
+const EXCEPTION_EXPIRES = '2026-12-31';
 
 const ALLOWED = new Map([
-  ['GHSA-vfj7-8cjw-p6xm', {
-    package: 'braces',
-    reason: 'stack-exhaustion DoS on deeply nested patterns; no patched release (3.0.3 is latest and affected); build-time glob matching in metro-file-map only',
+  ['GHSA-qr28-fpjm-wq7f', {
+    package: 'decode-uri-component',
+    reason: 'quadratic DoS on long percent-encoded runs; fixed only in 0.5.x, which is ESM-only and cannot replace the CommonJS require() in query-string 7; ships via expo-router 57 -> query-string 7, but the only decoding call site is the vendored react-navigation fallback parser that expo-router always overrides; removed by the Expo SDK 58 upgrade',
   }],
-  ['GHSA-86w9-cpqp-85rv', {
-    package: 'node-forge',
-    reason: 'PKCS#1 v1.5 signature verification accepts extra DigestAlgorithm elements; no patched release (1.4.0 is latest and affected); Expo CLI/code-signing only, and EAS Update code signing is not configured',
-  }],
+]);
+
+// Boundary 4's evidence: for each excepted advisory, the test that proves the
+// reachability argument against the INSTALLED tree. The audit job installs
+// nothing, so it cannot run the proof; the unit-test job does, on every PR. This
+// gate checks only that the proof still exists and still names the advisory, so
+// the exception cannot outlive the evidence it rests on.
+const PROOFS = new Map([
+  ['GHSA-qr28-fpjm-wq7f', 'src/lib/decodeUriComponentReachability.test.ts'],
 ]);
 
 // Reachability bounds: for each listed package, the ONLY immediate
-// reverse-dependency parents it may have. A new parent — above all a
-// customer-runtime package — changes the reachability argument and must fail
-// until it is re-reviewed.
+// reverse-dependency parents it may have. A new parent changes the reachability
+// argument and must fail until it is re-reviewed.
 //
-// A BOUND MUST REACH A BUILD TOOL, NOT STOP AT A GENERIC LIBRARY. `braces`' only
-// parent is `micromatch`, a general-purpose glob library that any runtime
-// package could use. Bounding `braces` at `micromatch` alone therefore proved
-// nothing: a customer-runtime package depending on `micromatch` would have
-// joined the approved closure and passed. So `micromatch`'s own parents are
-// bounded too, to the two Metro file-map packages that are the actual build
-// tools. Review caught this on #416. `node-forge` stops at its immediate parents
-// because those ARE the Expo CLI and its code-signing helper, not generic code.
+// A BOUND MUST REACH THE PACKAGE THE PROOF IS ABOUT, NOT STOP AT A GENERIC
+// LIBRARY. `query-string` is a general-purpose library any package could use,
+// and the proof covers expo-router's use of it only. So `query-string`'s own
+// parents are bounded too: a second consumer would call parse() with nobody
+// having checked, and must fail here. (The same lesson as #416, where bounding
+// `braces` only at `micromatch` proved nothing.)
 const REACHABILITY_BOUNDS = new Map([
-  ['braces', new Set(['micromatch'])],
-  ['micromatch', new Set(['metro-file-map', '@expo/metro-file-map'])],
-  ['node-forge', new Set(['@expo/cli', '@expo/code-signing-certificates'])],
+  ['decode-uri-component', new Set(['query-string'])],
+  ['query-string', new Set(['expo-router'])],
 ]);
+
+// The top of an approved chain that is a DIRECT dependency by design. A
+// build-tool exception had none — every package on its path had to stay out of
+// the app — but a runtime exception's root is the app's own router. It is
+// exempt from the directness and import checks below, and nothing else is.
+const RUNTIME_ROOTS = new Set(['expo-router']);
 
 // The packages that carry an excepted advisory. Boundary 3's closure starts here.
 const EXCEPTED_PACKAGES = new Set([...ALLOWED.values()].map((m) => m.package));
@@ -164,7 +184,10 @@ if (critical > 0) failures.push(`${critical} CRITICAL vulnerability record(s); c
 if (expired) failures.push(`the mobile audit exception expired on ${EXCEPTION_EXPIRES}; re-review the advisories annotated above before extending it`);
 
 // Every package on an approved path — each bounded package AND every approved
-// parent — must stay out of the app's own dependencies and its own source.
+// parent, except a declared RUNTIME_ROOT — must stay out of the app's own
+// dependencies and its own source. Today that is `decode-uri-component` and
+// `query-string`: the app reaching either directly would be a call site the
+// reachability proof never looked at.
 //
 // THE APPROVED PARENTS ARE INCLUDED ON PURPOSE. A bound proves that the excepted
 // code is reached only THROUGH a build tool; it proves nothing if the app depends
@@ -176,11 +199,12 @@ if (expired) failures.push(`the mobile audit exception expired on ${EXCEPTION_EX
 // the bounded packages. Review caught it on #416.
 const ON_APPROVED_PATH = new Set(REACHABILITY_BOUNDS.keys());
 for (const parents of REACHABILITY_BOUNDS.values()) for (const parent of parents) ON_APPROVED_PATH.add(parent);
+for (const root of RUNTIME_ROOTS) ON_APPROVED_PATH.delete(root);
 
 for (const field of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
   for (const pkg of ON_APPROVED_PATH) {
     if (mobilePackage?.[field]?.[pkg]) {
-      failures.push(`${pkg} became a direct mobile ${field} entry; the build-tool-only exception no longer applies`);
+      failures.push(`${pkg} became a direct mobile ${field} entry; the exception assumes it is reached only through its approved parents`);
     }
   }
 }
@@ -226,7 +250,7 @@ for (const file of appSource) {
   }
 }
 if (importers.length > 0) {
-  failures.push(`app source imports a package the exceptions assume is build-tool-only: ${importers.join('; ')}`);
+  failures.push(`app source imports a package the exceptions assume is reached only through its approved parents: ${importers.join('; ')}`);
 }
 
 // Boundary 1 — exact advisory identity. A different HIGH on an excepted package
@@ -256,7 +280,7 @@ for (const [pkg, parents] of REACHABILITY_BOUNDS) {
   }
   const immediate = Array.isArray(v.effects) ? v.effects : [];
   if (immediate.length === 0) {
-    failures.push(`${pkg} has no immediate reverse-dependency parents; cannot prove build-tool ancestry`);
+    failures.push(`${pkg} has no immediate reverse-dependency parents; cannot prove the approved ancestry`);
     continue;
   }
   const stray = immediate.filter((name) => !parents.has(name));
@@ -317,50 +341,29 @@ for (const ghsa of ALLOWED.keys()) {
 // Boundary 4 — the PRECONDITION an exception rests on, enforced here and not
 // only in the document.
 //
-// `node-forge`'s flaw is in signature verification, and the exception is
-// justified by one fact: EAS Update code signing is OFF, so nothing in this app
-// verifies a signature with it. That was originally recorded only in
-// docs/DEPENDENCY_ADVISORIES.md — so turning code signing on would have left
-// every graph check above still passing (same package, same parents) while the
-// reason for accepting the flaw had quietly stopped being true. The document's
-// own heading said these exceptions were "bounded by the gate, not by this
-// document", which was false for this precondition. Review caught it on #416.
-//
-// The check is STATIC because the audit job installs nothing (`npm audit` reads
-// the lockfile), so resolving the Expo config is not available here. It does not
-// need to be: EAS Update code signing cannot operate without the `expo-updates`
-// package, so its absence from the lockfile rules the feature out. The config
-// scan is belt and braces, catching code signing configured before the package
-// lands. Both fail closed on an unreadable file.
-const NODE_FORGE_GHSA = 'GHSA-86w9-cpqp-85rv';
-if (observed.has(NODE_FORGE_GHSA)) {
-  const reasons = [];
-  let lock;
+// The retired node-forge exception taught this: its justification (EAS Update
+// code signing is off) lived only in docs/DEPENDENCY_ADVISORIES.md, so turning
+// code signing on would have left every graph check above passing while the
+// reason for accepting the flaw had stopped being true. Review caught it on
+// #416. The current exception rests on a reachability PROOF, so the proof is the
+// precondition: if it is deleted, or stops naming the advisory, the exception
+// fails rather than quietly surviving its evidence. Fails closed on an
+// unreadable file.
+for (const ghsa of observed) {
+  const proof = PROOFS.get(ghsa);
+  if (!proof) {
+    failures.push(`allowlisted advisory ${ghsa} has no reachability proof registered in PROOFS`);
+    continue;
+  }
+  let text = '';
   try {
-    lock = JSON.parse(readFileSync('apps/mobile/package-lock.json', 'utf8'));
+    text = readFileSync(proof, 'utf8');
   } catch {
-    reasons.push('apps/mobile/package-lock.json could not be read');
+    failures.push(`the reachability proof for ${ghsa} (${proof}) could not be read; the exception rests on it`);
+    continue;
   }
-  const lockedPaths = Object.keys(lock?.packages ?? {});
-  if (lockedPaths.some((k) => k === 'node_modules/expo-updates' || k.endsWith('/node_modules/expo-updates'))) {
-    reasons.push('expo-updates is in the mobile lockfile');
-  }
-  for (const file of ['app.json', 'app.config.js', 'app.config.ts', 'app.config.mjs', 'app.config.cjs']) {
-    const path = `apps/mobile/${file}`;
-    if (!existsSync(path)) continue;
-    let text;
-    try {
-      text = readFileSync(path, 'utf8');
-    } catch {
-      reasons.push(`${path} could not be read`);
-      continue;
-    }
-    if (/codeSigningCertificate|codeSigningMetadata|expo-updates/.test(text)) {
-      reasons.push(`${path} configures code signing or expo-updates`);
-    }
-  }
-  if (reasons.length > 0) {
-    failures.push(`the node-forge exception (${NODE_FORGE_GHSA}) rests on EAS Update code signing being OFF, and it may now be on: ${reasons.join('; ')}. Re-review docs/DEPENDENCY_ADVISORIES.md §3.3 before relying on it`);
+  if (!text.includes(ghsa)) {
+    failures.push(`the reachability proof ${proof} no longer names ${ghsa}; re-review docs/DEPENDENCY_ADVISORIES.md §3 before relying on the exception`);
   }
 }
 
@@ -369,6 +372,6 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`mobile dependency audit: ${high} high record(s), all attributable to the reviewed build-tool advisories`);
+console.log(`mobile dependency audit: ${high} high record(s), all attributable to the reviewed advisories`);
 for (const [ghsa, meta] of ALLOWED) console.log(`  accepted until ${EXCEPTION_EXPIRES}: ${meta.package} ${ghsa} — ${meta.reason}`);
 console.log('any critical, any other high advisory, or a reachability change still fails this gate');
