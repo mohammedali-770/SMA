@@ -476,3 +476,91 @@ appending `|| true`. Any exception must record:
 
 An exception with no review date and no enforcement boundary is not an
 exception; it is an unrecorded risk.
+
+## 6. The weekly run
+
+The two gates in §1 also run every Monday at 04:23 UTC, with no pull request
+needed (`.github/workflows/dependency-audit-weekly.yml`, job **Dependency audit
+(weekly)**). Added 2026-11-10. No pull request was opened between 2026-10-09
+and 2026-11-09, and seven new HIGH advisories landed against the locked tree in
+that month. Nothing reported them until the next pull request (#418) turned every
+check red at once.
+
+A red weekly run means exactly one of two things, and neither is a flake —
+both scripts are deterministic against the lockfile and the advisory database:
+
+- **a new HIGH/CRITICAL advisory** — fix it, or record an exception under §5;
+- **a standing exception has reached its expiry** — re-review it or remove it.
+
+GitHub emails the account that last changed the schedule. In a public
+repository it also disables a scheduled workflow after 60 days with no
+repository activity; re-enable it from the Actions tab if that happens.
+
+## 7. Adding a dependency
+
+A new package is code that runs on customers' phones, in the staff console, or in
+a CI job holding a production credential. Check it on the registry before adding
+it — not from memory, and not from an AI assistant's suggestion. Assistants
+invent plausible package names, and attackers register the names they invent
+("slopsquatting").
+
+- **It exists under exactly that name, and is the package you mean.** Read
+  `npm view <name>` and the repository it links to. A near-miss of a popular name
+  is the typosquat pattern.
+- **Age and history.** A package or version published in the last few days, a
+  sudden new maintainer, or a long-dormant package that has just shipped is a
+  reason to wait. Prefer a version that has been out for a week or two.
+- **Maintainers and use.** One anonymous maintainer and a handful of weekly
+  downloads is a different risk from a widely used package.
+- **Install scripts.** `npm view <name> scripts`. A `preinstall`, `install` or
+  `postinstall` script runs on every machine and CI job that installs the
+  package. Only three packages in both trees have one today (§8); a fourth needs a
+  reason.
+- **It lands in the lockfile**, and the pull request says what was added, why,
+  and what was checked.
+
+Then both gates in §1 must pass. An advisory against a dependency you are only
+now adding is not a candidate for an exception: choose another package.
+
+## 8. Tools CI downloads at run time
+
+Every action is pinned to a full commit SHA, and every CLI that a workflow
+downloads while it runs is pinned to an exact version.
+`scripts/check-workflow-pins.mjs` enforces both. It runs in the always-reporting
+`Change-control guard` job, so a pull request that adds a tag or a `latest` fails
+there.
+
+| Tool | Where | Credential in that job | Pinned to |
+| --- | --- | --- | --- |
+| Vercel CLI | `production-gates.yml`, gated deploy job | `VERCEL_TOKEN` | `vercel@65.3.1` |
+| `eas-cli` | `eas-build.yml`, `eas-status.yml` | `EXPO_TOKEN` | `25.3.0` |
+| Supabase CLI | `deploy-functions.yml`, `function-drift.yml` | `SUPABASE_ACCESS_TOKEN` — never created (`OWNER_ACTIONS.md` §15) | `2.122.0` |
+
+**All three were `latest` until 2026-11-10.** Each pin was at least two weeks
+old when chosen. Where a new major line had just appeared, the pin is the last
+release of the previous line instead: `eas-cli` 26.0.0 was superseded within two
+days, and the Supabase CLI's 3.0.0 was a week old. Bump a pin deliberately, in a
+commit of its own, saying which version and why. For `eas-cli`, bump it in the
+same change as an Expo SDK upgrade.
+
+**Install scripts, measured 2026-11-10.** Across both lockfiles, three packages
+declare an install script:
+- `esbuild` (web tree);
+- `fsevents` (web tree, macOS-only);
+- `@sentry/cli` (both trees).
+
+The two EAS workflows now run `npm ci --ignore-scripts`, because `EXPO_TOKEN` is
+already in their environment when they install. Neither needs a script: the
+cloud build does its own install, and the local job only resolves the app
+config. Both results below were checked rather than assumed:
+- the resolved Expo config, `public` and `prebuild`, is identical with and
+  without scripts once the two directory paths are normalised;
+- the pinned `eas-cli` resolves the production build profile from a
+  scripts-disabled install.
+
+**Deliberately not changed:**
+- `npm run build`, which is Vercel's build command. Changing how Vercel installs
+  is a Production change (CLAUDE.md §13).
+- The CI build job, which exists to mirror that command.
+
+Neither holds a credential while it installs.

@@ -193,6 +193,8 @@ If production policy is intended to be “deploy only after all CI checks pass,�
 
 Do not enable a second deploy path while auto-deploy is still active and accidentally double-deploy every merge.
 
+**The gated deploy job runs a pinned Vercel CLI** (`vercel@65.3.1`, pinned 2026-11-10). It used to run `npx vercel@latest` three times with the production token, so whatever release npm served that day would have run next to it. The EAS workflows pin `eas-cli` (25.3.0) and install with `--ignore-scripts`, because `EXPO_TOKEN` is in their environment; the two Supabase workflows pin the Supabase CLI (2.122.0). `scripts/check-workflow-pins.mjs`, run by the `Change-control guard` job, fails on any `latest`. Bump a pin deliberately, in its own commit, and say which version and why — `docs/DEPENDENCY_ADVISORIES.md` §8.
+
 ## 10. Environment-variable changes
 
 Vite/Expo public env values are build-time inputs. Changing them requires a new deployment/build to affect the shipped browser bundle.
