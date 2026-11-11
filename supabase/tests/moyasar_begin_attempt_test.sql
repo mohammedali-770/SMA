@@ -151,21 +151,32 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- Case 4: the guard is PER PROVIDER, and the Tap path is untouched. The partial
--- unique index is (order_id, provider), so a Tap attempt and a Moyasar attempt
--- can coexist for one order and each reuses only its own.
+-- Case 4: the guard is PER PROVIDER. The partial unique index is
+-- (order_id, provider), so a Moyasar attempt opens beside an 'initiated' row of
+-- another provider and reuses only its own. Production holds exactly such
+-- rows: three Tap attempts from July, still 'initiated' and long expired. The
+-- Tap row is written directly, in their shape, because the RPC that wrote them
+-- is gone (20261004120000).
 -- ---------------------------------------------------------------------------
 do $$
 declare
   v_order uuid := pg_temp.new_online_order();
-  t       record;
+  v_tap   uuid;
   m       record;
   m2      record;
 begin
-  select * into t from public.tap_begin_payment_attempt(v_order, 'test', 30);
-  select * into m from public.begin_payment_attempt(v_order, 'moyasar', 'test', 30);
+  insert into public.payment_records
+    (order_id, provider, status, amount, currency, mode,
+     reference_transaction, reference_order, initiated_at, expires_at)
+  values
+    (v_order, 'tap', 'initiated', 50, 'SAR', 'test',
+     'sm_' || replace(gen_random_uuid()::text, '-', ''),
+     'ORD-' || substr(replace(v_order::text, '-', ''), 1, 12),
+     now() - interval '120 days', now() - interval '120 days' + interval '30 minutes')
+  returning id into v_tap;
 
-  if m.attempt_id = t.attempt_id then
+  select * into m from public.begin_payment_attempt(v_order, 'moyasar', 'test', 30);
+  if m.attempt_id = v_tap then
     raise exception 'CASE 4 FAILED: the Moyasar call returned the Tap attempt';
   end if;
   if m.reused then
@@ -177,10 +188,12 @@ begin
     raise exception 'CASE 4 FAILED: Moyasar reuse crossed into another provider row';
   end if;
 
-  if (select count(*) from public.payment_records where order_id = v_order and provider = 'tap') <> 1 then
-    raise exception 'CASE 4 FAILED: the Tap attempt row was disturbed';
+  -- The Moyasar path expires only its own stale attempts: the Tap row is
+  -- history, and stays exactly as it was.
+  if (select status from public.payment_records where id = v_tap) is distinct from 'initiated' then
+    raise exception 'CASE 4 FAILED: the Tap history row was disturbed';
   end if;
-  raise notice 'CASE 4 ok: the one-active-attempt guard is provider-scoped';
+  raise notice 'CASE 4 ok: the one-active-attempt guard is provider-scoped, and Tap history is left alone';
 end $$;
 
 -- ---------------------------------------------------------------------------
