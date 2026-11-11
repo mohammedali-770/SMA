@@ -184,6 +184,13 @@ Do not perform online-payment/refund tests while the payment freeze is active un
 
 Repository source contains CI checks and a controlled deployment path, but **the current Vercel auto-deploy/dashboard state cannot be proved from Git source alone**.
 
+**Measured 2026-11-11, read-only: the gated job did not deploy the #424 merge, and the merge reached production anyway.**
+- On `577e7e7`, `Deploy to Vercel (gated on CI)` concluded **skipped**. Its three needed jobs were green and the event was a push to the default branch, so the skip means the repository variable `DEPLOY_GATE_ENABLED` is not `'true'`.
+- By 05:15 UTC, production `/app` was serving that merge's bundle: its entry chunk carries #424's "keep browsing" text, which first appears on the default branch in that merge.
+- So a merge to the default branch reaches production by a path outside this repository's workflows, most plausibly Vercel's Git integration (auto-deploy).
+
+That answers the first item below for the moment it was read. It is dashboard state and can change without a commit, so re-check it before relying on it. Detail: `MIGRATIONS.md` §52.
+
 If production policy is intended to be “deploy only after all CI checks pass,” verify the current setup against `OWNER_ACTIONS.md` §6 before changing anything:
 
 - Vercel auto-deploy behavior;

@@ -24,6 +24,21 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11 — `20260930120000_product_variants_guest_read` is
+> APPLIED, and the count is TWO.** 04:58:33 UTC on explicit owner approval
+> naming the target by version; live version `20261111045833`, history
+> **147 → 148**, ledger row 103, detail §52. It changed one table's read
+> policies and nothing else: a signed-out read of the menu's price tiers now
+> returns the 144 active tiers instead of HTTP 401. Outstanding:
+> `20260824100000_moyasar_payment_provider.sql` (frozen under §6) and
+> `20260929120000_db_advisor_hardening.sql` (written, validated, awaiting
+> approval, §51). Moyasar still sorts first. **Name the target by version.**
+>
+> **The entries below stop at 2026-09-16.** They were not kept up to date
+> through the applies of 2026-09-17 and 2026-09-20 (ledger rows 97–102), so the
+> latest of them understates what is applied. Read the current position from
+> `CLAUDE.md` §8 and the ledger, not from the newest entry here.
+
 > **Updated 2026-09-13 (later) — `20260916120000_branch_delivery_requests` is
 > APPLIED.** 12:40:39 UTC on explicit owner approval naming the target by
 > version; live version `20260913124039`, history **134 → 135**, ledger row 90.
@@ -1482,8 +1497,9 @@ production.
 | 100 | 20260926120000 | variant_closing_flag | `01a4c9ac95cf` | 20260917124937 | variant_closing_flag | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:49:37 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Adds `app_settings.variant_closing_enabled`, defaulting FALSE, which hides the branch console's per-size controls. It exists because the console deploys on merge while the customer app reaches a customer only in the next EAS build, and a build that does not understand a closed tier shows a **generic error at the payment step** — `failureMessage` returns a translated KEY rather than the server's sentence. §9-B.7: merged copy re-hashed (sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`, 135 lines / 7 622 bytes) and matched before sending. **APPLYING IT CHANGED NOTHING, WHICH IS THE WHOLE POINT** — contrast row 82, where the default was TRUE and applying the migration WAS the behaviour change. Live value **false**, column NOT NULL, default `false`, `app_settings` 34 → 35 columns, still 1 row; money path unchanged at `12b6816d…` / `22e2d429…`; **0 functions anywhere in `public` mention the flag**, so server-side refusal stays unconditional; orders 76; `branch_variant_availability` still 0 rows. **THE COLUMN-GRANT TRAP WAS CHECKED BY OUTCOME, NOT BY PREDICATE, BECAUSE THAT IS THE DISTINCTION ROW 96 TURNED ON.** `orders.is_comped` broke every My Orders list for three weeks because a new column landed on a table whose client grants are COLUMN-scoped. `app_settings` grants are TABLE-level — measured live before the apply in `information_schema.table_privileges` (SELECT for `anon` and `authenticated`, UPDATE for `authenticated`) — so a new column is covered automatically. Afterwards, rather than trusting `has_column_privilege`, the client-shaped read was actually performed under both roles: `set local role anon; select * from public.app_settings` **returns its row** instead of raising, and `anon` reads the new column directly as `false`; same under `authenticated`. **APPLIED IS NOT ENABLED.** Turning the flag on is a separate §5 decision that must follow the EAS build carrying the customer half — `docs/OWNER_ACTIONS.md` §40. Moyasar re-verified absent. |
 | 101 | 20260927120000 | admin_push_subscriptions | `26046da81644` | 20260920050434 | admin_push_subscriptions | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 05:04:34 UTC** on explicit owner approval ("apply 20260927120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 2 of the admin closure-notification work: `admin_push_subscriptions`, the nullable `app_settings.admin_push_vapid_public_key` column, and three `is_admin()`-gated RPCs. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`, 400 lines / 18 474 bytes) and matched the recorded value before anything was sent. **THIS IS THE SECOND ATTEMPT, AND THE FIRST ONE FAILING IS THE MOST USEFUL THING IN THIS ROW.** On 2026-09-19 the same file — then `9861df21…` / 365 lines — was approved, hashed correctly, had every live precondition verified, and was **REFUSED BY ITS OWN ASSERTION 5.5**: `anon can execute save_admin_push_subscription(text,text,text,text,text), which must never be true`. Nothing landed (the apply is transactional; history stayed at 145 / `20260917124937`, verified immediately afterwards rather than assumed). The cause: `revoke all on function … from public` does **not** remove `anon`'s grant, because this project's `pg_default_acl` grants EXECUTE on new functions in `public` to `anon`, `authenticated` and `service_role` **directly**. 85 of the 89 `revoke all on function` statements in this tree already said `public, anon`; these three were the outlier, and `20260729091000_caller_can_read_order_anon_revoke` exists solely because the identical mistake was made once before. Corrected in PR #400 as squash `182f670`. **A HARNESS THAT IS STRICTER THAN PRODUCTION IS NOT THE SAFE DIRECTION.** `.github/sql-ci/bootstrap.sql` modelled default privileges for TABLES only, so on the local chain `from public` and `from public, anon` were indistinguishable and every CI check was green on a file that could not apply. It now models functions and sequences too, read live from `pg_default_acl` — proven rather than asserted: with the original `from public` restored the chain fails at file 141 with the exact Production message, and was green before the change. Widening it required correcting 8 of the 13 `"svc"` expectations in `operations_alerts_digest_test.sql`, which had never described Production (measured live: all 13 are `svc=true`) and passed only because the harness was stricter. **THE GRANT FIX WAS VERIFIED ON BOTH HALVES, because removing `authenticated` as well would apply cleanly and ship a feature that cannot work:** all three RPCs now read `anon` **NO**, `authenticated` **YES**, `service_role` **YES**. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, each with exactly one overload (cardinality checked BEFORE the body was read); the file itself refuses to apply unless both still hash those values. **All three bodies byte-identical** against hashes pre-computed from the merged file: `save_admin_push_subscription` `7484f213f168257d40d773a1d1134836` / 1 376 chars, `delete_admin_push_subscription` `9240758de77959fc3e73955bb244e5ec` / 343, `admin_push_state` `37ae19fdb910ac8e804faf98b00e6b44` / 910. **APPLYING IT SUBSCRIBED NOBODY:** `admin_push_subscriptions` 0 rows, the VAPID column present and **NULL**, so no key pair exists and even a subscribed admin could not be sent to; `admin_push_outbox` absent, which is correct — it belongs to `20260928120000`. **The table is CLOSED, re-measured as an outcome rather than trusted to the `revoke`:** RLS enabled, **zero** policies, **zero** privileges for `anon` or `authenticated`. **ROW 86’S LESSON APPLIED — a clean apply proves storage, not execution.** All three were **called** and their outcomes read back as VALUES rather than notices (row 90): `42501 :: Only admins may subscribe to closure notifications`, `42501 :: Only admins may manage closure notifications`, `42501 :: Only admins may read closure notification state`. The probe ran inside a transaction aborted by a `RAISE` and the table was confirmed still empty afterwards. That proves them only as far as their gate, which is stated rather than glossed — driving deeper needs an admin session at AAL2. **THE TWO PUSH CHANNELS STAYED APART, measured on both sides:** `push_devices` unchanged at 5 rows / 5 active, and **0** functions mentioning `admin_push` reference `push_devices` — the property assertion 5.9 exists to enforce. Moyasar re-verified absent (0 functions, 0 history rows, `provider_name` still `tap`, still disabled). Live history **145 → 146**. **No deploy implied.** **Version NOT aligned** — live carries the apply-time stamp `20260920050434` (§9-D). **TWO repository files remain unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6, and `20260928120000_admin_push_closure_notifications.sql`, written and awaiting approval. Moyasar still sorts ahead of everything, so a bulk apply takes the frozen payment file FIRST — name the target by version.** |
 | 102 | 20260928120000 | admin_push_closure_notifications | `e3e265e484fd` | 20260920061858 | admin_push_closure_notifications | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 06:18:58 UTC** on explicit owner approval ("apply 20260928120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 4 and the LAST of the admin closure-notification work: `app_settings.admin_push_enabled`, the `admin_push_outbox` queue, two bilingual copy composers, an enqueue trigger on each of the two closure audit tables, claim/finalize RPCs, an HMAC signature verifier, a pg_cron driver and its job. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `e3e265e484fd50d0cee51fa45dcd07692ce9a33db53171a0c3504e38fb962068`, 983 lines / 45 326 bytes) and matched the recorded value before anything was sent. **APPLYING IT QUEUED NOTHING AND SENT NOTHING:** `admin_push_outbox` 0 rows, `admin_push_subscriptions` 0, `push_devices` unchanged at 5 customer rows, orders unchanged at 76, `admin_push_enabled` true. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, and the file REFUSES TO APPLY unless both still hash those values, with cardinality asserted first and `is distinct from` used so a NULL cannot pass as a clean check (row 90). Moyasar re-verified absent. **A 45 KB HAND-TRANSCRIPTION, CHECKED THE ONLY WAY THAT COULD HAVE CAUGHT IT.** `apply_migration` takes SQL inline, and this file carries Arabic notification copy where one wrong character would be invisible in the apply output — every other signal (the apply result, all ten self-verification assertions, the cron ticks) would have looked identical. So **all ten function bodies were hashed against values PRE-COMPUTED from the merged file before sending**, and all ten came back byte-identical with one overload each: `admin_push_duration_ar` `8e9fc83c…` / 294, `admin_push_duration_en` `6929584d…` / 187, `admin_push_availability_copy` `64866289…` / 1 953, `admin_push_delivery_copy` `918cccf9…` / 596, `admin_push_enqueue_availability` `cacce9f3…` / 1 403, `admin_push_enqueue_delivery` `b38c09f0…` / 1 164, `claim_admin_push_notifications` `6c31c22d…` / 1 614, `finalize_admin_push_notification` `a68b2df8…` / 1 753, `verify_admin_push_dispatch_signature` `5e188b6e…` / 1 407, `invoke_admin_push_dispatch` `84dca6f7…` / 4 362. **What that does NOT cover is stated rather than glossed:** comments OUTSIDE function bodies were trimmed for transport, so the applied text is not byte-identical to the repository file even though every stored body is. Cosmetic, since `prosrc` is what executes, but the same class of deviation recorded for the `admin-push-dispatch` bundle. **ROW 86’S LESSON APPLIED — and here the driver proved itself twice over.** `invoke_admin_push_dispatch()` was CALLED and returned **NULL**, the empty-queue gate taken before any Vault read or HTTP request, with the outbox confirmed still empty afterwards. Better than that, it is RUNNING: cron job 11 (`* * * * *`, active, jobs 10 → 11) had ticked twice within two minutes, both `succeeded`, in **15 ms** and **5 ms**. **BOTH VAULT SECRETS EXIST.** `admin_push_dispatch_secret` was generated by `gen_random_bytes` inside the apply transaction and written straight to Vault, so it never crossed the wire — the §28 method, performed by the migration rather than by hand. `admin_push_dispatch_project_url` was COPIED from `operations_alert_dispatch_project_url`, whose presence was verified BEFORE the apply rather than discovered after, so `docs/OWNER_ACTIONS.md` §41.7’s "did the project URL copy?" check is already answered and the driver will not hold notices for an incomplete Vault. **THE TWO PUSH CHANNELS STAYED APART, enforced rather than intended:** assertion 10.8 fails the apply if any `%admin_push%` function references `push_devices` or `promos_enabled`, and it uses `%admin_push%` rather than a prefix match precisely so the `claim_`/`finalize_`/`invoke_` functions are not exempted — the claim RPC being the natural place for a later "also notify the customer". **NO CLOSURE PATH WAS TOUCHED:** assertion 10.5 enumerates the five closure RPCs and fails if any is missing or mentions `admin_push`. **DEPLOY IMPLIED: one, and it was already done** — `admin-push-dispatch` v1 shipped 2026-09-20 with the queue-drain mode (ledger note in `docs/ADMIN_PUSH_NOTIFICATIONS.md`), so the queue has a worker from the moment this applied. Live history **146 → 147**. **Version NOT aligned** — live carries the apply-time stamp `20260920061858` (§9-D). **THE OUTSTANDING SET IS BACK TO ONE: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — "apply the outstanding migrations" now has exactly one referent and it is the frozen payment file. Name the target by version. |
+| 103 | 20260930120000 | product_variants_guest_read | `fbd5d5bfdfa6` | 20261111045833 | product_variants_guest_read | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-11 04:58:33 UTC** on explicit owner approval (the owner chose "Apply 20260930120000 first", an option that named the target by version and stated it covered that one file, not `20260929120000` and not Moyasar; after two timeouts, "retry the apply"), via MCP `apply_migration`, **one call landed, target named explicitly**. The database half of guest browsing (App Store 5.1.1(v)). It split `product_variants_select_public` — `(is_active OR is_staff())` for anon and authenticated, which refused every signed-out read with 401 because anon cannot execute `is_staff()` — into `product_variants_select_active_public` (`is_active`, anon and authenticated) and `product_variants_select_inactive_staff` (`(NOT is_active) AND is_staff()`, authenticated only). §9-B.7: the merged copy was re-hashed from the default branch (sha256 `fbd5d5bfdfa6be2c99cbfa00d17cce58c5b75e458c0e87ffc3dfed4f7b80d2cd`, 107 lines / 5 317 bytes) before anything was sent and matched. **THE SQL SENT IS THAT FILE BYTE FOR BYTE**, as the session recorded the call — no transport trimming, unlike row 102. **TWO EARLIER ATTEMPTS LANDED NOTHING, verified rather than assumed:** 2026-11-10 16:23 and 2026-11-11 04:37 UTC each timed out after 230 s with the connector's confirmation question unanswered, and a read-only check after each found 147 rows and the legacy policy in place. The third landed in 14 s with the owner watching, and exactly one history row carries the name. **APPLYING IT CHANGED WHAT A GUEST CAN READ AND NOTHING ELSE:** exactly the three intended policies (admin write unchanged); 147 tiers / 144 active before and after; `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…` unchanged with one overload each, which the file also asserts before landing; Moyasar absent (0 rows, 0 functions; provider `tap`, disabled); `20260929120000` still unapplied. **THE OUTCOME, measured on the client's path and as the role:** signed out through PostgREST, a ranged count returned `206` with `content-range: 0-0/144` (401 the day before) and inactive tiers returned `[]`; in SQL, `set local role anon` read back `current_user = anon`, 144 visible, 0 inactive. **#424 merged 95 s later (05:00:08 UTC), as its ordering required**, and production `/app` then opened on the order-type chooser for a signed-out visitor with every catalogue read 200. **The gated deploy job was SKIPPED on that merge**, because `DEPLOY_GATE_ENABLED` is not `'true'`; the merge reached production by a path outside this repository's workflows (`docs/DEPLOY.md` §9). No deploy implied. Live history **147 → 148**. **Version NOT aligned** — live carries the apply-time stamp `20261111045833` (§9-D). **THE OUTSTANDING SET IS TWO: Moyasar (frozen, §6) and `20260929120000` (written, awaiting approval). Two is the shape that looks safe and is not** — `20260824100000` still sorts first. Name the target by version. |
 
-Reconciliation check: the rows above detail **102 repository rows, 100 of which
+Reconciliation check: the rows above detail **103 repository rows, 101 of which
 carry a live version** — rows 8 and 9 are the two that do not, and both are
 class `—`. **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
@@ -1503,7 +1519,7 @@ carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
 from the artifact, never adopt from a working note — applied to this file's own
 summary line.
 
-Rows **89–101** are not described in the narrative below, which stops at 88.
+Rows **89–103** are not described in the narrative below, which stops at 88.
 Each is recorded in its own row and in the section it names; the live totals for
 the whole repository are in `CLAUDE.md` §8, not here.
 
@@ -6738,19 +6754,105 @@ so the assertion behaves identically in both.
 **Applying it is a §5 action, named by version.** Afterwards, re-read the
 advisors: expect 0011 at 0, 0028 at 1 and 0029 at 85.
 
-## 52. Guest menu read on `product_variants` — WRITTEN, NOT APPLIED (2026-11-09)
+## 52. Guest menu read on `product_variants` — APPLIED 2026-11-11 (ledger row 103)
 
-`20260930120000_product_variants_guest_read.sql`. **Written 2026-11-09, validated,
-awaiting owner approval.** This is the one database change that guest browsing
-(App Store guideline 5.1.1(v), plan item A4) needs. (§51 is the advisor-hardening
-file in #422; the two are independent and can be applied in either order.)
+`20260930120000_product_variants_guest_read.sql`. **Applied 2026-11-11
+04:58:33 UTC**, live version `20261111045833`, on explicit owner approval, via
+MCP `apply_migration`, one call that landed. Live history **147 → 148**. Ledger
+row 103. This is the one database change that guest browsing (App Store
+guideline 5.1.1(v), plan item A4) needs. (§51 is the advisor-hardening file from
+#422. The two are independent, and §51's file is **still unapplied**.)
+
+**The approval named its target and nothing else.** The owner chose the option
+"Apply 20260930120000 first", which stated that it approved that single apply,
+after #423 merged and before #424, and that it did not cover `20260929120000`
+or Moyasar. After two attempts timed out (below), the instruction was "retry
+the apply".
 
 sha256 `fbd5d5bfdfa6be2c99cbfa00d17cce58c5b75e458c0e87ffc3dfed4f7b80d2cd`,
-107 lines / 5 317 bytes. **Re-hash the MERGED copy before applying**, per §15.
+107 lines / 5 317 bytes. The merged copy was re-hashed from the default branch
+at 04:37 UTC, before anything was sent, per §15, and matched. It was also
+identical to the copy reviewed the day before.
 
-**It must be applied BEFORE any build that lets a signed-out user reach the
-menu.** Until then, nothing in Production reads this table signed out. The app
-sends a signed-out user to the login screen first, which is why the defect
+**THE TEXT SENT WAS THE FILE, BYTE FOR BYTE.** `apply_migration` takes SQL
+inline, and §50 records the usual deviation: comments outside function bodies
+trimmed for transport. Not here. The SQL in the apply call, as the session
+recorded it, is the merged file itself: the same sha256 over all 5 317 bytes.
+There is no deviation to describe.
+
+### Two attempts timed out, and neither landed
+
+The Supabase connector asked the owner to confirm before running this file, and
+it waits **230 seconds** for an answer. The first two attempts, 2026-11-10 16:23
+UTC and 2026-11-11 04:37 UTC, timed out with the question unanswered. After
+each, a read-only check found history still at **147** and the legacy policy
+still in place, so nothing had landed. The third, sent at 04:58:19 with the
+owner on the web, landed at 04:58:33. Live history holds **exactly one** row
+with this name, so no earlier attempt landed late.
+
+Two lessons, both about the tool rather than the file:
+- **a timed-out apply is unknown, not failed, until a read settles it.** The
+  read has to look for the outcome (the history row, the policy set), not for an
+  error;
+- **plan an apply for when the owner can answer.** Earlier applies through the
+  same connector did not ask. Treat the question as the connector's current
+  behaviour, not as a property of this file.
+
+### What it changed, measured
+
+**What a guest can read, and nothing else.**
+- **Policies:** exactly three on the table. `product_variants_admin_write` is
+  unchanged. `product_variants_select_active_public` is `is_active`, for anon
+  and authenticated. `product_variants_select_inactive_staff` is
+  `(NOT is_active) AND is_staff()`, for authenticated only. The legacy
+  `product_variants_select_public` is gone.
+- **Data:** 147 tiers, 144 active, identical before and after.
+- **Money path:** `place_order` `12b6816d…` and `compute_order_snapshot`
+  `22e2d429…`, one overload each, identical before and after. The file refuses
+  to apply otherwise.
+- **Nothing else moved:** Moyasar is absent (0 history rows, 0 functions), the
+  payment provider is still `tap` and disabled, and `20260929120000` is still
+  unapplied.
+
+**The outcome, measured where a guest meets it.**
+- **Through PostgREST, signed out, with the public anon key.** A ranged count
+  (`Range: 0-0`, `Prefer: count=exact`) on `product_variants` returned **`206`
+  with `content-range: 0-0/144`**: a count, where the day before it returned
+  401. A filter for inactive tiers returned **`[]`**. `products` and
+  `categories` still returned 200.
+- **As the role, in SQL**, which is the check this section prescribed below.
+  `set local role anon` read back `current_user = anon`, with **144** tiers
+  visible and **0** inactive. Reading `current_user` matters: a `set local`
+  that silently did not take effect would run as the connection's own role,
+  which bypasses RLS, and show all 147.
+- The file's own block had already performed the read as anon inside the apply
+  transaction. These two checks repeat it from outside.
+
+**The ordering held, and the merge reached customers.** #424 merged at 05:00:08
+UTC, **95 seconds after the apply**, as its body required. By 05:15 UTC the
+live `/app` entry bundle carried #424's guest text. A headless guest visit
+straight afterwards opened on the order-type chooser, listed pickup branches,
+showed the sign-in card on the Orders tab, and got **200 on every catalogue
+read**, with 0 page errors. That visit allowed no write: every non-GET request
+to Supabase and every Edge Function call was blocked, and none was attempted.
+The native apps change only at the next EAS build.
+
+**The gated deploy job is not what put it there.** `Deploy to Vercel (gated on
+CI)` was **skipped** on the merge commit `577e7e7`, because the repository
+variable `DEPLOY_GATE_ENABLED` is not `'true'`. The merge reached production by
+a path outside this repository's workflows, most plausibly Vercel's own Git
+integration, which is dashboard state (`docs/DEPLOY.md` §9). So the ordering
+constraint was real: a merge reaches `/app` without the gate.
+
+**No deploy implied, and none made.** **Version NOT aligned:** live carries the
+apply-time stamp `20261111045833` (§9-D).
+
+**The description below is as written before the apply.** It is kept because
+its reasoning is the point.
+
+**It had to be applied BEFORE any build that lets a signed-out user reach the
+menu.** Until then, nothing in Production read this table signed out. The app
+sent a signed-out user to the login screen first, which is why the defect
 never surfaced.
 
 ### The defect, measured live
