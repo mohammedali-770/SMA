@@ -1,9 +1,11 @@
 /**
  * Expo push-token registration for the signed-in customer.
  *
- * Flow (driven by the Profile notification toggles — never an app-launch nag):
- *  1. The customer turns a toggle ON → OS permission is requested with that
- *     clear context.
+ * Flow (always behind an explicit tap — never an app-launch nag):
+ *  1. OS permission is requested from exactly two places, each after the
+ *     customer has been told what they are allowing: the consent screen's
+ *     Allow button on the first run after sign-in (useFirstRunPermissions),
+ *     and a Profile toggle turned ON (NotificationSettings).
  *  2. On grant, the Expo push token is fetched (real devices only) and
  *     upserted into push_devices via the RLS-scoped client — a customer can
  *     only ever write their own device rows.
@@ -33,6 +35,20 @@ import type { DbPushDevice } from '../../types/db';
 export async function hasNotificationPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
   return current.granted;
+}
+
+/**
+ * The OS permission as it stands, asking nothing: granted, and whether the OS
+ * would still show its dialog if asked.
+ *
+ * `canAskAgain` is what keeps the first-run consent screen honest — after a
+ * permanent refusal the OS shows nothing, and a screen whose button promises a
+ * prompt would be a dead end. Note that Android 12 and older report `granted`
+ * from install: there is no runtime permission there, so the OS never asks.
+ */
+export async function readNotificationPermission(): Promise<{ granted: boolean; canAskAgain: boolean }> {
+  const current = await Notifications.getPermissionsAsync();
+  return { granted: current.granted, canAskAgain: current.canAskAgain };
 }
 
 /** Ask (or re-check) OS notification permission. Returns true when granted. */

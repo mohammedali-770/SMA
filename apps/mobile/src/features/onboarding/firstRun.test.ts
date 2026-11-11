@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_FIRST_RUN, isCompletedForReview, shouldRegisterOnFirstRun,
+  DEFAULT_FIRST_RUN, firstRunNotificationStep, isCompletedForReview, shouldRegisterOnFirstRun,
   shouldRequestFirstRunPermissions, shouldRequestReview,
 } from './firstRun';
 
 describe('shouldRequestFirstRunPermissions', () => {
-  it('raises the OS dialogs once for a signed-in customer', () => {
+  it('spends the first run once, for a signed-in customer', () => {
     expect(shouldRequestFirstRunPermissions(DEFAULT_FIRST_RUN, true)).toBe(true);
   });
   it('never asks before sign-in — a granted notification permission is useless without an account to register', () => {
@@ -14,6 +14,40 @@ describe('shouldRequestFirstRunPermissions', () => {
   });
   it('never asks twice — an iOS notification denial is permanent', () => {
     expect(shouldRequestFirstRunPermissions({ ...DEFAULT_FIRST_RUN, permissionsRequested: true }, true)).toBe(false);
+  });
+});
+
+describe('firstRunNotificationStep — the consent screen comes before the OS prompt', () => {
+  const askable = { granted: false, canAskAgain: true };
+  const base = { state: DEFAULT_FIRST_RUN, signedIn: true, pushEnabled: true, permission: askable };
+
+  it('offers the consent screen to a signed-in customer the OS can still ask', () => {
+    expect(firstRunNotificationStep(base)).toBe('offer_consent');
+  });
+
+  it('never before sign-in', () => {
+    expect(firstRunNotificationStep({ ...base, signedIn: false })).toBe('nothing');
+  });
+
+  it('never twice on a device — the storage key is unchanged, so nobody already through first run is re-asked', () => {
+    expect(firstRunNotificationStep({ ...base, state: { ...DEFAULT_FIRST_RUN, permissionsRequested: true } }))
+      .toBe('nothing');
+  });
+
+  it('never while the push kill switch is off', () => {
+    expect(firstRunNotificationStep({ ...base, pushEnabled: false })).toBe('nothing');
+  });
+
+  it('not when permission is already granted: an existing customer, or Android 12 and older', () => {
+    // Android 12 and older report `granted` from install, so the OS never asks
+    // there. Those devices are told by the one-time consent NOTICE instead,
+    // never registered again from here (shouldRegisterOnFirstRun).
+    expect(firstRunNotificationStep({ ...base, permission: { granted: true, canAskAgain: true } })).toBe('nothing');
+  });
+
+  it('not when the OS would show nothing — a screen promising a prompt would be a dead end', () => {
+    // Also the web build, whose mirror reports exactly this (pushRegistration.web.ts).
+    expect(firstRunNotificationStep({ ...base, permission: { granted: false, canAskAgain: false } })).toBe('nothing');
   });
 });
 
