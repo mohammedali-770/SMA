@@ -118,6 +118,15 @@ Deployment/version-skew failures such as a missing dynamic chunk are useful prod
 
 The shared source classification tests are authoritative.
 
+### Known noise, 2026-11-11: refused order reads from guests on `/app/orders`
+
+From the Expo SDK 58 deploy (2026-11-11 06:08 UTC) until the Orders-tab gate fix is deployed, `/app` sent one event per signed-out visit that opened `/app/orders` directly, by link or by reloading that tab. Each event is a `permission denied for table orders` failure from subsystem `orders`, operation `load_orders`.
+
+- **Not an access problem.** The server refused a read with no session, which is what it should do.
+- **The cause was the route.** It mounted `OrdersScreen` while auth was still `loading`. SDK 58 renders a directly opened tab before the session settles, and SDK 57 did not: measured 5 of 5 direct loads against 0 of 5.
+- **The fix.** `app/(tabs)/orders.tsx` now renders `OrdersScreen` only for a known `signed_in` session, and `features/auth/ordersTabGate.test.tsx` renders every state.
+- **What to do with these events.** Resolve the ones from that window. Do **not** add `permission denied` to the expected list: anywhere else, a refused read is a real signal.
+
 ## Admin surface is the strictest context
 
 The staff console can render privileged operational/customer data. Observability code must never inspect/capture visible DOM/form contents to enrich an event.
