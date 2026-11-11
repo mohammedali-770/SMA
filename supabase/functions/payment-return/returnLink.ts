@@ -12,15 +12,29 @@ export function sanitizeUuid(raw: string | null | undefined): string {
 }
 
 /**
+ * Our UUID query value, tolerant of one provider quirk. Moyasar documents no
+ * query parameters for success_url or back_url. If it appends its own with a
+ * second '?' ('…/payment-return?session=<uuid>?id=…'), the parsed value
+ * arrives as '<uuid>?id=…' and strict validation alone would drop it. Only
+ * that shape is repaired: everything from the first '?' is discarded, unread,
+ * and what remains must still be a strict UUID.
+ */
+export function queryUuid(raw: string | null | undefined): string {
+  if (typeof raw !== 'string') return '';
+  const end = raw.indexOf('?');
+  return sanitizeUuid(end === -1 ? raw : raw.slice(0, end));
+}
+
+/**
  * Build the fixed spicymeal:// return deep link. The new flow forwards `session`;
  * the legacy flow forwards `order`. Whatever the provider appends (Moyasar's
  * `id`, for one) is ignored — the app re-verifies server-side and never trusts
  * anything in this URL.
  */
 export function buildReturnDeepLink(order: string | null | undefined, session: string | null | undefined): string {
-  const s = sanitizeUuid(session);
+  const s = queryUuid(session);
   if (s) return `spicymeal://payment/return?session=${encodeURIComponent(s)}`;
-  const o = sanitizeUuid(order);
+  const o = queryUuid(order);
   if (o) return `spicymeal://payment/return?order=${encodeURIComponent(o)}`;
   return 'spicymeal://payment/return';
 }
