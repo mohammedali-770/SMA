@@ -198,8 +198,10 @@ export function CheckoutScreen() {
   const branchOpen = branchIsOpen(selectedBranch);
 
   // Payment availability (admin-controlled; place_order re-validates server-side).
-  const payMethods = availableMethods(payment);
-  const paymentBlocked = checkoutBlocked(payment);
+  // Online is never offered in the web build: the payment WebView cannot run
+  // in a browser (lib/payment.ts).
+  const payMethods = availableMethods(payment, Platform.OS);
+  const paymentBlocked = checkoutBlocked(payment, Platform.OS);
 
   // Keep the chosen method valid as availability changes (e.g. admin turns cash
   // off mid-session). `clearIfUnavailable` can only ever take the choice AWAY —
@@ -208,7 +210,7 @@ export function CheckoutScreen() {
   // not agree to. Losing the selection returns the footer to
   // "Choose a payment method", which is the truthful thing to say.
   useEffect(() => {
-    setPaymentMethod((prev) => clearIfUnavailable(payment, prev));
+    setPaymentMethod((prev) => clearIfUnavailable(payment, prev, Platform.OS));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment.onlineEnabled, payment.cashEnabled]);
 

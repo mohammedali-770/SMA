@@ -54,6 +54,16 @@ describe('CheckoutScreen shows a verify result the way recovery reads it', () =>
   });
 });
 
+describe('the web build never offers online payment', () => {
+  const screen = code('features/checkout/CheckoutScreen.tsx');
+
+  it('CheckoutScreen asks for the methods of the platform it runs on', () => {
+    expect(screen).toContain('availableMethods(payment, Platform.OS)');
+    expect(screen).toContain('checkoutBlocked(payment, Platform.OS)');
+    expect(screen).toContain('clearIfUnavailable(payment, prev, Platform.OS)');
+  });
+});
+
 describe('the payment WebView lets the page pay, and nothing more', () => {
   const screen = code('app/payment/checkout.tsx');
   // The JSX element, not `useRef<WebView>`: a tag name followed by whitespace.
