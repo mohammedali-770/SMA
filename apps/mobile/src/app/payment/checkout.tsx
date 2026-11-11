@@ -1,29 +1,29 @@
 /**
- * payment/checkout — the in-app Tap hosted-checkout screen. It renders the Tap
- * checkout page INSIDE the app (react-native-webview) instead of handing off to
- * the external browser, so the customer stays in Spicy Meal the whole time.
+ * payment/checkout — the in-app secure-payment screen. It renders Moyasar's
+ * hosted invoice page INSIDE the app (react-native-webview), the only surface
+ * the app uses for online payment, so the customer stays in Spicy Meal the whole
+ * time — card entry, Apple Pay and the bank's 3-D Secure challenge included.
  *
- * What it does NOT do: it never reads card data, never injects JS into the Tap
+ * What it does NOT do: it never reads card data, never injects JS into the
  * page, and never decides that a payment succeeded. Its ONLY payment signal is
  * "the WebView reached our payment-return URL"; it then hands back to
  * CheckoutScreen, which asks the server (payment-verify) what actually happened.
- * Every navigation is run through the pure allow-list in webviewPolicy.ts.
+ * Every navigation is run through the pure policy in webviewPolicy.ts.
  *
- * The Tap checkout URL (which carries a short-lived token) is taken from the
- * in-memory handoff by session id — it is never a route param and never logged.
+ * The invoice URL (a payable link) is taken from the in-memory handoff by session
+ * id — it is never a route param and never logged.
  *
- * This pass restyled the CHROME ONLY — header, loader, error overlay, footer.
- * The WebView props are a frozen security surface (see the originWhitelist note
- * below) and are byte-identical.
+ * The WebView props are the security surface (see the notes beside each one),
+ * and paymentWebViewWiring.test.ts pins them.
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type WebViewNavigation } from 'react-native-webview';
-// Platform-split: native re-exports react-native-webview verbatim (frozen Tap
-// flow unchanged); web renders a clean "app-only" state for online payment.
-import { WebView } from '../../components/TapWebView';
+// Platform-split: native re-exports react-native-webview verbatim; web renders
+// a clean "app-only" state for online payment.
+import { WebView } from '../../components/PaymentWebView';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
 import { Header } from '../../components/Header';
@@ -56,7 +56,7 @@ export default function PaymentCheckoutScreen() {
   const { t, pick } = useI18n();
 
   const sessionId = uuidParam(params.session);
-  // Take the Tap URL from the in-memory handoff ONCE (lazy init — never a ref read
+  // Take the invoice URL from the in-memory handoff ONCE (lazy init — never a ref read
   // during render). It never lives in route params or storage. If it's absent (app
   // relaunched straight into this route, or the handoff was already settled), there
   // is nothing to resume here — we fall back to checkout, whose recovery resolves
@@ -147,6 +147,7 @@ export default function PaymentCheckoutScreen() {
             <Text variant="label" tone="ember">{pick('Close', 'إغلاق')}</Text>
           </Pressable>
         )}
+        safeTop
       />
       <View style={styles.body}>
         {checkoutUrl ? (
@@ -169,14 +170,26 @@ export default function PaymentCheckoutScreen() {
             onLoadEnd={() => { setLoading(false); setFirstLoaded(true); }}
             onError={() => { setLoading(false); setFailed(true); }}
             onHttpError={() => { setLoading(false); setFailed(true); }}
-            // Tap's web checkout needs JS + cookies (session, 3DS). We add NO JS of
-            // our own — no injectedJavaScript, no message bridge reading the page.
+            // The hosted page and the bank's 3-D Secure need JS, DOM storage and
+            // cookies. We add NO JS of our own — no injectedJavaScript, no
+            // message bridge reading the page.
             javaScriptEnabled
             domStorageEnabled
             thirdPartyCookiesEnabled
-            sharedCookiesEnabled
-            // Keep every navigation inside this WebView so the allow-list governs
-            // it; no popups / new windows can escape the policy.
+            // iOS only (a no-op on Android): lets the page offer Apple Pay.
+            // Without it react-native-webview adds its own history-shim user
+            // script to every page (14.0.1 RNCWebViewImpl.m, resetupScripts),
+            // and WebKit refused Apple Pay beside injected scripts until iOS 16
+            // (Safari 13 and 16 release notes; the app's floor is iOS 16.4). With
+            // it the library injects nothing at all, and injectJavaScript,
+            // injectedJavaScript and sharedCookiesEnabled stop working — this
+            // screen uses none of them.
+            enableApplePay
+            // Android: a target=_blank link or window.open loads in this same
+            // WebView, under the policy, instead of escaping to the system
+            // browser. react-native-webview documents that false re-exposes
+            // CVE-2020-6506 (a cross-origin iframe reaching the top document);
+            // the pages loaded here are Moyasar's and the card issuer's.
             setSupportMultipleWindows={false}
             allowsBackForwardNavigationGestures={false}
             startInLoadingState={false}
@@ -193,8 +206,9 @@ export default function PaymentCheckoutScreen() {
             </View>
           </View>
         ) : loading && !firstLoaded ? (
-          // Opaque loader only before the first paint; later Tap/3DS transitions
-          // render on the page itself so we don't blank an interactive checkout.
+          // Opaque loader only before the first paint; later page and 3-D Secure
+          // transitions render on the page itself so we don't blank an
+          // interactive checkout.
           <View style={styles.overlay} pointerEvents="none">
             <ActivityIndicator size="large" color={colors.ember} />
             <Text variant="body" tone="secondary" align="center">{t('payScreenLoading')}</Text>
@@ -204,7 +218,7 @@ export default function PaymentCheckoutScreen() {
       {/* Reassurance strip: this is a hosted, secure page; we never see card data. */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <Text variant="caption" tone="tertiary" align="center">
-          {pick('Your card details are entered on Tap’s secure page.', 'تُدخل بيانات بطاقتك في صفحة Tap الآمنة.')}
+          {pick('Your card details are entered on Moyasar’s secure page.', 'تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.')}
         </Text>
       </View>
     </View>

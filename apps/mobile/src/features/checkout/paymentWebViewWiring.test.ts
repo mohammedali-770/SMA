@@ -38,3 +38,52 @@ describe('CheckoutScreen opens the hosted page only in the in-app WebView', () =
     );
   });
 });
+
+describe('the payment WebView lets the page pay, and nothing more', () => {
+  const screen = code('app/payment/checkout.tsx');
+  // The JSX element, not `useRef<WebView>`: a tag name followed by whitespace.
+  const tag = screen.match(/<WebView\s[\s\S]*?\/>/)?.[0] ?? '';
+
+  it('renders exactly one WebView, from the platform-split PaymentWebView', () => {
+    expect(screen.match(/<WebView\s/g)).toHaveLength(1);
+    expect(screen).toContain("import { WebView } from '../../components/PaymentWebView';");
+    expect(tag).not.toBe('');
+  });
+
+  it('enables Apple Pay (iOS; the prop is a no-op on Android)', () => {
+    expect(tag).toMatch(/^\s*enableApplePay(?:=\{true\})?\s*$/m);
+  });
+
+  it('injects nothing into the page and reads nothing from it', () => {
+    // Any of these would put a script in the page, which is what costs Apple Pay
+    // under react-native-webview, or open a channel from the page into the app.
+    expect(screen).not.toMatch(/injectedJavaScript|injectJavaScript/);
+    expect(screen).not.toMatch(/\bonMessage\b|\bpostMessage\b/);
+    expect(screen).not.toContain('sharedCookiesEnabled');
+  });
+
+  it("keeps originWhitelist at ['*'], so every navigation reaches the policy", () => {
+    // A narrower list makes react-native-webview hand a non-matching URL to the
+    // OS with Linking.openURL instead of asking our handler.
+    expect(tag).toMatch(/originWhitelist=\{\[\s*'\*'\s*\]\}/);
+  });
+
+  it('decides every navigation, top frame or iframe, from its URL alone', () => {
+    expect(tag).toContain('onShouldStartLoadWithRequest={onShouldStart}');
+    expect(screen).toContain('decideNavigation(req.url, cfg)');
+    // A bank's 3-D Secure challenge can load in an iframe; telling frames apart
+    // is how a policy ends up cancelling it.
+    expect(screen).not.toContain('isTopFrame');
+  });
+
+  it('keeps popups inside the WebView on Android', () => {
+    expect(tag).toContain('setSupportMultipleWindows={false}');
+  });
+
+  it('never pulls react-native-webview into the web build', () => {
+    expect(code('components/PaymentWebView.tsx')).toContain(
+      "export { WebView } from 'react-native-webview';",
+    );
+    expect(code('components/PaymentWebView.web.tsx')).not.toContain('react-native-webview');
+  });
+});
