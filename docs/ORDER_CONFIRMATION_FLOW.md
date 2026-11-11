@@ -1900,6 +1900,19 @@ the branch was deactivated since the order was placed, the control simply does
 not render rather than opening a broken map. Platform behaviour and the iOS
 `LSApplicationQueriesSchemes` requirement are in [`MAPS.md`](MAPS.md).
 
+### Leaving the screen
+
+**View my orders** and **Back to menu** go back to the tabs below this screen
+(`router.dismissTo`) and switch to Orders or Home. A receipt opened from a
+direct link has nothing below it, so it replaces itself, as before. Until
+2026-11-11 both used `router.replace`, which put a NEW copy of the tabs in place
+of the receipt and left the old copy underneath. After a checkout, the emptied cart stayed
+between the two, so Back from Home showed an empty cart. On a phone, every copy
+also ran the tabs layout's own work, the notification consent flow included.
+The same defect was measured on production through the order-type screen, where
+four changes stacked five copies. `stackedTabsWiring.test.ts` pins every screen
+that leaves this way.
+
 ### The store-review prompt
 
 Leaving the confirmation screen may raise the OS review dialog. Every guard is

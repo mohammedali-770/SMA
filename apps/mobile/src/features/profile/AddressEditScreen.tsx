@@ -96,7 +96,7 @@ export function AddressEditScreen() {
           title={t('addrNotFound')}
           subtitle={t('addrNotFoundSub')}
           actionLabel={t('addrTitle')}
-          onAction={() => router.replace('/profile/addresses')}
+          onAction={() => router.dismissTo('/profile/addresses')}
         />
       </Screen>
     );

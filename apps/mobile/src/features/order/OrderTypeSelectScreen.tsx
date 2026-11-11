@@ -85,7 +85,7 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (valid) {
-        router.replace('/(tabs)');
+        router.dismissTo('/(tabs)');
         return true;
       }
       return true;
@@ -93,7 +93,13 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
     return () => sub.remove();
   }, [valid]);
 
-  const done = useCallback(() => router.replace('/(tabs)'), []);
+  // dismissTo, not replace. This screen is usually pushed above the tabs, so
+  // replacing it with '/(tabs)' left a second tabs layout underneath, one more
+  // for every change of order type (measured on production 2026-11-11: 1 to 5
+  // after four changes, and Back walked through each stale Home). dismissTo
+  // pops back to the tabs already in the stack, and replaces only when there
+  // are none.
+  const done = useCallback(() => router.dismissTo('/(tabs)'), []);
   const commit = useCallback(
     async (apply: () => void | Promise<void>) => {
       setBusy(true);

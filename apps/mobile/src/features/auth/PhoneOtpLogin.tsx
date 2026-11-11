@@ -102,7 +102,9 @@ export function PhoneOtpLogin({ returnTo }: { returnTo?: string } = {}) {
       if (session) {
         // AuthProvider.onChange also fires; navigate eagerly for a snappy UI —
         // back to where the customer was asked to sign in, or the home tab.
-        router.replace(safeReturnPath(returnTo) ?? HOME_ROUTE);
+        // dismissTo, not replace: login usually sits above the tabs, and
+        // replacing it with a tab route would add a second copy of the tabs.
+        router.dismissTo(safeReturnPath(returnTo) ?? HOME_ROUTE);
       } else {
         setError(t('invalidOrExpiredCode'));
       }
