@@ -43,7 +43,8 @@ red is a gate everybody learns to ignore.
 As of **2026-11-10**, both trees are clean at high/critical, and **the mobile
 gate holds no exception at all**. The last one, `decode-uri-component`, left with
 the Expo SDK 58 upgrade, which removed `query-string` from `expo-router`
-(§4.15). What remains are moderates, which the gate does not block (§3.1).
+(§4.15). What remains are moderates, which the gate does not block: Expo's in
+the mobile tree (§3.1) and the Sentry Vite plugin's in the web tree (§3.2).
 
 *Superseded 2026-11-10:* as of 2026-11-09 the mobile tree had one reviewed direct
 HIGH advisory, `decode-uri-component`, propagating to 3 high records
@@ -103,6 +104,26 @@ for the high gate and should be read as covering this table too.
 
 **To clear:** upgrade the Expo SDK deliberately, rebuild all targets, re-run the
 audit, and remove this exception when the advisories disappear.
+
+### 3.2 Sentry Vite plugin — moderate advisories (web tree)
+
+| Field | Value |
+| --- | --- |
+| **Packages** | `glob` 13.0.6 (GHSA-3g3m-2fjr-6pw4) and `minimatch` 10.2.5 (GHSA-g3hv-75wg-m249), the same two advisories §3.1 accepts. Here they are reached only through `@sentry/bundler-plugins` 10.67.0 under `@sentry/vite-plugin` 5.4.0. That is **4 moderate records, measured 2026-11-11** |
+| **Severity** | Moderate |
+| **Reachability** | Build time only. Every console build loads the plugin, but `vite.config.ts` runs it only when `SENTRY_AUTH_TOKEN` is set, which is CI and Vercel. It uploads the console's source maps, using glob patterns from the build config rather than from any user. Nothing from this chain ships in a bundle |
+| **Status** | Accepted. `npm audit` offers only `@sentry/vite-plugin` 11.12.0. That is a semver-major move, and the upload path it changes can only be exercised with the Vercel token |
+| **Reviewed** | 2026-11-11, for the app-hardening checklist (S08) |
+| **Next review** | On the next `@sentry/vite-plugin` major upgrade, or 2027-03-31, whichever comes first |
+
+**Until 2026-11-11 the web tree's moderates were recorded nowhere.** There were
+six of them. Two had a fix inside the existing range, which landed with this
+entry (§4.16).
+
+**To clear:** upgrade `@sentry/vite-plugin` deliberately. Then confirm that an
+approved admin-web test event resolves to a readable stack (release validation
+in `docs/SENTRY_WEB_OBSERVABILITY.md`), and remove this entry once the audit is
+clean.
 
 ### What the gate cannot see — stated rather than implied
 
@@ -639,6 +660,31 @@ Gate:
 | the proof no longer names the advisory | killed |
 | `query-string` declared as a direct dependency | killed |
 | the exception date in the past | killed |
+
+### 4.16 `vitest` / `@vitest/mocker` — two moderate advisories (web tree, test runner) — RESOLVED 2026-11-11
+
+| Advisory | Affects | What it is |
+| --- | --- | --- |
+| GHSA-82fw-gwwq-j7x9 | `< 4.1.11` | path traversal / arbitrary file read through a redirect mock |
+| GHSA-qxg6-89mg-rqv8 | `< 4.1.12` | code injection through unauthenticated manual-mock registration |
+
+Both are in the test runner only, so nothing shipped. The fix moves `vitest`
+`^4.1.10` → `^4.1.12` (published 2026-10-15). That moves the seven `@vitest/*`
+packages with it, plus `chai` 6.2.2 → 6.3.0 and `tinyrainbow` 3.1.0 → 3.2.0,
+each inside its existing range. The web audit went from 6 moderates to 4
+(§3.2), and the suite is unchanged at 213 files / 3,667 tests.
+
+**How the lockfile was written, because the obvious command fails.** npm 10.9
+is the version CI and Vercel run with Node 22, and it crashes resolving this
+tree. Both `npm install` and `npm update` stop with *"Cannot read properties of
+null (reading 'edgesOut')"*, a bug in how npm resolves peer dependencies.
+
+The lockfile was therefore produced with
+`npx npm@11.21.1 install --save-dev vitest@^4.1.12`, then installed with npm 10's
+own `npm ci`, which accepted it as written. The diff holds the vitest family and
+the two packages above, nothing else.
+
+Expect the same crash on the next dependency bump in the root tree.
 
 ## 5. Adding or extending an exception
 
