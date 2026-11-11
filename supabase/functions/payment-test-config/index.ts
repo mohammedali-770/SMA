@@ -199,6 +199,9 @@ async function handleMoyasar(
     if (result.reason === MOYASAR_IP_NOT_ALLOWED) {
       return json({ status: 'pending', message: ipNotAllowedMessage(rec.mode === 'live' ? 'live' : 'test') }, 200);
     }
+    if (result.reason === 'test_mode_attempt') {
+      return json({ status: 'failed', message: 'This attempt was opened in TEST mode. A test payment never confirms a customer order.' }, 200);
+    }
     const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
     return json({ status: outcome, message: result.messageKey }, 200);
   }

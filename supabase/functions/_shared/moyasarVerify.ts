@@ -26,6 +26,7 @@ import {
   MOYASAR_IP_NOT_ALLOWED,
   basicAuthHeader,
   checkPaymentBinding,
+  confirmMessageKey,
   fromMinorUnits,
   isMoyasarIpNotAllowed,
   lastFourOf,
@@ -150,6 +151,24 @@ export async function validateAndConfirmMoyasarPayment(
   };
 
   if (outcome === 'paid' && allMatch) {
+    // A TEST-mode attempt never confirms anything. Moyasar's sandbox settles a
+    // test invoice exactly as live settles a real one, so the binding above
+    // matches and a published test card would mark a real order paid and send
+    // it to the kitchen. payment-initiate refuses to open such an attempt for a
+    // customer; this is the second line, here because every confirmation (the
+    // webhook, payment-verify and the admin re-verify) comes through it. The
+    // admin sandbox invoice has no attempt row, so it never reaches this.
+    if (attempt.mode !== 'live') {
+      console.warn(JSON.stringify({
+        event: 'moyasar_confirm_refused', reason: 'test_mode_attempt', attempt: String(attempt.id).slice(0, 36),
+      }));
+      await touch({
+        status: 'failed', failure_code: 'test_mode_attempt',
+        failure_message_safe: 'A test payment cannot pay for an order.',
+      });
+      return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };
+    }
+
     const paidMajor = fromMinorUnits(Number(payment.amount ?? 0), currency);
     const cardScheme = source.company != null ? String(source.company) : null;
     const cardLast4 = lastFourOf(source.number);
@@ -326,8 +345,7 @@ export async function verifyMoyasarAttempt(
   }
 
   const result = await validateAndConfirmMoyasarPayment(admin, attempt, payment);
-  const { messageKey } = mapMoyasarPaymentStatus(payment.status);
-  return { ...result, messageKey };
+  return { ...result, messageKey: confirmMessageKey(payment.status, result.paid) };
 }
 
 /**

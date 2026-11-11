@@ -72,6 +72,15 @@ function fnBody(src: string, declaration: string): string {
   return declaration + (next === -1 ? rest : rest.slice(0, next));
 }
 
+/** From `from` up to `to`: one exported function, whose signature may hold braces. */
+function section(src: string, from: string, to: string): string {
+  const start = src.indexOf(from);
+  const end = src.indexOf(to, start + from.length);
+  expect(start, from).toBeGreaterThan(-1);
+  expect(end, to).toBeGreaterThan(start);
+  return src.slice(start, end);
+}
+
 /** From `marker` to the brace that closes the block it opens. */
 function block(src: string, marker: string): string {
   const start = src.indexOf(marker);
@@ -142,11 +151,11 @@ describe('every Moyasar request goes through moyasarFetch', () => {
 
   it('reports a failed GET as a value instead of throwing it at the caller', () => {
     const verify = stripComments(sources.get('_shared/moyasarVerify.ts') ?? '');
-    const get = fnBody(verify, 'async function moyasarGet(');
+    const get = block(verify, 'async function moyasarGet(');
     expect(get).toMatch(/\} catch \(e\) \{[\s\S]*return \{ ok: false, status: 0, body: \{\} \};/);
-    expect(fnBody(verify, 'export async function verifyMoyasarAttempt(')).toContain(
-      'isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}',
-    );
+    expect(
+      section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult'),
+    ).toContain('isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}');
   });
 });
 
@@ -325,6 +334,61 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     );
     expect(admin).toContain("resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test')");
     expect(admin).not.toMatch(/refuseTestModeCheckout|payment-initiate/);
+  });
+});
+
+// Moyasar's sandbox settles a test invoice exactly as live settles a real one,
+// so the binding matches and a published test card could mark a real order
+// paid. payment-initiate refuses to open such an attempt; this is the second
+// line, in the one function every confirmation passes through.
+describe('a TEST-mode attempt never confirms an order', () => {
+  const verify = stripComments(readFileSync(new URL('./moyasarVerify.ts', import.meta.url), 'utf8'));
+  const confirm = section(
+    verify,
+    'export async function validateAndConfirmMoyasarPayment(',
+    'export async function verifyMoyasarAttempt(',
+  );
+  const paid = block(confirm, "if (outcome === 'paid' && allMatch) {");
+
+  it('refuses before the payment id is stamped and before either confirmation RPC', () => {
+    const refusal = paid.indexOf("if (attempt.mode !== 'live') {");
+    expect(refusal).toBeGreaterThan(-1);
+    for (const step of [
+      "admin.rpc('finalize_checkout_session'",
+      '.update({ provider_ref: paymentId })',
+      "admin.rpc('confirm_order_payment'",
+      'triggerLazywaitSyncOnce(admin)',
+    ]) {
+      expect(paid.indexOf(step), step).toBeGreaterThan(refusal);
+    }
+    const refused = block(paid, "if (attempt.mode !== 'live') {");
+    expect(refused).toContain("return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };");
+    expect(refused).toContain("status: 'failed', failure_code: 'test_mode_attempt',");
+    expect(count(refused, 'console.')).toBe(1);
+    expect(refused).not.toMatch(/\.rpc\(/);
+  });
+
+  it('leaves no second way to a confirmation', () => {
+    expect(count(verify, "admin.rpc('finalize_checkout_session'")).toBe(1);
+    expect(count(verify, "admin.rpc('confirm_order_payment'")).toBe(1);
+    for (const fn of ['payment-verify', 'payment-webhook', 'payment-test-config']) {
+      expect(code(fn), fn).not.toMatch(/confirm_order_payment|finalize_checkout_session/);
+    }
+  });
+
+  it('never reports the refusal as a success', () => {
+    expect(
+      section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult'),
+    ).toContain('messageKey: confirmMessageKey(payment.status, result.paid)');
+    expect(code('payment-test-config')).toContain("if (result.reason === 'test_mode_attempt') {");
+  });
+
+  // The admin sandbox test is a separate path, and must keep working in TEST.
+  it('leaves the admin sandbox result path alone', () => {
+    const result = block(code('payment-test-config'), "if (payload.action === 'test_checkout_result') {");
+    expect(result).toContain('retrieveMoyasarInvoice(m.secretKey, invoiceId)');
+    expect(result).toContain('if (!isAdminTestInvoice(invoice))');
+    expect(result).not.toMatch(/verifyMoyasarAttempt|validateAndConfirm/);
   });
 });
 

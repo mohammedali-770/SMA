@@ -5,7 +5,7 @@ import {
   keyMatchesMode, lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
   selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
-  matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow,
+  matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow, confirmMessageKey,
 } from './moyasar.ts';
 import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
 
@@ -379,10 +379,25 @@ describe('message keys the app can show', () => {
     expect(mapMoyasarInvoiceStatus('refunded')).toEqual({ outcome: 'refunded', messageKey: 'payUnknown' });
   });
 
+  /**
+   * The app shows the server's key beside the state it was given, so a paid
+   * payment that was not confirmed (a binding mismatch, a TEST-mode attempt)
+   * must not arrive as "Payment successful" on a failed dialog.
+   */
+  it('never says the payment succeeded unless it was confirmed', () => {
+    expect(confirmMessageKey('paid', true)).toBe('paySuccess');
+    expect(confirmMessageKey('captured', true)).toBe('paySuccess');
+    expect(confirmMessageKey('paid', false)).toBe('payUnknown');
+    expect(confirmMessageKey('captured', false)).toBe('payUnknown');
+    expect(confirmMessageKey('failed', false)).toBe('payDeclined');
+    expect(confirmMessageKey('initiated', false)).toBe('payPending');
+  });
+
   it('never emits a key the app strings lack, in either language', () => {
     const emitted = [
       ...PAYMENT_STATUSES.map((s) => mapMoyasarPaymentStatus(s).messageKey),
       ...INVOICE_STATUSES.map((s) => mapMoyasarInvoiceStatus(s).messageKey),
+      ...PAYMENT_STATUSES.flatMap((s) => [confirmMessageKey(s, true), confirmMessageKey(s, false)]),
     ];
     for (const key of emitted) {
       expect(Object.keys(STRINGS.en), `en.${key}`).toContain(key);

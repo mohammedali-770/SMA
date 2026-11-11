@@ -427,6 +427,18 @@ export function mapMoyasarPaymentStatus(status: unknown): { outcome: MoyasarOutc
 }
 
 /**
+ * The message key for a confirmation result. A payment Moyasar reports as paid
+ * that we did NOT confirm (a binding mismatch, a TEST-mode attempt) must not
+ * tell the customer "Payment successful": the app shows the server's key as it
+ * is, beside a failed state. payUnknown says what is true: "We could not
+ * confirm the payment" (apps/mobile/src/i18n/strings.ts, en and ar).
+ */
+export function confirmMessageKey(paymentStatus: unknown, paid: boolean): string {
+  const mapped = mapMoyasarPaymentStatus(paymentStatus);
+  return mapped.outcome === 'paid' && !paid ? 'payUnknown' : mapped.messageKey;
+}
+
+/**
  * Map a Moyasar INVOICE status. Invoices add `canceled`, `on_hold` and
  * `expired` to the payment set (https://docs.moyasar.com/api/invoices/01-create-invoice).
  * `on_hold` is deliberately 'pending': it is not a terminal state and closing
