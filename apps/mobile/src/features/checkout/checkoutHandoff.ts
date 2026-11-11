@@ -4,9 +4,9 @@
  *
  * Why in memory: the Moyasar invoice URL is a payable link — anyone holding it
  * can pay that invoice. It is held ONLY here — never placed in navigation route
- * params, never written to AsyncStorage, never logged. The route carries only the non-secret checkout-
- * session UUID; the WebView screen exchanges that id for the URL through this
- * module. The authoritative payment state always comes from the server verify,
+ * params, never written to AsyncStorage, never logged. The route carries only
+ * the non-secret checkout-session UUID; the WebView screen exchanges that id for
+ * the URL through this module. The authoritative payment state always comes from the server verify,
  * so this bridge only signals "the user finished / dismissed the WebView".
  *
  * Pure module (no React Native / Expo) so the settlement + supersede logic is
