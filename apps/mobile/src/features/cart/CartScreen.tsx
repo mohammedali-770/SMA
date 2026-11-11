@@ -66,7 +66,7 @@ export function CartScreen() {
     if (s.addability === 'configure') router.push({ pathname: '/product/[id]', params: { id: s.product.id } });
     else cart.addItem(s.product, {}, 1);
   };
-  if (cart.items.length === 0) return <View style={styles.root}><Header title={t('myCart')} showBack safeTop /><EmptyView icon={<BagIcon size={48} />} title={t('emptyCartTitle')} subtitle={t('emptyCartSub')} actionLabel={t('browseMenu')} onAction={() => router.replace('/(tabs)')} /></View>;
+  if (cart.items.length === 0) return <View style={styles.root}><Header title={t('myCart')} showBack safeTop /><EmptyView icon={<BagIcon size={48} />} title={t('emptyCartTitle')} subtitle={t('emptyCartSub')} actionLabel={t('browseMenu')} onAction={() => router.dismissTo('/(tabs)')} /></View>;
   return (
     <View style={styles.root}>
       <Header title={t('myCart')} showBack safeTop />
@@ -91,7 +91,7 @@ export function CartScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <View style={[styles.subtotalRow, rtlRow]}><Text variant="body" tone="secondary">{t('subtotal')}</Text><Price amount={cart.subtotal} size={typeScale.heading.size} weight="700" /></View>
         {orderCtx.valid ? <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={goToCheckout} accessibilityRole="button"><Text variant="heading" tone="onEmber">{t('goToCheckout')}</Text><Text variant="caption" tone="onEmber">{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text></Pressable>
-          : <Pressable style={[styles.checkoutBtn, styles.checkoutBtnDisabled]} onPress={() => router.replace('/select')} accessibilityRole="button"><Text variant="heading" tone="secondary" align="center">{t('otSelectToOrder')}</Text></Pressable>}
+          : <Pressable style={[styles.checkoutBtn, styles.checkoutBtnDisabled]} onPress={() => router.dismissTo('/select')} accessibilityRole="button"><Text variant="heading" tone="secondary" align="center">{t('otSelectToOrder')}</Text></Pressable>}
       </View>
     </View>
   );

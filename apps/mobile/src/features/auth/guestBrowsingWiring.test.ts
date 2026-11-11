@@ -95,7 +95,8 @@ describe('login returns the customer, only through the allow-list', () => {
 
   it('PhoneOtpLogin navigates through safeReturnPath and has no hard-coded destination', () => {
     const otp = code('features/auth/PhoneOtpLogin.tsx');
-    expect(otp).toContain('router.replace(safeReturnPath(returnTo) ?? HOME_ROUTE)');
+    // dismissTo, not replace: login opens above the tabs (stackedTabsWiring.test.ts).
+    expect(otp).toContain('router.dismissTo(safeReturnPath(returnTo) ?? HOME_ROUTE)');
     expect(otp).not.toContain("router.replace('/(tabs)')");
   });
 

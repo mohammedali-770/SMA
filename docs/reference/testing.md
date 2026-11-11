@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**212 TypeScript test files declaring 3297 test blocks, plus 82 SQL suites.**
+**213 TypeScript test files declaring 3301 test blocks, plus 82 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -128,7 +128,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-77 files, 1078 declared test blocks.
+78 files, 1082 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -168,6 +168,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 21 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
+| `apps/mobile/src/features/order/stackedTabsWiring.test.ts` | 4 | screens opened above another route go back to it |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
 | `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
