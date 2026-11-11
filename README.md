@@ -105,7 +105,7 @@ npm --prefix apps/mobile run web
 npm --prefix apps/mobile start
 ```
 
-Create local environment files from the examples as needed. Client-side Supabase anon/publishable credentials are public by design; **service-role/provider secrets must never be placed in client env files or committed**.
+Create local environment files from the two templates as needed: `cp .env.example .env.local` for the console, and `cp apps/mobile/.env.example apps/mobile/.env.local` for the customer app. Client-side Supabase anon/publishable credentials are public by design; **service-role/provider secrets must never be placed in client env files or committed**.
 
 ## Quality gates
 
