@@ -3425,6 +3425,134 @@ then, and receivers accept both. **The steps, in this order, each a separate
 
 **Rollback:** reactivate the legacy keys; no redeploy needed.
 
+## 43. Privacy policy — device location is used for more than the delivery pin
+
+**Opened 2026-11-10.** `privacy_policy` v2.3 says the device location is used
+*"only while you are choosing a delivery point on the map"*. The app also uses
+it on the pickup tab, to list the nearest branches, and at checkout, to warn
+when the delivery pin is far from the customer. Neither of those sends the
+location anywhere, and both are in the app customers already have. So this is a
+disclosure gap that applies now, not something the next build introduces.
+
+The exact replacement text in both languages, the evidence, and the publishing
+steps are in `docs/legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md`. Publishing
+means editing a live `legal_documents` row, which is a §5 action: copy-paste in
+the admin console, bump to **v2.4**, set the effective date.
+
+**The English can go first.** The Arabic is engineering-drafted and joins §35.
+A correct English disclosure beside an unchanged Arabic one is better than both
+incomplete.
+
+**Done looks like:** v2.4 active in both languages, the public `/privacy` page
+showing the new line, and this section marked closed with the date.
+
+## 44. PDPL — what the law requires, read against SDAIA's texts, and what only you or counsel can settle
+
+**Opened 2026-11-10.** Every item below was read against SDAIA's published texts
+that day: the PDPL, its Implementing Regulation (IR), the Transfer Regulation and
+the Register Rules. The full addresses are in `docs/RECORD_OF_PROCESSING.md`
+(Sources). The Arabic texts govern. **None of this is legal advice.** It is what
+the texts say, so that counsel's time goes on judgement rather than on finding
+the rules.
+
+### For you, now — no counsel needed
+
+1. **Register the controller on SDAIA's National Data Governance Platform.**
+   Whether registration is *required* depends on criteria (item 4 below). But
+   the breach-notification e-service will not accept a filing without a valid
+   registration certificate, so an unregistered controller cannot meet the
+   72-hour rule through it (`INCIDENT_RESPONSE.md` §10b).
+2. **Name the breach notifier and a deputy** in `INCIDENT_RESPONSE.md` §10b.
+3. **Decide three retention periods** (`RECORD_OF_PROCESSING.md`, Findings):
+   - sign-in send records (`whatsapp_message_logs`), which today are kept until
+     the account is deleted, with no time limit;
+   - inactive push device records. Turning notifications off stops sending but
+     keeps the token until the account is deleted;
+   - the figure behind "the period required by tax and accounting law" for
+     orders.
+
+   Each period then needs a small sweep, which is a migration and a §5 apply.
+
+### For counsel
+
+4. **Registration and a data protection officer.**
+   - **Registration** (Register Rules Art 2) is required of public entities,
+     controllers whose main activity is based on processing personal data,
+     controllers of sensitive data, and individuals processing beyond personal
+     use.
+   - **A DPO** (IR Art 32) is required where core activities involve regular and
+     systematic monitoring of data subjects, or are based on sensitive data.
+     SDAIA's DPO Rules list "location tracking" as an example of monitoring. The
+     app takes a delivery pin per order, and location only while the app is open
+     (activity 5 in the record). A free-text allergy note could be health data.
+   - Counsel decides whether either applies. SDAIA offers a DPO guiding tool on
+     the platform.
+5. **A transfer basis for every recipient outside the Kingdom** (PDPL Art 29;
+   Transfer Regulation Arts 2–7, as replaced by Resolution 1840, 1 Sep 2024):
+   - **No adequacy list has been published**, so Germany has no adequacy finding.
+   - The safeguards are SDAIA's standard contractual clauses (v1.0, used
+     unedited — an edited copy is "not recognized"), binding common rules, or an
+     accreditation certificate.
+   - A **risk assessment is required before** a transfer under Art 4.
+   - **The open question:** which Art 4(2) case covers *ongoing* cloud hosting
+     for a controller that is not part of a multinational group. The "service to
+     the data subject" case names only an accreditation certificate, and the
+     time-limited case does not fit ongoing hosting.
+   - The privacy policy today says only *"we rely on the data protection
+     commitments in our contract with that provider"*.
+6. **Marketing consent — the most consequential item here.**
+   - **What the texts say:**
+     - PDPL Art 25 allows advertising to a person's own means of communication
+       only with *"the prior consent of the targeted recipient"*, plus a clear
+       way to stop;
+     - IR Art 11 requires consent to be documented with time and means, and *"a
+       separate consent shall be obtained for each Processing purpose"*;
+     - IR Arts 28–29 require evidence of consent, and an opt-out as easy as
+       opting in.
+   - **What the app does:** offers are opt-out — on when notifications are
+     granted (CLAUDE.md §7). #425 now *tells* the customer before the OS prompt,
+     but one tap still grants two purposes, order updates and offers, and nothing
+     records it.
+   - **Against that wording:** an offers channel switched on by default without a
+     marketing-specific consent step does not match it. IR 28(1)'s "prior
+     interaction" exception has no counterpart in PDPL Art 25 or IR Art 29, and
+     both 2025–26 drafts narrow or remove it.
+   - **The engineering options, smallest first:**
+     - (a) keep opt-out as an accepted risk;
+     - (b) put a separate "occasional offers" choice on the consent screen and
+       register with the customer's answer;
+     - (c) (b) plus the consent ledger proposed in
+       `docs/decisions/0002-consent-ledger.md`, which is what "documented" asks
+       for.
+
+     Moving to opt-in is the one-line revert CLAUDE.md §7 already records
+     (`promosEnabled: false`). Doing it properly is (c).
+   - **Any change to who receives offers is a §7 owner decision** (2026-08-20,
+     re-confirmed 2026-11-09). This item asks you to revisit it with counsel, not
+     assume the answer.
+7. **The record of processing.** PDPL Art 31 and IR Art 33 require it to be
+   written, kept current, available to SDAIA on request, and kept for five years
+   after the processing ends. `docs/RECORD_OF_PROCESSING.md` is the engineering
+   draft. Its lawful-basis column is engineering's reading.
+
+### Two drafts to watch, neither of them law at the time of writing
+
+- **SDAIA's October 2026 consultation on the Implementing Regulation** (6 October
+  to 5 November 2026, confirmed by Umm Al-Qura) proposes, among other changes:
+  - **an express duty to store personal data within the Kingdom** (Art 23);
+  - 72-hour breach notice for **every** breach, not only harmful ones;
+  - a registration trigger for controllers that transfer data abroad.
+
+  It takes effect 60 days after publication if adopted. The first change would
+  make item 5 a migration rather than a contract.
+- **The April 2025 draft** carries similar registration triggers. The content of
+  both drafts is from published law-firm summaries and SDAIA's consultation page;
+  the October draft's own text could not be read.
+
+**Done looks like:** items 1–3 performed, items 4–7 answered by counsel in
+writing, with each answer reflected in `RECORD_OF_PROCESSING.md` and
+`GO_LIVE_READINESS.md` §A, and this section closed with the date.
+
 ## Owner-action closeout rule
 
 When an item is completed:

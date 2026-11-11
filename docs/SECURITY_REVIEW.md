@@ -148,7 +148,11 @@ lives only in `integration_settings`; the admin UI reads the non-secret projecti
   credentials — the audit trail is what bounds the damage, not prevention.
 
 - **Leaked-password protection is OFF** in Supabase Auth (advisor `0027`). Enable
-  HaveIBeenPwned checking in the dashboard (Auth → Policies) — free, no code.
+  HaveIBeenPwned checking in the dashboard (Auth → Policies) — no code, **but not
+  free**. Supabase's docs, read 2026-11-10: *"Leaked password protection is
+  available on the Pro Plan and above."* It applies only to password sign-in,
+  which here means staff accounts. Customers sign in with a WhatsApp code and have
+  no password, so it does not protect them.
 - **Coupon/loyalty cross-account abuse beyond the counter** is bounded by the fixes
   above; monitor coupon redemption vs. limits in reporting.
 
