@@ -93,3 +93,28 @@ describe('branch_availability health card', () => {
     expect(screen.getByText(/الأحجام/)).toBeTruthy();
   });
 });
+
+/**
+ * The payment card names the provider it actually grades. Moyasar is the only
+ * payment provider; the card said "Payment / Tap" until 2026-11-11, and the
+ * database renders the same label in alert emails (20261003120000).
+ */
+describe('payment health card', () => {
+  afterEach(() => cleanup());
+
+  const payment: OperationsHealthSystem = {
+    id: 'payment',
+    critical: true,
+    state: 'not_configured',
+    source: 'integration_settings',
+    details: {},
+  };
+
+  it('is titled for Moyasar, in both languages', () => {
+    render(<HealthSystemCard system={payment} lang="en" />);
+    expect(screen.getByText('Payment / Moyasar')).toBeTruthy();
+    cleanup();
+    render(<HealthSystemCard system={payment} lang="ar" />);
+    expect(screen.getByText('الدفع / Moyasar')).toBeTruthy();
+  });
+});

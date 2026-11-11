@@ -79,14 +79,14 @@ describe('in-flight states', () => {
 
 describe('timeline states', () => {
   const openRow = async () => {
-    const code = await screen.findByText('TAP_WEBHOOK_LATENCY');
+    const code = await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     fireEvent.click(code.closest('button') as HTMLElement);
   };
 
   it('closed: nothing is fetched and no events are on screen', async () => {
     const timeline = vi.spyOn(operationsAlerts, 'timeline');
     render(<OperationsAlertsPanel lang="en" />);
-    await screen.findByText('TAP_WEBHOOK_LATENCY');
+    await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     expect(timeline).not.toHaveBeenCalled();
     expect(screen.queryByText('Opened')).toBeNull();
   });
@@ -139,7 +139,7 @@ describe('sections do not fetch until opened', () => {
     const preview = vi.spyOn(operationsAlerts, 'digestPreview');
     const history = vi.spyOn(operationsAlerts, 'digestList');
     render(<OperationsAlertsPanel lang="en" />);
-    await screen.findByText('TAP_WEBHOOK_LATENCY');
+    await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     expect(preview).not.toHaveBeenCalled();
     expect(history).not.toHaveBeenCalled();
   });
@@ -147,7 +147,7 @@ describe('sections do not fetch until opened', () => {
   it('the settings tab is inert while closed', async () => {
     const get = vi.spyOn(operationsAlerts, 'settingsGet');
     render(<OperationsAlertsPanel lang="en" isAdmin />);
-    await screen.findByText('TAP_WEBHOOK_LATENCY');
+    await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     expect(get).not.toHaveBeenCalled();
   });
 
@@ -175,14 +175,14 @@ describe('load payload and failure', () => {
     vi.spyOn(operationsAlerts, 'summary').mockRejectedValue(new Error('summary down'));
     render(<OperationsAlertsPanel lang="en" />);
     expect(await screen.findByText('summary down')).toBeTruthy();
-    expect(screen.queryByText('TAP_WEBHOOK_LATENCY')).toBeNull();
+    expect(screen.queryByText('PAYMENT_WEBHOOK_LATENCY')).toBeNull();
   });
 
   it('the inverse partial failure behaves the same way', async () => {
     vi.spyOn(operationsAlerts, 'list').mockRejectedValue(new Error('list down'));
     render(<OperationsAlertsPanel lang="en" />);
     expect(await screen.findByText('list down')).toBeTruthy();
-    expect(screen.queryByText('TAP_WEBHOOK_LATENCY')).toBeNull();
+    expect(screen.queryByText('PAYMENT_WEBHOOK_LATENCY')).toBeNull();
   });
 
   it('keeps an UNKNOWN subsystem and severity visible', async () => {
@@ -194,7 +194,7 @@ describe('load payload and failure', () => {
       severity: 'nonsense' as 'critical',
     })]);
     render(<OperationsAlertsPanel lang="en" />);
-    const code = await screen.findByText('TAP_WEBHOOK_LATENCY');
+    const code = await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     const row = code.closest('button') as HTMLElement;
     expect(row.textContent).toContain('brand_new_subsystem');
     expect(row.textContent).toContain('Info');
@@ -253,7 +253,7 @@ describe('the absences that are the contract', () => {
 
   it('an expanded alert offers no acknowledge control', async () => {
     render(<OperationsAlertsPanel lang="en" isAdmin />);
-    const code = await screen.findByText('TAP_WEBHOOK_LATENCY');
+    const code = await screen.findByText('PAYMENT_WEBHOOK_LATENCY');
     fireEvent.click(code.closest('button') as HTMLElement);
     await screen.findByText('Opened');
     expect(screen.queryByRole('button',

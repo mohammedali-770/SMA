@@ -4,11 +4,14 @@ import { CreditCard, Plug, RefreshCw } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
-import { Notice } from '../../design-system/ui/Notice';
+import { Notice, type NoticeTone } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { paymentGateway, PaymentGatewayStatus } from '../../lib/api';
-import { canRunMoyasarAdminTestCheckout, moyasarBlockingReason } from '../../lib/moyasarAdminTest';
+import {
+  canRunMoyasarAdminTestCheckout, isMoyasarShapedStatus, moyasarBlockingReason,
+} from '../../lib/moyasarAdminTest';
+import { webhookVerificationNotice, type WebhookVerificationNotice } from '../../lib/moyasarWebhookVerification';
 
 /**
  * Admin Moyasar readiness + connection test. Reads config-presence booleans from
@@ -22,8 +25,8 @@ import { canRunMoyasarAdminTestCheckout, moyasarBlockingReason } from '../../lib
  * checkout below is gated by `canRunMoyasarAdminTestCheckout`, which refuses to
  * run in live mode at all.
  *
- * TWO THINGS THIS PANEL SHOWS THAT THE TAP PANEL CANNOT.
- *  - "Key matches mode". Moyasar keys are self-describing (`sk_test_` /
+ * TWO READINESS ITEMS WORTH THEIR OWN ROWS.
+ *  - "Key prefix". Moyasar keys are self-describing (`sk_test_` /
  *    `sk_live_`), so a live key filed under TEST is detectable rather than
  *    something you discover from a customer's statement.
  *  - "Webhook secret". Moyasar signs nothing; the token echoed in the webhook
@@ -31,6 +34,17 @@ import { canRunMoyasarAdminTestCheckout, moyasarBlockingReason } from '../../lib
  *    server refuses to act on webhooks at all, which shows up as orders that
  *    are paid at Moyasar but never confirm here — so it is surfaced as a
  *    first-class readiness item, not a footnote.
+ *
+ * A SERVER THAT PREDATES MOYASAR. The console deploys on merge; the payment
+ * functions only on a separate deploy. Until then payment-test-config can be a
+ * bundle written before any Moyasar code, whose status describes another
+ * gateway's keys (`isMoyasarShapedStatus`). The panel then says to deploy, hides
+ * those readings and disables the connection test, which would not test Moyasar.
+ *
+ * THE WEBHOOK VERIFICATION CODE. Moyasar may send a one-time six-digit code when
+ * a webhook is registered, to be entered in its dashboard within 30 minutes;
+ * until it is, Moyasar delivers no events to that webhook. payment-webhook
+ * records it, and the panel shows it for exactly that window.
  */
 export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
   const { adminLang } = useApp();
@@ -48,14 +62,28 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
   // Sanitized Moyasar rejection detail (type + message only — never secret/auth).
   const [coErr, setCoErr] = useState<{ code?: string | null; description?: string | null; httpStatus?: number } | null>(null);
   const [coResult, setCoResult] = useState<{ invoiceId?: string; status?: string; amount?: number; currency?: string; mode?: string } | null>(null);
+  const [verification, setVerification] = useState<WebhookVerificationNotice | null>(null);
 
+  const loadVerification = async () => {
+    // A failed read shows nothing: the code is a convenience, and an error here
+    // must not crowd out the readiness below.
+    try { setVerification(webhookVerificationNotice(await paymentGateway.latestWebhookVerification(), Date.now())); }
+    catch { setVerification(null); }
+  };
   const load = async () => {
     setLoading(true); setError(null);
+    void loadVerification();
     try { setStatus(await paymentGateway.status()); }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setLoading(false); }
   };
   useEffect(() => { void load(); }, []);
+  // Moyasar refuses the code once its window closes, so it goes away then.
+  useEffect(() => {
+    if (!verification) return undefined;
+    const timer = window.setTimeout(() => setVerification(null), Math.max(0, verification.expiresAtMs - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [verification]);
 
   const handleTest = async () => {
     setTesting(true); setTestMsg(null);
@@ -67,31 +95,65 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
     } finally { setTesting(false); }
   };
 
-  const isMoyasar = (status?.provider ?? '') === 'moyasar';
   const isLive = status?.mode === 'live';
+  // False against a payment-test-config deployed before Moyasar: its readings
+  // describe another gateway's keys, so none of them is shown.
+  const shaped = isMoyasarShapedStatus(status);
   const canRunTest = canRunMoyasarAdminTestCheckout(status, disabled);
   const blocking = moyasarBlockingReason(status);
+  const keyPrefix = isLive ? 'sk_live_' : 'sk_test_';
+  const clock = (ms: number) =>
+    new Date(ms).toLocaleTimeString(isRTL ? 'ar-SA' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  const blockingText = (): string | null => {
+  const blockingNotice = (): { title: string; action?: string; tone: NoticeTone } | null => {
     switch (blocking) {
       case 'not_moyasar':
-        return isRTL ? "اضبط مزوّد الدفع على 'moyasar' في البطاقة أعلاه." : "Set the payment provider to 'moyasar' in the card above.";
+        return {
+          tone: 'warning',
+          title: isRTL
+            ? "مزوّد الدفع المحفوظ ليس 'moyasar'. احفظ بطاقة الدفع أعلاه لتخزينه."
+            : "The stored payment provider is not 'moyasar'. Save the payment card above to store it.",
+        };
+      case 'server_predates_moyasar':
+        return {
+          tone: 'blocking',
+          title: isRTL ? 'انشر دوال الدفع الخاصة بـ Moyasar أولاً.' : 'Deploy the Moyasar payment functions first.',
+          action: isRTL
+            ? 'دالة payment-test-config على الخادم أقدم من Moyasar. قراءاتها تخص بوابة الدفع السابقة فلا تُعرض هنا، واختبار الاتصال فيها لا يختبر Moyasar.'
+            : 'The payment-test-config function on the server predates Moyasar. Its readings describe the previous gateway, so they are not shown here, and its connection test does not test Moyasar.',
+        };
       case 'disabled':
-        return isRTL ? 'المزوّد غير مفعّل — لن يُعرض الدفع الإلكتروني على العملاء.' : 'The provider is disabled — online payment is not offered to customers.';
+        return { tone: 'warning', title: isRTL ? 'المزوّد غير مفعّل — لن يُعرض الدفع الإلكتروني على العملاء.' : 'The provider is disabled — online payment is not offered to customers.' };
       case 'no_key':
-        return isRTL ? `لم يُضبط المفتاح السري لوضع ${status?.mode ?? 'test'}.` : `No secret key is configured for ${status?.mode ?? 'test'} mode.`;
+        return { tone: 'warning', title: isRTL ? `لم يُضبط المفتاح السري لوضع ${status?.mode ?? 'test'}.` : `No secret key is configured for ${status?.mode ?? 'test'} mode.` };
       case 'key_prefix':
-        return isRTL
-          ? 'المفتاح المحفوظ لا يطابق بادئة الوضع (sk_test_ / sk_live_). صحّح الحقل قبل الاستخدام.'
-          : 'The stored key does not carry the prefix for its mode (sk_test_ / sk_live_). Fix the slot before using it.';
+        return {
+          tone: 'blocking',
+          title: isRTL
+            ? 'المفتاح المحفوظ لا يطابق بادئة الوضع (sk_test_ / sk_live_). صحّح الحقل قبل الاستخدام.'
+            : 'The stored key does not carry the prefix for its mode (sk_test_ / sk_live_). Fix the slot before using it.',
+        };
       case 'no_webhook_secret':
-        return isRTL
-          ? 'لم يُضبط رمز الويب هوك السري. لا يمكن التحقّق من إشعارات Moyasar، ولن تُؤكَّد الطلبات المدفوعة تلقائياً.'
-          : 'No webhook secret token is set. Moyasar notifications cannot be authenticated, so paid orders will not confirm automatically.';
+        return {
+          tone: 'blocking',
+          title: isRTL
+            ? 'لم يُضبط رمز الويب هوك السري. لا يمكن التحقّق من إشعارات Moyasar، ولن تُؤكَّد الطلبات المدفوعة تلقائياً.'
+            : 'No webhook secret token is set. Moyasar notifications cannot be authenticated, so paid orders will not confirm automatically.',
+        };
+      case 'server_not_ready': {
+        // A reason this console does not know yet: say what the server said
+        // rather than calling the gateway ready.
+        const reason = status?.config_reason ? ` (${status.config_reason})` : '';
+        return {
+          tone: 'warning',
+          title: isRTL ? `يفيد الخادم بأن Moyasar غير جاهز${reason}.` : `The server reports Moyasar is not ready${reason}.`,
+        };
+      }
       default:
         return null;
     }
   };
+  const notice = blockingNotice();
 
   const runTestCheckout = async () => {
     setCoRunning(true); setCoMsg(null); setCoResult(null); setCoErr(null);
@@ -171,36 +233,45 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
         </div>
       </div>
 
+      {verification && (
+        <Notice
+          tone="warning"
+          title={isRTL ? `رمز التحقق من الويب هوك: ${verification.code}` : `Webhook verification code: ${verification.code}`}
+          action={isRTL
+            ? `أرسله Moyasar الساعة ${clock(Date.parse(verification.receivedAt))}. أدخله في Moyasar ← الإعدادات ← Webhooks خلال 30 دقيقة من وصوله، أي قبل ${clock(verification.expiresAtMs)}. لا يرسل Moyasar أي أحداث إلى الويب هوك قبل إدخاله.`
+            : `Moyasar sent it at ${clock(Date.parse(verification.receivedAt))}. Enter it in Moyasar → Settings → Webhooks within 30 minutes of its arrival, before ${clock(verification.expiresAtMs)}. Moyasar delivers no events to the webhook until it is entered.`}
+        />
+      )}
+
       {error ? (
         <Notice title={error} tone="blocking" />
       ) : status ? (
         <>
-          {blockingText() && (
-            <Notice
-              title={blockingText() as string}
-              tone={blocking === 'no_webhook_secret' || blocking === 'key_prefix' ? 'blocking' : 'warning'}
-            />
+          {notice && <Notice title={notice.title} action={notice.action} tone={notice.tone} />}
+
+          {shaped && (
+            <>
+              <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
+                <Indicator label={isRTL ? `مفتاح الوضع (${status.mode})` : `Key for mode (${status.mode})`} ok={status.active_key_set} />
+                <Indicator label={isRTL ? `بادئة المفتاح (${keyPrefix})` : `Key prefix (${keyPrefix})`} ok={status.key_prefix_ok === true} />
+                <Indicator label={isRTL ? `رمز الويب هوك السري (${status.mode})` : `Webhook secret (${status.mode})`} ok={status.webhook_secret_set === true} />
+                <Indicator label={isRTL ? 'مفتاح تجريبي' : 'Test key'} ok={status.test_key_set} />
+                <Indicator label={isRTL ? 'مفتاح مباشر' : 'Live key'} ok={status.live_key_set} />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 px-1">
+                <Text variant="caption" tone="secondary" as="span">
+                  {isRTL ? 'العملة' : 'Currency'}: <span className="num">{status.currency}</span>
+                </Text>
+                <Text variant="caption" tone="secondary" as="span">
+                  {isRTL ? 'الطريقة' : 'Flow'}: <span className="num">invoice</span>
+                </Text>
+                <Text variant="caption" tone="secondary" as="span">
+                  {isRTL ? 'انتهاء' : 'Expiry'}: <span className="num">{status.expiry_minutes}m</span>
+                </Text>
+              </div>
+            </>
           )}
-
-          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
-            <Indicator label={isRTL ? `مفتاح الوضع (${status.mode})` : `Key for mode (${status.mode})`} ok={status.active_key_set} />
-            <Indicator label={isRTL ? 'بادئة المفتاح تطابق الوضع' : 'Key matches mode'} ok={status.key_prefix_ok === true} />
-            <Indicator label={isRTL ? 'رمز الويب هوك السري' : 'Webhook secret'} ok={status.webhook_secret_set === true} />
-            <Indicator label={isRTL ? 'مفتاح تجريبي' : 'Test key'} ok={status.test_key_set} />
-            <Indicator label={isRTL ? 'مفتاح مباشر' : 'Live key'} ok={status.live_key_set} />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 px-1">
-            <Text variant="caption" tone="secondary" as="span">
-              {isRTL ? 'العملة' : 'Currency'}: <span className="num">{status.currency}</span>
-            </Text>
-            <Text variant="caption" tone="secondary" as="span">
-              {isRTL ? 'الطريقة' : 'Flow'}: <span className="num">invoice</span>
-            </Text>
-            <Text variant="caption" tone="secondary" as="span">
-              {isRTL ? 'انتهاء' : 'Expiry'}: <span className="num">{status.expiry_minutes}m</span>
-            </Text>
-          </div>
 
           {!disabled && (
             <div className="space-y-2 border-t border-con-line pt-3">
@@ -211,7 +282,7 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
                 <Button
                   label={testing ? '…' : (isRTL ? 'اختبار' : 'Test')}
                   onClick={() => { void handleTest(); }}
-                  disabled={testing || !status.active_key_set}
+                  disabled={testing || !shaped || !status.active_key_set}
                   loading={testing}
                   variant="secondary"
                   leading={<Plug className="size-3" aria-hidden="true" />}
@@ -272,14 +343,6 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
                   : 'An isolated sandbox invoice linked to no order. Available in TEST mode only.'}
               </Text>
             </div>
-          )}
-
-          {!isMoyasar && (
-            <Text variant="caption" tone="tertiary" as="p">
-              {isRTL
-                ? 'المزوّد النشط ليس Moyasar، لذا لا تعكس هذه القراءات ما يستخدمه العملاء فعلياً.'
-                : 'Moyasar is not the active provider, so these readings do not reflect what customers actually use.'}
-            </Text>
           )}
         </>
       ) : (

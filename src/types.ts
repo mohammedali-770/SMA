@@ -280,17 +280,10 @@ export interface BrandSettings {
 //  (`apiKey`), which is the same defect recorded in src/data/initialData.ts, and
 //  IntegrationEvent described a SIMULATED gateway message for the retired
 //  emulator. Real provider config lives in integration_settings; the admin UI
-//  reads only the non-secret projection. PaymentSettings is deliberately left in
-//  place — it is unused too, but it is payment-shaped and CLAUDE.md §6 is
-//  cheaper to respect than to argue with.)
-
-export interface PaymentSettings {
-  providerName: 'paytabs' | 'hyperpay' | 'moyasar' | 'sandbox';
-  isLiveMode: boolean;
-  publicKey: string;
-  secretKey: string;
-  isEnabled: boolean;
-}
+//  reads only the non-secret projection. PaymentSettings, the same kind of
+//  shape with a client-side `secretKey`, was kept back then because CLAUDE.md §6
+//  froze payment code. It went on 2026-11-11, unreferenced, when the owner
+//  confirmed Moyasar and asked for the other gateways' code to be removed.)
 
 export interface LoyaltySettings {
   isEnabled: boolean;
