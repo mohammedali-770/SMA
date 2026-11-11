@@ -8,6 +8,7 @@ import {
   pickupBranches,
   resolveDeliveryBranch,
   shouldForceSelection,
+  shouldResetOnUserChange,
   type OrderContext,
 } from './orderContext';
 import type { Branch, DeliveryZone } from '../../types/models';
@@ -135,5 +136,29 @@ describe('shouldForceSelection (launch/menu gate)', () => {
     expect(shouldForceSelection(s({ ready: false }))).toBe(false);
     expect(shouldForceSelection(s({ loading: true }))).toBe(false);
     expect(shouldForceSelection(s({ error: 'network down' }))).toBe(false);
+  });
+});
+
+describe('shouldResetOnUserChange', () => {
+  const pickup = makePickupContext(branch(), 1);
+  const delivery = makeDeliveryContext(branch(), { addressId: 'addr-a', lat: 24.7, lng: 46.6, description: 'Gate 3' }, 1);
+
+  it("drops a delivery context when the customer changes: A's address must not reach B", () => {
+    expect(shouldResetOnUserChange('user-a', 'user-b', delivery)).toBe(true);
+  });
+
+  it('drops a delivery context on sign-out', () => {
+    expect(shouldResetOnUserChange('user-a', null, delivery)).toBe(true);
+  });
+
+  it('keeps a pickup context through sign-in, so a guest keeps their branch at checkout', () => {
+    expect(shouldResetOnUserChange(null, 'user-a', pickup)).toBe(false);
+    expect(shouldResetOnUserChange('user-a', 'user-b', pickup)).toBe(false);
+  });
+
+  it('does nothing when the customer has not changed, or there is no context', () => {
+    expect(shouldResetOnUserChange('user-a', 'user-a', delivery)).toBe(false);
+    expect(shouldResetOnUserChange(null, undefined, delivery)).toBe(false);
+    expect(shouldResetOnUserChange('user-a', 'user-b', null)).toBe(false);
   });
 });

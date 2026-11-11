@@ -13,7 +13,8 @@ import { priceAccessibilityLabel } from '../../design-system/generated/money';
 import { hitTarget, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
-import { useCart, useOrderContext } from '../../store';
+import { useAuth, useCart, useOrderContext } from '../../store';
+import { loginHref } from '../auth/returnPath';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { CartItem } from '../../types/models';
@@ -23,6 +24,10 @@ import { useCartSuggestions } from './useCartSuggestions';
 
 export function CartScreen() {
   const insets = useSafeAreaInsets(); const { t, pick, rtlRow, isRTL, lang } = useI18n(); const styles = useStyles(); const cart = useCart(); const orderCtx = useOrderContext();
+  const { status } = useAuth();
+  // A guest fills the cart freely (App Store 5.1.1(v)); checkout is where an
+  // account is needed. Sign in, then land on checkout with the cart intact.
+  const goToCheckout = () => router.push(status === 'signed_in' ? '/checkout' : loginHref('/checkout'));
   // Called before the empty-cart early return so the hook order never changes.
   const { suggestions, noteRemoved, noteSlateVisible } = useCartSuggestions();
   const suggestionCards: SuggestionCardModel[] = suggestions.map((s) => {
@@ -85,7 +90,7 @@ export function CartScreen() {
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <View style={[styles.subtotalRow, rtlRow]}><Text variant="body" tone="secondary">{t('subtotal')}</Text><Price amount={cart.subtotal} size={typeScale.heading.size} weight="700" /></View>
-        {orderCtx.valid ? <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button"><Text variant="heading" tone="onEmber">{t('goToCheckout')}</Text><Text variant="caption" tone="onEmber">{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text></Pressable>
+        {orderCtx.valid ? <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={goToCheckout} accessibilityRole="button"><Text variant="heading" tone="onEmber">{t('goToCheckout')}</Text><Text variant="caption" tone="onEmber">{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text></Pressable>
           : <Pressable style={[styles.checkoutBtn, styles.checkoutBtnDisabled]} onPress={() => router.replace('/select')} accessibilityRole="button"><Text variant="heading" tone="secondary" align="center">{t('otSelectToOrder')}</Text></Pressable>}
       </View>
     </View>

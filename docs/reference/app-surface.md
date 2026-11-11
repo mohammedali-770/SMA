@@ -48,7 +48,7 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | Module | Source files |
 | --- | --- |
 | `account` | 2 |
-| `auth` | 3 |
+| `auth` | 5 |
 | `cart` | 6 |
 | `checkout` | 23 |
 | `legal` | 2 |
