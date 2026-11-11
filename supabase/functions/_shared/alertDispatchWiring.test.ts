@@ -53,6 +53,17 @@ describe('operations-alert-dispatch is inert until deliberately enabled', () => 
   it('refuses to send when the email provider is disabled', () => {
     expect(code()).toContain("getProviderConfig(admin, 'email')");
   });
+
+  // Why a change to `_shared/smtpTarget.ts` cannot reach a live connection while
+  // the flag is off: the endpoint is read and validated only after the handler
+  // has returned `disabled`. The mail-port rule (2026-11-11) relies on this.
+  it('validates the SMTP endpoint only after the master flag has been checked', () => {
+    const c = code();
+    const disabled = c.indexOf("status: 'disabled', reason: 'external dispatch disabled'");
+    const parse = c.indexOf('parseSmtpTarget(');
+    expect(disabled).toBeGreaterThan(-1);
+    expect(parse).toBeGreaterThan(disabled);
+  });
 });
 
 describe('delivery is fenced, and at least once across a crash', () => {

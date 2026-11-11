@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { MAX_PLAINTEXT_BYTES } from './webPush';
 import {
+  DEFAULT_PUSH_SERVICE_HOSTS,
   DEFAULT_TTL_SECONDS,
   MAX_CONSECUTIVE_FAILURES,
   buildPayload,
@@ -366,12 +367,65 @@ describe('refusePushEndpoint', () => {
     expect(refusePushEndpoint('')).toBe('endpoint_not_a_url');
   });
 
-  it('honours an optional operator allowlist, and only narrows', () => {
+  it('honours an optional operator allowlist in place of the default list', () => {
     const apple = 'https://web.push.apple.com/x';
     expect(refusePushEndpoint(apple, null)).toBeNull();
     expect(refusePushEndpoint(apple, '')).toBeNull();
     expect(refusePushEndpoint(apple, 'push.apple.com')).toBeNull();
     expect(refusePushEndpoint(apple, 'fcm.googleapis.com')).toBe('endpoint_not_allowed');
+  });
+
+  /*
+   * A PUBLIC HOSTNAME WAS NOT ENOUGH (2026-11-11). Every rule above is lexical,
+   * and nothing resolves the name: `10.0.0.5.sslip.io` is a well-formed public
+   * hostname that wildcard DNS answers with 10.0.0.5, so it passed, and so did
+   * any attacker's host on any port. An endpoint a browser hands out always
+   * belongs to that browser vendor's push service, so with no operator list the
+   * sender now admits only those services, and never an explicit port.
+   */
+  it.each([
+    ['a name that resolves into private space', 'https://10.0.0.5.sslip.io/x'],
+    ['loopback reached through wildcard DNS', 'https://127.0.0.1.nip.io/x'],
+    ['an arbitrary public host', 'https://attacker.example/x'],
+    ['a look-alike that only ends with a push host', 'https://notfcm.googleapis.com/x'],
+    ['a push host used as a subdomain', 'https://fcm.googleapis.com.attacker.example/x'],
+  ])('refuses %s when no allowlist is configured', (_label, endpoint) => {
+    expect(refusePushEndpoint(endpoint)).toBe('endpoint_not_allowed');
+    expect(refusePushEndpoint(endpoint, null)).toBe('endpoint_not_allowed');
+  });
+
+  it('refuses an explicit port, even on a real push service', () => {
+    expect(refusePushEndpoint('https://fcm.googleapis.com:8443/x')).toBe('endpoint_has_port');
+    expect(refusePushEndpoint('https://web.push.apple.com:444/x')).toBe('endpoint_has_port');
+    // An operator list cannot re-open a port.
+    expect(refusePushEndpoint('https://fcm.googleapis.com:8443/x', 'fcm.googleapis.com')).toBe(
+      'endpoint_has_port',
+    );
+  });
+
+  it('admits each browser push service by suffix, including Edge on Windows', () => {
+    expect(DEFAULT_PUSH_SERVICE_HOSTS).toEqual([
+      'fcm.googleapis.com',
+      'updates.push.services.mozilla.com',
+      'web.push.apple.com',
+      'notify.windows.com',
+    ]);
+    // WNS hands out per-region hosts under notify.windows.com.
+    expect(refusePushEndpoint('https://wns2-par02p.notify.windows.com/w/?token=abc')).toBeNull();
+  });
+
+  it('treats a blank allowlist as unset, so an empty secret does not open every host', () => {
+    expect(refusePushEndpoint('https://attacker.example/x', '')).toBe('endpoint_not_allowed');
+    expect(refusePushEndpoint('https://attacker.example/x', '   ')).toBe('endpoint_not_allowed');
+  });
+
+  it('lets the operator list replace the default, but never re-admit an internal address', () => {
+    expect(refusePushEndpoint('https://push.example.net/x', 'push.example.net')).toBeNull();
+    expect(refusePushEndpoint('https://fcm.googleapis.com/x', 'push.example.net')).toBe(
+      'endpoint_not_allowed',
+    );
+    expect(refusePushEndpoint('https://10.0.0.5/x', '10.0.0.5')).toBe('endpoint_not_public');
+    expect(refusePushEndpoint('https://push.internal/x', 'push.internal')).toBe('endpoint_not_public');
   });
 
   it('is not fooled by a trailing dot on the hostname', () => {
