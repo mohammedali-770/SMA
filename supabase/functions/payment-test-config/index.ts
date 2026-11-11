@@ -212,6 +212,11 @@ async function handleMoyasar(
     // payment_records, Lazywait, cash, or the mobile flow. Fails closed unless
     // Moyasar is enabled in TEST mode with a valid test key.
     if (!enabled) return json({ ok: false, message: 'Enable Moyasar first.' }, 200);
+    // The resolver below is forced to 'moyasar' to pick the TEST key, so the
+    // configured provider is checked here, or any enabled row would run it.
+    if ((providerName ?? '').toLowerCase() !== 'moyasar') {
+      return json({ ok: false, message: "Set the payment provider to 'moyasar' first." }, 200);
+    }
     if (mode !== 'test') return json({ ok: false, message: 'Admin test checkout is only available in TEST mode.' }, 200);
     const m = resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test'); // force the TEST key
     if (!m.secretKey) return json({ ok: false, message: 'Test secret key is not set.' }, 200);

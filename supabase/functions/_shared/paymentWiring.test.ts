@@ -534,6 +534,19 @@ describe('payment-test-config', () => {
 
   // The handler now answers for every configuration, so a hard-coded 'moyasar'
   // would tell the console Moyasar is selected when the row says otherwise.
+  // test_checkout forces 'moyasar' into the resolver to pick the TEST key, so
+  // without its own check any enabled payment row would run a Moyasar invoice.
+  it('runs test_checkout only when the configured provider is Moyasar', () => {
+    const checkout = block(src, "if (payload.action === 'test_checkout') {");
+    const gate = checkout.indexOf("if ((providerName ?? '').toLowerCase() !== 'moyasar') {");
+    expect(gate).toBeGreaterThan(-1);
+    expect(block(checkout, "if ((providerName ?? '').toLowerCase() !== 'moyasar') {")).toContain(
+      "return json({ ok: false, message: \"Set the payment provider to 'moyasar' first.\" }, 200);",
+    );
+    expect(gate).toBeLessThan(checkout.indexOf("resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test')"));
+    expect(gate).toBeLessThan(checkout.indexOf('moyasarFetch('));
+  });
+
   it('reports the configured provider in its status instead of assuming Moyasar', () => {
     expect(src).toContain("provider: (providerName ?? '').toLowerCase() || null,");
     expect(src).not.toContain("provider: 'moyasar',");
