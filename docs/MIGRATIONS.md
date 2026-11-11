@@ -25,12 +25,12 @@ to Production.**
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
 > **Updated 2026-11-11 (later still) — `20261002120000_staff_actor_fk_set_null`
-> is written, validated and NOT applied, so on merge the count is FOUR, which
-> supersedes the THREE in the note below:** Moyasar (frozen, §6),
-> `20260929120000` (§51), `20261001120000` (§53) and this file (§54). It lets a
-> staff account that filed, resolved or revealed something be deleted. The three
-> unfrozen files are independent; apply each on its own approval. Moyasar still
-> sorts first. **Name the target by version.**
+> is written, validated and NOT applied, so on merge the count is THREE:**
+> Moyasar (frozen, §6), `20260929120000` (§51) and this file (§54).
+> `20261001120000` (§53) is not among them: it was applied at 12:30:50 UTC the
+> same day. This file lets a staff account that filed, resolved or revealed
+> something be deleted. The two unfrozen files are independent; apply each on
+> its own approval. Moyasar still sorts first. **Name the target by version.**
 
 > **Updated 2026-11-11 (later) — `20261001120000_prune_operational_run_history`
 > is written, validated and NOT applied, so on merge the count is THREE:**
