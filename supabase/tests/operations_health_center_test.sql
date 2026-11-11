@@ -235,89 +235,159 @@ end $$;
 
 -- ---- CONFIGURED MIRRORS RUNTIME READINESS (payment/push) --------------------
 -- The "configured" boolean must track the real runtime gates, not a looser
--- proxy: a broken local Tap setup must read not_configured (never the softer
--- not_monitored), and a correctly enabled Expo push (which carries no DB secret)
--- must never be mislabelled not_configured.
+-- proxy: a Moyasar setup that resolveMoyasarConfig would refuse must read
+-- not_configured (never the softer not_monitored), and a correctly enabled Expo
+-- push (which carries no DB secret) must never be mislabelled not_configured.
+--
+-- The payment cases follow resolveMoyasarConfig
+-- (supabase/functions/_shared/moyasar.ts) check for check, including what
+-- String.prototype.trim() removes. chr() builds every whitespace value, so no
+-- invisible character sits in this file.
+create function pg_temp.set_payment(
+  p_provider text, p_public jsonb, p_secret jsonb, p_enabled boolean default true
+) returns void language sql as $$
+  update public.integration_settings
+     set enabled = p_enabled, provider_name = p_provider,
+         public_config = p_public, secret_config = p_secret
+   where provider_type = 'payment';
+$$;
+
+create function pg_temp.payment_card() returns jsonb language sql as $$
+  select x from jsonb_array_elements(public.operations_health_summary() -> 'systems') x
+   where x ->> 'id' = 'payment';
+$$;
+
+-- For an ENABLED row: the card's `configured` flag must be p_configured, and
+-- the state must follow from it.
+create function pg_temp.expect_payment(p_configured boolean, p_label text)
+returns void language plpgsql as $$
+declare
+  v_card jsonb := pg_temp.payment_card();
+begin
+  if (v_card -> 'details' ->> 'configured')::boolean is distinct from p_configured then
+    raise exception 'payment readiness (%): configured=%, expected %',
+      p_label, coalesce(v_card -> 'details' ->> 'configured', 'NULL'), p_configured::text;
+  end if;
+  if p_configured and v_card ->> 'state' in ('not_configured', 'disabled') then
+    raise exception 'payment readiness (%): configured, but the state is %', p_label, v_card ->> 'state';
+  end if;
+  if not p_configured and v_card ->> 'state' is distinct from 'not_configured' then
+    raise exception 'payment readiness (%): not configured, but the state is %',
+      p_label, coalesce(v_card ->> 'state', 'NULL');
+  end if;
+end $$;
+
 do $$
 declare
   st text;
   prov text;
   txt text;
+  v_test constant jsonb := '{"mode":"test","currency":"SAR"}';
+  v_live constant jsonb := '{"mode":"live","currency":"SAR"}';
+  v_keys constant jsonb := '{"moyasar_test_secret_key":"sk_test_ok","moyasar_test_webhook_secret_token":"tok_test"}';
 begin
-  -- Tap: enabled, provider 'tap', merchant set, but only the WRONG-mode key is
-  -- stored (mode=test, only live key) => resolveTapConfig fails => not_configured.
-  update public.integration_settings
-     set enabled = true,
-         provider_name = 'tap',
-         public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
-         secret_config = '{"live_secret_key":"sk_live_only"}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st <> 'not_configured' then
-    raise exception 'Tap with only the wrong-mode key must be not_configured, got %', st;
+  -- Moyasar in test mode with a test secret key and a test webhook token, and
+  -- no merchant_id at all => configured. No provider probe exists, so the
+  -- state is a configured one (normally not_monitored).
+  perform pg_temp.set_payment('moyasar', v_test, v_keys);
+  perform pg_temp.expect_payment(true, 'test key and test token, no merchant_id');
+
+  -- The provider name is compared case-insensitively, as the resolver does.
+  perform pg_temp.set_payment('Moyasar', v_test, v_keys);
+  perform pg_temp.expect_payment(true, 'provider spelled Moyasar');
+
+  -- No webhook token => not_configured. The resolver refuses to open an invoice
+  -- whose outcome it could never be told (missing_webhook_secret).
+  perform pg_temp.set_payment('moyasar', v_test, '{"moyasar_test_secret_key":"sk_test_ok"}');
+  perform pg_temp.expect_payment(false, 'no webhook token');
+
+  -- A LIVE key filed under test => not_configured (key_mode_mismatch): the
+  -- check that keeps a setup labelled TEST from charging real cards.
+  perform pg_temp.set_payment('moyasar', v_test,
+    '{"moyasar_test_secret_key":"sk_live_misfiled","moyasar_test_webhook_secret_token":"tok_test"}');
+  perform pg_temp.expect_payment(false, 'sk_live_ key filed under test');
+
+  -- Provider 'tap' => not_configured, even with a complete Tap setup and valid
+  -- Moyasar keys beside it.
+  perform pg_temp.set_payment('tap', v_test || '{"merchant_id":"m_123"}',
+    v_keys || '{"test_secret_key":"sk_test_tap","live_secret_key":"sk_live_tap"}');
+  perform pg_temp.expect_payment(false, 'provider tap');
+
+  -- Tap's key names are not Moyasar's.
+  perform pg_temp.set_payment('moyasar', v_test,
+    '{"test_secret_key":"sk_test_tap","moyasar_test_webhook_secret_token":"tok_test"}');
+  perform pg_temp.expect_payment(false, 'only a Tap-named key');
+
+  -- Whitespace-only key => not_configured (the resolver trims the key).
+  perform pg_temp.set_payment('moyasar', v_test, jsonb_build_object(
+    'moyasar_test_secret_key', chr(32) || chr(9) || chr(32),
+    'moyasar_test_webhook_secret_token', 'tok_test'));
+  perform pg_temp.expect_payment(false, 'whitespace-only key');
+
+  -- Whitespace-only token => not_configured, for ASCII whitespace, for the
+  -- no-break and ideographic spaces JavaScript also trims, and for the vertical
+  -- tab, which the old E'...\v' trim set never contained.
+  perform pg_temp.set_payment('moyasar', v_test, jsonb_build_object(
+    'moyasar_test_secret_key', 'sk_test_ok',
+    'moyasar_test_webhook_secret_token', chr(9) || chr(10) || chr(13) || chr(32)));
+  perform pg_temp.expect_payment(false, 'ASCII-whitespace token');
+  perform pg_temp.set_payment('moyasar', v_test, jsonb_build_object(
+    'moyasar_test_secret_key', 'sk_test_ok',
+    'moyasar_test_webhook_secret_token', chr(160) || chr(12288)));
+  perform pg_temp.expect_payment(false, 'no-break and ideographic space token');
+  perform pg_temp.set_payment('moyasar', v_test, jsonb_build_object(
+    'moyasar_test_secret_key', 'sk_test_ok',
+    'moyasar_test_webhook_secret_token', chr(11)));
+  perform pg_temp.expect_payment(false, 'vertical-tab token');
+
+  -- Trimming works the other way too: a key pasted with a byte-order mark in
+  -- front still carries its prefix once trimmed, as it does at runtime...
+  perform pg_temp.set_payment('moyasar', v_test, jsonb_build_object(
+    'moyasar_test_secret_key', chr(65279) || 'sk_test_ok',
+    'moyasar_test_webhook_secret_token', 'tok_test'));
+  perform pg_temp.expect_payment(true, 'key behind a byte-order mark');
+
+  -- ...and it removes whitespace ONLY. 'vsk_test_' does not carry the prefix,
+  -- and a trim set holding the letter v would have read it as if it did.
+  perform pg_temp.set_payment('moyasar', v_test,
+    '{"moyasar_test_secret_key":"vsk_test_ok","moyasar_test_webhook_secret_token":"tok_test"}');
+  perform pg_temp.expect_payment(false, 'key starting with the letter v');
+
+  -- Live mode reads the LIVE slots, with no silent fall back to the test ones,
+  -- not even when a live key was typed into the test field.
+  perform pg_temp.set_payment('moyasar', v_live, v_keys);
+  perform pg_temp.expect_payment(false, 'live mode with only test credentials');
+  perform pg_temp.set_payment('moyasar', v_live,
+    '{"moyasar_test_secret_key":"sk_live_ok","moyasar_live_webhook_secret_token":"tok_live"}');
+  perform pg_temp.expect_payment(false, 'live mode, live key in the test slot');
+  perform pg_temp.set_payment('moyasar', v_live,
+    '{"moyasar_live_secret_key":"sk_live_ok","moyasar_live_webhook_secret_token":"tok_live"}');
+  perform pg_temp.expect_payment(true, 'live key and live token');
+  perform pg_temp.set_payment('moyasar', '{"mode":"LIVE"}',
+    '{"moyasar_live_secret_key":"sk_live_ok","moyasar_live_webhook_secret_token":"tok_live"}');
+  perform pg_temp.expect_payment(true, 'mode spelled LIVE');
+
+  -- One shared token serves when no mode-specific token is saved...
+  perform pg_temp.set_payment('moyasar', v_test,
+    '{"moyasar_test_secret_key":"sk_test_ok","moyasar_webhook_secret_token":"tok_shared"}');
+  perform pg_temp.expect_payment(true, 'shared webhook token');
+  -- ...but an EMPTY mode-specific token does not fall through to it. The
+  -- resolver uses `??`, which skips only a missing value.
+  perform pg_temp.set_payment('moyasar', v_test,
+    '{"moyasar_test_secret_key":"sk_test_ok","moyasar_test_webhook_secret_token":"","moyasar_webhook_secret_token":"tok_shared"}');
+  perform pg_temp.expect_payment(false, 'empty mode token beside a shared one');
+
+  -- A disabled row reads disabled, however complete it is.
+  perform pg_temp.set_payment('moyasar', v_test, v_keys, false);
+  st := pg_temp.payment_card() ->> 'state';
+  if st is distinct from 'disabled' then
+    raise exception 'a disabled Moyasar row must read disabled, got %', st;
   end if;
 
-  -- Add the correct selected-mode key => fully configured => not the unconfigured
-  -- or disabled states (no external probe exists, so normally not_monitored).
-  update public.integration_settings
-     set secret_config = '{"test_secret_key":"sk_test_ok","live_secret_key":"sk_live_only"}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st in ('not_configured','disabled') then
-    raise exception 'fully configured Tap must not be %; expected a configured state', st;
-  end if;
-
-  -- Missing merchant_id => not_configured even with a valid selected-mode key.
-  update public.integration_settings
-     set public_config = '{"mode":"test","currency":"SAR"}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st <> 'not_configured' then
-    raise exception 'Tap missing merchant_id must be not_configured, got %', st;
-  end if;
-
-  -- Provider not 'tap' => not_configured.
-  update public.integration_settings
-     set provider_name = 'geidea',
-         public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
-         secret_config = '{"test_secret_key":"sk_test_ok"}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st <> 'not_configured' then
-    raise exception 'non-tap payment provider must be not_configured, got %', st;
-  end if;
-
-  -- Whitespace-only merchant_id => not_configured (resolveTapConfig trims it).
-  update public.integration_settings
-     set provider_name = 'tap',
-         public_config = '{"mode":"test","currency":"SAR","merchant_id":"   "}'::jsonb,
-         secret_config = '{"test_secret_key":"sk_test_ok"}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st <> 'not_configured' then
-    raise exception 'whitespace-only merchant_id must be not_configured, got %', st;
-  end if;
-
-  -- Whitespace-only selected-mode key => not_configured (resolver trims the key).
-  update public.integration_settings
-     set public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
-         secret_config = '{"test_secret_key":"  \t "}'::jsonb
-   where provider_type = 'payment';
-  select x->>'state' into st
-  from jsonb_array_elements(public.operations_health_summary()->'systems') x
-  where x->>'id'='payment';
-  if st <> 'not_configured' then
-    raise exception 'whitespace-only Tap key must be not_configured, got %', st;
+  -- Nothing secret reaches the card: booleans only.
+  perform pg_temp.set_payment('moyasar', v_test, v_keys);
+  if pg_temp.payment_card()::text ~ '(sk_test_ok|tok_test)' then
+    raise exception 'the payment card leaked a key or token: %', pg_temp.payment_card();
   end if;
 
   -- Push: enabled + provider 'expo' + EMPTY secret_config must be treated as

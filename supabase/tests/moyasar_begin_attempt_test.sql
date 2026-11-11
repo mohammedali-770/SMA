@@ -1,21 +1,22 @@
 -- ============================================================================
--- Provider-generic payment-attempt tests (migration
--- 20260824100000_moyasar_payment_provider.sql).
+-- Payment-attempt tests for the Moyasar RPCs (migrations
+-- 20260824100000_moyasar_payment_provider.sql and
+-- 20261003120000_moyasar_only_payments.sql).
 --
 -- Runs against a throwaway Postgres with the FULL migration chain applied. Each
 -- case RAISES EXCEPTION on failure; a clean run prints NOTICEs and commits
 -- nothing (wrapped in a rollback).
 --
--- WHY THESE CASES AND NOT OTHERS. Tap accepts an idempotency reference on charge
--- creation, so its double-charge protection is belt-and-braces: the provider
--- would return the first charge even if our guard leaked. Moyasar documents NO
--- idempotency on `POST /v1/invoices`, so for Moyasar the one-active-attempt
--- guard tested here IS the protection. That is what makes the reuse and
--- provider-scoping cases below load-bearing rather than decorative.
+-- WHY THESE CASES AND NOT OTHERS. Moyasar documents NO idempotency on
+-- `POST /v1/invoices`, so the one-active-attempt guard tested here is the only
+-- thing standing between a repeated tap on Pay and a second live invoice. That
+-- is what makes the reuse and provider-scoping cases below load-bearing rather
+-- than decorative. Case 11 is the loyalty guard 20261003120000 ported: without
+-- it, two live checkout sessions could each be paid with the same points.
 --
 -- No provider is contacted: begin_payment_attempt / begin_session_attempt only
 -- write a payment_records row. Nothing here schedules or invokes the refund
--- worker, and no Tap object is touched.
+-- worker.
 -- ============================================================================
 begin;
 
@@ -397,6 +398,91 @@ begin
     raise exception 'CASE 10 FAILED: the provider_checkout_ref index is UNIQUE';
   end if;
   raise notice 'CASE 10 ok: provider_checkout_ref is indexed and deliberately non-unique';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Case 11: THE LOYALTY MULTI-SPEND GUARD (20261003120000). Two live sessions
+-- priced against the same 100 points must not both reach a payment: the live
+-- balance has to cover this session's points PLUS those reserved by the
+-- customer's other live sessions. Without the guard both attempts open, and
+-- insert_order_from_snapshot later clamps the second DEDUCTION to the balance
+-- left while keeping the second DISCOUNT.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_cust  uuid := 'c0000000-0000-0000-0000-0000000000fd';
+  v_a     uuid;
+  v_b     uuid;
+  v_c     uuid;
+  v_state text;
+  v_msg   text;
+  r       record;
+begin
+  begin
+    insert into auth.users (id, email) values (v_cust, 'moyasar-loyalty-suite@example.com')
+      on conflict (id) do nothing;
+  exception when undefined_table then
+    null; -- harness seeds auth.users differently
+  end;
+  insert into public.profiles (id, role) values (v_cust, 'customer')
+    on conflict (id) do nothing;
+  update public.profiles set loyalty_points = 100 where id = v_cust;
+
+  -- Two live sessions, each priced to redeem 80 of the same 100 points.
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe',
+            '{"loyalty_points_redeemed": 80}'::jsonb, 50, 42)
+    returning id into v_a;
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe',
+            '{"loyalty_points_redeemed": 80}'::jsonb, 50, 42)
+    returning id into v_b;
+
+  -- 80 + 80 > 100, so paying either one is refused while the other is live.
+  begin
+    perform public.begin_session_attempt(v_a, 'moyasar', 'test', 30);
+  exception when others then
+    v_state := sqlstate;
+    v_msg := sqlerrm;
+  end;
+  if v_state is distinct from 'P0001'
+     or v_msg is distinct from 'Your loyalty points balance changed. Please rebuild your order.' then
+    raise exception 'CASE 11 FAILED: two live sessions could spend the same points (sqlstate %, %)',
+      coalesce(v_state, 'none'), coalesce(v_msg, 'no error');
+  end if;
+  if exists (select 1 from public.payment_records where checkout_session_id in (v_a, v_b)) then
+    raise exception 'CASE 11 FAILED: a refused attempt still wrote a payment row';
+  end if;
+
+  -- Once the other session has expired, the same session can pay.
+  update public.checkout_sessions set status = 'expired' where id = v_b;
+  select * into r from public.begin_session_attempt(v_a, 'moyasar', 'test', 30);
+  if r.attempt_id is null or r.reused then
+    raise exception 'CASE 11 FAILED: a covered session could not open its attempt';
+  end if;
+
+  -- Points spent elsewhere also block a REUSE of that open attempt...
+  update public.profiles set loyalty_points = 50 where id = v_cust;
+  v_state := null;
+  begin
+    perform public.begin_session_attempt(v_a, 'moyasar', 'test', 30);
+  exception when others then
+    v_state := sqlstate;
+  end;
+  if v_state is distinct from 'P0001' then
+    raise exception 'CASE 11 FAILED: a reused attempt ignored a balance that no longer covers it';
+  end if;
+
+  -- ...while a session that redeems nothing is never held up by the guard.
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', '{}'::jsonb, 50, 50)
+    returning id into v_c;
+  select * into r from public.begin_session_attempt(v_c, 'moyasar', 'test', 30);
+  if r.attempt_id is null then
+    raise exception 'CASE 11 FAILED: a session that redeems no points was refused';
+  end if;
+
+  raise notice 'CASE 11 ok: the live balance must cover the points of every live session';
 end $$;
 
 rollback;
