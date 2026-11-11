@@ -236,6 +236,31 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**Current position 2026-11-11, read live AFTER the run-history prune apply: 145
+repository files on the default branch / 149 live history rows / TWO unapplied
+— `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
+`20260929120000_db_advisor_hardening`, written, validated and awaiting
+approval.** Latest live version `20261111123050`; the most recent apply is
+`20261001120000` (ledger row 104, `docs/MIGRATIONS.md` §53). Reconciled **by
+name** against the default branch at `8df5408`: 141 files applied, 2 superseded
+(ledger rows 8-9), and these 2. The delta against the read below is **+1 file
+and +1 row**: #435 merged the file, and this apply landed it. Two is still the
+shape that looks safe and is not: `20260824100000` sorts first. **Name the
+target by version.**
+
+**APPLIED IS NOT YET EFFECTIVE.** The apply added a function and a daily job
+and deleted nothing. The first prune is the 01:10 UTC run on 2026-11-12, and
+the run log's backlog takes three nights to clear. Until then it keeps growing.
+
+**HASH WHAT THE DATABASE STORED, NOT WHAT YOU SENT.**
+`supabase_migrations.schema_migrations.statements` keeps the full SQL each
+`apply_migration` call ran. Here it hashes to the merged file byte for byte
+(`c95300da…`), and row 103's does too. It is the one check of an inline apply
+that reads the database's copy rather than the caller's.
+
+**Superseded 2026-11-11 (afternoon) — `20261001120000` is APPLIED. The
+amendment below is kept as written, and its THREE is no longer the count.**
+
 **AMENDED 2026-11-11 — `20261001120000_prune_operational_run_history` is
 written, validated and awaiting approval, so on merge the outstanding set is
 THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
@@ -247,8 +272,9 @@ unfrozen files are independent, each on its own approval, and
 `20260824100000` still sorts first. **Name the target by version.** Detail:
 `docs/MIGRATIONS.md` §53.
 
-**Current position 2026-11-11, read live AFTER the guest-menu policy apply: 144
-repository files on the default branch / 148 live history rows / TWO unapplied
+**Superseded, kept because the count is the point — the position read live
+2026-11-11, AFTER the guest-menu policy apply: 144 repository files on the
+default branch / 148 live history rows / TWO unapplied
 — `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
 `20260929120000_db_advisor_hardening`, written, validated and awaiting
 approval.** Latest live version `20261111045833`; the most recent apply is
