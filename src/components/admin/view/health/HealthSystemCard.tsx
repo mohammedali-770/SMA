@@ -64,8 +64,8 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
     descAr: 'جدولة معالجة الحذف والطلبات المستحقة والمراجعة اليدوية.',
   },
   payment: {
-    en: 'Payment / Tap',
-    ar: 'الدفع / Tap',
+    en: 'Payment / Moyasar',
+    ar: 'الدفع / Moyasar',
     descEn: 'Database evidence only; no live provider availability probe in v1.',
     descAr: 'بيانات قاعدة البيانات فقط؛ لا يوجد فحص مباشر لمزود الدفع في الإصدار الأول.',
   },

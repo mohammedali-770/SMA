@@ -23,9 +23,9 @@ export const FIXED_NOW = Date.parse('2026-03-14T12:00:00.000Z');
 export function alertFixture(over: Partial<OperationsAlert> = {}): OperationsAlert {
   return {
     id: 'alert-1',
-    fingerprint: 'payment:TAP_WEBHOOK_LATENCY:v1',
+    fingerprint: 'payment:PAYMENT_WEBHOOK_LATENCY:v1',
     subsystem: 'payment',
-    condition_code: 'TAP_WEBHOOK_LATENCY',
+    condition_code: 'PAYMENT_WEBHOOK_LATENCY',
     severity: 'critical',
     status: 'open',
     generation: 3,

@@ -89,8 +89,8 @@ describe('labels keep unknown values visible', () => {
   it('falls back to the raw subsystem id', () => {
     // A NEW subsystem the UI has not learned yet must stay identifiable, or
     // its alerts appear attributed to nothing.
-    expect(subsystemLabel('payment', 'en')).toBe('Payment / Tap');
-    expect(subsystemLabel('payment', 'ar')).toBe('الدفع / Tap');
+    expect(subsystemLabel('payment', 'en')).toBe('Payment / Moyasar');
+    expect(subsystemLabel('payment', 'ar')).toBe('الدفع / Moyasar');
     expect(subsystemLabel('brand_new_subsystem', 'en')).toBe('brand_new_subsystem');
   });
 

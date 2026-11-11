@@ -2,7 +2,7 @@
  * Pure payment-method helpers shared by checkout + admin + order displays.
  *
  * Cash on Delivery / Cash on Pickup exists but is controlled by Admin settings;
- * it is NEVER assumed. Online payment has no gateway yet. `place_order` is the
+ * it is NEVER assumed. Online payment goes through Moyasar. `place_order` is the
  * server-authoritative gate (a client cannot pick a disabled method or fake
  * payment_status); these helpers only mirror it for UI.
  *

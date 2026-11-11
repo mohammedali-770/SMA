@@ -36,7 +36,7 @@ const SUBSYSTEM_TEXT: Record<string, { en: string; ar: string }> = {
   account_deletion: { en: 'Account Deletion', ar: 'حذف الحسابات' },
   database_jobs: { en: 'Scheduled Jobs', ar: 'المهام المجدولة' },
   branch_availability: { en: 'Branch Availability', ar: 'إتاحة الأصناف بالفروع' },
-  payment: { en: 'Payment / Tap', ar: 'الدفع / Tap' },
+  payment: { en: 'Payment / Moyasar', ar: 'الدفع / Moyasar' },
   push: { en: 'Push Notifications', ar: 'الإشعارات الفورية' },
   email: { en: 'Email / SMTP', ar: 'البريد / SMTP' },
   otp: { en: 'WhatsApp / OTP', ar: 'واتساب / رمز التحقق' },
