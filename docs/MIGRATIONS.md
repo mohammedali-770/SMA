@@ -24,6 +24,17 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11 (later) — two Moyasar-only files are written, validated
+> and NOT applied: `20261003120000_moyasar_only_payments` (§53) and
+> `20261004120000_drop_tap_payment_rpcs` (§54).** On merge the outstanding set
+> is FOUR, plus any file from #435 or #436 that merges first:
+> `20260824100000`, `20260929120000` (§51) and these two. **The Moyasar files
+> have a required order:** `20260824100000`, then `20261003120000`, then the
+> Moyasar-only `payment-initiate` deploy, then `20261004120000`, each on its own
+> approval. The second refuses to apply before the first, and the fourth before
+> the second. `20260824100000` still sorts ahead of everything. **Name the
+> target by version.**
+
 > **Updated 2026-11-11 — `20260930120000_product_variants_guest_read` is
 > APPLIED, and the count is TWO.** 04:58:33 UTC on explicit owner approval
 > naming the target by version; live version `20261111045833`, history
@@ -1498,12 +1509,15 @@ production.
 | 101 | 20260927120000 | admin_push_subscriptions | `26046da81644` | 20260920050434 | admin_push_subscriptions | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 05:04:34 UTC** on explicit owner approval ("apply 20260927120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 2 of the admin closure-notification work: `admin_push_subscriptions`, the nullable `app_settings.admin_push_vapid_public_key` column, and three `is_admin()`-gated RPCs. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`, 400 lines / 18 474 bytes) and matched the recorded value before anything was sent. **THIS IS THE SECOND ATTEMPT, AND THE FIRST ONE FAILING IS THE MOST USEFUL THING IN THIS ROW.** On 2026-09-19 the same file — then `9861df21…` / 365 lines — was approved, hashed correctly, had every live precondition verified, and was **REFUSED BY ITS OWN ASSERTION 5.5**: `anon can execute save_admin_push_subscription(text,text,text,text,text), which must never be true`. Nothing landed (the apply is transactional; history stayed at 145 / `20260917124937`, verified immediately afterwards rather than assumed). The cause: `revoke all on function … from public` does **not** remove `anon`'s grant, because this project's `pg_default_acl` grants EXECUTE on new functions in `public` to `anon`, `authenticated` and `service_role` **directly**. 85 of the 89 `revoke all on function` statements in this tree already said `public, anon`; these three were the outlier, and `20260729091000_caller_can_read_order_anon_revoke` exists solely because the identical mistake was made once before. Corrected in PR #400 as squash `182f670`. **A HARNESS THAT IS STRICTER THAN PRODUCTION IS NOT THE SAFE DIRECTION.** `.github/sql-ci/bootstrap.sql` modelled default privileges for TABLES only, so on the local chain `from public` and `from public, anon` were indistinguishable and every CI check was green on a file that could not apply. It now models functions and sequences too, read live from `pg_default_acl` — proven rather than asserted: with the original `from public` restored the chain fails at file 141 with the exact Production message, and was green before the change. Widening it required correcting 8 of the 13 `"svc"` expectations in `operations_alerts_digest_test.sql`, which had never described Production (measured live: all 13 are `svc=true`) and passed only because the harness was stricter. **THE GRANT FIX WAS VERIFIED ON BOTH HALVES, because removing `authenticated` as well would apply cleanly and ship a feature that cannot work:** all three RPCs now read `anon` **NO**, `authenticated` **YES**, `service_role` **YES**. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, each with exactly one overload (cardinality checked BEFORE the body was read); the file itself refuses to apply unless both still hash those values. **All three bodies byte-identical** against hashes pre-computed from the merged file: `save_admin_push_subscription` `7484f213f168257d40d773a1d1134836` / 1 376 chars, `delete_admin_push_subscription` `9240758de77959fc3e73955bb244e5ec` / 343, `admin_push_state` `37ae19fdb910ac8e804faf98b00e6b44` / 910. **APPLYING IT SUBSCRIBED NOBODY:** `admin_push_subscriptions` 0 rows, the VAPID column present and **NULL**, so no key pair exists and even a subscribed admin could not be sent to; `admin_push_outbox` absent, which is correct — it belongs to `20260928120000`. **The table is CLOSED, re-measured as an outcome rather than trusted to the `revoke`:** RLS enabled, **zero** policies, **zero** privileges for `anon` or `authenticated`. **ROW 86’S LESSON APPLIED — a clean apply proves storage, not execution.** All three were **called** and their outcomes read back as VALUES rather than notices (row 90): `42501 :: Only admins may subscribe to closure notifications`, `42501 :: Only admins may manage closure notifications`, `42501 :: Only admins may read closure notification state`. The probe ran inside a transaction aborted by a `RAISE` and the table was confirmed still empty afterwards. That proves them only as far as their gate, which is stated rather than glossed — driving deeper needs an admin session at AAL2. **THE TWO PUSH CHANNELS STAYED APART, measured on both sides:** `push_devices` unchanged at 5 rows / 5 active, and **0** functions mentioning `admin_push` reference `push_devices` — the property assertion 5.9 exists to enforce. Moyasar re-verified absent (0 functions, 0 history rows, `provider_name` still `tap`, still disabled). Live history **145 → 146**. **No deploy implied.** **Version NOT aligned** — live carries the apply-time stamp `20260920050434` (§9-D). **TWO repository files remain unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6, and `20260928120000_admin_push_closure_notifications.sql`, written and awaiting approval. Moyasar still sorts ahead of everything, so a bulk apply takes the frozen payment file FIRST — name the target by version.** |
 | 102 | 20260928120000 | admin_push_closure_notifications | `e3e265e484fd` | 20260920061858 | admin_push_closure_notifications | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 06:18:58 UTC** on explicit owner approval ("apply 20260928120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 4 and the LAST of the admin closure-notification work: `app_settings.admin_push_enabled`, the `admin_push_outbox` queue, two bilingual copy composers, an enqueue trigger on each of the two closure audit tables, claim/finalize RPCs, an HMAC signature verifier, a pg_cron driver and its job. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `e3e265e484fd50d0cee51fa45dcd07692ce9a33db53171a0c3504e38fb962068`, 983 lines / 45 326 bytes) and matched the recorded value before anything was sent. **APPLYING IT QUEUED NOTHING AND SENT NOTHING:** `admin_push_outbox` 0 rows, `admin_push_subscriptions` 0, `push_devices` unchanged at 5 customer rows, orders unchanged at 76, `admin_push_enabled` true. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, and the file REFUSES TO APPLY unless both still hash those values, with cardinality asserted first and `is distinct from` used so a NULL cannot pass as a clean check (row 90). Moyasar re-verified absent. **A 45 KB HAND-TRANSCRIPTION, CHECKED THE ONLY WAY THAT COULD HAVE CAUGHT IT.** `apply_migration` takes SQL inline, and this file carries Arabic notification copy where one wrong character would be invisible in the apply output — every other signal (the apply result, all ten self-verification assertions, the cron ticks) would have looked identical. So **all ten function bodies were hashed against values PRE-COMPUTED from the merged file before sending**, and all ten came back byte-identical with one overload each: `admin_push_duration_ar` `8e9fc83c…` / 294, `admin_push_duration_en` `6929584d…` / 187, `admin_push_availability_copy` `64866289…` / 1 953, `admin_push_delivery_copy` `918cccf9…` / 596, `admin_push_enqueue_availability` `cacce9f3…` / 1 403, `admin_push_enqueue_delivery` `b38c09f0…` / 1 164, `claim_admin_push_notifications` `6c31c22d…` / 1 614, `finalize_admin_push_notification` `a68b2df8…` / 1 753, `verify_admin_push_dispatch_signature` `5e188b6e…` / 1 407, `invoke_admin_push_dispatch` `84dca6f7…` / 4 362. **What that does NOT cover is stated rather than glossed:** comments OUTSIDE function bodies were trimmed for transport, so the applied text is not byte-identical to the repository file even though every stored body is. Cosmetic, since `prosrc` is what executes, but the same class of deviation recorded for the `admin-push-dispatch` bundle. **ROW 86’S LESSON APPLIED — and here the driver proved itself twice over.** `invoke_admin_push_dispatch()` was CALLED and returned **NULL**, the empty-queue gate taken before any Vault read or HTTP request, with the outbox confirmed still empty afterwards. Better than that, it is RUNNING: cron job 11 (`* * * * *`, active, jobs 10 → 11) had ticked twice within two minutes, both `succeeded`, in **15 ms** and **5 ms**. **BOTH VAULT SECRETS EXIST.** `admin_push_dispatch_secret` was generated by `gen_random_bytes` inside the apply transaction and written straight to Vault, so it never crossed the wire — the §28 method, performed by the migration rather than by hand. `admin_push_dispatch_project_url` was COPIED from `operations_alert_dispatch_project_url`, whose presence was verified BEFORE the apply rather than discovered after, so `docs/OWNER_ACTIONS.md` §41.7’s "did the project URL copy?" check is already answered and the driver will not hold notices for an incomplete Vault. **THE TWO PUSH CHANNELS STAYED APART, enforced rather than intended:** assertion 10.8 fails the apply if any `%admin_push%` function references `push_devices` or `promos_enabled`, and it uses `%admin_push%` rather than a prefix match precisely so the `claim_`/`finalize_`/`invoke_` functions are not exempted — the claim RPC being the natural place for a later "also notify the customer". **NO CLOSURE PATH WAS TOUCHED:** assertion 10.5 enumerates the five closure RPCs and fails if any is missing or mentions `admin_push`. **DEPLOY IMPLIED: one, and it was already done** — `admin-push-dispatch` v1 shipped 2026-09-20 with the queue-drain mode (ledger note in `docs/ADMIN_PUSH_NOTIFICATIONS.md`), so the queue has a worker from the moment this applied. Live history **146 → 147**. **Version NOT aligned** — live carries the apply-time stamp `20260920061858` (§9-D). **THE OUTSTANDING SET IS BACK TO ONE: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — "apply the outstanding migrations" now has exactly one referent and it is the frozen payment file. Name the target by version. |
 | 103 | 20260930120000 | product_variants_guest_read | `fbd5d5bfdfa6` | 20261111045833 | product_variants_guest_read | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-11 04:58:33 UTC** on explicit owner approval (the owner chose "Apply 20260930120000 first", an option that named the target by version and stated it covered that one file, not `20260929120000` and not Moyasar; after two timeouts, "retry the apply"), via MCP `apply_migration`, **one call landed, target named explicitly**. The database half of guest browsing (App Store 5.1.1(v)). It split `product_variants_select_public` — `(is_active OR is_staff())` for anon and authenticated, which refused every signed-out read with 401 because anon cannot execute `is_staff()` — into `product_variants_select_active_public` (`is_active`, anon and authenticated) and `product_variants_select_inactive_staff` (`(NOT is_active) AND is_staff()`, authenticated only). §9-B.7: the merged copy was re-hashed from the default branch (sha256 `fbd5d5bfdfa6be2c99cbfa00d17cce58c5b75e458c0e87ffc3dfed4f7b80d2cd`, 107 lines / 5 317 bytes) before anything was sent and matched. **THE SQL SENT IS THAT FILE BYTE FOR BYTE**, as the session recorded the call — no transport trimming, unlike row 102. **TWO EARLIER ATTEMPTS LANDED NOTHING, verified rather than assumed:** 2026-11-10 16:23 and 2026-11-11 04:37 UTC each timed out after 230 s with the connector's confirmation question unanswered, and a read-only check after each found 147 rows and the legacy policy in place. The third landed in 14 s with the owner watching, and exactly one history row carries the name. **APPLYING IT CHANGED WHAT A GUEST CAN READ AND NOTHING ELSE:** exactly the three intended policies (admin write unchanged); 147 tiers / 144 active before and after; `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…` unchanged with one overload each, which the file also asserts before landing; Moyasar absent (0 rows, 0 functions; provider `tap`, disabled); `20260929120000` still unapplied. **THE OUTCOME, measured on the client's path and as the role:** signed out through PostgREST, a ranged count returned `206` with `content-range: 0-0/144` (401 the day before) and inactive tiers returned `[]`; in SQL, `set local role anon` read back `current_user = anon`, 144 visible, 0 inactive. **#424 merged 95 s later (05:00:08 UTC), as its ordering required**, and production `/app` then opened on the order-type chooser for a signed-out visitor with every catalogue read 200. **The gated deploy job was SKIPPED on that merge**, because `DEPLOY_GATE_ENABLED` is not `'true'`; the merge reached production by a path outside this repository's workflows (`docs/DEPLOY.md` §9). No deploy implied. Live history **147 → 148**. **Version NOT aligned** — live carries the apply-time stamp `20261111045833` (§9-D). **THE OUTSTANDING SET IS TWO: Moyasar (frozen, §6) and `20260929120000` (written, awaiting approval). Two is the shape that looks safe and is not** — `20260824100000` still sorts first. Name the target by version. |
+| 104 | 20261003120000 | moyasar_only_payments | `7199ab22f717` | — | — | — | **E** | WRITTEN, NOT APPLIED | n/a | owner approval, by version, after `20260824100000` | high if `db push` | **Written 2026-11-11, not applied** (§53). Redefines five functions: `begin_session_attempt` gains the loyalty multi-spend guard that `20260824100000` left out; `invoke_payment_refund_processor` gates on `moyasar` instead of `tap`; `open_order_refund_record` falls back to `moyasar`; the payment card of `operations_health_snapshot_internal` mirrors `resolveMoyasarConfig`; `operations_alerts_render_event` reads `Payment / Moyasar`. Rewrites three comments that named Tap. **Refuses to apply before `20260824100000`.** No row, grant or cron change; money path asserted unchanged. 1 916 lines / 91 746 bytes; full sha256 in §53. |
+| 105 | 20261004120000 | drop_tap_payment_rpcs | `c95d950a7a1c` | — | — | — | **E** | WRITTEN, NOT APPLIED | n/a | owner approval, by version, after the Moyasar-only `payment-initiate` deploy | high if `db push` | **Written 2026-11-11, not applied** (§54). Drops `tap_begin_payment_attempt` and `tap_begin_session_attempt`. **Refuses to apply before `20261003120000`**, or while any function body or cron command names them. Apply it only after the Moyasar-only `payment-initiate` is deployed: the live v8 still calls both on its unreachable `tap` branch. Money path asserted unchanged. 159 lines / 7 873 bytes; full sha256 in §54. |
 
-Reconciliation check: the rows above detail **103 repository rows, 101 of which
-carry a live version** — rows 8 and 9 are the two that do not, and both are
-class `—`. **Counted from the table itself, so it is reproducible:** every data
-row between the header and this paragraph, split on whether column 2 and column
-5 hold a 14-digit version.
+Reconciliation check: the rows above detail **105 repository rows, 101 of which
+carry a live version**. The four that do not are rows 8 and 9, class **H**
+(superseded), and rows 104 and 105, class **E** (written, not applied).
+**Counted from the table itself, so it is reproducible:** every data row between
+the header and this paragraph, split on whether column 2 and column 5 hold a
+14-digit version.
 
 **CORRECTED 2026-09-20, and the correction is worth more than the number.** This
 line read **88 repository / 89 live** from 2026-09-09 (#355, the commit that
@@ -1519,7 +1533,7 @@ carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
 from the artifact, never adopt from a working note — applied to this file's own
 summary line.
 
-Rows **89–103** are not described in the narrative below, which stops at 88.
+Rows **89–105** are not described in the narrative below, which stops at 88.
 Each is recorded in its own row and in the section it names; the live totals for
 the whole repository are in `CLAUDE.md` §8, not here.
 
@@ -6922,3 +6936,296 @@ anon, rather than inspecting the policy text.
 **Applying it is a §5 action, named by version.** Afterwards, verify read-only as
 anon (`set local role anon; select count(*) from public.product_variants`): it
 must return a count, not an error.
+
+## 53. Moyasar-only payment objects — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261003120000_moyasar_only_payments.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** It is the database half of the owner's decision of
+2026-11-11 that Moyasar is the payment provider (CLAUDE.md §6).
+
+sha256 `7199ab22f7173becebc630d1b62bfa59dd8d183f099744f6577ca70f285810ea`,
+1 916 lines / 91 746 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It redefines five functions and rewrites three comments, and nothing else.**
+No row is written, no grant or cron job changes, and it does not create
+`refund_trigger_secret`. **MONEY PATH UNTOUCHED, and the file asserts it**
+before and after: `place_order` `12b6816d…` and `compute_order_snapshot`
+`22e2d429…`, one definition each.
+
+### What it fixes, measured live 2026-11-11
+
+Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
+
+| Object | Before | After |
+| --- | --- | --- |
+| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard | the guard from `20260712170000:253-267`, ported verbatim |
+| `invoke_payment_refund_processor` | returns NULL unless the provider is `tap`, so the refund worker can never be invoked | gates on `moyasar`, case-insensitively |
+| `open_order_refund_record` | falls back to provider `tap` | falls back to `moyasar` |
+| `operations_health_snapshot_internal` | the payment card's `configured` flag is Tap's resolver, so a Moyasar row always reads `not_configured` | mirrors `resolveMoyasarConfig` |
+| `operations_alerts_render_event` | `Payment / Tap`, `الدفع / Tap` | `Payment / Moyasar`, `الدفع / Moyasar` |
+
+The three comments are those of `begin_payment_attempt`,
+`begin_session_attempt` and `payment_records.provider_checkout_ref`, which
+described Tap as a current provider.
+
+**The guard defect.** `20260824100000`'s header promises "same locking, same
+reuse-or-expire logic" as the Tap pair, but it copied the July body from before
+`20260712170000` added the guard. Without it, two live checkout sessions can
+each be paid with the same points. Each session is priced against the full
+balance, and `insert_order_from_snapshot` later clamps the second deduction to
+what is left but keeps the second discount. The guard refuses to open a payment
+unless the live balance covers this session's points plus those reserved by the
+customer's other live sessions, under a lock on the profile row. A refusal is
+`P0001 'Your loyalty points balance changed. Please rebuild your order.'`, which
+`payment-initiate` logs and answers with its generic "Could not start the
+payment". The file has never run in Production, so nobody was affected.
+
+**The payment card.** The new `configured` flag requires, check for check with
+`resolveMoyasarConfig` (`supabase/functions/_shared/moyasar.ts`):
+- provider `moyasar`;
+- the secret key for the selected mode, carrying that mode's prefix, `sk_test_`
+  or `sk_live_`. A live key filed under test is not ready;
+- a webhook token for that mode, or the shared `moyasar_webhook_secret_token`.
+  An empty mode-specific token does not fall through to the shared one, which is
+  the resolver's `??`;
+- no merchant id.
+
+Both values are trimmed of exactly what `String.prototype.trim()` removes. Only
+booleans leave the statement; no key or token is selected.
+
+### Ordering, and why the file enforces it
+
+1. **`20260824100000` first.** This file refuses to apply until
+   `begin_payment_attempt`, `begin_session_attempt` and
+   `payment_records.provider_checkout_ref` exist. Without that check, its
+   `create or replace` would create `begin_session_attempt` on its own, and a
+   later apply of `20260824100000` would silently put the unguarded body back.
+   Proven: on a chain without `20260824100000`, the file stops at its first
+   check and creates nothing.
+2. **Both before the Moyasar-only `payment-initiate` is deployed.** That deploy
+   is what first calls `begin_payment_attempt` and `begin_session_attempt`, and
+   selects `provider_checkout_ref`.
+3. **`20261004120000` (§54) after that deploy.** It refuses to apply before this
+   file.
+
+Each is its own §5 action, named by version. **`20260824100000` still sorts
+ahead of every outstanding file, so a bulk apply takes it first.** This file is
+independent of `20260929120000`, `20261001120000` and `20261002120000`.
+
+### Derived, not retyped
+
+Every body is the current definition from the migration that last defined it,
+changed only by anchored substitutions. Each was asserted to match exactly once
+when the file was generated:
+
+| Function | Source | Substitutions |
+| --- | --- | --- |
+| `begin_session_attempt` | `20260824100000:186-268` | 2: three declarations, and the guard block |
+| `invoke_payment_refund_processor` | `20260729090000:186-262` | 1: the gate and its comment |
+| `open_order_refund_record` | `20260724120000:519-556` | 1: the literal |
+| `operations_health_snapshot_internal` | `20260925120000:113-1206` | 1: the payment configuration read and its comment |
+| `operations_alerts_render_event` | `20260820160000:1577-1651` | 2: the two labels |
+
+A `pg_get_functiondef` diff of each function, before and after, on the local
+chain shows only those hunks.
+
+**The pre-images were hashed against the live functions**, read-only, on
+2026-11-11:
+
+| Function | live `md5(prosrc)` | live `md5(pg_get_functiondef)` | Against its source file |
+| --- | --- | --- | --- |
+| `invoke_payment_refund_processor` | `52a3faab…` | `9e31bb04…` | byte-identical |
+| `operations_health_snapshot_internal` | `10265270…`, 47 919 chars | `47c7553a…` | byte-identical |
+| `operations_alerts_render_event` | `605c1ada…` | `85d67661…` | byte-identical |
+| `open_order_refund_record` | `0532e1c7…`, 1 021 chars | `780d39e5…` | comment-trimmed |
+| `tap_begin_session_attempt`, the guard's source | `35773fe3…`, 3 608 chars | `1e5bc676…` | comment-stripped, lines joined |
+
+The last two are not byte-identical to their files. With `--` comments removed
+and whitespace collapsed, live and repository hash the same: `6925d1a4…` and
+`588fc392…`. So the statements are the ones in the files, and the guard being
+ported is the one running today. `begin_session_attempt` is not live at all.
+
+**Hashes to expect after the apply**, computed on the local chain from this
+file before anything is sent:
+
+| Function | `md5(prosrc)` | `md5(pg_get_functiondef)` |
+| --- | --- | --- |
+| `begin_session_attempt` | `235aedf3456beec445f76efaf9f443c7` (4 365 chars) | `ca27604a86180acedd60beea257cd9e8` |
+| `invoke_payment_refund_processor` | `afad660670f6d46b5e9c75e9f4d12c71` (2 677) | `2920cd9b992a2a1c1e61e07cfdd9e287` |
+| `open_order_refund_record` | `140778650aaea14bd32d4e087ae68ad9` (1 139) | `81c0ff702d8f5adbec5ddc450896329b` |
+| `operations_health_snapshot_internal` | `1e300b3d61759729e523d7c74224ce78` (49 281) | `54c3f7b243ca0cb7628c99f2438b7447` |
+| `operations_alerts_render_event` | `9214c2932078957a227ad61ac678f26d` (2 632) | `da6f2ae7ac65d0fb0a6e93c2ac0e7375` |
+
+They hold only for the sha256 above. **Check which side of the apply a hash
+describes before calling a mismatch** (CLAUDE.md §8).
+
+### A trim-set trap, found while mirroring the resolver
+
+The Tap predicate trimmed with `E' \t\n\r\f\v'`. **PostgreSQL has no `\v`
+escape**, so `E'\v'` is the letter `v`, measured as `ascii(E'\v') = 118`. The
+set trims a leading or trailing letter v and leaves a vertical tab in place.
+The new predicate spells the 25 code points `String.prototype.trim()` removes as
+`\u` escapes, enumerated with Node 22 and Deno 2.9.4.
+
+**The same set is still used in two places this file does not touch:**
+- the email card of the same snapshot, for `host` and `from_email`;
+- `address_description_is_usable` (`20260802120000`). It trims a lowercase v
+  from either end of a delivery landmark, so `villa` measures 4 and is refused
+  (measured on the local chain).
+
+Fixing those is a separate change.
+
+### What it deliberately does not do
+
+- **It does not create `refund_trigger_secret`.** The driver reads it from the
+  payment row's `secret_config`, not from Vault, and keeps returning NULL
+  without it. Creating it is an owner step.
+- **It adds no provider allow-list to `begin_payment_attempt` or
+  `begin_session_attempt`.** Both stay provider-parameterised. Their only caller
+  passes `moyasar`, and the service role they require can write
+  `payment_records` directly, so a refusal there would guard nothing.
+- **It does not touch the `payment-refund-worker` cron job**, which is inactive
+  live.
+- **It does not drop the Tap RPCs.** That is §54, after the deploy.
+
+### Validation
+
+- **Local chain harness** (`.github/sql-ci/run.sh`, Postgres 16 + PostGIS 3):
+  - base, at `2b69ab1`: 144 migrations, 82 suites, 80 passed, 2 quarantined;
+  - with this file: **145 migrations, 83 suites, 81 passed, 2 quarantined, 0
+    new failures**;
+  - the idempotence report is identical to the base, and the file re-applies
+    cleanly.
+- **Every new case fails without the file and passes with it:**
+  - `moyasar_begin_attempt_test.sql` Case 11, the guard. Of two live sessions
+    each redeeming 80 of 100 points, the first is refused while the other is
+    live, and pays once the other has expired. A reuse of its attempt is refused
+    once the balance no longer covers it. A session without points is never
+    checked;
+  - `operations_health_center_test.sql`. The Tap readiness cases become 20
+    Moyasar checks. Without the file, every check that expects `configured`
+    fails, and so does provider `tap`;
+  - `moyasar_only_payments_test.sql`. The refund gate, through the harness's
+    `net.http_post` recorder: a `tap` row sends nothing, an enabled `moyasar` row
+    posts to `/functions/v1/payment-refund` with the secret verbatim, and a
+    disabled row or a blank secret still sends nothing. Also the refund fallback
+    and both labels.
+- **Mutation testing: 16 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by a paired suite:
+  - the guard dropped, the `tap` gate kept, the `tap` fallback kept, the Tap
+    predicate kept;
+  - in the predicate: `sk_` instead of the mode's prefix; no token check; an
+    ASCII-only trim set; the old `E'\v'` set; an empty mode token falling
+    through; live mode reading the test key slot; no provider check;
+  - the Arabic label kept; a case-sensitive refund gate;
+  - the guard after the reuse lookup, counting its own session, counting
+    expired sessions.
+
+  Three of them survived the block's first version, which matched statement
+  fragments. The block now compares the whole guard and the whole predicate,
+  comments removed and whitespace collapsed.
+
+### What it proves at apply time, and what it cannot
+
+The block **calls** the snapshot and the renderer and reads their results back
+as values. The payment card must be in a legitimate state, report `enabled` and
+`configured` as booleans consistent with that state, and carry no key material.
+
+It does **not** call `invoke_payment_refund_processor`, which can POST to the
+refund worker, or `begin_session_attempt`, which writes `payment_records`. A
+trigger function cannot be called directly. Those three are proven on the local
+chain only.
+
+**What the card reads after the apply depends on what the owner saved**, which
+no check reads. It is `not_monitored` if the selected mode's secret key and a
+webhook token are saved, and `not_configured` otherwise. With optional alerts
+on, a `not_configured` card raises `payment:configuration`.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20260824100000` by name. Verify that `begin_payment_attempt`,
+   `begin_session_attempt` and `payment_records.provider_checkout_ref` exist.
+2. Apply `20261003120000` by name, after re-hashing the merged copy.
+3. Verify read-only: the five hashes above, one definition each, the money-path
+   pair unchanged, and `anon` and `authenticated` unable to execute any of the
+   five.
+
+A timed-out apply is unknown until a read settles it (§52).
+
+## 54. Tap payment RPCs dropped — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261004120000_drop_tap_payment_rpcs.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** It drops `tap_begin_payment_attempt(uuid, text,
+integer)` and `tap_begin_session_attempt(uuid, text, integer)`, which open a
+payment attempt with the provider hard-coded to `tap`.
+
+sha256 `c95d950a7a1cd18401a5c94fc2aba459adfb33a5ebeddbae447b423e42a168ce`,
+159 lines / 7 873 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It drops two functions and nothing else.** No row is written:
+`payment_records` keeps its 9 Tap history rows, and the provider-scoped
+one-active indexes stay, because they guard Moyasar against a double charge
+too. **MONEY PATH UNTOUCHED, and the file asserts it.**
+
+### Apply it only after the Moyasar-only `payment-initiate` is deployed
+
+The live `payment-initiate` (v8, deployed 2026-07-13) still calls both functions
+on its `tap` branch. That branch cannot be reached while the payment row's
+provider is `moyasar`, but it is the only way back to Tap while v8 is live.
+After the Moyasar-only deploy, nothing calls them.
+
+The file also **refuses to apply before `20261003120000`**, so the loyalty guard
+is never dropped with its last copy.
+
+### Measured live 2026-11-11, read-only
+
+- Both functions exist, `SECURITY DEFINER`, executable by service_role only.
+- No other function body in any schema names `tap_begin_`, and `pg_depend`
+  lists no dependents.
+- Their only callers are in `supabase/functions/payment-initiate`.
+
+### What the file checks
+
+- **Before the drop:** `20261003120000` is applied (one `begin_session_attempt`,
+  carrying the guard), and no other function body and no cron command names a
+  `tap_begin_` function. plpgsql bodies are not tracked in `pg_depend`, so the
+  drop alone could not see such a caller.
+- **The drop** runs without `CASCADE`, so a dependent object fails the apply
+  instead of disappearing with it.
+- **After:** neither name exists under any signature. `begin_payment_attempt`
+  and `begin_session_attempt` are present and service_role only, and the session
+  one still carries the guard. The money path is unchanged.
+
+### Validation
+
+- **Local chain harness:** **146 migrations, 83 suites, 81 passed, 2
+  quarantined, 0 new failures**. The idempotence report is identical to the
+  base, and the file re-applies cleanly.
+- **Suites:**
+  - `tap_reference_order_opaque_test.sql` is **deleted**. Its subject is gone,
+    and with this file it fails at its first call. The opaque-reference rule
+    for Moyasar is covered by `moyasar_begin_attempt_test.sql` Cases 1 and 8;
+  - `moyasar_begin_attempt_test.sql` Case 4 called the Tap RPC and failed the
+    same way. It now writes a provider `tap` initiated row directly, in the
+    shape of the three live July rows, and also asserts that the Moyasar path
+    leaves that row alone;
+  - **new** `drop_tap_payment_rpcs_test.sql` fails without this file and passes
+    with it. It keeps asserting the drop on every later chain.
+- **Mutation testing: 3 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by the suite:
+  - one function left in place;
+  - `begin_session_attempt` dropped as well;
+  - the precondition removed and the file applied before `20261003120000`. The
+    first version of the post-check missed this one; it now asserts the guard
+    too.
+
+### Applying it (owner, §5, named by version)
+
+1. Confirm that the Moyasar-only `payment-initiate` is deployed:
+   `list_edge_functions` shows a version newer than v8.
+2. Apply `20261004120000` by name, after re-hashing the merged copy.
+3. Verify read-only: no `pg_proc` row is named `tap_begin_payment_attempt` or
+   `tap_begin_session_attempt`.
+
+**Rollback**, as a new migration: re-create the two functions from
+`20260724180000` and `20260712170000`, each with its revoke/grant pair.
