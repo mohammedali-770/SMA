@@ -19,6 +19,17 @@
 -- which is why they are small. At the measured growth the cap is about six
 -- months away.
 --
+-- THE SLOWER DAMAGE IS ALREADY HAPPENING. The operations health snapshot looks
+-- up each monitored job's newest runs in cron.job_run_details, which has only a
+-- primary-key index and is owned by supabase_admin, so it cannot be given one;
+-- every lookup scans the whole table. The alerts evaluator runs that snapshot
+-- every five minutes, and its weekly average run time rose in a straight line
+-- with the table, from 0.16 s in the week of 2026-07-20 to 13.29 s in the week
+-- of 2026-11-09 (max 57.7 s; read from cron.job_run_details). The staff
+-- console calls the same snapshot under the 8 s statement_timeout of
+-- `authenticated`. On a local copy at production volume, 14 days of history
+-- cut the health summary from ~800 ms to ~140 ms.
+--
 -- WHAT IS KEPT, and why the rule is "recent, plus the newest of each kind".
 -- Every reader of these three tables asks for the NEWEST row of some kind, never
 -- for a count over a window:

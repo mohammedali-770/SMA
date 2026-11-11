@@ -6935,8 +6935,8 @@ must return a count, not an error.
 `20261001120000_prune_operational_run_history.sql`. **Written 2026-11-11,
 validated, awaiting owner approval.** App-hardening checklist, capacity finding.
 
-sha256 `1eea72e4cdd4c6a0720bf3eb3274875e29dd4c85c5d7ebc430a4d36ca22fbd9a`,
-278 lines / 13 155 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `da99296b2e7dc8d1c3fa41fce069cb24434918b619eaad5ac4049c1589152f63`,
+289 lines / 13 908 bytes. **Re-hash the MERGED copy before applying**, per §15.
 
 **It adds one function and one daily job, and redefines nothing.** No existing
 function body changes, and no deploy is implied. **MONEY PATH UNTOUCHED, and the
@@ -6958,6 +6958,25 @@ fails, so no order can be placed
 | `branch_availability_runs`, `lazywait_sync_requests` | 4–5 MB | ~20 160 each | already 14 days |
 
 At that growth the cap is about six months away.
+
+**The slower damage is already happening.** The operations health snapshot looks
+up each monitored job's newest runs in `cron.job_run_details`. That table has only
+a primary-key index, and it is owned by `supabase_admin`, so it cannot be given
+one: every lookup scans the whole table. The alerts evaluator runs the snapshot
+every five minutes, and its weekly average run time rose in a straight line with
+the table:
+
+| Week of | Evaluator average | Evaluator max |
+| --- | --- | --- |
+| 2026-07-20 | 0.16 s | 0.80 s |
+| 2026-09-07 | 3.27 s | 14.00 s |
+| 2026-10-05 | 6.16 s | 30.38 s |
+| 2026-11-09 | **13.29 s** | **57.69 s** |
+
+The staff console calls the same snapshot under `authenticated`'s 8 s
+`statement_timeout`, and a timed-out call shows every system as unavailable.
+On a local copy at production volume (692 780 rows), the health summary took
+~800 ms. With 14 days kept it took ~140 ms, and with 7 days ~112 ms.
 
 ### What it keeps, and why that rule
 
