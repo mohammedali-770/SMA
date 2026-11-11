@@ -236,6 +236,17 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-11 — `20261001120000_prune_operational_run_history` is
+written, validated and awaiting approval, so on merge the outstanding set is
+THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
+file. It schedules a daily prune of pg_cron's run log (14 days) and the two
+monitor ledgers (30 days), keeping every row a health reader picks, so the
+Free-plan database stays under the 500 MB cap at which Supabase makes it
+read-only. It redefines nothing; the money path is self-asserted. The two
+unfrozen files are independent, each on its own approval, and
+`20260824100000` still sorts first. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §53.
+
 **Current position 2026-11-11, read live AFTER the guest-menu policy apply: 144
 repository files on the default branch / 148 live history rows / TWO unapplied
 — `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
