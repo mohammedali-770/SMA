@@ -42,3 +42,4 @@ Older decisions have not been backfilled. Backfilling is worth doing when you ar
 | # | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-documentation-system.md) | Three-layer documentation with CI-enforced freshness | Accepted |
+| [0002](0002-consent-ledger.md) | Record each customer's consent decisions in an append-only ledger | Proposed |
