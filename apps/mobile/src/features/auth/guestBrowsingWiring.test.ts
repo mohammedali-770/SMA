@@ -72,7 +72,10 @@ describe('an account is asked for at the point it is needed', () => {
 
   it('the Orders tab, with a return to that tab', () => {
     const orders = code('app/(tabs)/orders.tsx');
-    expect(orders).toMatch(/status === 'signed_out'/);
+    // OrdersScreen only for a KNOWN session. During `loading` it would send its
+    // orders query with no session; ordersTabGate.test.tsx renders every state.
+    expect(orders).toContain("if (status === 'signed_in') return <OrdersScreen />;");
+    expect(orders.match(/<OrdersScreen\b/g)).toHaveLength(1);
     expect(orders).toContain('returnTo="/(tabs)/orders"');
   });
 
