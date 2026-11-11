@@ -216,9 +216,9 @@ From the build that carries it:
 - sign-in is asked for at checkout, for delivery, and on the Orders and Profile
   tabs, and returns the customer where they were.
 
-A reviewer still needs the test number to place an order. **That build must not
-ship before `20260930120000_product_variants_guest_read` is applied**
-(`MIGRATIONS.md` §52).
+A reviewer still needs the test number to place an order. The database change
+that build needs, `20260930120000_product_variants_guest_read`, **was applied
+2026-11-11** (`MIGRATIONS.md` §52).
 
 **And login is Saudi-mobile-only, enforced on both sides of the wire.** The
 client rejects a foreign number (`apps/mobile/src/lib/phone.test.ts:52` pins
