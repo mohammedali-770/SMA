@@ -72,7 +72,6 @@ export default function PaymentCheckoutScreen() {
   const settledRef = useRef(false);
 
   const cfg: WebviewNavConfig = {
-    checkoutHost: hostOf(checkoutUrl ?? ''),
     returnHost: hostOf(SUPABASE_URL),
     returnPath: '/functions/v1/payment-return',
   };
@@ -161,7 +160,8 @@ export default function PaymentCheckoutScreen() {
             // calling our handler. A narrow list would therefore hand http://,
             // tel:, intent://, market:// … to the OS behind our back. With ['*']
             // our decideNavigation is the sole authority: it 'block's everything
-            // non-Tap (returns false → not loaded AND not opened externally).
+            // that is not https (returns false → not loaded AND not opened
+            // externally).
             originWhitelist={['*']}
             onShouldStartLoadWithRequest={onShouldStart}
             onNavigationStateChange={onNavStateChange}
