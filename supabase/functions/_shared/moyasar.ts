@@ -331,6 +331,38 @@ export function buildInvoicePayload(p: BuildInvoiceParams): Record<string, unkno
   return body;
 }
 
+export type CheckoutLanguage = 'ar' | 'en';
+
+/**
+ * The invoice's hosted-checkout URL as it may be handed to the app, or null.
+ *
+ * The app opens whatever payment-initiate returns, so only Moyasar's own
+ * domain may come back: https on moyasar.com or a subdomain of it. Moyasar's
+ * documented example is `http://checkout.moyasar.com/invoices/<id>?lang=en`
+ * (https://docs.moyasar.com/api/invoices/01-create-invoice), so http on that
+ * domain is upgraded rather than refused. Anything else is refused: another
+ * host or a look-alike such as moyasar.com.evil.example, credentials, a port,
+ * another scheme.
+ *
+ * `lang` is set to the customer's language. It is not a documented request
+ * field, but it appears in every invoice URL Moyasar's documentation shows;
+ * a page that ignores it is unharmed.
+ */
+export function customerCheckoutUrl(raw: unknown, lang: CheckoutLanguage): string | null {
+  let url: URL;
+  try {
+    url = new URL(String(raw ?? ''));
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host !== 'moyasar.com' && !host.endsWith('.moyasar.com')) return null;
+  if (url.protocol === 'http:') url.protocol = 'https:';
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+  url.searchParams.set('lang', lang);
+  return url.toString();
+}
+
 /** Clamp an expiry to Moyasar-safe bounds and render the ISO instant. */
 export function invoiceExpiryIso(nowMs: number, expiryMinutes: number): string {
   const minutes = Math.min(60, Math.max(5, Math.round(Number(expiryMinutes) || 30)));

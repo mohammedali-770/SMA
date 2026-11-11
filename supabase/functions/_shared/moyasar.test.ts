@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  amountsMatch, basicAuthHeader, buildInvoicePayload, currencyExponent, extractMoyasarError,
+  amountsMatch, basicAuthHeader, buildInvoicePayload, currencyExponent, customerCheckoutUrl, extractMoyasarError,
   fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, isMoyasarIpNotAllowed,
   keyMatchesMode, lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
@@ -243,6 +243,46 @@ describe('buildInvoicePayload', () => {
     const meta = buildInvoicePayload({ ...base, metadata: { purpose: 'admin_test' } }).metadata as Record<string, string>;
     expect(meta.purpose).toBe('admin_test');
     expect(meta.reference_transaction).toBe('sm_abc');
+  });
+});
+
+describe('customerCheckoutUrl', () => {
+  const ID = 'efebc231-7795-4cfd-b69c-980fe4c02c49';
+
+  /** Moyasar's own documented example uses http, so it is upgraded, not refused. */
+  it("upgrades Moyasar's documented http example and sets the customer's language", () => {
+    expect(customerCheckoutUrl(`http://checkout.moyasar.com/invoices/${ID}?lang=en`, 'ar')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?lang=ar`,
+    );
+  });
+  it('keeps an https URL on the domain or a subdomain, adding lang and keeping the rest', () => {
+    expect(customerCheckoutUrl(`https://checkout.moyasar.com/invoices/${ID}`, 'en')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?lang=en`,
+    );
+    expect(customerCheckoutUrl(`https://CHECKOUT.Moyasar.com/invoices/${ID}?x=1`, 'ar')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?x=1&lang=ar`,
+    );
+    expect(customerCheckoutUrl('https://moyasar.com/i/1', 'en')).toBe('https://moyasar.com/i/1?lang=en');
+    expect(customerCheckoutUrl('https://a.b.moyasar.com/i', 'en')).toBe('https://a.b.moyasar.com/i?lang=en');
+  });
+  it("refuses anything that is not https on Moyasar's own domain", () => {
+    for (const raw of [
+      'https://evil.example/invoices/1',
+      'https://moyasar.com.evil.example/invoices/1',
+      'https://evilmoyasar.com/invoices/1',
+      'https://checkout.moyasar.com.evil.example/invoices/1',
+      'https://checkout.moyasar.com./invoices/1',
+      'https://user:pass@checkout.moyasar.com/invoices/1',
+      'https://checkout.moyasar.com:8443/invoices/1',
+      'ftp://checkout.moyasar.com/invoices/1',
+      'javascript:alert(1)//checkout.moyasar.com',
+      'checkout.moyasar.com/invoices/1',
+      '',
+      null,
+      undefined,
+    ]) {
+      expect(customerCheckoutUrl(raw, 'en'), String(raw)).toBeNull();
+    }
   });
 });
 

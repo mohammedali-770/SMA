@@ -2,8 +2,9 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
-  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, extractMoyasarError, invoiceExpiryIso,
-  mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
+  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, customerCheckoutUrl, extractMoyasarError,
+  invoiceExpiryIso, mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
+  type CheckoutLanguage,
 } from '../_shared/moyasar.ts';
 import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
@@ -25,8 +26,10 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * card can never pay for a real order; see refuseTestModeCheckout(). Sandbox
  * testing is the console's admin test (payment-test-config `test_checkout`).
  *
- * The app also sends `language`. Nothing here reads it: the invoice request
- * (buildInvoicePayload) carries no language field.
+ * The checkout URL handed to the app is always https on Moyasar's own domain;
+ * anything else is refused (customerCheckoutUrl, refuseCheckoutUrl). The app
+ * also sends `language` ('ar' or 'en'), which sets that URL's `lang`; the
+ * invoice request itself carries no language field.
  */
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -40,6 +43,7 @@ Deno.serve(async (req: Request) => {
   const orderId = String(body.orderId ?? body.order_id ?? '');
   const sessionId = String(body.checkoutSessionId ?? body.checkout_session_id ?? '');
   if (!orderId && !sessionId) return json({ error: 'orderId or checkoutSessionId is required' }, 400);
+  const lang: CheckoutLanguage = body.language === 'ar' ? 'ar' : 'en';
 
   const supaUser = userClient(authHeader);
 
@@ -60,7 +64,7 @@ Deno.serve(async (req: Request) => {
     const admin0 = adminClient();
     const cfg0 = await getProviderConfig(admin0, 'payment');
     if (!cfg0) return json({ status: 'disabled' }, 200);
-    return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0);
+    return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);
   }
 
   // Legacy flow: pay for an already-created order. Read it AS THE USER — RLS
@@ -81,7 +85,7 @@ Deno.serve(async (req: Request) => {
   const admin = adminClient();
   const cfg = await getProviderConfig(admin, 'payment');
   if (!cfg) return json({ status: 'disabled' }, 200);
-  return await initiateMoyasar(admin, order, cfg);
+  return await initiateMoyasar(admin, order, cfg, lang);
 });
 
 // ---------------------------------------------------------------------------
@@ -100,6 +104,19 @@ Deno.serve(async (req: Request) => {
 // ---------------------------------------------------------------------------
 const MOYASAR_INVOICES = `${MOYASAR_API_BASE}/invoices`;
 
+/**
+ * The hosted page Moyasar returned is not https on Moyasar's own domain, so it
+ * is not handed to the app (see customerCheckoutUrl). The log line carries the
+ * scheme and host only: the path holds the invoice id.
+ */
+function refuseCheckoutUrl(raw: unknown, attempt: 'created' | 'reused'): Response {
+  let scheme = '';
+  let host = 'unparseable';
+  try { const u = new URL(String(raw ?? '')); scheme = u.protocol; host = u.hostname; } catch { /* stays unparseable */ }
+  console.error(JSON.stringify({ event: 'payment_initiate_refused', reason: 'checkout_url_rejected', attempt, scheme, host }));
+  return json({ error: 'Could not start the payment. Please try again.' }, 502);
+}
+
 /** Shared invoice-create + persist step for both the order and session flows. */
 async function createMoyasarInvoice(
   admin: SupabaseClient,
@@ -110,6 +127,7 @@ async function createMoyasarInvoice(
     description: string;
     returnQuery: string;              // e.g. `order=<uuid>` or `session=<uuid>`
     extra: Record<string, unknown>;   // extra fields echoed back to the client
+    lang: CheckoutLanguage;           // the hosted page's language
   },
 ): Promise<Response> {
   const attemptId = attempt.attempt_id;
@@ -138,21 +156,31 @@ async function createMoyasarInvoice(
 
   const persistAndReturn = async (invoice: Record<string, unknown>): Promise<Response> => {
     const invoiceId = String(invoice.id ?? '');
-    const checkoutUrl = String(invoice.url ?? '');
-    if (!invoiceId || !checkoutUrl) {
+    const invoiceUrl = String(invoice.url ?? '');
+    if (!invoiceId || !invoiceUrl) {
       await admin.from('payment_records').update({
         status: 'failed', failure_code: 'no_invoice_url', raw: sanitizeMoyasarInvoice(invoice),
       }).eq('id', attemptId).then(() => {}, () => {});
       return json({ error: 'Could not start the payment. Please try again.' }, 502);
     }
+    // Refused before anything is stored, and the attempt is closed, so the next
+    // try opens a fresh invoice instead of reusing a page nobody may be sent to.
+    const checkoutUrl = customerCheckoutUrl(invoiceUrl, params.lang);
+    if (!checkoutUrl) {
+      await admin.from('payment_records').update({
+        status: 'failed', failure_code: 'checkout_url_rejected', raw: sanitizeMoyasarInvoice(invoice),
+      }).eq('id', attemptId).then(() => {}, () => {});
+      return refuseCheckoutUrl(invoiceUrl, 'created');
+    }
 
     // Persist the invoice id BEFORE handing out any checkout URL. The webhook and
     // payment-verify both locate the attempt by provider_checkout_ref, so a URL
     // for an invoice we failed to store would let the customer pay something we
-    // can never match back to their order.
+    // can never match back to their order. The URL is stored as Moyasar
+    // returned it; the language is the request's, so it is applied on the way out.
     const { error: persistErr } = await admin.from('payment_records').update({
       provider_checkout_ref: invoiceId,
-      checkout_url: checkoutUrl,
+      checkout_url: invoiceUrl,
       raw: sanitizeMoyasarInvoice(invoice),
       last_verified_at: new Date().toISOString(),
       failure_code: null,
@@ -302,6 +330,7 @@ async function initiateMoyasar(
   admin: SupabaseClient,
   order: Record<string, unknown>,
   cfg: ProviderConfig,
+  lang: CheckoutLanguage,
 ): Promise<Response> {
   if (String(order.payment_method ?? '') !== 'online') {
     return json({ error: 'This order is not an online-payment order' }, 400);
@@ -344,9 +373,11 @@ async function initiateMoyasar(
   }
 
   if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
+    const checkoutUrl = customerCheckoutUrl(attempt.checkout_url, lang);
+    if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');
     return json({
       provider: 'moyasar', mode: mAttempt.mode, invoiceId: attempt.provider_checkout_ref,
-      checkoutUrl: attempt.checkout_url, expiryMinutes: mAttempt.expiryMinutes,
+      checkoutUrl, expiryMinutes: mAttempt.expiryMinutes,
     }, 200);
   }
 
@@ -358,6 +389,7 @@ async function initiateMoyasar(
     description: 'Spicy Meal order',
     returnQuery: `order=${encodeURIComponent(String(order.id))}`,
     extra: {},
+    lang,
   });
 }
 
@@ -366,6 +398,7 @@ async function initiateMoyasarForSession(
   supaUser: SupabaseClient,
   sessionId: string,
   cfg: ProviderConfig,
+  lang: CheckoutLanguage,
 ): Promise<Response> {
   // Read the session AS THE USER — RLS returns it only if they own it; its
   // `total` is the server-computed amount we charge (never a client value).
@@ -411,9 +444,11 @@ async function initiateMoyasarForSession(
   }
 
   if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
+    const checkoutUrl = customerCheckoutUrl(attempt.checkout_url, lang);
+    if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');
     return json({
       provider: 'moyasar', mode: mAttempt.mode, invoiceId: attempt.provider_checkout_ref,
-      checkoutUrl: attempt.checkout_url, checkoutSessionId: session.id,
+      checkoutUrl, checkoutSessionId: session.id,
       expiryMinutes: mAttempt.expiryMinutes,
     }, 200);
   }
@@ -423,5 +458,6 @@ async function initiateMoyasarForSession(
     description: 'Spicy Meal order',
     returnQuery: `session=${encodeURIComponent(String(session.id))}`,
     extra: { checkoutSessionId: session.id },
+    lang,
   });
 }

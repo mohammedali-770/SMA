@@ -190,8 +190,8 @@ describe('payment-initiate', () => {
   });
 
   it('sends every configuration down the Moyasar path, choosing nothing by provider name', () => {
-    expect(handler).toContain('return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0);');
-    expect(handler).toContain('return await initiateMoyasar(admin, order, cfg);');
+    expect(handler).toContain('return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);');
+    expect(handler).toContain('return await initiateMoyasar(admin, order, cfg, lang);');
     expect(handler).not.toMatch(/providerName|sessionProvider/);
     expect(src).not.toMatch(/guardCrossProviderAttempt|decideCrossProviderAttempt|provider_switched/);
   });
@@ -210,8 +210,53 @@ describe('payment-initiate', () => {
     expect(src).toContain("return json({ status: 'already_paid', orderId: session.order_id }, 200);");
     expect(src).toContain("provider: 'moyasar', mode: m.mode, invoiceId, checkoutUrl,");
     expect(src).toContain("...(outcome === 'pending' ? {} : { needsVerify: true }),");
-    expect(src).toContain('checkoutUrl: attempt.checkout_url, checkoutSessionId: session.id,');
+    expect(src).toContain('checkoutUrl, checkoutSessionId: session.id,');
     expect(src).toContain('extra: { checkoutSessionId: session.id },');
+  });
+});
+
+// The app opens whatever URL payment-initiate returns, in a WebView or the
+// system browser. A created, reconciled or reused attempt all hand one out, so
+// each goes through customerCheckoutUrl, which allows only https on Moyasar's
+// domain and sets the page's language.
+describe('payment-initiate hands the app only a Moyasar checkout URL', () => {
+  const src = code('payment-initiate');
+  const handler = fnBody(src, 'Deno.serve(');
+  const create = fnBody(src, 'async function createMoyasarInvoice(');
+
+  it('checks the created or reconciled invoice URL before storing anything', () => {
+    const check = create.indexOf('const checkoutUrl = customerCheckoutUrl(invoiceUrl, params.lang);');
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(create.indexOf('provider_checkout_ref: invoiceId,'));
+    const refused = block(create, 'if (!checkoutUrl) {');
+    expect(refused).toContain("status: 'failed', failure_code: 'checkout_url_rejected'");
+    expect(refused).toContain("return refuseCheckoutUrl(invoiceUrl, 'created');");
+    // The reconcile path adopts an invoice through the same function.
+    expect(count(create, 'return await persistAndReturn(')).toBe(3);
+  });
+
+  it('checks a reused URL too, and never hands out a stored one as it is', () => {
+    for (const fn of ['async function initiateMoyasar(', 'async function initiateMoyasarForSession(']) {
+      const reuse = block(fnBody(src, fn), 'if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {');
+      expect(reuse, fn).toContain('const checkoutUrl = customerCheckoutUrl(attempt.checkout_url, lang);');
+      expect(reuse, fn).toContain("if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');");
+    }
+    expect(src).not.toMatch(/checkoutUrl: (?:attempt\.checkout_url|invoiceUrl|String\()/);
+    expect(count(src, 'customerCheckoutUrl(')).toBe(3);
+  });
+
+  it('fails closed with a 502 and one log line naming only the scheme and host', () => {
+    const refuse = fnBody(src, 'function refuseCheckoutUrl(');
+    expect(refuse).toContain("return json({ error: 'Could not start the payment. Please try again.' }, 502);");
+    expect(count(refuse, 'console.')).toBe(1);
+    expect(refuse).toMatch(/console\.error\(JSON\.stringify\(\{ event: 'payment_initiate_refused', reason: 'checkout_url_rejected', attempt, scheme, host \}\)\)/);
+  });
+
+  it("takes the page's language from the request, defaulting to English", () => {
+    expect(handler).toContain("const lang: CheckoutLanguage = body.language === 'ar' ? 'ar' : 'en';");
+    expect(handler).toContain('return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);');
+    expect(handler).toContain('return await initiateMoyasar(admin, order, cfg, lang);');
+    expect(count(src, '    lang,\n  });')).toBe(2);
   });
 });
 
