@@ -1585,7 +1585,15 @@ Those intentions are now **tested, and the tests run in CI**.
 `.github/workflows/change-control.yml`, which also asserts that the hook is still
 registered in `.claude/settings.json` and that the PreToolUse matcher still
 covers every writing tool — a guard that passes its own tests but is no longer
-wired into the harness protects nothing. Until 2026-08-23 nothing ran that suite
+wired into the harness protects nothing.
+
+**Since 2026-11-10 the same job also checks what code CI runs**
+(`scripts/check-workflow-pins.mjs`): every action pinned to a commit SHA, and
+every tool a workflow downloads at run time pinned to an exact version. Until
+then three CLIs were fetched as `latest`, two of them next to a production
+credential — the Vercel CLI with `VERCEL_TOKEN`, and `eas-cli` with
+`EXPO_TOKEN`. Bumping a pin is a deliberate change (`docs/DEPENDENCY_ADVISORIES.md`
+§8). Until 2026-08-23 nothing ran that suite
 at all, which is how a fix to the detached-HEAD recovery path reached a pull
 request unexecuted (#233).
 
