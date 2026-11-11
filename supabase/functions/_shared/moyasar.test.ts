@@ -4,9 +4,9 @@ import {
   fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, keyMatchesMode,
   lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
-  selectInvoicePayment, checkPaymentBinding, looksLikeMoyasarWebhook, decideCrossProviderAttempt,
-  timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
+  selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
 } from './moyasar.ts';
+import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
 
 describe('minor units (halalas)', () => {
   it('converts SAR major units to integer halalas', () => {
@@ -312,6 +312,44 @@ describe('mapMoyasarInvoiceStatus', () => {
   });
 });
 
+/**
+ * payment-verify forwards `messageKey` to the app, which renders it with
+ * `t(messageKey)` — and `t()` falls back to the key's own NAME when a string is
+ * missing (I18nProvider.tsx). A key the shipped app lacks is therefore printed
+ * on the customer's screen verbatim. The app reaches customers only through an
+ * EAS build, so the server must stay inside the strings the app already has.
+ *
+ * The repository's strings are the proxy checked here. A key added to
+ * strings.ts after the last EAS build would pass this test and still be missing
+ * on installed phones, which is why `refunded` maps to a key that has been in
+ * the app since the first online-payment build rather than to a new one.
+ */
+describe('message keys the app can show', () => {
+  const PAYMENT_STATUSES = [
+    'initiated', 'paid', 'captured', 'authorized', 'verified', 'failed', 'voided', 'refunded', 'something_new',
+  ];
+  const INVOICE_STATUSES = [
+    'initiated', 'paid', 'failed', 'canceled', 'cancelled', 'voided', 'expired', 'on_hold', 'refunded',
+    'something_new',
+  ];
+
+  it('maps a refunded payment or invoice to payUnknown, keeping the refunded outcome', () => {
+    expect(mapMoyasarPaymentStatus('refunded')).toEqual({ outcome: 'refunded', messageKey: 'payUnknown' });
+    expect(mapMoyasarInvoiceStatus('refunded')).toEqual({ outcome: 'refunded', messageKey: 'payUnknown' });
+  });
+
+  it('never emits a key the app strings lack, in either language', () => {
+    const emitted = [
+      ...PAYMENT_STATUSES.map((s) => mapMoyasarPaymentStatus(s).messageKey),
+      ...INVOICE_STATUSES.map((s) => mapMoyasarInvoiceStatus(s).messageKey),
+    ];
+    for (const key of emitted) {
+      expect(Object.keys(STRINGS.en), `en.${key}`).toContain(key);
+      expect(Object.keys(STRINGS.ar), `ar.${key}`).toContain(key);
+    }
+  });
+});
+
 describe('verifyWebhookSecretToken', () => {
   it('accepts the configured token', () => {
     expect(verifyWebhookSecretToken('wh_secret', 'wh_secret')).toBe(true);
@@ -553,41 +591,12 @@ describe('selectInvoicePayment', () => {
   });
 });
 
-describe('looksLikeMoyasarWebhook', () => {
-  it('recognises the documented Moyasar envelope', () => {
-    expect(looksLikeMoyasarWebhook({
-      id: 'evt_1', type: 'payment_paid', secret_token: 'wh', live: true, data: { id: 'pay_1' },
-    })).toBe(true);
-  });
-
-  /**
-   * The case this exists for: during a provider switch a Tap charge body must
-   * not be routed into the Moyasar handler, where it would fail the
-   * secret-token check and leave a paid order unconfirmed.
-   */
-  it('does not mistake a Tap charge body for a Moyasar event', () => {
-    expect(looksLikeMoyasarWebhook({
-      id: 'chg_123', status: 'CAPTURED', amount: 45.5, currency: 'SAR', live_mode: false,
-      reference: { transaction: 'sm_x', order: 'ORD-x' },
-    })).toBe(false);
-  });
-
-  it('rejects junk and partial shapes rather than guessing', () => {
-    expect(looksLikeMoyasarWebhook({})).toBe(false);
-    expect(looksLikeMoyasarWebhook(null)).toBe(false);
-    expect(looksLikeMoyasarWebhook({ type: 'payment_paid' })).toBe(false);      // no data
-    expect(looksLikeMoyasarWebhook({ data: { id: 'x' } })).toBe(false);          // no type
-    expect(looksLikeMoyasarWebhook({ type: '', data: {} })).toBe(false);         // empty type
-    expect(looksLikeMoyasarWebhook({ type: 'x', data: null })).toBe(false);
-  });
-});
-
 describe('resolveMoyasarConfig key namespacing', () => {
   /**
-   * secret_config is MERGED on save, so distinct field names let Tap and
-   * Moyasar credentials coexist in the one integration_settings row. Reading
-   * Tap's names would defeat that: saving Moyasar keys would overwrite Tap's by
-   * collision and strand every refund still queued for Tap.
+   * secret_config is MERGED on save, so Tap's old `test_secret_key` survives in
+   * the payment row wherever it was ever saved — and a Tap test key is also
+   * `sk_test_`-prefixed. Reading that name would treat a different gateway's
+   * credential as a ready Moyasar key.
    */
   it('does not read Tap-shaped key names', () => {
     const c = resolveMoyasarConfig(true, 'moyasar',
@@ -604,73 +613,5 @@ describe('resolveMoyasarConfig key namespacing', () => {
       { moyasar_test_secret_key: 'sk_test_x', moyasar_webhook_secret_token: 'wh' });
     expect(c.ok).toBe(true);
     expect(c.secretKey).toBe('sk_test_x');
-  });
-});
-
-describe('decideCrossProviderAttempt', () => {
-  const NOW = Date.parse('2026-08-24T12:00:00.000Z');
-  const FUTURE = '2026-08-24T12:30:00.000Z';
-  const PAST = '2026-08-24T11:30:00.000Z';
-  const live = (over = {}) => ({
-    id: 'att_1', provider: 'tap', provider_ref: null, provider_checkout_ref: null,
-    expires_at: FUTURE, ...over,
-  });
-
-  it('proceeds when there is no live attempt at all', () => {
-    expect(decideCrossProviderAttempt(null, 'moyasar', NOW)).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(undefined, 'moyasar', NOW)).toEqual({ action: 'proceed' });
-  });
-
-  it('proceeds when the live attempt is the SAME provider (normal reuse)', () => {
-    expect(decideCrossProviderAttempt(live({ provider: 'moyasar' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(live({ provider: 'MOYASAR' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
-  });
-
-  /**
-   * THE double-charge case. A Tap hosted page is open and payable; opening a
-   * Moyasar invoice too would give the customer two payable pages for one order,
-   * and only one of the two charges could ever be enrolled for refund.
-   */
-  it('refuses a second checkout when the other provider already has a payable one', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1' }), 'moyasar', NOW))
-      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
-    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1' }), 'moyasar', NOW))
-      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
-  });
-
-  /** Nothing exists at the other gateway, so nothing is payable — safe to close. */
-  it('closes a stale other-provider attempt that never reached its gateway', () => {
-    expect(decideCrossProviderAttempt(live(), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-  });
-
-  it('treats a blank provider on the row as nothing to guard against', () => {
-    expect(decideCrossProviderAttempt(live({ provider: null }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
-  });
-
-  /**
-   * THE LOCK-OUT. `status='initiated'` does not mean payable: nothing sweeps
-   * stale attempts, and only the owning provider's RPC ever closes one. Refusing
-   * on an EXPIRED other-provider attempt would 409 that order's online payment
-   * permanently — while the error text tells the customer to wait for an expiry
-   * that is never processed.
-   */
-  it('closes an EXPIRED other-provider attempt instead of refusing forever', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: PAST }), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1', expires_at: PAST }), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-  });
-
-  it('still refuses while the other page is genuinely live', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: FUTURE }), 'moyasar', NOW).action)
-      .toBe('refuse');
-  });
-
-  it('refuses on a null expiry rather than assuming it lapsed', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: null }), 'moyasar', NOW).action)
-      .toBe('refuse');
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: 'not-a-date' }), 'moyasar', NOW).action)
-      .toBe('refuse');
   });
 });

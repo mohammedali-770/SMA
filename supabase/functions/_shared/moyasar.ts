@@ -1,8 +1,7 @@
 /**
  * Moyasar helpers (pure, web-standard only — no Deno APIs — so vitest can import
- * them, mirroring _shared/tap.ts and _shared/whatsapp.ts). Nothing here logs or
- * returns a secret; the secret key is only ever used as the HTTP Basic username
- * by the caller.
+ * them, mirroring _shared/whatsapp.ts). Nothing here logs or returns a secret;
+ * the secret key is only ever used as the HTTP Basic username by the caller.
  *
  * WHY THE INVOICE, NOT A CHARGE
  * Moyasar's authentication page states, without qualification: "Sending
@@ -12,26 +11,26 @@
  * (https://docs.moyasar.com/api/authentication)
  *
  * So `POST /v1/payments` with `source[type]=creditcard` — which carries the PAN,
- * CVC and expiry — is NOT a server-side option for us. The server-side flow that
- * corresponds to Tap's hosted checkout is the INVOICE: we create an invoice, the
- * customer is redirected to Moyasar's own checkout page, and the card never
- * touches our infrastructure. That is what this module builds.
+ * CVC and expiry — is NOT a server-side option for us. The server-side hosted
+ * checkout is the INVOICE: we create an invoice, the customer is redirected to
+ * Moyasar's own checkout page, and the card never touches our infrastructure.
+ * That is what this module builds.
  *
- * TWO IDS, NOT ONE — the shape difference from Tap
- * Tap gives one id (the charge) that is created up front and refunded later.
+ * TWO IDS, NOT ONE
  * Moyasar gives two:
  *   - the INVOICE id, known when we open the attempt, which owns the hosted URL;
  *   - the PAYMENT id, which only exists once the customer actually pays, and
  *     which is the thing `POST /v1/payments/:id/refund` takes.
  * We store the invoice id in `payment_records.provider_checkout_ref` and the
  * payment id in `provider_ref`, so the refund path and the (provider,
- * provider_ref) confirmation idempotency both key off the payment — exactly as
- * they already do for a Tap charge — with no change to any shared RPC.
+ * provider_ref) confirmation idempotency both key off the payment, with no
+ * change to any shared RPC.
  *
  * AMOUNTS ARE MINOR UNITS. Moyasar takes "a positive integer representing the
- * payment amount in the smallest currency unit" — 1.00 SAR is `100`, not `1`.
- * Tap takes major units. Getting this wrong is a 100x charge, so the conversion
- * lives here behind unit tests and is never done inline at a call site.
+ * payment amount in the smallest currency unit" — 1.00 SAR is `100`, not `1`,
+ * while `orders.total` holds major units. Getting this wrong is a 100x charge,
+ * so the conversion lives here behind unit tests and is never done inline at a
+ * call site.
  */
 
 const encoder = new TextEncoder();
@@ -186,9 +185,8 @@ export function keyMatchesMode(key: string, mode: MoyasarMode, kind: 'secret' | 
  *     authenticating an inbound webhook (see verifyWebhookSecretToken);
  *   - the key must carry the prefix for the mode it is filed under.
  *
- * That last check has no Tap equivalent and is deliberate. Tap's key slots are
- * opaque strings, so a live key pasted into the test slot is undetectable and
- * would charge real cards from an interface labelled TEST. Moyasar's keys are
+ * That last check is deliberate. A live key pasted into the test slot would
+ * charge real cards from an interface labelled TEST. Moyasar's keys are
  * self-describing (`sk_test_` / `sk_live_`), so we can refuse that outright
  * rather than discovering it from a customer's statement.
  *
@@ -209,16 +207,13 @@ export function resolveMoyasarConfig(
   //
   // `integration_settings` holds ONE row per provider_type, and
   // upsert_integration_settings MERGES secret_config (`old || new`) rather than
-  // replacing it — so keys the new payload does not mention survive a save.
-  // That merge only helps if the two gateways use DIFFERENT names: had Moyasar
-  // reused Tap's `test_secret_key` / `live_secret_key`, saving Moyasar
-  // credentials would overwrite Tap's by collision, and every refund still
-  // queued for Tap would become impossible to execute.
+  // replacing it — so keys the new payload does not mention survive a save,
+  // Tap's old `test_secret_key` / `live_secret_key` included wherever they were
+  // ever saved. Distinct names are what guarantee a leftover Tap credential is
+  // never read as a Moyasar one.
   //
-  // With these names both gateways' credentials coexist in the one row, so
-  // switching the provider is reversible and in-flight work at the old gateway
-  // stays serviceable. Nothing is stored under the old names — no Moyasar
-  // credential exists anywhere — so this costs nothing to adopt.
+  // Do not rename these. They are live data: the admin card writes them, and
+  // Production already stores `moyasar_test_publishable_key` under this name.
   const secretKey = String(
     (mode === 'live' ? secretConfig.moyasar_live_secret_key : secretConfig.moyasar_test_secret_key) ?? '',
   ).trim();
@@ -264,7 +259,7 @@ export interface BuildInvoiceParams {
    * Customer-safe text only — Moyasar renders `description` on the hosted
    * checkout page the customer sees. NEVER embed the internal SM-… order number
    * here; the verification binding lives in metadata + invoice_id, not this
-   * field. (Same rule as the Tap charge description — Issue #94.)
+   * field (Issue #94).
    */
   description: string;
   /** Our unique per-attempt reference (sm_<uuid>). */
@@ -387,7 +382,13 @@ export function mapMoyasarPaymentStatus(status: unknown): { outcome: MoyasarOutc
     case 'voided':
       return { outcome: 'cancelled', messageKey: 'payCancelled' };
     case 'refunded':
-      return { outcome: 'refunded', messageKey: 'payRefunded' };
+      // The money came back, so there is nothing to confirm. The key is
+      // payUnknown because the shipped app has no refund-specific string, and
+      // its t() prints a missing key's own name on screen. payUnknown's copy is
+      // true of a refunded payment too: "We could not confirm the payment.
+      // Please contact support if an amount was deducted."
+      // (apps/mobile/src/i18n/strings.ts, en and ar).
+      return { outcome: 'refunded', messageKey: 'payUnknown' };
     default: // anything unrecognised — NEVER paid.
       return { outcome: 'unknown', messageKey: 'payUnknown' };
   }
@@ -415,7 +416,8 @@ export function mapMoyasarInvoiceStatus(status: unknown): { outcome: MoyasarOutc
     case 'expired':
       return { outcome: 'expired', messageKey: 'payExpired' };
     case 'refunded':
-      return { outcome: 'refunded', messageKey: 'payRefunded' };
+      // payUnknown, not a refund-specific key — see mapMoyasarPaymentStatus.
+      return { outcome: 'refunded', messageKey: 'payUnknown' };
     default:
       return { outcome: 'unknown', messageKey: 'payUnknown' };
   }
@@ -433,14 +435,14 @@ export function mapMoyasarInvoiceStatus(status: unknown): { outcome: MoyasarOutc
  * HMAC and NO signature header; the webhook reference documents `secret_token`
  * as a field of the event object and nothing else.
  *
- * THIS IS WEAKER THAN TAP'S HASHSTRING AND THE DIFFERENCE MATTERS.
+ * A BEARER SECRET IS NOT A SIGNATURE, AND THE DIFFERENCE MATTERS.
  * A bearer secret in a request body proves only that the sender knows the
  * secret. It does not bind the secret to the payload, so it cannot detect a
- * tampered body the way an HMAC over the charge fields does — anyone who ever
+ * tampered body the way an HMAC over the payment fields would — anyone who ever
  * obtains the token (a log, a proxy, a misrouted request) can post an arbitrary
- * "paid" event. The mitigation is architectural, not cryptographic, and it is
- * the same one the Tap path already uses: this check only decides whether we
- * BOTHER to look, and the webhook body is never trusted as evidence of payment.
+ * "paid" event. The mitigation is architectural, not cryptographic: this check
+ * only decides whether we BOTHER to look, and the webhook body is never trusted
+ * as evidence of payment.
  * Confirmation always comes from a server-to-server fetch of the payment with
  * our own secret key (moyasarVerify.ts), so a forged webhook achieves nothing
  * beyond making us perform a lookup that will not confirm.
@@ -519,8 +521,7 @@ export const HANDLED_WEBHOOK_TYPES = new Set([
  *
  * Moyasar returns `source.number` masked as first-six + last-four. The first six
  * are the BIN: they identify the issuing bank and card product, which is more
- * about the customer than we need to keep, and the Tap sanitizer already drops
- * the equivalent `first_six` deliberately. So we store only the last four.
+ * about the customer than we need to keep. So we store only the last four.
  */
 export function lastFourOf(maskedNumber: unknown): string | null {
   const s = String(maskedNumber ?? '').replace(/\D/g, '');
@@ -701,107 +702,4 @@ export function selectInvoicePayment(invoice: Record<string, unknown>): Record<s
   const sorted = [...payments].sort((a, b) =>
     String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')));
   return sorted[0] ?? null;
-}
-
-/**
- * Does this webhook body look like a Moyasar event rather than another
- * gateway's?
- *
- * WHY SHAPE AND NOT CONFIGURATION. payment-webhook used to pick its handler
- * from `integration_settings.provider_name` — whatever an administrator
- * selected most recently. That is the wrong question when a customer is
- * mid-checkout during a provider switch: the event that arrives belongs to the
- * gateway that took the money, not to the one now configured. Routing a Tap
- * charge into the Moyasar handler makes it fail the secret-token check and
- * return 401, so a paid order silently never confirms.
- *
- * The test is deliberately structural and cheap: Moyasar's envelope is
- * `{ id, type, created_at, secret_token, account_name, live, data }`
- * (https://docs.moyasar.com/api/other/webhooks/webhook-reference), and a Tap
- * charge body has no `type`/`data` pair. This only chooses which handler looks
- * at the body — each one still authenticates independently and fails closed, so
- * a wrong guess cannot confirm anything.
- */
-export function looksLikeMoyasarWebhook(body: unknown): boolean {
-  const b = (body ?? {}) as Record<string, unknown>;
-  return typeof b.type === 'string'
-    && b.type.length > 0
-    && typeof b.data === 'object'
-    && b.data !== null;
-}
-
-// ---------------------------------------------------------------------------
-// Cross-provider attempt guard.
-// ---------------------------------------------------------------------------
-
-export interface LiveAttempt {
-  id: string;
-  provider: string | null;
-  provider_ref: string | null;
-  provider_checkout_ref: string | null;
-  /** ISO instant the attempt stops being payable; null means no expiry was set. */
-  expires_at: string | null;
-}
-
-export type CrossProviderDecision =
-  | { action: 'proceed' }
-  | { action: 'close_stale'; attemptId: string }
-  | { action: 'refuse'; attemptId: string; provider: string };
-
-/**
- * Decide what to do when an order (or checkout session) already has a LIVE
- * payment attempt belonging to a DIFFERENT provider than the one about to be
- * used.
- *
- * WHY THIS IS NEEDED AT ALL. The database's double-charge guard is two partial
- * unique indexes keyed on (order_id, provider) and
- * (checkout_session_id, provider) — they are provider-SCOPED. That was correct
- * when one gateway existed. With two, a Tap attempt does not block a Moyasar
- * attempt on the same order: switch the configured provider while a customer has
- * a hosted checkout page open, let them tap Pay again, and they end up holding
- * TWO payable pages for one order. If both are paid, `confirm_order_payment`
- * de-duplicates on (provider, provider_ref) — which differ — so both settle, and
- * `open_order_refund_record` can only ever enrol ONE of the two charges for
- * refund. The second charge is money we took and cannot automatically give back.
- *
- * The check cannot live in the SQL RPCs without touching the frozen Tap ones, so
- * it lives at the one place that knows about both gateways: payment-initiate.
- *
- * The two outcomes are deliberately different:
- *  - The other attempt has NO provider-side object yet (no charge, no invoice) —
- *    nothing is payable anywhere, so it is safe to close it and move on.
- *  - The other attempt already has one. That page IS payable and we cannot close
- *    it from here, so opening a second one is refused outright. The customer
- *    waits for it to expire; that is a worse checkout and a far better outcome
- *    than being charged twice.
- */
-export function decideCrossProviderAttempt(
-  existing: LiveAttempt | null | undefined,
-  wantedProvider: string,
-  nowMs: number,
-): CrossProviderDecision {
-  if (!existing) return { action: 'proceed' };
-  const other = String(existing.provider ?? '').toLowerCase();
-  if (!other || other === String(wantedProvider ?? '').toLowerCase()) return { action: 'proceed' };
-
-  // EXPIRY IS CHECKED FIRST, and leaving it out was a live lock-out.
-  //
-  // `status = 'initiated'` does NOT mean "still payable". An attempt is only
-  // moved off 'initiated' by its own provider's begin_*_attempt RPC, and there
-  // is no sweeper that closes stale rows. So an abandoned attempt at the other
-  // gateway keeps `status='initiated'` forever — and refusing on it would 409
-  // that order's online payment permanently, while telling the customer to wait
-  // for an expiry that is never going to be processed.
-  //
-  // An expired attempt is not payable, so it cannot be double-charged against:
-  // close it and move on, exactly as if it had never reached its gateway.
-  const expiresAt = existing.expires_at ? Date.parse(existing.expires_at) : NaN;
-  const expired = Number.isFinite(expiresAt) && expiresAt <= nowMs;
-  if (expired) return { action: 'close_stale', attemptId: existing.id };
-
-  const hasProviderSideCheckout =
-    Boolean(existing.provider_ref) || Boolean(existing.provider_checkout_ref);
-  return hasProviderSideCheckout
-    ? { action: 'refuse', attemptId: existing.id, provider: other }
-    : { action: 'close_stale', attemptId: existing.id };
 }

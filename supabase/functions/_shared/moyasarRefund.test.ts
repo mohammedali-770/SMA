@@ -255,7 +255,7 @@ describe('refundFinalStatus', () => {
     expect(refundFinalStatus(mk('pending', 'refund_ambiguous_needs_review'))).toBe('failed');
   });
 
-  it('never parks a Tap-shaped pending verdict, which carries no such code', () => {
+  it('never parks an ordinary pending verdict, which carries no such code', () => {
     expect(refundFinalStatus(mk('pending', null))).toBe('pending');
   });
 });

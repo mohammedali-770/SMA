@@ -1,16 +1,11 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
-import { resolveTapConfig, timingSafeEqual } from '../_shared/tap.ts';
+import { basicAuthHeader, resolveMoyasarConfig, timingSafeEqual, toMinorUnits } from '../_shared/moyasar.ts';
 import {
-  buildRefundBody, classifyRefundResponse, decideRefundLogging, refundRequestIsValid,
-} from '../_shared/tapRefund.ts';
-import { basicAuthHeader, resolveMoyasarConfig, toMinorUnits } from '../_shared/moyasar.ts';
-import {
-  buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, moyasarPaymentUrl,
-  moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview, refundFinalStatus,
-  refundRequestIsValid as moyasarRefundRequestIsValid, resolveRefundFromPayment,
-  type RefundClassification,
+  buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, decideRefundLogging,
+  moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview, refundFinalStatus,
+  refundRequestIsValid, resolveRefundFromPayment, type RefundClassification,
 } from '../_shared/moyasarRefund.ts';
 
 /**
@@ -38,9 +33,8 @@ import {
  * verify_jwt = false (config.toml): the caller is a scheduler/server, gated by
  * the same shared-secret pattern as lazywait-sync and failing CLOSED.
  */
-const TAP_REFUNDS_URL = 'https://api.tap.company/v2/refunds';
 const REFUND_TIMEOUT_MS = 15_000;
-/** Bounded per invocation so one run cannot fan out unboundedly against Tap. */
+/** Bounded per invocation so one run cannot fan out unboundedly against Moyasar. */
 const MAX_PER_RUN = 5;
 
 Deno.serve(async (req: Request) => {
@@ -53,7 +47,7 @@ Deno.serve(async (req: Request) => {
     return json({ status: 'disabled', reason: 'payment provider not configured' }, 200);
   }
   const configuredProvider = (cfg.providerName ?? '').toLowerCase();
-  if (configuredProvider !== 'tap' && configuredProvider !== 'moyasar') {
+  if (configuredProvider !== 'moyasar') {
     return json({ status: 'ignored', reason: `provider is '${cfg.providerName}'` }, 200);
   }
 
@@ -89,23 +83,30 @@ Deno.serve(async (req: Request) => {
     } | undefined;
     if (!row) break; // queue drained
 
-    // ROUTE BY THE CLAIMED ROW, NOT BY THE CURRENT CONFIGURATION.
-    // order_refunds.provider records which gateway actually took the money. The
-    // configured provider is whatever an administrator selected most recently,
-    // and those two disagree for every refund that was queued before a provider
-    // switch. Dispatching on the configuration would POST a Tap charge id to
-    // Moyasar, which 404s — and classifyMoyasarRefundResponse treats a 404 as a
-    // DEFINITIVE failure, so the row would be closed 'failed' and the customer
-    // would simply never be refunded.
+    // ONLY A MOYASAR REFUND CAN BE EXECUTED HERE. order_refunds.provider records
+    // which gateway actually took the money, and Moyasar is the only gateway
+    // this code can talk to. A row naming any other provider (order_refunds held
+    // no rows at all when Tap was removed on 2026-11-11) can never be refunded by
+    // this worker, so it is FINALIZED rather than released. Releasing it as
+    // 'pending' would re-claim and release it on every run, for ever, where
+    // nobody would see it; 'failed' frees the one-live-refund slot and puts it in
+    // front of a person via list_failed_order_refunds(). Nothing is sent to
+    // Moyasar for it: a foreign charge id there would 404, which
+    // classifyMoyasarRefundResponse treats as definitive anyway.
     const rowProvider = String(row.provider ?? '').toLowerCase();
+    if (rowProvider !== 'moyasar') {
+      console.warn('refund queued for an unsupported provider; parked for review', JSON.stringify({
+        refund: String(row.refund_id).slice(0, 36), row_provider: rowProvider || 'unknown',
+      }));
+      await admin.rpc('finalize_order_refund', {
+        p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'failed',
+        p_provider_ref: null, p_failure_code: 'unsupported_provider',
+        p_error_safe: 'Queued for a payment provider that is no longer supported. Refund it manually.',
+      });
+      processed.push({ refund: row.refund_id, outcome: 'failed', reason: 'unsupported_provider' });
+      continue;
+    }
 
-    const request = {
-      chargeId: String(row.charge_ref ?? ''),
-      amount: Number(row.amount),
-      currency: String(row.currency ?? 'SAR'),
-      reference: String(row.idempotency_key),
-      reason: 'order_could_not_be_delivered_to_branch',
-    };
     // Moyasar refunds POST to /payments/:id/refund, so the provider reference we
     // need IS the payment id — which is exactly what provider_ref holds for a
     // confirmed Moyasar attempt and therefore what order_refunds.charge_ref was
@@ -115,17 +116,15 @@ Deno.serve(async (req: Request) => {
       amount: Number(row.amount),
       currency: String(row.currency ?? 'SAR'),
     };
-    const requestValid = rowProvider === 'moyasar'
-      ? moyasarRefundRequestIsValid(moyasarRequest)
-      : refundRequestIsValid(request);
 
-    // No captured charge reference recorded → nothing can be refunded through the
-    // provider. This is a definitive operational failure needing a human, not a
-    // retry loop, so it is finalized as failed and surfaces in the admin feed.
-    // (This and the key-unavailable path below finalize IMMEDIATELY after the
-    // claim with no external call in between, so there is no window in which the
-    // lease could have been lost — unlike the provider path further down.)
-    if (!requestValid) {
+    // No captured payment reference recorded → nothing can be refunded through
+    // the provider. This is a definitive operational failure needing a human,
+    // not a retry loop, so it is finalized as failed and surfaces in the admin
+    // feed. (This, the provider check above and the key-unavailable path below
+    // finalize IMMEDIATELY after the claim with no external call in between, so
+    // there is no window in which the lease could have been lost — unlike the
+    // provider path further down.)
+    if (!refundRequestIsValid(moyasarRequest)) {
       await admin.rpc('finalize_order_refund', {
         p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'failed',
         p_provider_ref: null, p_failure_code: 'missing_charge_reference',
@@ -137,190 +136,139 @@ Deno.serve(async (req: Request) => {
 
     // The secret key is chosen by the ATTEMPT's stored mode via the payment
     // record, mirroring payment-verify: flipping Admin test↔live must never
-    // break a refund for an older charge.
+    // break a refund for an older payment.
     const { data: pay } = await admin.from('payment_records')
-      // Scoped to THIS refund's provider. Without it, an order that somehow
-      // carries paid records for two gateways hands back the newest one's mode
-      // — e.g. a Moyasar test attempt selecting the Tap TEST key for a LIVE Tap
-      // charge, which Tap rejects 4xx, which classifyRefundResponse treats as
-      // definitive, which closes the refund 'failed' permanently.
-      .select('mode').eq('order_id', row.order_id).eq('provider', rowProvider).eq('status', 'paid')
+      .select('mode').eq('order_id', row.order_id).eq('provider', 'moyasar').eq('status', 'paid')
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
     const attemptMode = (pay?.mode as 'test' | 'live' | undefined) ?? undefined;
 
-    // `integration_settings` holds ONE row for provider_type='payment'.
-    // upsert_integration_settings MERGES secret_config, and Moyasar's key names
-    // are namespaced (`moyasar_*`), so both gateways' credentials can coexist
-    // and a switch does not destroy the previous one's keys.
-    //
-    // What a switch DOES change is `provider_name`, and resolve*Config() require
-    // it to match before returning ok — deliberately, because a gateway that is
-    // not the selected one should not be transacted against on its own.
-    //
-    // resolve*Config() would still hand back a non-empty `secretKey` here —
-    // it reads the slot before deciding `ok` — so using `.secretKey` alone would
-    // send the NEW provider's key as the OLD provider's credential. Gate on
-    // `.ok`, which requires provider_name to match, and release anything that
-    // does not resolve.
-    const resolved = rowProvider === 'moyasar'
-      ? resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode)
-      : resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode);
+    // Gate on `.ok`, not on `.secretKey`. resolveMoyasarConfig() reads the key
+    // slot before it decides, so `.secretKey` can be non-empty for a key filed
+    // under the wrong mode or a payment row missing its webhook secret. A refund
+    // moves money, so it is attempted only on a configuration that resolves
+    // cleanly, and released untouched for a later run otherwise.
+    const resolved = resolveMoyasarConfig(
+      cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode,
+    );
     const secretKey = resolved.ok ? resolved.secretKey : '';
     if (!secretKey) {
-      // Cannot authenticate to this refund's provider → release for a later run.
-      // Never resolve a money movement we could not even attempt, and never send
-      // it to a different gateway than the one that took the money.
-      const reason = rowProvider !== configuredProvider ? 'provider_switched' : 'key_unavailable';
-      if (reason === 'provider_switched') {
-        // Operationally important and otherwise invisible: this refund is owed
-        // and cannot be paid until the original gateway is configured again.
-        console.warn('refund queued for a provider that is no longer configured', JSON.stringify({
-          refund: String(row.refund_id).slice(0, 36), row_provider: rowProvider, configured: configuredProvider,
-        }));
-        await admin.from('integration_sync_logs').insert({
-          provider: rowProvider || 'unknown', order_id: row.order_id, direction: 'push', status: 'skipped',
-          request: { action: 'refund', attempt: row.attempt_count }, error: 'provider_switched',
-        }).then(() => {}, () => {});
-      }
+      // Cannot authenticate to Moyasar for this refund → release for a later run.
+      // Never resolve a money movement we could not even attempt.
       await admin.rpc('finalize_order_refund', {
         p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'pending',
         p_provider_ref: null, p_failure_code: null, p_error_safe: null,
       });
-      processed.push({ refund: row.refund_id, outcome: 'pending', reason });
+      processed.push({ refund: row.refund_id, outcome: 'pending', reason: 'key_unavailable' });
       continue;
     }
 
     let verdict: RefundClassification;
 
-    if (rowProvider === 'moyasar') {
-      const expectedMinor = toMinorUnits(moyasarRequest.amount, moyasarRequest.currency);
+    const expectedMinor = toMinorUnits(moyasarRequest.amount, moyasarRequest.currency);
 
-      /**
-       * Ask Moyasar what actually happened to this refund, without sending one.
-       * GET /v1/payments/:id carries `status`, the cumulative `refunded` amount
-       * and `refunded_at`; resolveRefundFromPayment reads exactly those.
-       * Returns null when the lookup itself could not be completed — which is
-       * NOT the same as "nothing was refunded" and must never be treated as
-       * permission to POST.
-       */
-      const reconcile = async (): Promise<RefundClassification | null> => {
-        try {
-          const lookup = await fetch(moyasarPaymentUrl(moyasarRequest.paymentId), {
-            method: 'GET',
-            headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
-          });
-          if (!lookup.ok) return null;
-          const payment = await lookup.json().catch(() => ({})) as Record<string, unknown>;
-          return resolveRefundFromPayment(payment, expectedMinor);
-        } catch {
-          return null;
-        }
-      };
-
-      // ---------------------------------------------------------------------
-      // RECONCILE BEFORE RE-POSTING. This ordering is the whole safety property.
-      //
-      // Moyasar documents no idempotency on POST /v1/payments/:id/refund, so a
-      // second POST for the same refund is a second movement of money. A run
-      // that timed out, or whose response was ambiguous, releases the row as
-      // 'pending' — and the next run claims it. If that run POSTed first it
-      // would double-refund exactly the customer whose first attempt actually
-      // succeeded but reported badly.
-      //
-      // claim_order_refund increments attempt_count BEFORE returning it, so the
-      // first ever attempt arrives as 1 and anything greater means this refund
-      // has been sent to Moyasar at least once already. On those runs we ask
-      // before we act, and POST only when Moyasar positively reports that
-      // nothing has been refunded.
-      // ---------------------------------------------------------------------
-      let settledWithoutPosting: RefundClassification | null = null;
-      if (mustReconcileBeforePost(row.attempt_count)) {
-        const decision = decideAfterReconcile(await reconcile());
-        if (decision.action === 'release') {
-          // We could not establish what the earlier attempt did. Sending another
-          // refund now is the one action that could pay the customer twice, so
-          // release the row untouched and let a later run ask again.
-          await admin.rpc('finalize_order_refund', {
-            p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'pending',
-            p_provider_ref: null, p_failure_code: null, p_error_safe: null,
-          });
-          processed.push({ refund: row.refund_id, outcome: 'pending', reason: decision.reason });
-          continue;
-        }
-        // 'settle' means already refunded, definitively failed, or
-        // unreconcilable — all three are answers, and none of them is
-        // "send it again". 'post' means Moyasar positively reports nothing
-        // refunded, so the earlier attempt did not land.
-        if (decision.action === 'settle') settledWithoutPosting = decision.verdict;
+    /**
+     * Ask Moyasar what actually happened to this refund, without sending one.
+     * GET /v1/payments/:id carries `status`, the cumulative `refunded` amount
+     * and `refunded_at`; resolveRefundFromPayment reads exactly those.
+     * Returns null when the lookup itself could not be completed — which is
+     * NOT the same as "nothing was refunded" and must never be treated as
+     * permission to POST.
+     */
+    const reconcile = async (): Promise<RefundClassification | null> => {
+      try {
+        const lookup = await fetch(moyasarPaymentUrl(moyasarRequest.paymentId), {
+          method: 'GET',
+          headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
+        });
+        if (!lookup.ok) return null;
+        const payment = await lookup.json().catch(() => ({})) as Record<string, unknown>;
+        return resolveRefundFromPayment(payment, expectedMinor);
+      } catch {
+        return null;
       }
+    };
 
-      if (settledWithoutPosting) {
-        verdict = settledWithoutPosting;
-      } else {
-        let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
-        try {
-          const res = await fetch(moyasarRefundUrl(moyasarRequest.paymentId), {
-            method: 'POST',
-            headers: {
-              Authorization: basicAuthHeader(secretKey),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(buildMoyasarRefundBody(moyasarRequest)),
-            signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
-          });
-          ok = res.ok;
-          httpStatus = res.status;
-          body = await res.json().catch(() => ({}));
-        } catch {
-          // Timeout / network: the refund MAY have been accepted. Treat it as
-          // ambiguous, never as failed or succeeded.
-          ok = false; httpStatus = 0; body = {};
-        }
-
-        verdict = classifyMoyasarRefundResponse(ok, httpStatus, body);
-
-        // An ambiguous response is resolved immediately where we can, which
-        // often settles it in this same run. When it cannot be resolved the row
-        // stays 'pending' and the guard above re-asks before the next POST.
-        if (verdict.outcome === 'pending') {
-          const resolvedNow = await reconcile();
-          if (resolvedNow) verdict = resolvedNow;
-        }
+    // ---------------------------------------------------------------------
+    // RECONCILE BEFORE RE-POSTING. This ordering is the whole safety property.
+    //
+    // Moyasar documents no idempotency on POST /v1/payments/:id/refund, so a
+    // second POST for the same refund is a second movement of money. A run
+    // that timed out, or whose response was ambiguous, releases the row as
+    // 'pending' — and the next run claims it. If that run POSTed first it
+    // would double-refund exactly the customer whose first attempt actually
+    // succeeded but reported badly.
+    //
+    // claim_order_refund increments attempt_count BEFORE returning it, so the
+    // first ever attempt arrives as 1 and anything greater means this refund
+    // has been sent to Moyasar at least once already. On those runs we ask
+    // before we act, and POST only when Moyasar positively reports that
+    // nothing has been refunded.
+    // ---------------------------------------------------------------------
+    let settledWithoutPosting: RefundClassification | null = null;
+    if (mustReconcileBeforePost(row.attempt_count)) {
+      const decision = decideAfterReconcile(await reconcile());
+      if (decision.action === 'release') {
+        // We could not establish what the earlier attempt did. Sending another
+        // refund now is the one action that could pay the customer twice, so
+        // release the row untouched and let a later run ask again.
+        await admin.rpc('finalize_order_refund', {
+          p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'pending',
+          p_provider_ref: null, p_failure_code: null, p_error_safe: null,
+        });
+        processed.push({ refund: row.refund_id, outcome: 'pending', reason: decision.reason });
+        continue;
       }
+      // 'settle' means already refunded, definitively failed, or
+      // unreconcilable — all three are answers, and none of them is
+      // "send it again". 'post' means Moyasar positively reports nothing
+      // refunded, so the earlier attempt did not land.
+      if (decision.action === 'settle') settledWithoutPosting = decision.verdict;
+    }
 
-      if (needsHumanReview(verdict)) {
-        // Moyasar reports a refund timestamp but no amount we can reconcile
-        // against. Retrying is the one action that could double-refund, and
-        // releasing as 'pending' would just loop — so refundFinalStatus() below
-        // writes 'failed' with this code, which frees the one-live-refund slot
-        // and puts the row in front of a person via list_failed_order_refunds().
-        console.warn('moyasar refund unresolvable; parked for review', JSON.stringify({
-          refund: String(row.refund_id).slice(0, 36),
-        }));
-      }
+    if (settledWithoutPosting) {
+      verdict = settledWithoutPosting;
     } else {
       let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
       try {
-        const res = await fetch(TAP_REFUNDS_URL, {
+        const res = await fetch(moyasarRefundUrl(moyasarRequest.paymentId), {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${secretKey}`,
+            Authorization: basicAuthHeader(secretKey),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(buildRefundBody(request)),
+          body: JSON.stringify(buildMoyasarRefundBody(moyasarRequest)),
           signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
         });
         ok = res.ok;
         httpStatus = res.status;
         body = await res.json().catch(() => ({}));
       } catch {
-        // Timeout / network: the refund MAY have been accepted by Tap. Treat it as
-        // pending so the next run reconciles, never as failed or succeeded.
+        // Timeout / network: the refund MAY have been accepted. Treat it as
+        // ambiguous, never as failed or succeeded.
         ok = false; httpStatus = 0; body = {};
       }
 
-      verdict = classifyRefundResponse(ok, httpStatus, body);
+      verdict = classifyMoyasarRefundResponse(ok, httpStatus, body);
+
+      // An ambiguous response is resolved immediately where we can, which
+      // often settles it in this same run. When it cannot be resolved the row
+      // stays 'pending' and the guard above re-asks before the next POST.
+      if (verdict.outcome === 'pending') {
+        const resolvedNow = await reconcile();
+        if (resolvedNow) verdict = resolvedNow;
+      }
+    }
+
+    if (needsHumanReview(verdict)) {
+      // Moyasar reports a refund timestamp but no amount we can reconcile
+      // against. Retrying is the one action that could double-refund, and
+      // releasing as 'pending' would just loop — so refundFinalStatus() below
+      // writes 'failed' with this code, which frees the one-live-refund slot
+      // and puts the row in front of a person via list_failed_order_refunds().
+      console.warn('moyasar refund unresolvable; parked for review', JSON.stringify({
+        refund: String(row.refund_id).slice(0, 36),
+      }));
     }
     const { data: finalized } = await admin.rpc('finalize_order_refund', {
       p_refund_id: row.refund_id,

@@ -1,25 +1,24 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
-import { resolveTapConfig, mapTapStatus } from '../_shared/tap.ts';
-import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
 import { resolveMoyasarConfig } from '../_shared/moyasar.ts';
 import { verifyMoyasarAttempt, type MoyasarAttempt } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
- * payment-verify — the app calls this after returning from the provider's hosted
- * checkout. It is the ONLY thing the app trusts: it retrieves the charge (Tap) or
- * the invoice and its payment (Moyasar) server-to-server and confirms the order
- * paid only on a clean success. The redirect params the app saw are never
- * trusted — Moyasar's redirect in particular appends only an unsigned `id`, and
- * Moyasar's own guide requires this server-side fetch before fulfilling an order.
- * verify_jwt = true and the order is read via the user's RLS, so a customer can
- * only ever verify their OWN order.
+ * payment-verify — the app calls this after returning from Moyasar's hosted
+ * checkout. It is the ONLY thing the app trusts: it retrieves the invoice and its
+ * payment server-to-server and confirms the order paid only on a clean success.
+ * The redirect params the app saw are never trusted — Moyasar's redirect appends
+ * only an unsigned `id`, and Moyasar's own guide requires this server-side fetch
+ * before fulfilling an order. verify_jwt = true and the order is read via the
+ * user's RLS, so a customer can only ever verify their OWN order.
  *
  * The secret key is chosen by the STORED attempt's mode (not the current Admin
  * mode), so flipping Admin test↔live never breaks verification of older attempts.
- * Idempotent: repeated calls converge on a single confirmation.
+ * Only Moyasar attempts are looked up, so the July Tap attempts still in
+ * payment_records (none of them paid) read 'pending'. Idempotent: repeated calls
+ * converge on a single confirmation.
  */
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -38,7 +37,7 @@ Deno.serve(async (req: Request) => {
   const admin = adminClient();
 
   // Session flow: the order is created by finalize_checkout_session on a clean
-  // CAPTURED. Return its id so the app can open the receipt.
+  // paid payment. Return its id so the app can open the receipt.
   if (sessionId) return await verifySession(supaUser, admin, sessionId);
 
   // Legacy order flow (unchanged): verify an already-created order.
@@ -51,41 +50,17 @@ Deno.serve(async (req: Request) => {
   if (!order) return json({ error: 'Order not found' }, 404);
   if (order.payment_status === 'paid') return json({ status: 'paid', orderId }, 200);
 
+  // An explicit guard, not an assertion: with no payment row there is no key to
+  // verify with, and the app keeps polling 'pending' rather than seeing a crash.
   const cfg = await getProviderConfig(admin, 'payment');
-  const providerName = (cfg?.providerName ?? '').toLowerCase();
-  // Route by the provider of the attempt that is actually in flight, not by the
-  // one configured right now — see attemptProvider().
-  const route = (await attemptProvider(admin, 'order_id', orderId)) || providerName;
-  if (route && route !== providerName) return await unverifiableProvider(admin, route, providerName);
-  if (route === 'moyasar') return await verifyMoyasarOrder(admin, cfg!, orderId);
-  if (!cfg || route !== 'tap') {
-    return json({ status: 'pending' }, 200);
-  }
-
-  const { data: recs } = await admin.from('payment_records')
-    .select('id, order_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
-    .eq('order_id', orderId).eq('provider', 'tap')
-    .order('created_at', { ascending: false }).limit(1);
-  const rec = (Array.isArray(recs) ? recs[0] : null) as TapAttempt | null;
-  if (!rec || !rec.provider_ref) return json({ status: 'pending' }, 200);
-
-  // Verify with the key for the ATTEMPT's mode (not current admin mode).
-  const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, (rec.mode as 'test' | 'live') ?? undefined);
-  if (!tap.secretKey) return json({ status: 'pending' }, 200);
-
-  const retrieved = await retrieveTapCharge(tap.secretKey, String(rec.provider_ref));
-  if (!retrieved.ok) return json({ status: 'pending' }, 200); // transient — let the app retry
-
-  const result = await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId);
-  const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
-  const { messageKey } = mapTapStatus(retrieved.charge.status);
-  return json({ status: outcome, messageKey, orderId }, 200);
+  if (!cfg) return json({ status: 'pending' }, 200);
+  return await verifyMoyasarOrder(admin, cfg, orderId);
 });
 
 /**
- * Verify the Tap charge tied to a CHECKOUT SESSION. On a clean CAPTURED,
- * validateAndConfirmTapCharge → finalize_checkout_session creates the real order;
- * we return its id + number so the app opens the receipt. Never trusts the app.
+ * Verify the Moyasar payment tied to a CHECKOUT SESSION. On a clean `paid`,
+ * validateAndConfirmMoyasarPayment → finalize_checkout_session creates the real
+ * order; we return its id so the app opens the receipt. Never trusts the app.
  */
 async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, sessionId: string): Promise<Response> {
   const { data: session, error: sErr } = await supaUser
@@ -97,90 +72,18 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
   }
 
   const cfg = await getProviderConfig(admin, 'payment');
-  const providerName = (cfg?.providerName ?? '').toLowerCase();
-  const route = (await attemptProvider(admin, 'checkout_session_id', sessionId)) || providerName;
-  if (route && route !== providerName) return await unverifiableProvider(admin, route, providerName);
-  if (route === 'moyasar') return await verifyMoyasarSession(supaUser, admin, cfg!, sessionId);
-  if (!cfg || route !== 'tap') return json({ status: 'pending' }, 200);
-
-  const { data: recs } = await admin.from('payment_records')
-    .select('id, order_id, checkout_session_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
-    .eq('checkout_session_id', sessionId).eq('provider', 'tap')
-    .order('created_at', { ascending: false }).limit(1);
-  const rec = (Array.isArray(recs) ? recs[0] : null) as TapAttempt | null;
-  if (!rec || !rec.provider_ref) return json({ status: 'pending' }, 200);
-
-  const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, (rec.mode as 'test' | 'live') ?? undefined);
-  if (!tap.secretKey) return json({ status: 'pending' }, 200);
-
-  const retrieved = await retrieveTapCharge(tap.secretKey, String(rec.provider_ref));
-  if (!retrieved.ok) return json({ status: 'pending' }, 200); // transient — let the app retry
-
-  const result = await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId);
-  const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
-  const { messageKey } = mapTapStatus(retrieved.charge.status);
-
-  let outOrderId = result.orderId ?? '';
-  if (outcome === 'paid' && !outOrderId) {
-    const { data: s2 } = await supaUser.from('checkout_sessions').select('order_id').eq('id', sessionId).maybeSingle();
-    outOrderId = String(s2?.order_id ?? '');
-  }
-  return json({ status: outcome, messageKey, orderId: outOrderId || null }, 200);
-}
-
-// ---------------------------------------------------------------------------
-// Provider routing.
-//
-// An in-flight attempt belongs to the gateway that opened it. Routing
-// verification by `integration_settings.provider_name` — whatever is configured
-// at the moment the app asks — means that after a provider switch a customer
-// with an open Tap checkout is looked up in the Moyasar tables, found absent,
-// and told 'pending' forever even after they pay.
-//
-// So: find the attempt first, and let IT choose the path.
-// ---------------------------------------------------------------------------
-async function attemptProvider(
-  admin: SupabaseClient, column: 'order_id' | 'checkout_session_id', value: string,
-): Promise<string | null> {
-  const { data } = await admin.from('payment_records')
-    .select('provider')
-    .eq(column, value)
-    .order('created_at', { ascending: false }).limit(1);
-  const row = (Array.isArray(data) ? data[0] : null) as { provider?: string } | null;
-  return row?.provider ? String(row.provider).toLowerCase() : null;
-}
-
-/**
- * The attempt belongs to a gateway that is not the configured one. There is a
- * single credential slot for provider_type='payment', so switching overwrites
- * the previous gateway's keys and this attempt genuinely cannot be verified.
- *
- * Reported as 'pending' because that is the truth from the app's point of view —
- * it keeps polling and the order is not falsely failed — and logged so the
- * situation is visible to an operator rather than presenting as a customer who
- * "never finished paying".
- */
-async function unverifiableProvider(
-  admin: SupabaseClient, attemptProviderName: string, configured: string,
-): Promise<Response> {
-  console.warn('payment attempt for a provider that is no longer configured', JSON.stringify({
-    attempt: attemptProviderName, configured,
-  }));
-  await admin.from('integration_sync_logs').insert({
-    provider: attemptProviderName, order_id: null, direction: 'webhook', status: 'skipped',
-    request: { action: 'verify' }, error: 'provider_not_configured',
-  }).then(() => {}, () => {});
-  return json({ status: 'pending', reason: 'provider_not_configured' }, 200);
+  if (!cfg) return json({ status: 'pending' }, 200);
+  return await verifyMoyasarSession(supaUser, admin, cfg, sessionId);
 }
 
 // ---------------------------------------------------------------------------
 // Moyasar verification.
 //
-// Same shape as the Tap paths and the same guarantees: the attempt's STORED mode
-// picks the secret key (so flipping Admin test<->live never breaks verification
-// of an older attempt), the provider is asked directly, and confirmation runs
-// through the shared idempotent RPCs. A transient failure returns 'pending' so
-// the app retries rather than showing a customer a failure that did not happen.
+// The attempt's STORED mode picks the secret key (so flipping Admin test<->live
+// never breaks verification of an older attempt), Moyasar is asked directly,
+// and confirmation runs through the shared idempotent RPCs. A transient failure
+// returns 'pending' so the app retries rather than showing a customer a failure
+// that did not happen.
 // ---------------------------------------------------------------------------
 function moyasarSelect(): string {
   return 'id, order_id, checkout_session_id, provider_ref, provider_checkout_ref, reference_transaction, reference_order, amount, currency, mode, status';

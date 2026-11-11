@@ -286,8 +286,9 @@ export async function verifyMoyasarAttempt(
   const retrieved = await retrieveMoyasarInvoice(secretKey, invoiceId);
   // A transient failure must leave the attempt open so the app can retry. A 404
   // is NOT transient, but it is also not a reason to fail an attempt that may be
-  // mid-flight in the other mode's namespace, so it is reported the same way and
-  // the expiry sweep closes the attempt instead.
+  // mid-flight in the other mode's namespace, so it is reported the same way.
+  // Nothing sweeps such an attempt: begin_payment_attempt / begin_session_attempt
+  // close it once it has expired, the next time the customer starts a payment.
   if (!retrieved.ok) return { outcome: 'pending', paid: false, messageKey: 'payPending' };
 
   const invoice = retrieved.body;
@@ -309,17 +310,15 @@ export async function verifyMoyasarAttempt(
  * Find an invoice we may have already created, by the per-attempt reference we
  * stamped into its metadata.
  *
- * WHY THIS EXISTS — the retry that Tap can do safely and Moyasar cannot.
- * The Tap path retries a failed charge create once, and that is safe because the
- * payload carries `reference.idempotent`, so Tap returns the FIRST charge rather
- * than opening a second one. Moyasar documents idempotency (`given_id`) for
- * PAYMENT CREATION ONLY — there is no idempotency parameter on
- * `POST /v1/invoices` (https://docs.moyasar.com/api/idempotency). Blindly
- * retrying an invoice create after a timeout could therefore leave two live
- * invoices for one order. The customer would only pay one of them, but we would
- * have stored the id of the other — and verification binds on
- * `payment.invoice_id`, so a real payment against the forgotten invoice would
- * never confirm. Money taken, order never placed.
+ * WHY THIS EXISTS — an invoice create cannot safely be retried.
+ * Moyasar documents idempotency (`given_id`) for PAYMENT CREATION ONLY — there
+ * is no idempotency parameter on `POST /v1/invoices`
+ * (https://docs.moyasar.com/api/idempotency). Blindly retrying an invoice
+ * create after a timeout could therefore leave two live invoices for one
+ * order. The customer would only pay one of them, but we would have stored the
+ * id of the other — and verification binds on `payment.invoice_id`, so a real
+ * payment against the forgotten invoice would never confirm. Money taken, order
+ * never placed.
  *
  * So instead of retrying, the caller RECONCILES: it asks Moyasar whether the
  * ambiguous create actually landed, and adopts the existing invoice if it did.

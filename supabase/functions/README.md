@@ -1,6 +1,6 @@
 # Spicy Meal — Supabase Edge Functions
 
-> **Updated 2026-08-12.** Edge Functions are the server-side boundary for provider calls, service-role work and externally authenticated callbacks. The older Geidea-only documentation is obsolete.
+> **Updated 2026-11-11.** Edge Functions are the server-side boundary for provider calls, service-role work and externally authenticated callbacks.
 
 The Expo customer app and the staff/admin web app use the Supabase anon/publishable key plus the signed-in user's JWT. They must never receive the service-role key or provider secrets.
 
@@ -60,29 +60,23 @@ Push went live on 2026-08-17. `push-dispatch` still reads the `integration_setti
 
 Because this function now messages real customers, changes to its status copy, targeting or dispatch behaviour are customer-facing changes. Its `order_status` and `pos_sync` paths are idempotent per `(order_id, status)` under a claim/fencing lifecycle; `broadcast` is immediate, non-recallable, and restricted to devices with `promos_enabled = true`.
 
-## Payment/refund functions — PROVISIONAL AND FROZEN
+## Payment/refund functions — Moyasar
 
-The repository still contains the existing payment implementation and historical provider scaffolding:
+Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-11). The Tap and Geidea code paths were removed; their July history stays in `payment_records` as data.
 
-| Function | `verify_jwt` | Current treatment |
+| Function | `verify_jwt` | Responsibility |
 | --- | --- | --- |
-| `payment-initiate` | true | frozen provisional payment initiation; source contains Tap path plus older Geidea scaffold |
-| `payment-verify` | true | frozen Tap verification path |
-| `payment-webhook` | false | frozen provider webhook path |
-| `payment-return` | false | frozen public return/redirect path |
-| `payment-refund` | false | frozen refund processor; automated scheduling remains disabled |
-| `payment-test-config` | true | frozen admin payment diagnostics/test tooling |
-| `tap-admin-test-return` | false | frozen isolated Tap test return page |
+| `payment-initiate` | true | Opens (or reuses) a Moyasar invoice for the customer's own checkout session or order; any other configuration answers `{status:'disabled'}` |
+| `payment-verify` | true | The verification the app trusts: fetches the invoice and its payment from Moyasar and confirms only a clean `paid` |
+| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed |
+| `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
+| `payment-refund` | false | Refund worker, Moyasar refunds only; automated scheduling (the `payment-refund-worker` cron job) is off |
+| `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and isolated sandbox test invoice |
+| `tap-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to |
 
-**Do not treat Tap or the old Geidea scaffold as the final payment architecture.** The owner decision is that the final payment provider has not been selected and payment/refund work is postponed.
+These functions need migration `20260824100000_moyasar_payment_provider` (`begin_payment_attempt`, `begin_session_attempt`, `payment_records.provider_checkout_ref`), so it must be applied, named by version, before any of them is deployed. They then deploy as one set: an older bundle beside a new one can open an invoice that nothing confirms.
 
-Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`:
-
-- no ordinary payment/refund code changes;
-- no provider configuration changes;
-- no payment/refund deployment/testing;
-- no automated refund re-enablement;
-- reopening requires a separate provider decision and explicit approval.
+Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`. Each of these is a separate owner approval: applying a payment migration, deploying a payment function, entering keys or the webhook secret, enabling online payment, and re-enabling automated refunds.
 
 ## Shared server helpers — `_shared/`
 
@@ -93,8 +87,7 @@ The `_shared` directory contains reusable server-only contracts, including:
 - integration-secret readers;
 - WhatsApp send/logging helpers;
 - Lazywait client/contracts;
-- Tap helpers and refund classification;
-- legacy Geidea helper code retained by the existing provisional payment path.
+- Moyasar helpers: invoice construction, verification binding, webhook authentication and refund classification.
 
 A helper being present does not imply its provider is active or approved.
 
@@ -134,7 +127,7 @@ Do **not** copy old README commands that directly deploy a set of functions to p
 
 Production Edge Function deployment is an explicit owner-approved action governed by `CLAUDE.md` and the controlled GitHub workflow. The deployment workflow is manual, production-branch constrained and requires named functions/confirmation.
 
-Payment functions remain frozen even though the workflow can technically deploy them.
+Deploying a payment function needs the same explicit approval as any other deploy, plus the migration and one-set ordering described above.
 
 ## Related docs
 

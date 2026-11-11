@@ -26,13 +26,13 @@
  *
  * Moyasar does not supply the first. `given_id` is documented for PAYMENT
  * CREATION only (https://docs.moyasar.com/api/idempotency); no idempotency
- * parameter is documented on `POST /v1/payments/:id/refund`. Taken alone that is
- * WORSE than Tap, which at least has a 24-hour `reference.idempotent`.
+ * parameter is documented on `POST /v1/payments/:id/refund`. Taken alone, that
+ * would make an automated retry unsafe.
  *
  * It does supply the second, and supplies it well. `GET /v1/payments/:id`
  * returns `status`, `refunded` (the cumulative amount refunded so far, in minor
  * units) and `refunded_at`. Those three fields answer "did my ambiguous attempt
- * actually land?" exactly — which a Tap refund retrieve was only assumed to do.
+ * actually land?" exactly.
  * `resolveRefundFromPayment()` below is that resolution step, and the worker
  * must run it before any retry rather than re-POSTing blind.
  *
@@ -345,8 +345,6 @@ export function decideAfterReconcile(prior: RefundClassification | null): RetryD
  * `expire_stale_order_refund_claims()` already treats a lease it cannot resolve,
  * and for the same stated reason — "we cannot know whether the dead worker
  * already sent the refund … an automatic re-send could double-refund".
- *
- * A Tap verdict never carries this failure code, so this is a no-op there.
  */
 export function refundFinalStatus(v: RefundClassification): 'succeeded' | 'failed' | 'pending' {
   if (v.outcome === 'succeeded') return 'succeeded';

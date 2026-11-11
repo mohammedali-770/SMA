@@ -13,8 +13,9 @@ export function sanitizeUuid(raw: string | null | undefined): string {
 
 /**
  * Build the fixed spicymeal:// return deep link. The new flow forwards `session`;
- * the legacy flow forwards `order`. Tap's tap_id / status params are ignored — the
- * app re-verifies server-side and never trusts anything in this URL.
+ * the legacy flow forwards `order`. Whatever the provider appends (Moyasar's
+ * `id`, for one) is ignored — the app re-verifies server-side and never trusts
+ * anything in this URL.
  */
 export function buildReturnDeepLink(order: string | null | undefined, session: string | null | undefined): string {
   const s = sanitizeUuid(session);
