@@ -94,3 +94,12 @@ jobs:
       # provides all of them, so there is nothing to install.
       - name: Guard behaviour
         run: bash .claude/hooks/protect-default-branch.test.sh
+
+      # The other half of change control is WHAT CODE a job runs, not only who
+      # may push: several jobs hold a production credential, and a tag or an
+      # `@latest` would run whatever was current that day, next to it. Every
+      # action must be pinned to a commit SHA and every tool a workflow
+      # downloads at run time to an exact version. Node builtins only, so there
+      # is still nothing to install.
+      - name: Every action and downloaded tool is pinned
+        run: node scripts/check-workflow-pins.mjs

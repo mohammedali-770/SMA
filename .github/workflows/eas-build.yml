@@ -55,7 +55,13 @@ jobs:
       - name: Setup EAS / Expo
         uses: expo/expo-github-action@eab7a230208c952974db8c3245cfd78402c7b385 # v9.0.0
         with:
-          eas-version: latest
+          # An exact version, not `latest`: eas-cli runs with EXPO_TOKEN, which
+          # can start a store build, so a bad release would run with it the next
+          # time this job did. Bump deliberately, ideally in the same change as
+          # an Expo SDK upgrade (scripts/check-workflow-pins.mjs fails on
+          # `latest`). 25.3.0 was three weeks old when pinned and the last of its
+          # line; 26.0.0 was superseded within two days.
+          eas-version: 25.3.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       # A production build without SENTRY_AUTH_TOKEN succeeds and ships — it just
@@ -82,8 +88,14 @@ jobs:
           fi
           echo "SENTRY_AUTH_TOKEN present — source maps will upload."
 
+      # --ignore-scripts: EXPO_TOKEN is already in this job's environment (the
+      # step above exports it), so every package install script would run with
+      # it. Only one package in this tree has one (@sentry/cli, which fetches a
+      # binary this job never calls), and the cloud build does its own install.
+      # Measured 2026-11-10: the resolved Expo config, public and prebuild, is
+      # byte-identical with and without scripts. docs/DEPENDENCY_ADVISORIES.md.
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       # NOTE: a `mobile-build-*` tag push has no `inputs`, so it falls through to
       # the `preview` profile — an INTERNAL APK, not a submittable production
