@@ -548,10 +548,11 @@ from the build that carries it.** It was added for guideline **5.1.1(v)** on
 reviewer outside Saudi Arabia cannot get past the first screen of those builds.
 Either way, a reviewer still needs the test number below to place an order.
 
-**Prerequisite:** the build must not ship before
-`20260930120000_product_variants_guest_read` is applied. A signed-out read of the
-menu's price tiers is refused in Production until then, and a guest would see
-"Something went wrong" on the home screen (`MIGRATIONS.md` §52).
+**Prerequisite, met 2026-11-11:** `20260930120000_product_variants_guest_read` is
+applied (`MIGRATIONS.md` §52). Before it, Production refused a signed-out read of
+the menu's price tiers, and a guest would have seen "Something went wrong" on the
+home screen. A signed-out visitor to production `/app` now opens on the
+order-type chooser.
 
 The mechanism is decided and proven: a **Supabase Auth test-OTP number**, needing
 no code change. `OWNER_ACTIONS.md` §27 holds the mechanism and paste-ready review
