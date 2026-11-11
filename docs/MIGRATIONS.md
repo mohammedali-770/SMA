@@ -1519,7 +1519,7 @@ production.
 
 Reconciliation check: the rows above detail **104 repository rows, 102 of which
 carry a live version** — rows 8 and 9 are the two that do not, and both are
-class `—`. **Counted from the table itself, so it is reproducible:** every data
+class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
 5 hold a 14-digit version.
 
