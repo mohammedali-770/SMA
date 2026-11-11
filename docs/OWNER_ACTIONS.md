@@ -78,7 +78,7 @@ Required owner actions, in this order:
 A nearer outage needs no data loss at all. At 500 MB a Free project goes
 read-only and no order can be placed; the database was 207 MB on 2026-11-11 and
 growing about 1.7 MB a day. The run-history prune in PR #435 stops that growth. It
-was open and unapplied on 2026-11-11, and applying it is its own approval
+was merged on 2026-11-11 (`8df5408`) and is not applied; applying it is its own approval
 (`docs/BACKUP_RECOVERY.md` §3).
 
 Do not call backup/recovery "ready" until `docs/BACKUP_RECOVERY.md` §7 holds a

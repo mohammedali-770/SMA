@@ -101,10 +101,10 @@ Measured read-only on 2026-11-11:
 recorded), so the database has grown by about 1.7 MB a day. At that rate it
 reaches 500 MB in roughly five to six months.
 
-**The fix is written and not live.** PR #435 adds the migration
-`20261001120000_prune_operational_run_history`, which prunes those three logs. On
-2026-11-11 it is open: not merged and not applied. Applying it is an owner action
-(CLAUDE.md §5). It stops the growth; it does not shrink what is already on disk,
+**The fix is merged and not live.** PR #435 adds the migration
+`20261001120000_prune_operational_run_history`, which prunes those three logs. It
+was merged on 2026-11-11 (`8df5408`) and is not applied. Applying it, named by
+version, is an owner action (CLAUDE.md §5). It stops the growth; it does not shrink what is already on disk,
 which would take a one-off `VACUUM FULL`.
 
 ## 4. What a restore or rebuild depends on
