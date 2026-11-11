@@ -12,6 +12,10 @@
  * pin the behaviour rather than the styling: the note is rendered, it is rendered
  * verbatim, and a note that is only whitespace does not produce an empty panel
  * that reads as "no special instructions".
+ *
+ * The payment API is mocked. The receipt's payment block reads the order's
+ * payment record on mount, and without the mock that read went to Supabase from
+ * jsdom on every test here.
  */
 import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
@@ -19,9 +23,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Branch, Order } from '../../../../types';
 
+const paymentRecord = vi.fn();
+vi.mock('../../../../lib/api', () => ({
+  paymentGateway: { record: (orderId: string) => paymentRecord(orderId), adminVerify: vi.fn() },
+}));
+
 import { OrderReceiptModal } from './OrderReceiptModal';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  paymentRecord.mockReset();
+});
 
 const baseOrder: Order = {
   id: 'o1',
@@ -97,5 +109,32 @@ describe('OrderReceiptModal — customer note', () => {
     renderReceipt({ notes: undefined });
 
     expect(screen.queryByText('Customer note:')).toBeNull();
+  });
+});
+
+describe('OrderReceiptModal — online payment details', () => {
+  it("shows a Moyasar payment's details inside the receipt", async () => {
+    paymentRecord.mockResolvedValue({
+      id: 'r1',
+      order_id: 'o1',
+      provider: 'moyasar',
+      provider_ref: 'pay_7f3a',
+      status: 'paid',
+      amount: 100,
+      currency: 'SAR',
+      mode: 'live',
+      card_scheme: 'mada',
+      card_last_four: '4242',
+      failure_code: null,
+      failure_message_safe: null,
+      confirmed_at: '2026-08-03T10:01:00.000Z',
+      last_verified_at: '2026-08-03T10:01:00.000Z',
+      created_at: '2026-08-03T10:00:30.000Z',
+    });
+    renderReceipt({ paymentMethod: 'online' });
+
+    expect(await screen.findByText('Moyasar')).toBeTruthy();
+    expect(screen.getByText('pay_7f3a')).toBeTruthy();
+    expect(paymentRecord).toHaveBeenCalledWith('o1');
   });
 });

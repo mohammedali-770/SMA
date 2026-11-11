@@ -79,3 +79,52 @@ describe('paymentGateway.latestWebhookVerification', () => {
     await expect(paymentGateway.latestWebhookVerification()).rejects.toThrow('permission denied');
   });
 });
+
+/**
+ * The receipt's payment read selects the safe columns and nothing else.
+ *
+ * `provider_checkout_ref` (the Moyasar invoice id) is created by
+ * 20260824100000, which is not applied in Production. Selecting a column that
+ * does not exist makes PostgREST refuse the whole read, and the receipt swallows
+ * that error, so payment details would vanish from every online order. `raw`
+ * holds the provider payload, which the console never needs.
+ */
+describe('paymentGateway.record', () => {
+  it('selects only the safe payment_records columns', async () => {
+    const select = vi.fn();
+    const chain = {
+      select: (cols: string) => {
+        select(cols);
+        return chain;
+      },
+      eq: () => chain,
+      order: () => chain,
+      limit: () => Promise.resolve({ data: [], error: null }),
+    };
+    vi.mocked(supabase.from).mockReturnValue(chain as never);
+
+    await paymentGateway.record('o1');
+
+    expect(supabase.from).toHaveBeenCalledWith('payment_records');
+    const cols = String(select.mock.calls[0][0])
+      .split(',')
+      .map((c) => c.trim());
+    expect(cols).toEqual([
+      'id',
+      'order_id',
+      'provider',
+      'provider_ref',
+      'status',
+      'amount',
+      'currency',
+      'mode',
+      'card_scheme',
+      'card_last_four',
+      'failure_code',
+      'failure_message_safe',
+      'confirmed_at',
+      'last_verified_at',
+      'created_at',
+    ]);
+  });
+});

@@ -186,7 +186,7 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/orders/OrderReceiptModal.tsx',
   'src/components/admin/view/orders/OrdersRequiringVerificationCard.tsx',
   'src/components/admin/view/orders/OrdersTable.tsx',
-  'src/components/admin/view/orders/TapPaymentDetails.tsx',
+  'src/components/admin/view/orders/PaymentDetails.tsx',
   'src/components/admin/view/orders/ordersView.ts',
   // Catalog + Branch Operations
   'src/components/admin/BannerManagementPanel.tsx',
