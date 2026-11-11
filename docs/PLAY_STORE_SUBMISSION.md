@@ -965,6 +965,40 @@ whose layout nobody has looked at, and no tablet screenshot exists. Either suppl
 treatment — and if tablets are meant to be out of scope, that is a deliberate
 manifest change rather than something to leave implicit.
 
+### Android 16 removes the portrait lock on tablets — added 2026-11-10
+
+The bundle targets API 36 (C1), and Android's
+[behaviour-changes page for Android 16](https://developer.android.com/about/versions/16/behavior-changes-16)
+says:
+
+> For apps targeting Android 16 (API level 36), orientation, resizability, and
+> aspect ratio restrictions no longer apply on displays with smallest width >=
+> 600dp. Apps fill the entire display window, regardless of aspect ratio or a
+> user's preferred orientation, and pillarboxing isn't used.
+
+So **on a tablet running Android 16, the portrait lock is ignored.** The app
+rotates with the device and fills the screen, and nobody has looked at its layout
+there. Phones are unaffected: *"Screens that are smaller than sw600dp"* are an
+exception.
+
+A temporary opt-out exists (`PROPERTY_COMPAT_ALLOW_RESTRICTED_RESIZABILITY`), but
+Android says it *"won't apply when targeting API level 37"*. That makes it a
+delay, not an answer.
+
+**This turns the decision above from "undecided" into one with a date.** The
+three ways out:
+
+1. Make the layout work wide, and supply tablet screenshots.
+2. Exclude large screens in the manifest. That is a deliberate change, with its
+   own Play consequences.
+3. Set the temporary opt-out, which holds only until the app targets API 37.
+
+Doing none of these means tablet customers get the stretched layout.
+
+**Owner decision.** Until it is taken, the December device check should include
+one look at the app on a tablet emulator at sw600dp, so the decision is made from
+what the screen shows.
+
 
 ---
 
@@ -1037,6 +1071,84 @@ assumption survives unchallenged.
 | Are 12 testers actually *opted in*, not merely invited? | Play-side, per tester | Check weekly during the closed test |
 | Do the screenshots still show the shipped build? | Judgement, not a byte comparison | They do not today — see §11 and the note in §12 |
 | Is `loyalty_pickup_only` still true in live settings? | A database value; source cannot prove it | Read it before publishing the listing copy |
+
+---
+
+## 16. Policy deadlines, November 2026 to April 2027 — added 2026-11-10
+
+Each row was read from Google's own pages on 2026-11-10.
+
+| When | Requirement, in Google's words | Applies here? | What it needs |
+| --- | --- | --- | --- |
+| **Now** | **Trader status:** *"Starting in November 2026, you must declare your trader status in Play Console in accordance with new Console requirements."* ([answer/18100766](https://support.google.com/googleplay/android-developer/answer/18100766), 29 Oct 2026) | Yes, every developer | **Owner:** declare it in Play Console |
+| **27 Jan 2027** (a 30-day self-extension is available) | **Precise-location declaration:** *"All apps requesting precise location (ACCESS_FINE_LOCATION) must complete a declaration in the Play Console to demonstrate access needs and justify why the location button or coarse location is insufficient."* ([answer/17033915](https://support.google.com/googleplay/android-developer/answer/17033915)) | Yes. The app requests `ACCESS_FINE_LOCATION` | **Owner:** submit the declaration below |
+| **1 Feb 2027** | **16 KB page sizes:** *"Starting February 1, 2027, if your app updates don't support 16 KB memory page sizes, you won't be able to release these updates."* ([page sizes](https://developer.android.com/guide/practices/page-sizes)) | Yes. The app targets API 36 and ships native code | **Measure it** on the uploaded bundle (below) |
+| **Feb 2027** | **Memory thresholds:** *"Google Play has defined bad behavior thresholds for your app's core vitals. Memory usage is being introduced as new core vitals metrics"*: overall memory and bitmap memory, judged at the 90th percentile on the last 28 days ([answer/17492799](https://support.google.com/googleplay/android-developer/answer/17492799)) | **Yes, every app.** These have no size exemption. They are measured from real users' devices, so there is nothing to read until the app has users on Play | **Owner:** once the app is in production, check **Android vitals → Memory** |
+| **Feb 2027** | **DEX code optimisation:** *"a minimum of 25% optimization, obfuscation and shrinking for any app uploads to Play Console"*, which *"will only be enforced where you have non-negligible DEX sizes"*: more than 10 MB for an app (answer/17492799) | Only above 10 MB of DEX. **The app ships with no R8 shrinking today** | **Owner:** read the DEX size in App bundle explorer. R8 comes with the Expo SDK 58 upgrade (#430) |
+| **Apr 2027** | **Zero-Tap Sign-In restoration** for apps with sign-in (answer/17492799) | Yes | A design document first, then the native work (2026-11-09 compliance plan, phase 5) |
+
+### The precise-location declaration — proposed answers
+
+Google's form asks two questions, and the answers follow from what the code does.
+
+**1. "Which user-facing features in your app require ACCESS_FINE_LOCATION?"**
+**One time location sharing**, which Google's form describes as *"Autofiling the
+user's current address or sharing their current coordinates"*. That is **"Use my
+location" on the delivery map**, which asks for `Accuracy.High` and moves the pin
+to the device (`LocationPickerMap.tsx:226`).
+
+The pickup tab's nearest-branches list is **not** a reason to keep FINE. It asks
+for `Balanced` accuracy, and Google's own example says *"a coarse location is
+sufficient to show the three closest stores"*.
+
+**2. "Explain why ACCESS_COARSE_LOCATION or LocationButton is not sufficient and
+you need ongoing ACCESS_FINE_LOCATION."** A draft, for you to adjust:
+
+```text
+Delivery orders are taken to a door. When the customer taps "Use my location"
+on the delivery map, the app places the delivery pin at the device's position.
+Approximate location would put the pin in the wrong street or building, and the
+order would be taken to the wrong place. Location is requested only when the
+customer opens the pickup tab or taps that button, only while the app is open,
+and never in the background. The app targets API level 36; it will move this
+button to the Android location button when it targets API level 37, where the
+button becomes the required method for this use.
+```
+
+**The draft does not claim an ongoing need, because there isn't one.** The page
+is explicit that a one-time address pick is what the new location button is for:
+
+- *"For apps targeting Android 17 (API level 37) and higher, the Android location
+  button is the required minimum scope method for obtaining precise location for
+  'transactional' (one-time) use cases."*
+- Its examples include *"Address Pickers: Helping users autofill a delivery
+  address."*
+
+The button is not required while the app targets API 36, so the declaration is
+the right step now. **Moving to API 37 will mean adopting the button**, declared
+with `android:usesPermissionFlags="onlyForLocationButton"`. That depends on Expo
+exposing it, and belongs to whichever change raises the target API.
+
+### 16 KB — expected, not yet measured
+
+The bundle is built by React Native 0.86 on Expo SDK 57, and no one has read the
+result. Android's [page-size guide](https://developer.android.com/guide/practices/page-sizes)
+treats compatibility as **two properties, and both must hold**:
+
+1. **The native libraries are built for 16 KB.** Every `LOAD` segment of every
+   `.so` shows `align 2**14` or more. Check with Android's
+   `check_elf_alignment.sh` on an APK, or with `llvm-objdump -p <lib>.so | grep LOAD`.
+2. **The package keeps them aligned.** `zipalign -c -P 16 -v 4` on the APK checks
+   this, and only this: Android's own docs say `-c` checks alignment of the
+   archive. **A pass here does not settle the first property**, so it cannot close
+   this item alone.
+
+Play Console's **App bundle explorer** reports the result for the uploaded bundle,
+and Android's page shows the compatibility warning Play raises when a bundle
+fails. Reading it there covers both properties at once.
+
+Record the result here when read. A failure blocks every update from 1 February
+2027.
 
 ---
 
