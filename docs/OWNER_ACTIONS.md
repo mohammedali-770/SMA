@@ -1834,6 +1834,14 @@ recorded here if you want; the code may not.
 That last line is deliberate: it answers guideline **5.1.1(v)** in the same breath,
 and the row it points at exists as of 2026-09-03 (X4).
 
+**From the first build that carries guest browsing (added 2026-11-09), add this
+line to the notes.** It answers the other half of 5.1.1(v), "let people use it
+without a login". Do not add it to a build without that change, where it would be
+false:
+
+> The menu can be browsed, and a pickup branch chosen, without signing in. Sign-in
+> is requested at checkout, for delivery, and on the Orders and Profile tabs.
+
 ### What was rejected, and why
 
 - **App Review notes alone**, with a human relaying each code — reviewers work in

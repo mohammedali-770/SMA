@@ -1,9 +1,18 @@
-/** Bottom tabs + mandatory fresh-session order-type popup. */
+/**
+ * Bottom tabs + mandatory fresh-session order-type popup.
+ *
+ * Open to guests (App Store 5.1.1(v)): a signed-out customer browses the menu
+ * and chooses a pickup branch like anyone else. Delivery needs an account,
+ * because addresses are saved to one, so a guest who picks it is asked to sign
+ * in and comes back to delivery selection afterwards. Orders and Profile show
+ * their own sign-in prompt.
+ */
 import { Redirect, router, Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
+import { loginHref } from '../../features/auth/returnPath';
 import { NotificationConsentModal } from '../../features/notifications/NotificationConsentModal';
 import { useNotificationOnboarding } from '../../features/onboarding/useNotificationOnboarding';
 import { LaunchOrderTypeModal } from '../../features/order/LaunchOrderTypeModal';
@@ -38,12 +47,22 @@ export default function TabsLayout() {
     return () => { alive = false; sub.remove(); };
   }, [status]);
 
-  if (status === 'signed_out') return <Redirect href="/(auth)/login" />;
   if (deletionPending) return <Redirect href="/account/delete" />;
-  // Native Modal renders above the root stack. Hide it while /select is active
-  // so the branch/address resolver is usable; if the user returns without a
-  // valid context, the popup automatically appears again on the tabs route.
-  const requireOrderChoice = status === 'signed_in' && orderCtx.ready && !catalogLoading && !catalogError && !orderCtx.valid && pathname !== '/select';
+  // Native Modal renders above the root stack, so it is shown only while a TAB
+  // is the visible route. It used to be hidden on /select alone; with guests in
+  // here it would otherwise cover the login screen a guest is sent to, and any
+  // legal page opened from it. If the customer returns to the tabs without a
+  // valid context, the popup appears again.
+  const onTabRoute = pathname === '/' || pathname === '/orders' || pathname === '/profile';
+  const requireOrderChoice =
+    status !== 'loading' && orderCtx.ready && !catalogLoading && !catalogError && !orderCtx.valid && onTabRoute;
+  const chooseOrderType = (type: 'delivery' | 'pickup') => {
+    if (type === 'delivery' && status !== 'signed_in') {
+      router.push(loginHref('/select?type=delivery'));
+      return;
+    }
+    router.push({ pathname: '/select', params: { type } });
+  };
 
   return (
     <>
@@ -52,7 +71,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="orders" options={{ title: t('orderHistory'), tabBarIcon: ({ color, size }) => <ReceiptIcon color={color} size={size} /> }} />
         <Tabs.Screen name="profile" options={{ title: t('profile'), tabBarIcon: ({ color, size }) => <PersonIcon color={color} size={size} /> }} />
       </Tabs>
-      {requireOrderChoice ? <LaunchOrderTypeModal onChoose={(type) => router.push({ pathname: '/select', params: { type } })} /> : null}
+      {requireOrderChoice ? <LaunchOrderTypeModal onChoose={chooseOrderType} /> : null}
       {/* Never over the order-type pop-up, and only on a tab (consentScreenVisible). */}
       <NotificationConsentModal consent={consent} blocked={requireOrderChoice} />
     </>
