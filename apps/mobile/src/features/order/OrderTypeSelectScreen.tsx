@@ -30,7 +30,8 @@ import { failureMessage } from '../../lib/errors/reportFailure';
 import { shouldBecomeDefault } from '../../store/addressBook';
 import { mapConfig } from '../../lib/map';
 import { distanceKm, type GeoPoint } from '../../lib/geo';
-import { useAddressBook, useCart, useCatalog, useOrderContext } from '../../store';
+import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
+import { SignInPrompt } from '../auth/SignInPrompt';
 import { isBranchOpen, pickupBranches, resolveDeliveryBranch } from './orderContext';
 import { validateCartForBranch } from './cartValidation';
 import { makeStyles } from '../../theme/makeStyles';
@@ -45,6 +46,7 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
   const { t, pick, lang, rtlRow } = useI18n();
   const styles = useStyles();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
+  const guest = useAuth().status === 'signed_out';
   const { context, valid, setPickup, setDelivery } = useOrderContext();
   const cart = useCart();
   const addressBook = useAddressBook();
@@ -256,6 +258,22 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
                 </Pressable>
               );
             })}
+          </View>
+        </ScrollView>
+      ) : tab === 'delivery' && guest ? (
+        // Delivery saves the address to the customer's account before it can be
+        // used (addressBook.create needs a session), so a guest is asked to sign
+        // in here and returns to this tab afterwards. Pickup stays open to them.
+        <ScrollView contentContainerStyle={styles.list}>
+          <View style={[columnStyles.column, styles.stack]}>
+            <SignInPrompt
+              title={pick('Delivery needs an account', 'التوصيل يتطلب حساباً')}
+              body={pick(
+                'Delivery addresses are saved to your account. Sign in to add one, or choose Pickup to keep browsing.',
+                'تُحفظ عناوين التوصيل في حسابك. سجّل الدخول لإضافة عنوان، أو اختر الاستلام لمتابعة التصفح.',
+              )}
+              returnTo="/select?type=delivery"
+            />
           </View>
         </ScrollView>
       ) : (

@@ -3,7 +3,6 @@ import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AuthGate } from '../components/AuthGate';
 import { radius, space } from '../design-system/generated/tokens';
 import { Text } from '../design-system/ui/Text';
 import { OrderTypeSelectScreen } from '../features/order/OrderTypeSelectScreen';
@@ -11,6 +10,11 @@ import { useI18n } from '../i18n/I18nProvider';
 import { makeStyles } from '../theme/makeStyles';
 import type { OrderType } from '../types/models';
 
+/**
+ * Not behind AuthGate: a guest may choose a pickup branch (guest browsing, App
+ * Store 5.1.1(v)). Delivery needs an account because addresses are saved to
+ * one, so OrderTypeSelectScreen asks a guest to sign in on its delivery tab.
+ */
 export default function SelectRoute() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
@@ -18,13 +22,13 @@ export default function SelectRoute() {
   const { lang, isRTL, toggle } = useI18n();
   const initialType: OrderType | undefined = type === 'delivery' ? 'delivery' : type === 'pickup' ? 'pickup' : undefined;
   return (
-    <AuthGate><View style={styles.root}>
+    <View style={styles.root}>
       <OrderTypeSelectScreen initialType={initialType} />
       <Pressable accessibilityRole="button" accessibilityLabel={lang === 'en' ? 'Switch to Arabic' : 'التبديل إلى الإنجليزية'} hitSlop={8} onPress={toggle}
         style={[styles.language, { top: insets.top + space.s3 }, isRTL ? styles.languageRTL : styles.languageLTR]}>
         <Text variant="label" tone="ember" align="center">{lang === 'en' ? 'العربية' : 'EN'}</Text>
       </Pressable>
-    </View></AuthGate>
+    </View>
   );
 }
 const useStyles = makeStyles((colors) => ({

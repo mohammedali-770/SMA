@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**208 TypeScript test files declaring 3242 test blocks, plus 82 SQL suites.**
+**210 TypeScript test files declaring 3267 test blocks, plus 82 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -128,7 +128,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-73 files, 1023 declared test blocks.
+75 files, 1048 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -141,7 +141,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/dev/fixtureGate.test.ts` | 10 | fixture gate — fails closed |
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 7 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
+| `apps/mobile/src/features/auth/guestBrowsingWiring.test.ts` | 13 | the menu is open to a guest |
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
+| `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
@@ -162,7 +164,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/cartValidation.test.ts` | 21 | validateCartForBranch |
 | `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
-| `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
+| `apps/mobile/src/features/order/orderContext.test.ts` | 21 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
