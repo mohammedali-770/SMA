@@ -233,8 +233,9 @@ it is a test that has not been run, not a clock that is running out.
   **Re-read 2026-11-11: 207 MB, and "not urgent" no longer holds.** At 500 MB
   Supabase makes a Free project read-only, so no order can be placed. Growth has been
   about 1.7 MB a day, most of it `pg_cron`'s never-pruned run log, which puts the cap
-  roughly five to six months out. The fix is the run-history prune in PR #435, merged
-  on 2026-11-11 (`8df5408`) and not applied ([`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md) §3).
+  roughly five to six months out. The fix is the run-history prune from PR #435, merged
+  on 2026-11-11 (`8df5408`) and applied the same day. Its first nightly run is 01:10 UTC
+  on 2026-11-12 ([`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md) §3).
 
 ### Should-fix, cash launch
 

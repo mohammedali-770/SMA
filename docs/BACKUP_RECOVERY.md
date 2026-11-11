@@ -101,10 +101,13 @@ Measured read-only on 2026-11-11:
 recorded), so the database has grown by about 1.7 MB a day. At that rate it
 reaches 500 MB in roughly five to six months.
 
-**The fix is merged and not live.** PR #435 adds the migration
-`20261001120000_prune_operational_run_history`, which prunes those three logs. It
-was merged on 2026-11-11 (`8df5408`) and is not applied. Applying it, named by
-version, is an owner action (CLAUDE.md §5). It stops the growth; it does not shrink what is already on disk,
+**The fix is applied, and its first run is 01:10 UTC on 2026-11-12.** PR #435
+merged the migration `20261001120000_prune_operational_run_history`, which prunes
+those three logs, on 2026-11-11 (`8df5408`). It was applied the same day at
+12:30:50 UTC on the owner's approval (live version `20261111123050`,
+`MIGRATIONS.md` §53). It deleted nothing at apply time. The daily job does the
+work, at most 200,000 rows per table a night, so the run log's backlog clears on
+the third night. It stops the growth; it does not shrink what is already on disk,
 which would take a one-off `VACUUM FULL`.
 
 ## 4. What a restore or rebuild depends on
@@ -120,7 +123,7 @@ API keys, Realtime settings, extensions, and Storage objects
 
 ### 4.1 Scheduled jobs: stop the five that call out, first
 
-There are eleven `pg_cron` jobs. Five of them run a function that calls an Edge
+There are twelve `pg_cron` jobs. Five of them run a function that calls an Edge
 Function over `pg_net`. These five functions are the only ones in the database that
 call out, and only `pg_cron` calls them (catalog read, 2026-11-11).
 
@@ -137,6 +140,7 @@ call out, and only `pg_cron` calls them (catalog read, 2026-11-11).
 | `operations-digest-generator` | hourly | yes | no | |
 | `loyalty-expiry` | 00:20 UTC daily | yes | no | expires points, only while `loyalty_expiry_enabled` is on |
 | `otp-retention-sweep` | 00:40 UTC daily | yes | no | deletes expired sign-in codes |
+| `operational-history-prune` | 01:10 UTC daily | yes | no | deletes old run history: pg_cron's log past 14 days, the two monitor ledgers past 30. Scheduled 2026-11-11 |
 
 **Why they are stopped before anything else.** Each caller takes its target URL from
 a Vault entry (§4.2) and authenticates with a secret the receiving function
@@ -162,7 +166,7 @@ where jobname in ('lazywait-sync', 'account-deletion-processor',
 select jobname, active from cron.job order by jobname;  -- all five: false
 ```
 
-- **For a drill, stop all eleven:** run it without the `where`. The other six touch
+- **For a drill, stop all twelve:** run it without the `where`. The other seven touch
   only the copy's own rows, but they change the counts you are about to compare.
 - **Deactivate; do not unschedule.** A real recovery needs the definitions, and
   disabling the `pg_cron` extension deletes every job
@@ -173,7 +177,7 @@ select jobname, active from cron.job order by jobname;  -- all five: false
   ([CLI reference](https://supabase.com/docs/reference/cli/supabase-db-dump)). For a
   real recovery, re-create them from the `cron.schedule` statements in the
   migrations that made them (`grep -n "select cron.schedule(" supabase/migrations/*.sql`
-  lists all eleven), then stop `payment-refund-worker` again.
+  lists all twelve), then stop `payment-refund-worker` again.
 
 ### 4.2 Vault secrets
 
@@ -303,7 +307,7 @@ restores no business data.
   replay that includes the Moyasar file installs the frozen payment objects.
 - The two superseded July files, `20260707120700_place_order` and
   `20260707120800_loyalty`, replay as normal; later files replace what they define.
-- A rebuild schedules all eleven jobs, `payment-refund-worker` among them, as
+- A rebuild schedules all twelve jobs, `payment-refund-worker` among them, as
   **active**, because the scheduler migration schedules it (`MIGRATIONS.md` §11).
   Stop it at once (§5).
 - Apply file by file, each named, as `MIGRATIONS.md` §9 describes. `supabase db push`
@@ -339,7 +343,7 @@ made. If none exists, record that in §7 and stop.
    **no** Edge Functions to it.
 3. **Restore it**, for a dump with the `psql` steps in Supabase's Backup and Restore
    using the CLI. Start the clock.
-4. **Stop all eleven jobs at once** (§4.1), then read `cron.job_run_details` for
+4. **Stop all twelve jobs at once** (§4.1), then read `cron.job_run_details` for
    anything that ran before you did. Leave the Vault URLs alone (§4.2).
 5. **Give the copy a sign-in that sends nothing.** Customers normally sign in
    through the Send SMS hook (`auth-send-sms-whatsapp`), which the copy deliberately
