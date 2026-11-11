@@ -270,6 +270,45 @@ Completed:
 - **turning the master flag off** — the way to stop all sending, including order updates;
 - **changing who a broadcast reaches.** As of 2026-08-20 `promos_enabled` defaults **TRUE** at registration (see the 2026-08-20 subsection below), so the broadcast audience is now every device that granted OS notification permission and has not switched offers off. Widening targeting beyond that — segments, topics, reaching devices that opted out — is still a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and still needs a separate owner decision, not a code change made in passing.
 
+### Expo send timeout — written 2026-11-11, live only after a `push-dispatch` deploy
+
+**Status:** SOURCE CONFIRMED; not live until `push-dispatch` is redeployed.
+
+The request to Expo had no timeout. If Expo accepted the connection and then
+stalled, `push-dispatch` waited until the platform stopped it (150 s request
+idle timeout, 150/400 s worker wall clock), and a `pos_sync` event it had
+claimed stayed 'processing' for good: those rows are never reclaimed, and the
+push health card counts only failures, so it would not have shown. Measured
+2026-11-11 against the real handler, with exp.host routed to a local socket that
+never answers: still pending at 20 s, never finalized. Production held no such
+row when read the same day (0 `pos_sync` or `order_status` rows 'processing' or
+'failed', 10:37 UTC), so the gap was latent.
+
+The request now carries `AbortSignal.timeout(EXPO_SEND_TIMEOUT_MS)`, 10 s, the
+value `admin-push-dispatch` uses. **A send slower than 10 s is recorded as
+failed instead of waited on.** `pos_sync` finalizes as terminal 'failed' and is
+never resent. `order_status` records 'failed', which a later call for the same
+transition may reclaim within the 5-attempt budget. `test` and `broadcast` count
+the chunk as failed. On the stub, the hang now settles at about 10 s
+(10,004–10,008 ms) and an immediate answer still records 'sent'. Copy, audience
+and targeting are unchanged; `_shared/pushDispatchTimeoutWiring.test.ts` pins the
+timeout and what it turns into.
+
+- **'failed' now means "not confirmed", not "not delivered".** Expo may have
+  accepted a request that timed out. For `order_status`, a later reclaim could
+  then send the same status twice. The 10-minute lease reclaim already accepts
+  that ambiguity; a timeout reaches it in 10 s instead.
+- **`lazywait-sync`'s drain still gives up on each call at 8 s**, before this
+  limit, so `push-dispatch` finalizes after its caller has let go. That relies on
+  a function running on after its caller disconnects. It was observed once in
+  production (SM-2026-000064, `docs/ORDER_CONFIRMATION_FLOW.md`), and Supabase
+  does not document it.
+- **The deploy is a §5 action with its own approval.** Keep `verify_jwt = false`,
+  as `supabase/config.toml` sets it. The live version was not read for this
+  change. The bundle is the whole current source, so it also ships the #419 key
+  handling (§42). If `lazywait-sync` is deployed in the same session, deploy
+  `push-dispatch` first: §42 puts receivers before senders.
+
 ### Marketing consent — now opt-OUT (owner decision, 2026-08-20)
 
 **Status:** SOURCE CONFIRMED — this is the current rule.
