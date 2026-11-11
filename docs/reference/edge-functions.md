@@ -27,15 +27,15 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `lazywait-webhook` | inbound receiver for Lazywait POS callbacks | by hand | service role |
 | `operations-alert-dispatch` | the thing that finally tells a human | by hand | service role |
 | `order-intake` | authenticated "create order + sync to POS" orchestration | by hand | service role |
+| `payment-admin-test-return` | the HTTPS page the admin's browser lands on after the isolated sandbox test in payment-test-config (`test_checkout`). The test invoice uses it as… | workflow | caller JWT |
 | `payment-initiate` | the authenticated customer starts paying for an order they already created (place_order left it payment_status='pending') | workflow | service role |
-| `payment-refund` | the automatic refund worker for orders that were PAID but provably never reached the branch (Issue #94, step 7) | by hand | service role |
+| `payment-refund` | the automatic refund worker for orders that were PAID but provably never reached the branch (Issue #94, step 7) | workflow | service role |
 | `payment-return` | the HTTPS URL the payment provider redirects the customer's browser to after checkout (providers require a real https redirect target; a raw app… | workflow | caller JWT |
-| `payment-test-config` | ADMIN-only (verify_jwt=true + is_admin(), role AND AAL2) | by hand | service role |
-| `payment-verify` | the app calls this after returning from the provider's hosted checkout. It is the ONLY thing the app trusts: it retrieves the charge (Tap) or the… | workflow | service role |
-| `payment-webhook` | called by the PAYMENT GATEWAY (not the app) after a payment event. verify_jwt = false: the caller is the gateway, authenticated by its own… | workflow | service role |
+| `payment-test-config` | ADMIN-only (verify_jwt=true + is_admin(), role AND AAL2) | workflow | service role |
+| `payment-verify` | the app calls this after returning from Moyasar's hosted checkout. It is the ONLY thing the app trusts: it retrieves the invoice and its payment… | workflow | service role |
+| `payment-webhook` | called by Moyasar (not the app) after a payment event | workflow | service role |
 | `push-dispatch` | Expo Push sender (COMPLETE implementation; replaces the old 501 placeholder) | by hand | service role |
 | `staff-accounts` | ADMIN-only provisioning for the branch-operations roles | by hand | service role |
-| `tap-admin-test-return` | the HTTPS page Tap redirects the admin's browser to after the isolated admin TEST checkout (Tap requires an https redirect target for 3DS). It is… | by hand | caller JWT |
 | `whatsapp-send-otp` | signed-in customer phone-ownership verification send | by hand | service role |
 | `whatsapp-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |
 | `whatsapp-verify-otp` | signed-in customer phone-ownership verification | by hand | service role |
@@ -59,7 +59,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
 - `_shared/cors.ts`
-- `_shared/geidea.ts`
+- `_shared/deployFunctionsWiring.test.ts`
 - `_shared/lazywait.test.ts`
 - `_shared/lazywait.ts`
 - `_shared/lazywaitApi.test.ts`
@@ -69,11 +69,14 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/lazywaitCatalog.ts`
 - `_shared/moyasar.test.ts`
 - `_shared/moyasar.ts`
+- `_shared/moyasarHttp.test.ts`
+- `_shared/moyasarHttp.ts`
 - `_shared/moyasarRefund.test.ts`
 - `_shared/moyasarRefund.ts`
 - `_shared/moyasarVerify.ts`
 - `_shared/orderIntakeSyncWiring.test.ts`
 - `_shared/paymentSync.ts`
+- `_shared/paymentWiring.test.ts`
 - `_shared/publicHost.ts`
 - `_shared/pushReadyCopyWiring.test.ts`
 - `_shared/rest.test.ts`
@@ -85,11 +88,6 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/supabaseClient.ts`
 - `_shared/syncLog.test.ts`
 - `_shared/syncLog.ts`
-- `_shared/tap.test.ts`
-- `_shared/tap.ts`
-- `_shared/tapRefund.test.ts`
-- `_shared/tapRefund.ts`
-- `_shared/tapVerify.ts`
 - `_shared/webPush.test.ts`
 - `_shared/webPush.ts`
 - `_shared/webhookReliabilityWiring.test.ts`
