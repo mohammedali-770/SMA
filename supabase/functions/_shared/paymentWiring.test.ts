@@ -121,6 +121,74 @@ describe('payment-initiate', () => {
   });
 });
 
+// A TEST-mode payment must never pay for a real customer's order. Moyasar's
+// published test cards settle a test invoice through exactly the path a live
+// one takes, so with online payment on in TEST mode they would confirm a real
+// order and send it to the kitchen. Customer checkout is refused twice: on the
+// configured mode before an attempt is opened, and on the attempt's STORED mode
+// after begin_*_attempt, because a reused attempt can predate a switch to live.
+describe('payment-initiate refuses customer checkout in TEST mode', () => {
+  const src = code('payment-initiate');
+  const flows = [
+    { flow: 'order', fn: 'async function initiateMoyasar(', begin: "admin.rpc('begin_payment_attempt'" },
+    {
+      flow: 'session',
+      fn: 'async function initiateMoyasarForSession(',
+      begin: "admin.rpc('begin_session_attempt'",
+    },
+  ] as const;
+
+  it.each(flows)(
+    '$flow flow: checks the configured mode before an attempt is opened',
+    ({ flow, fn, begin }) => {
+      const body = fnBody(src, fn);
+      const check = body.indexOf(
+        `if (m.mode !== 'live') return refuseTestModeCheckout('${flow}', 'configured');`,
+      );
+      expect(check).toBeGreaterThan(body.indexOf('const m = resolveMoyasarConfig('));
+      expect(check).toBeLessThan(body.indexOf(begin));
+    },
+  );
+
+  it.each(flows)(
+    "$flow flow: checks the attempt's stored mode before any invoice is handed out",
+    ({ flow, fn, begin }) => {
+      const body = fnBody(src, fn);
+      const check = body.indexOf(
+        `if (attempt.mode !== 'live') return refuseTestModeCheckout('${flow}', 'attempt');`,
+      );
+      expect(check).toBeGreaterThan(body.indexOf(begin));
+      expect(check).toBeLessThan(
+        body.indexOf('if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref)'),
+      );
+      expect(check).toBeLessThan(body.indexOf('return await createMoyasarInvoice('));
+    },
+  );
+
+  it('answers {status: disabled, reason: test_mode} and writes one JSON log line', () => {
+    const refusal = fnBody(src, 'function refuseTestModeCheckout(');
+    expect(refusal).toContain("return json({ status: 'disabled', reason: 'test_mode' }, 200);");
+    expect(count(refusal, 'console.')).toBe(1);
+    expect(refusal).toMatch(/console\.warn\(JSON\.stringify\(\{[^}]*reason: 'test_mode'/);
+  });
+
+  it('leaves no path to an invoice around the two checks', () => {
+    expect(count(src, 'await createMoyasarInvoice(')).toBe(2);
+    expect(count(src, "admin.rpc('begin_payment_attempt'")).toBe(1);
+    expect(count(src, "admin.rpc('begin_session_attempt'")).toBe(1);
+  });
+
+  // Sandbox testing is the console's admin test, which never touches an order.
+  it('leaves the admin sandbox test working in TEST mode', () => {
+    const admin = code('payment-test-config');
+    expect(admin).toContain(
+      "if (mode !== 'test') return json({ ok: false, message: 'Admin test checkout is only available in TEST mode.' }, 200);",
+    );
+    expect(admin).toContain("resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test')");
+    expect(admin).not.toMatch(/refuseTestModeCheckout|payment-initiate/);
+  });
+});
+
 describe('payment-verify', () => {
   const src = code('payment-verify');
 

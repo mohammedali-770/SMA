@@ -20,6 +20,10 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * other provider answers 200 {status:'disabled'}, which the app already shows as
  * "online payment unavailable".
  *
+ * Customer checkout is refused while the gateway is in TEST mode, so a test
+ * card can never pay for a real order; see refuseTestModeCheckout(). Sandbox
+ * testing is the console's admin test (payment-test-config `test_checkout`).
+ *
  * The app also sends `language`. Nothing here reads it: the invoice request
  * (buildInvoicePayload) carries no language field.
  */
@@ -267,6 +271,32 @@ function configForAttempt(
   return resolved.ok ? resolved : null;
 }
 
+/**
+ * A TEST-mode payment must never pay for a real customer's order.
+ *
+ * Moyasar's sandbox accepts its published test cards, and a paid test invoice
+ * confirms through exactly the path a live one takes: the binding (invoice id,
+ * amount, currency) matches, because the invoice was opened for that order. So
+ * with online payment switched on while the gateway is in TEST mode, anyone
+ * holding a public test card number could have a real order marked paid and
+ * sent to the kitchen without any money moving. Customer checkout therefore
+ * refuses TEST mode outright. Sandbox testing is the console's admin test
+ * (payment-test-config `test_checkout`), which never touches an order.
+ *
+ * Checked twice: against the configured mode before begin_*_attempt opens
+ * anything, and against the attempt's STORED mode after it returns, because a
+ * reused attempt keeps the mode it was opened in and can predate a switch from
+ * test to live.
+ *
+ * Answers {status:'disabled'}, which the app shows as "Online payment is
+ * unavailable right now." (CheckoutScreen.tsx: status 'disabled' →
+ * t('payUnavailable')).
+ */
+function refuseTestModeCheckout(flow: 'order' | 'session', check: 'configured' | 'attempt'): Response {
+  console.warn(JSON.stringify({ event: 'payment_initiate_refused', reason: 'test_mode', flow, check }));
+  return json({ status: 'disabled', reason: 'test_mode' }, 200);
+}
+
 async function initiateMoyasar(
   admin: SupabaseClient,
   order: Record<string, unknown>,
@@ -288,6 +318,7 @@ async function initiateMoyasar(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
+  if (m.mode !== 'live') return refuseTestModeCheckout('order', 'configured');
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_payment_attempt', {
     p_order_id: order.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -301,6 +332,7 @@ async function initiateMoyasar(
     console.error('begin_payment_attempt returned no attempt_id');
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
+  if (attempt.mode !== 'live') return refuseTestModeCheckout('order', 'attempt');
 
   // The attempt's stored mode is authoritative from here on — a reused attempt
   // may predate a mode switch. See configForAttempt().
@@ -355,6 +387,7 @@ async function initiateMoyasarForSession(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
+  if (m.mode !== 'live') return refuseTestModeCheckout('session', 'configured');
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_session_attempt', {
     p_session_id: session.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -368,6 +401,7 @@ async function initiateMoyasarForSession(
     console.error('begin_session_attempt returned no attempt_id');
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
+  if (attempt.mode !== 'live') return refuseTestModeCheckout('session', 'attempt');
 
   const mAttempt = configForAttempt(cfg, attempt);
   if (!mAttempt) {

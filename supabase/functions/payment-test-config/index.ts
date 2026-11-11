@@ -41,7 +41,10 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  *                                   invalid key returns 401.
  *   action 'verify_order'         → re-verify one order's Moyasar payment.
  *   action 'test_checkout'        → an isolated 1 SAR TEST invoice, linked to no
- *                                   order.
+ *                                   order. This is where sandbox testing happens:
+ *                                   payment-initiate refuses customer checkout in
+ *                                   TEST mode, so a test card can never pay for a
+ *                                   real order.
  *   action 'test_checkout_result' → read that test invoice back (display only).
  * Secret values are never returned; provider errors are sanitized.
  */
