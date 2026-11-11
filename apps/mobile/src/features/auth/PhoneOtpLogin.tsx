@@ -34,12 +34,18 @@ import { OtpResendTimer, type OtpResendHandle } from '../otp/OtpResendTimer';
 import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { auth } from '../../services/api';
 import { requestLoginCode } from './loginAvailability';
+import { HOME_ROUTE, safeReturnPath } from './returnPath';
 import { failureMessage } from '../../lib/errors/reportFailure';
 import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code';
 
-export function PhoneOtpLogin() {
+/**
+ * `returnTo` is the untrusted `next` parameter from the login link. It is only
+ * ever used through `safeReturnPath`, which refuses anything that is not one of
+ * this app's own routes — see returnPath.ts for why that matters on the web.
+ */
+export function PhoneOtpLogin({ returnTo }: { returnTo?: string } = {}) {
   const styles = useStyles();
   const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>('phone');
@@ -94,8 +100,9 @@ export function PhoneOtpLogin() {
     try {
       const session = await auth.verifyPhone(e164, value);
       if (session) {
-        // AuthProvider.onChange also fires; navigate eagerly for a snappy UI.
-        router.replace('/(tabs)');
+        // AuthProvider.onChange also fires; navigate eagerly for a snappy UI —
+        // back to where the customer was asked to sign in, or the home tab.
+        router.replace(safeReturnPath(returnTo) ?? HOME_ROUTE);
       } else {
         setError(t('invalidOrExpiredCode'));
       }

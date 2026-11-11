@@ -17,10 +17,19 @@ import { auth } from '../../services/api';
 import { makeStyles } from '../../theme/makeStyles';
 import { showsUnavailableCard, type WhatsAppLoginAvailability } from './loginAvailability';
 import { PhoneOtpLogin } from './PhoneOtpLogin';
+import { HOME_ROUTE } from './returnPath';
 
-export function LoginScreen() {
+/**
+ * `returnTo` is the untrusted `next` parameter. PhoneOtpLogin checks it against
+ * the allow-list when it navigates; nothing here acts on it.
+ */
+export function LoginScreen({ returnTo }: { returnTo?: string } = {}) {
   const { t, pick, lang } = useI18n();
   const styles = useStyles();
+  // Signing in is optional until the customer needs an account (guest browsing,
+  // App Store 5.1.1(v)), so this screen must never be a dead end. Back to where
+  // they came from when there is one, otherwise the menu.
+  const keepBrowsing = () => (router.canGoBack() ? router.back() : router.replace(HOME_ROUTE));
   const [availability, setAvailability] = useState<WhatsAppLoginAvailability | null>(null);
 
   useEffect(() => {
@@ -57,8 +66,12 @@ export function LoginScreen() {
               <Text variant="body" tone="secondary">{t('whatsappLoginNotAvailableSub')}</Text>
             </Card>
           ) : (
-            <PhoneOtpLogin />
+            <PhoneOtpLogin returnTo={returnTo} />
           )}
+
+          <RNText style={styles.browse} onPress={keepBrowsing} accessibilityRole="button">
+            {pick('Not now — keep browsing', 'ليس الآن — متابعة التصفح')}
+          </RNText>
 
           <RNText style={styles.policy}>
             {pick('By continuing, you agree to the ', 'بمتابعتك، فإنك توافق على ')}
@@ -82,6 +95,13 @@ const useStyles = makeStyles((color) => ({
   // Centred in BOTH languages — the lockup is the one block on this screen with
   // no reading direction. The form below it keeps the reading edge.
   hero: { alignItems: 'center' as const, marginTop: space.s5, marginBottom: space.s6 },
+  browse: {
+    marginTop: space.s4,
+    textAlign: 'center' as const,
+    color: color.emberText,
+    fontSize: typeScale.body.size,
+    fontWeight: '700' as const,
+  },
   policy: {
     marginTop: space.s5,
     textAlign: 'center' as const,
