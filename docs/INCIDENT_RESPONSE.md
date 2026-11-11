@@ -201,6 +201,80 @@ For suspected credential leakage, privilege escalation or malicious access:
 - verify RLS/staff authorization boundaries after containment;
 - follow the project's security reporting/contact policy in `SECURITY.md` where applicable.
 
+## 10b. Personal-data breach — SDAIA must hear within 72 hours
+
+**If customer personal data may have been exposed, lost, altered or accessed by
+someone who should not have it, the clock started when you found out.** Saudi
+PDPL gives the controller **72 hours from becoming aware** to notify SDAIA,
+whenever the incident could harm the personal data or the people it belongs to,
+or conflict with their rights (PDPL Art 20; Implementing Regulation Art 24).
+Read against SDAIA's published texts on 2026-11-10; sources at the end of this
+section.
+
+### Do this, in order
+
+1. **Write down the time you became aware.** That timestamp is what the 72 hours
+   run from, and SDAIA asks for it.
+2. **Contain it** — §10 above: stop the exposure, rotate the credential, keep the
+   evidence. Do not wait for containment to finish before starting step 3.
+3. **The named notifier files with SDAIA.** Use the *Personal Data Breach
+   Notification* e-service on SDAIA's National Data Governance Platform
+   (`dgp.sdaia.gov.sa` → e-services). **It requires a valid registration
+   certificate**, so a controller that is not already registered cannot file
+   through it. Registering in the middle of an incident spends the 72 hours —
+   which is why registration is an owner action now (`OWNER_ACTIONS.md` §44).
+4. **Send what you have within 72 hours**, and send the rest *"as soon as
+   possible, along with justifications for the delay"*. An incomplete notice on
+   time beats a complete one late.
+5. **Tell the affected customers without undue delay** if the breach may harm
+   their data or conflict with their rights or interests. Use simple, clear
+   language, in Arabic and English. Say what happened, the risks and what has
+   been done, who to contact, and what they can do to protect themselves.
+6. **Keep copies** of every notice and a record of the corrective measures.
+   SDAIA can ask for them, and §13's write-up should link them.
+
+**Who notifies — owner must fill:**
+
+| Role | Person | Contact |
+| --- | --- | --- |
+| Notifier (files with SDAIA) | _unassigned_ | |
+| Deputy | _unassigned_ | |
+
+### What the notice to SDAIA must contain (IR Art 24)
+
+- a description of the breach: time, date and circumstances, and when the
+  controller became aware;
+- the categories of data, the actual or approximate number of people affected,
+  and the type of data;
+- the risks, the actual or possible impact, what has been done to mitigate it,
+  and what will be done to stop it recurring;
+- whether the affected people have been, or will be, told;
+- contact details for the controller, its data protection officer, or another
+  responsible official.
+
+### What this procedure cannot do yet, stated plainly
+
+- **Nobody is named above.** Until someone is, step 3 has no owner.
+- **Registration is unconfirmed** (`GO_LIVE_READINESS.md` A2). Without it, the
+  e-service in step 3 will not accept a filing.
+- **Processors must tell us first.** Every processor contract must commit the
+  processor to tell the controller about a breach without undue delay (IR Art
+  17(1)(d)). Whether each of ours does is `GO_LIVE_READINESS.md` A8.
+
+**A draft, not the law:** SDAIA's October 2026 consultation on amending the
+Implementing Regulation would drop the harm test, so that every breach is
+notified to SDAIA within 72 hours. The consultation closed on 5 November 2026.
+Re-read this section if the amendment is adopted.
+
+Sources, all SDAIA's published texts on `dgp.sdaia.gov.sa`, English translations
+(the Arabic governs):
+
+- the PDPL;
+- its Implementing Regulation;
+- the *Personal Data Breach Notification* service page.
+
+`docs/RECORD_OF_PROCESSING.md` lists the full addresses.
+
 ## 11. Deployment incident
 
 If the symptom began after a web release:
