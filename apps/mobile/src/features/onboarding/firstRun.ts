@@ -4,9 +4,12 @@
  *
  * Two independent one-shot moments:
  *
- *  1. PERMISSIONS — the OS dialogs are raised once, on the first run after
- *     sign-in. There is no in-app screen in front of them: the system asks,
- *     and whatever the customer allows is what the app then uses.
+ *  1. NOTIFICATIONS — once, on the first run after sign-in, the in-app consent
+ *     screen is offered, and the OS notification prompt follows only if the
+ *     customer taps Allow there (`firstRunNotificationStep`). The OS dialog
+ *     cannot say that offers come with order updates; the screen does.
+ *     Location is NOT asked here: it is asked where it is used, on the pickup
+ *     tab and at "Use my location" on the delivery map.
  *
  *  2. REVIEW PROMPT — offered once, after their first completed order.
  *     Deliberately NOT while the confirmation screen is open: customers show
@@ -16,7 +19,12 @@
  */
 
 export interface FirstRunState {
-  /** The OS permission dialogs have already been raised once. */
+  /**
+   * The first run has been spent on this device: the consent screen was shown,
+   * or there was nothing to ask. The storage key predates the consent screen
+   * and is deliberately unchanged, so nobody already through first run is
+   * asked again.
+   */
   permissionsRequested: boolean;
   /** We have already asked for a store review; we never ask twice ourselves. */
   reviewAsked: boolean;
@@ -25,7 +33,7 @@ export interface FirstRunState {
 export const DEFAULT_FIRST_RUN: FirstRunState = { permissionsRequested: false, reviewAsked: false };
 
 /**
- * Raise the OS prompts once, for a signed-in customer.
+ * Spend the first run once, for a signed-in customer.
  *
  * Signed-in specifically: a granted notification permission is only useful once
  * there is an account to register the device against, and asking a
@@ -37,9 +45,46 @@ export function shouldRequestFirstRunPermissions(state: FirstRunState, signedIn:
 }
 
 /**
+ * What the first run does about notifications.
+ *
+ * `offer_consent`: show the in-app consent screen. The OS prompt is raised only
+ * from its Allow button, so the one ask iOS allows is never spent on someone
+ * who has not read what they are allowing — order updates AND occasional
+ * offers, which are on by default (CLAUDE.md §7).
+ *
+ * `nothing`, whenever there is nothing honest to ask:
+ *  - not signed in, already spent on this device, or the push kill switch off;
+ *  - permission already granted. That is an existing customer, or Android 12
+ *    and older, where notifications are granted at install and the OS never
+ *    asks. Neither is registered from here (`shouldRegisterOnFirstRun`): the
+ *    sign-in claim and the one-time consent notice cover them instead;
+ *  - permission refused for good (`canAskAgain: false`). The OS would show
+ *    nothing, so a screen promising a prompt would be a dead end; the Profile
+ *    toggle explains how to turn it back on in Settings. The web build lands
+ *    here too, because it can never ask (pushRegistration.web.ts).
+ */
+export type FirstRunNotificationStep = 'offer_consent' | 'nothing';
+
+export function firstRunNotificationStep(input: {
+  state: FirstRunState;
+  signedIn: boolean;
+  pushEnabled: boolean;
+  permission: { granted: boolean; canAskAgain: boolean };
+}): FirstRunNotificationStep {
+  if (!shouldRequestFirstRunPermissions(input.state, input.signedIn)) return 'nothing';
+  if (!input.pushEnabled) return 'nothing';
+  if (input.permission.granted || !input.permission.canAskAgain) return 'nothing';
+  return 'offer_consent';
+}
+
+/**
  * Whether first run may REGISTER this device for push.
  *
- * False whenever the OS permission was already granted before this run.
+ * False whenever the OS permission was already granted before this run — and,
+ * since the consent screen can wait a while for a calm moment, it is checked
+ * again when the customer taps Allow: a grant that arrived some other way in
+ * the meantime (a Profile toggle, or the OS Settings app) is the customer's own
+ * choice and stands untouched.
  *
  * The first-run flag is a storage key that no existing install has, so "first
  * run" is also every existing customer's next launch after upgrading. Those

@@ -99,8 +99,20 @@ export const STRINGS = {
     notifOrderUpdates: 'Order updates',
     notifOrderUpdatesSub: 'Status of your orders (preparing, ready, delivered…)',
     notifPromos: 'Offers & promotions',
-    notifPromosSub: 'Occasional deals — only if you opt in.',
+    // Offers are on by default (opt-out, CLAUDE.md §7). This line used to say
+    // "only if you opt in", which contradicted what the app actually does.
+    notifPromosSub: 'Occasional deals. On by default — turn off anytime.',
     notifPermissionDenied: 'Notifications are blocked for this app. Enable them in your device settings, then try again.',
+    // Consent screen (NotificationConsentModal). PROMPT mode comes before the OS
+    // prompt; NOTICE mode is shown once where the OS never asks. Both must say
+    // that offers come with order updates, and where to turn them off.
+    notifConsentTitle: 'Order updates and offers',
+    notifConsentBody: 'We’ll let you know when your order is being prepared, is ready, or is on its way. We’ll also send occasional offers — you can turn offers off anytime in Profile › Notifications.',
+    notifConsentNoticeBody: 'Notifications are on for this device: we’ll let you know when your order is being prepared, is ready, or is on its way, and send occasional offers. You can turn offers off anytime in Profile › Notifications.',
+    notifConsentAllow: 'Allow notifications',
+    notifConsentNotNow: 'Not now',
+    notifConsentOk: 'OK',
+    notifConsentSettings: 'Notification settings',
 
     // contact & support
     supportTitle: 'Contact & Support',
@@ -450,8 +462,15 @@ export const STRINGS = {
     notifOrderUpdates: 'تحديثات الطلب',
     notifOrderUpdatesSub: 'حالة طلباتك (قيد التحضير، جاهز، تم التوصيل…)',
     notifPromos: 'العروض والترويجات',
-    notifPromosSub: 'عروض من حين لآخر — فقط إذا اشتركت.',
+    notifPromosSub: 'عروض من حين لآخر. مفعّلة تلقائياً — ويمكنك إيقافها في أي وقت.',
     notifPermissionDenied: 'الإشعارات محظورة لهذا التطبيق. فعّلها من إعدادات جهازك ثم حاول مرة أخرى.',
+    notifConsentTitle: 'تحديثات الطلبات والعروض',
+    notifConsentBody: 'سنُعلمك عندما يكون طلبك قيد التحضير أو جاهزاً أو في الطريق إليك. وسنرسل لك أيضاً عروضاً من حين لآخر — ويمكنك إيقاف العروض في أي وقت من الملف الشخصي ثم الإشعارات.',
+    notifConsentNoticeBody: 'الإشعارات مفعّلة على هذا الجهاز: سنُعلمك عندما يكون طلبك قيد التحضير أو جاهزاً أو في الطريق إليك، وسنرسل لك عروضاً من حين لآخر. ويمكنك إيقاف العروض في أي وقت من الملف الشخصي ثم الإشعارات.',
+    notifConsentAllow: 'السماح بالإشعارات',
+    notifConsentNotNow: 'ليس الآن',
+    notifConsentOk: 'حسناً',
+    notifConsentSettings: 'إعدادات الإشعارات',
 
     // التواصل والدعم
     supportTitle: 'التواصل والدعم',

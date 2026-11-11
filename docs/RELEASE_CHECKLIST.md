@@ -13,7 +13,7 @@ Before release work:
 - [ ] No direct production-branch push/merge is being used.
 - [ ] Any action that requires explicit owner approval has that approval in the conversation.
 - [ ] Payment/refund code is untouched unless a separate payment exception was explicitly approved.
-- [ ] Push is LIVE: any change to notification copy, targeting or dispatch behaviour is a change to real customer messaging and was explicitly approved. Marketing is **opt-OUT** since the owner decision of 2026-08-20 — `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so granting the OS notification prompt enrols the device in offers, and the Profile toggle is the opt-out (CLAUDE.md §7). The column default `push_devices.promos_enabled` stays FALSE and never decides a live device's targeting.
+- [ ] Push is LIVE: any change to notification copy, targeting or dispatch behaviour is a change to real customer messaging and was explicitly approved. Marketing is **opt-OUT** since the owner decision of 2026-08-20 — `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so granting the OS notification prompt enrols the device in offers, and the Profile toggle is the opt-out (CLAUDE.md §7). Since 2026-11-10 an in-app consent screen says so before the OS prompt, and once as a notice where the OS never asks (Android 12 and older); changing that copy is a change to what the customer agreed to. The column default `push_devices.promos_enabled` stays FALSE and never decides a live device's targeting.
 
 See `CLAUDE.md`.
 
@@ -142,6 +142,8 @@ Before native store submission, a real device must exercise the native bundle.
 - [ ] Pickup/Delivery gate works.
 - [ ] Menu, product, cart and checkout screens render correctly.
 - [ ] Map/location and saved-address flows work.
+- [ ] **Permissions arrive in context, on a fresh install.** After sign-in there is no OS location prompt and no OS notification prompt on their own. Choose an order type; back on Home, the notification consent screen appears and names order updates **and** offers. **Allow** brings up the OS prompt, and Profile › Notifications then shows both switches on. **Not now** brings up nothing. Location is asked on the pickup tab and at "Use my location", and nowhere else.
+- [ ] **Android 12 or older** (an emulator is enough): the same text appears once as a notice with **OK** and **Notification settings**, and no OS prompt is raised — there is none on that version. **Then place an order and confirm a status notification is actually displayed.** `push-dispatch` sends on channel `default`, and Android shows nothing for a channel that does not exist; the channel is created at launch, not behind Allow, precisely because this version never shows the consent prompt.
 - [ ] Orders/history/receipt/profile/delete-account screens work.
 - [ ] No native dependency/framework launch crash occurs.
 - [ ] Sentry/native source-map path is verified for production builds.
