@@ -23,7 +23,7 @@ import { buildReturnDeepLink, escapeHtmlAttr } from './returnLink.ts';
  * which shows the page as RAW SOURCE and blocks its redirect. The cased subtype
  * `text/HTML` is matched case-insensitively by browsers (RFC 2045) yet is NOT
  * caught by that lowercase rewrite — so the page renders as real HTML and the
- * redirect fires. (Same technique the tap-admin-test-return page documents; the
+ * redirect fires. (Same technique the payment-admin-test-return page documents; the
  * inline <script>/meta-refresh/app-scheme were NOT the trigger — the lowercase
  * content-type was.) The body is emitted as explicit UTF-8 bytes so the runtime
  * cannot reinterpret the encoding, and the <meta charset> in the head keeps the

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -311,5 +311,49 @@ describe('payment-test-config', () => {
     expect(src).toContain('const invoiceId = String(payload.invoiceId ?? payload.chargeId ??');
     expect(src).toContain("source_id: 'invoice',");
     expect(src).toContain('merchant_id_set: true,');
+  });
+});
+
+// The admin sandbox invoice returns to this page (success_url AND back_url), so
+// despite its old tap-admin-test-return name it was never Tap-only: deleting it
+// would land the admin on a 404 after paying the test invoice.
+describe('payment-admin-test-return', () => {
+  // Read lazily, so a missing page fails these cases rather than the whole file.
+  const page = () => source('payment-admin-test-return');
+  const html = () => {
+    const src = page();
+    return src.slice(src.indexOf('const PAGE_HTML = `'), src.indexOf('</html>`;'));
+  };
+
+  it('is where the admin sandbox invoice sends the browser back to', () => {
+    const admin = code('payment-test-config');
+    expect(admin).toContain('successUrl: `${supabaseUrl}/functions/v1/payment-admin-test-return`,');
+    expect(admin).toContain('backUrl: `${supabaseUrl}/functions/v1/payment-admin-test-return`,');
+    expect(admin).not.toContain('tap-admin-test-return');
+  });
+
+  it('is registered with JWT verification off, under its new name only', () => {
+    const config = readFileSync(new URL('../../config.toml', import.meta.url), 'utf8');
+    expect(config).toMatch(/\[functions\.payment-admin-test-return\]\s*\nverify_jwt = false/);
+    expect(config).not.toContain('[functions.tap-admin-test-return]');
+    expect(existsSync(new URL('../tap-admin-test-return/index.ts', import.meta.url))).toBe(false);
+  });
+
+  it('marks nothing: no database client, no provider call, nothing read from the URL', () => {
+    expect(code('payment-admin-test-return')).not.toMatch(
+      /adminClient|userClient|supabaseClient|\.rpc\(|fetch\(|searchParams|req\.url/,
+    );
+  });
+
+  it('keeps the cased content type that stops the platform serving it as plain text', () => {
+    expect(page()).toContain("'Content-Type': 'text/HTML; charset=utf-8'");
+    expect(page()).toContain('new TextEncoder().encode(PAGE_HTML)');
+    expect(html()).toContain('<meta charset="utf-8" />');
+  });
+
+  it('names no provider, and says the same thing in both languages', () => {
+    expect(html()).not.toMatch(/\btap\b|moyasar/i);
+    expect(html()).toContain('Test checkout complete');
+    expect(html()).toMatch(/lang="ar" dir="rtl"[\s\S]*[\u0600-\u06FF]/);
   });
 });

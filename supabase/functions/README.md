@@ -72,7 +72,7 @@ Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-1
 | `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
 | `payment-refund` | false | Refund worker, Moyasar refunds only; automated scheduling (the `payment-refund-worker` cron job) is off |
 | `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
-| `tap-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to |
+| `payment-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to (renamed from `tap-admin-test-return` on 2026-11-11) |
 
 These functions need migration `20260824100000_moyasar_payment_provider` (`begin_payment_attempt`, `begin_session_attempt`, `payment_records.provider_checkout_ref`), so it must be applied, named by version, before any of them is deployed. They then deploy as one set: an older bundle beside a new one can open an invoice that nothing confirms.
 

@@ -200,8 +200,8 @@ async function handleMoyasar(
       referenceTransaction: ref,
       referenceOrder: 'admin_test',
       expiryMinutes: 30,
-      successUrl: `${supabaseUrl}/functions/v1/tap-admin-test-return`,
-      backUrl: `${supabaseUrl}/functions/v1/tap-admin-test-return`,
+      successUrl: `${supabaseUrl}/functions/v1/payment-admin-test-return`,
+      backUrl: `${supabaseUrl}/functions/v1/payment-admin-test-return`,
       expiresAtIso: invoiceExpiryIso(Date.now(), 30),
       metadata: { purpose: 'admin_test' },
     });
