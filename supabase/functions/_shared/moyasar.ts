@@ -467,6 +467,44 @@ export function mapMoyasarInvoiceStatus(status: unknown): { outcome: MoyasarOutc
   }
 }
 
+export interface ClosedInvoiceOutcome {
+  outcome: 'expired' | 'cancelled';
+  messageKey: string;
+  failureCode: string;
+}
+
+/**
+ * The terminal outcome of an invoice Moyasar has CLOSED without a settled
+ * payment, or null while it is open or once it is paid.
+ *
+ * An invoice with no paid payment used to read 'pending' whatever its own
+ * status said. Neither of these can ever be paid: "User will be prevented from
+ * paying the invoice once expired" (api/invoices/01-create-invoice), and
+ * cancelling one means "it can no longer be paid by the customer"
+ * (api/invoices/06-cancel-invoice). 'pending' kept the app resuming a page
+ * nobody could pay, and, while it did, refusing every new order, cash
+ * included. The outcomes and keys are ones the shipped app already treats as
+ * terminal and can show: 'expired' / payExpired and 'cancelled' / payCancelled
+ * (apps/mobile/src/features/checkout/pendingSession.ts TERMINAL_STATUSES;
+ * apps/mobile/src/i18n/strings.ts, en and ar).
+ *
+ * A settled payment always wins: money Moyasar holds is confirmed or refunded,
+ * never written off. `on_hold` (a SADAD bill not yet paid) is still open.
+ */
+export function closedInvoiceOutcome(invoice: Record<string, unknown>): ClosedInvoiceOutcome | null {
+  const payments = Array.isArray(invoice?.payments) ? (invoice.payments as Record<string, unknown>[]) : [];
+  if (payments.some((p) => mapMoyasarPaymentStatus(p?.status).outcome === 'paid')) return null;
+  switch (String(invoice?.status ?? '').toLowerCase()) {
+    case 'expired':
+      return { outcome: 'expired', messageKey: 'payExpired', failureCode: 'invoice_expired' };
+    case 'canceled':
+    case 'cancelled':
+      return { outcome: 'cancelled', messageKey: 'payCancelled', failureCode: 'invoice_canceled' };
+    default:
+      return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Webhook authentication — a shared secret in the BODY, not a signature.
 // ---------------------------------------------------------------------------

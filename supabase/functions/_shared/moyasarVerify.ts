@@ -26,6 +26,7 @@ import {
   MOYASAR_IP_NOT_ALLOWED,
   basicAuthHeader,
   checkPaymentBinding,
+  closedInvoiceOutcome,
   confirmMessageKey,
   fromMinorUnits,
   isMoyasarIpNotAllowed,
@@ -307,7 +308,8 @@ export async function validateAndConfirmMoyasarPayment(
 /**
  * Retrieve the invoice, pick its settled payment, and run the confirmation.
  * Returns 'pending' without touching anything when the invoice cannot be reached
- * (transient) or has not been paid yet.
+ * (transient) or has not been paid yet, and a terminal 'expired' or 'cancelled'
+ * when Moyasar has closed it with nothing settled (closedInvoiceOutcome).
  */
 export async function verifyMoyasarAttempt(
   admin: SupabaseClient,
@@ -335,6 +337,21 @@ export async function verifyMoyasarAttempt(
   }
 
   const invoice = retrieved.body;
+
+  // Expired or cancelled with nothing settled: it can never be paid now, so the
+  // attempt is closed (a fresh one can open) and the outcome is terminal.
+  const closed = closedInvoiceOutcome(invoice);
+  if (closed) {
+    await admin.from('payment_records')
+      .update({
+        status: 'failed', failure_code: closed.failureCode,
+        failure_message_safe: closed.outcome === 'expired' ? 'Payment session expired' : 'Invoice cancelled at Moyasar',
+        last_verified_at: new Date().toISOString(), raw: sanitizeMoyasarInvoice(invoice),
+      })
+      .eq('id', attempt.id).neq('status', 'paid').then(() => {}, () => {});
+    return { outcome: closed.outcome, paid: false, messageKey: closed.messageKey };
+  }
+
   const payment = selectInvoicePayment(invoice);
   if (!payment) {
     // The invoice exists but nobody has attempted a payment on it yet.

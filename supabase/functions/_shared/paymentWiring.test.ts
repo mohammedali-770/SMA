@@ -392,6 +392,29 @@ describe('a TEST-mode attempt never confirms an order', () => {
   });
 });
 
+// An expired or cancelled invoice with nothing settled can never be paid. Read
+// as 'pending', it kept the app resuming a dead page and refusing every new
+// order, cash included, because recovery runs before either branch.
+describe('verifyMoyasarAttempt closes an invoice Moyasar has closed', () => {
+  const verify = stripComments(readFileSync(new URL('./moyasarVerify.ts', import.meta.url), 'utf8'));
+  const fn = section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult');
+
+  it('decides it once the invoice is read, before the "not paid yet" answer and any confirmation', () => {
+    const decided = fn.indexOf('const closed = closedInvoiceOutcome(invoice);');
+    expect(decided).toBeGreaterThan(fn.indexOf('if (!retrieved.ok) {'));
+    expect(decided).toBeLessThan(fn.indexOf('const payment = selectInvoicePayment(invoice);'));
+    expect(decided).toBeLessThan(fn.indexOf('await validateAndConfirmMoyasarPayment(admin, attempt, payment)'));
+  });
+
+  it('closes the attempt, never a paid one, and answers with the closed outcome', () => {
+    const closed = block(fn, 'if (closed) {');
+    expect(closed).toContain("status: 'failed', failure_code: closed.failureCode,");
+    expect(closed).toContain(".eq('id', attempt.id).neq('status', 'paid')");
+    expect(closed).toContain('return { outcome: closed.outcome, paid: false, messageKey: closed.messageKey };');
+    expect(closed).not.toMatch(/\.rpc\(/);
+  });
+});
+
 describe('payment-verify', () => {
   const src = code('payment-verify');
 

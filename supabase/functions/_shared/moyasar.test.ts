@@ -6,8 +6,10 @@ import {
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
   selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
   matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow, confirmMessageKey,
+  closedInvoiceOutcome,
 } from './moyasar.ts';
 import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
+import { decidePendingAction } from '../../../apps/mobile/src/features/checkout/pendingSession.ts';
 
 describe('minor units (halalas)', () => {
   it('converts SAR major units to integer halalas', () => {
@@ -365,6 +367,53 @@ describe('mapMoyasarInvoiceStatus', () => {
  * on installed phones, which is why `refunded` maps to a key that has been in
  * the app since the first online-payment build rather than to a new one.
  */
+describe('closedInvoiceOutcome', () => {
+  const paid = { id: 'pay_1', status: 'paid' };
+
+  it('closes an expired or cancelled invoice that nobody paid', () => {
+    expect(closedInvoiceOutcome({ status: 'expired', payments: [] })).toEqual({
+      outcome: 'expired', messageKey: 'payExpired', failureCode: 'invoice_expired',
+    });
+    for (const status of ['canceled', 'cancelled', 'CANCELED']) {
+      expect(closedInvoiceOutcome({ status }), status).toEqual({
+        outcome: 'cancelled', messageKey: 'payCancelled', failureCode: 'invoice_canceled',
+      });
+    }
+  });
+
+  /** A declined card, or a 3-D Secure page abandoned half way, is not money held. */
+  it('closes it whatever unsettled attempts it carries', () => {
+    for (const status of ['failed', 'initiated', 'authorized', 'voided']) {
+      expect(closedInvoiceOutcome({ status: 'expired', payments: [{ status }] })?.outcome, status).toBe('expired');
+    }
+  });
+
+  /** Money Moyasar holds is confirmed or refunded, never written off. */
+  it('never closes an invoice carrying a settled payment', () => {
+    expect(closedInvoiceOutcome({ status: 'expired', payments: [{ status: 'failed' }, paid] })).toBeNull();
+    expect(closedInvoiceOutcome({ status: 'canceled', payments: [{ status: 'captured' }] })).toBeNull();
+  });
+
+  it('leaves an open invoice open, SADAD on_hold included', () => {
+    for (const status of ['initiated', 'on_hold', 'paid', 'refunded', 'something_new', '']) {
+      expect(closedInvoiceOutcome({ status, payments: [] }), status).toBeNull();
+    }
+    expect(closedInvoiceOutcome({})).toBeNull();
+    expect(closedInvoiceOutcome({ status: 'expired', payments: 'junk' })?.outcome).toBe('expired');
+  });
+
+  /** The contract with every installed copy of the app, read from the app itself. */
+  it('answers in outcomes the shipped app treats as terminal and keys it can show', () => {
+    for (const invoice of [{ status: 'expired' }, { status: 'canceled' }]) {
+      const closed = closedInvoiceOutcome(invoice)!;
+      expect(decidePendingAction({ status: closed.outcome })).toEqual({ kind: 'clear' });
+      expect(Object.keys(STRINGS.en)).toContain(closed.messageKey);
+      expect(Object.keys(STRINGS.ar)).toContain(closed.messageKey);
+    }
+    expect(decidePendingAction({ status: 'pending' })).toEqual({ kind: 'keep' });
+  });
+});
+
 describe('message keys the app can show', () => {
   const PAYMENT_STATUSES = [
     'initiated', 'paid', 'captured', 'authorized', 'verified', 'failed', 'voided', 'refunded', 'something_new',
