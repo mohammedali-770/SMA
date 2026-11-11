@@ -155,8 +155,8 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
    * order that actually reached the branch.
    */
   const leave = useCallback((href: '/(tabs)' | '/(tabs)/orders') => {
-    // dismissTo, not replace: the tabs are already below this screen, so
-    // replacing it would stack a second copy of them (with the emptied cart
+    // dismissTo, not replace: the tabs are normally already below this screen,
+    // so replacing it would stack a second copy of them (with the emptied cart
     // left between the two after a checkout).
     router.dismissTo(href);
     void (async () => {
