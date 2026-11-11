@@ -52,7 +52,7 @@ import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '.
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { cartLineLabel } from '../../utils/format';
-import { recoverPendingSession } from './pendingSession';
+import { describeVerifyResult, recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
 import { CheckoutFooter } from './view/CheckoutFooter';
@@ -853,30 +853,20 @@ export function CheckoutScreen() {
     try {
       const res = await payments.verifySession(sessionId);
       if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
-      // Only an EXPLICITLY terminal charge (failed/cancelled/expired) clears the
-      // persisted session. An 'unknown' status — and 'paid' without a resolved
+      // Only an EXPLICITLY terminal outcome (failed/cancelled/expired/refunded)
+      // clears the persisted session — the same set recovery uses, read through
+      // describeVerifyResult. An 'unknown' status — and 'paid' without a resolved
       // order id yet — the backend still treats as open, so we keep the session
-      // and show it as pending (verify again), never abandoning a charge that may
-      // still settle into a second one.
-      const isTerminal = res.status === 'failed' || res.status === 'cancelled' || res.status === 'expired';
-      const state: PayState =
-        res.status === 'cancelled' ? 'cancelled'
-        : res.status === 'expired' ? 'expired'
-        : res.status === 'failed' ? 'failed'
-        : 'pending';
-      if (isTerminal) void clearPendingSession();
+      // and show it as pending (verify again), never abandoning a payment that
+      // may still settle into a second one.
+      //
       // A user who closed the in-app checkout WITHOUT paying, on a still-open
-      // (pending) charge, sees the "not completed — continue or try again" copy.
+      // (pending) payment, sees the "not completed — continue or try again" copy.
       // An automatic verify that simply lands on pending keeps the neutral copy.
       // Terminal/declined states never show a raw provider error — only safe strings.
-      const msgKey =
-        state === 'pending' && opts?.dismissed ? 'payNotCompleted'
-        : res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey
-        : state === 'cancelled' ? 'payCancelled'
-        : state === 'expired' ? 'payExpired'
-        : state === 'pending' ? 'payPending'
-        : 'payFailed';
-      setPayFlow({ state, sessionId, message: t(msgKey as never) });
+      const shown = describeVerifyResult(res, { dismissed: opts?.dismissed });
+      if (shown.terminal) void clearPendingSession();
+      setPayFlow({ state: shown.state, sessionId, message: t(shown.messageKey) });
     } catch (e) {
       // Transient verify error — KEEP the persisted session so recovery can
       // resolve it on the next launch / checkout entry (never a new charge).

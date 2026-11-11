@@ -39,6 +39,21 @@ describe('CheckoutScreen opens the hosted page only in the in-app WebView', () =
   });
 });
 
+describe('CheckoutScreen shows a verify result the way recovery reads it', () => {
+  const screen = code('features/checkout/CheckoutScreen.tsx');
+
+  it('maps the result through describeVerifyResult and clears only what it calls terminal', () => {
+    expect(screen).toContain('const shown = describeVerifyResult(res, { dismissed: opts?.dismissed });');
+    expect(screen).toContain('if (shown.terminal) void clearPendingSession();');
+  });
+
+  it('keeps no second, inline list of terminal statuses', () => {
+    // A second list is how 'refunded' came to clear nothing: recovery and the
+    // screen each had their own, and neither knew it.
+    expect(screen).not.toMatch(/res\.status === '(failed|cancelled|expired|refunded)'/);
+  });
+});
+
 describe('the payment WebView lets the page pay, and nothing more', () => {
   const screen = code('app/payment/checkout.tsx');
   // The JSX element, not `useRef<WebView>`: a tag name followed by whitespace.
