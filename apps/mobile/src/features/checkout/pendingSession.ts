@@ -14,6 +14,8 @@
  * opened while an unresolved session exists.
  */
 
+import { STRINGS, type StringKey } from '../../i18n/strings';
+
 /** AsyncStorage key holding the single in-flight checkout session, if any. */
 export const PENDING_SESSION_KEY = 'sm.pendingCheckoutSession';
 
@@ -44,23 +46,28 @@ export function serializePendingSession(sessionId: string, at: number): string {
 
 /** The result of verifySession, narrowed to what the decision needs. */
 export interface VerifyOutcome {
-  status: string;               // 'paid' | 'pending' | 'failed' | 'cancelled' | 'expired' | ...
+  status: string;               // 'paid' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'refunded' | 'unknown'
   orderId?: string | null;      // present (with status 'paid') once the order exists
 }
 
 export type PendingAction =
   | { kind: 'receipt'; orderId: string }  // paid → open the receipt, clear cart + key
   | { kind: 'keep' }                       // still pending / unknown / transient error → leave the key
-  | { kind: 'clear' };                     // terminal (failed/cancelled/expired) → drop the key
+  | { kind: 'clear' };                     // terminal (failed/cancelled/expired/refunded) → drop the key
 
 /**
- * Tap statuses that are DEFINITELY terminal — the charge can no longer settle, so
- * the session is safe to drop. Every other value (pending, 'unknown', or any
+ * payment-verify outcomes that are DEFINITELY terminal — the payment can no longer
+ * settle into an order, so the session is safe to drop. 'cancelled' and 'expired'
+ * cover a cancelled or expired invoice as well as a voided payment; 'refunded'
+ * means the money already came back. Every other value (pending, 'unknown', or any
  * status the backend still leaves open) is KEPT: the backend treats an unknown
- * charge as pending, so clearing here would abandon a possibly-live charge and let
- * the next checkout open a second one.
+ * payment as pending, so clearing here would abandon a possibly-live payment and
+ * let the next checkout open a second one.
+ *
+ * The checkout screen reads this same set through describeVerifyResult, so the
+ * screen and recovery cannot disagree about which outcomes end a session.
  */
-const TERMINAL_STATUSES = new Set(['failed', 'cancelled', 'expired']);
+const TERMINAL_STATUSES = new Set(['failed', 'cancelled', 'expired', 'refunded']);
 
 /**
  * Decide what to do with a stored pending session given a verifySession result
@@ -75,6 +82,52 @@ export function decidePendingAction(res: VerifyOutcome | null | undefined): Pend
   if (res.status === 'paid') return { kind: 'keep' };        // paid but order id not resolved yet → retry verify
   if (TERMINAL_STATUSES.has(res.status)) return { kind: 'clear' };
   return { kind: 'keep' };                                    // pending | unknown | anything still open
+}
+
+/** The overlay state a verify result is shown in (a subset of the screen's PayState). */
+export type VerifyPayState = 'pending' | 'failed' | 'cancelled' | 'expired';
+
+export interface VerifyDisplay {
+  state: VerifyPayState;
+  /** True when the session is dead server-side: clear it, and a retry opens a fresh one. */
+  terminal: boolean;
+  messageKey: StringKey;
+}
+
+/** A server message key the app can actually render: t() prints an unknown key's own name. */
+function isPayKey(key: string | null | undefined): key is StringKey {
+  return typeof key === 'string' && key.startsWith('pay') && key in STRINGS.en;
+}
+
+/**
+ * How the checkout screen shows a verify result that did not open a receipt.
+ *
+ * Only an EXPLICITLY terminal outcome is terminal (see TERMINAL_STATUSES). A
+ * refunded payment is shown as failed, with the server's message — payUnknown,
+ * whose copy tells the customer to contact support if an amount was deducted. A
+ * customer who closed the WebView on a still-open payment sees payNotCompleted.
+ * A message key the app has no copy for falls back to the state's own copy
+ * rather than reaching the screen as a raw key.
+ */
+export function describeVerifyResult(
+  res: { status: string; messageKey?: string | null },
+  opts: { dismissed?: boolean } = {},
+): VerifyDisplay {
+  const terminal = TERMINAL_STATUSES.has(res.status);
+  const state: VerifyPayState =
+    res.status === 'cancelled' ? 'cancelled'
+    : res.status === 'expired' ? 'expired'
+    : terminal ? 'failed'
+    : 'pending';
+  const messageKey: StringKey =
+    state === 'pending' && opts.dismissed ? 'payNotCompleted'
+    : isPayKey(res.messageKey) ? res.messageKey
+    : res.status === 'refunded' ? 'payUnknown'
+    : state === 'cancelled' ? 'payCancelled'
+    : state === 'expired' ? 'payExpired'
+    : state === 'pending' ? 'payPending'
+    : 'payFailed';
+  return { state, terminal, messageKey };
 }
 
 export type RecoverResult =

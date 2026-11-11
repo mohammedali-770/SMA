@@ -18,6 +18,11 @@ describe('isSensitiveKey', () => {
     }
   });
 
+  it('treats any Moyasar-named key as sensitive', () => {
+    expect(isSensitiveKey('moyasar_invoice_id')).toBe(true);
+    expect(isSensitiveKey('Moyasar')).toBe(true);
+  });
+
   it('keeps safe diagnostic keys untouched', () => {
     for (const key of [
       'status_code', 'safe_error_code', 'code', 'subsystem', 'op', 'route',
@@ -44,6 +49,20 @@ describe('sanitizeText', () => {
     expect(sanitizeText('sb_other_abcdefghijkl')).toBe('sb_other_abcdefghijkl');
   });
 
+  it('redacts Moyasar API keys, secret and publishable, in both modes', () => {
+    for (const key of ['sk_test_AbC123dEf456', 'sk_live_AbC123dEf456', 'pk_test_AbC123dEf456', 'pk_live_AbC123dEf456']) {
+      expect(sanitizeText(`key ${key} used`), key).toBe('key [redacted-api-key] used');
+    }
+    // Moyasar takes the secret key as the HTTP Basic username, "sk_live_…:".
+    expect(sanitizeText('sk_live_ZyX987wvu654_-tail:')).toBe('[redacted-api-key]:');
+  });
+
+  it('leaves Moyasar look-alikes alone: too short, another prefix, or inside a word', () => {
+    expect(sanitizeText('sk_test_x')).toBe('sk_test_x');
+    expect(sanitizeText('sk_other_abcdefghijkl')).toBe('sk_other_abcdefghijkl');
+    expect(sanitizeText('task_live_dashboard01')).toBe('task_live_dashboard01');
+  });
+
   it('redacts bearer authorization values', () => {
     expect(sanitizeText('Bearer abcdef1234567890')).toContain('[redacted-auth]');
   });
@@ -66,6 +85,8 @@ describe('sanitizeText', () => {
   it('redacts payment provider references', () => {
     expect(sanitizeText('charge chg_TS0123456789 declined')).toBe('charge [redacted-payment-ref] declined');
     expect(sanitizeText('token tok_abcdef123')).toBe('token [redacted-payment-ref]');
+    // The token Moyasar's 3-D Secure URL carries.
+    expect(sanitizeText('3ds token auth_AbC123456')).toBe('3ds token [redacted-payment-ref]');
   });
 
   it('redacts high-precision coordinate pairs', () => {

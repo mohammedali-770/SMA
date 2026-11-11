@@ -180,7 +180,7 @@ export const STRINGS = {
     total: 'Total',
     placeOrder: 'Confirm & Order',
     placingOrder: 'Placing your order…',
-    // Online payment (Tap)
+    // Online payment (Moyasar)
     payTitle: 'Online payment',
     payOpening: 'Opening secure checkout…',
     payVerifying: 'Verifying payment…',
@@ -535,7 +535,7 @@ export const STRINGS = {
     total: 'الإجمالي',
     placeOrder: 'تأكيد وإرسال الطلب',
     placingOrder: 'جارٍ إرسال طلبك…',
-    // الدفع الإلكتروني (Tap)
+    // الدفع الإلكتروني (Moyasar)
     payTitle: 'الدفع الإلكتروني',
     payOpening: 'جارٍ فتح صفحة الدفع الآمنة…',
     payVerifying: 'جارٍ التحقق من الدفع…',

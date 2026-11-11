@@ -47,16 +47,11 @@ const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  *
  * An entry here is a debt with a reason, not a permanent exemption — and it is
  * itself asserted below, so a fixed file cannot sit in this list unnoticed.
+ *
+ * Empty now. The last entry was app/payment/checkout.tsx, left bare while the
+ * payment code was frozen and given `safeTop` when Moyasar became the provider.
  */
-const KNOWN_MISSING_INSET = new Map<string, string>([
-  [
-    'app/payment/checkout.tsx',
-    'Has the same defect Checkout had (bare View root, no safeTop) but sits under '
-    + 'the CLAUDE.md §6 payment freeze and the `payments` docs-ownership rule, so it '
-    + 'is not folded into a UI change. Remove this entry when the freeze lifts and the '
-    + 'screen is fixed.',
-  ],
-]);
+const KNOWN_MISSING_INSET = new Map<string, string>([]);
 
 /** The component that DEFINES `safeTop`; scanning it would match its own prop. */
 const HEADER_COMPONENT = 'components/Header.tsx';

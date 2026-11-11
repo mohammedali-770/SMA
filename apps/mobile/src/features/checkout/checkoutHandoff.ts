@@ -1,12 +1,12 @@
 /**
  * In-memory bridge between CheckoutScreen (which awaits the payment outcome) and
- * the pushed in-app Tap WebView screen (which settles it).
+ * the pushed in-app payment WebView screen (which settles it).
  *
- * Why in memory: the Tap hosted-checkout URL carries a short-lived Tap token. It
- * is held ONLY here — never placed in navigation route params, never written to
- * AsyncStorage, never logged. The route carries only the non-secret checkout-
- * session UUID; the WebView screen exchanges that id for the URL through this
- * module. The authoritative payment state always comes from the server verify,
+ * Why in memory: the Moyasar invoice URL is a payable link — anyone holding it
+ * can pay that invoice. It is held ONLY here — never placed in navigation route
+ * params, never written to AsyncStorage, never logged. The route carries only
+ * the non-secret checkout-session UUID; the WebView screen exchanges that id for
+ * the URL through this module. The authoritative payment state always comes from the server verify,
  * so this bridge only signals "the user finished / dismissed the WebView".
  *
  * Pure module (no React Native / Expo) so the settlement + supersede logic is

@@ -17,7 +17,6 @@
  */
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,10 +52,9 @@ import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '.
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { cartLineLabel } from '../../utils/format';
-import { recoverPendingSession } from './pendingSession';
+import { describeVerifyResult, recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
-import { chooseCheckoutTransport } from './paymentFlow';
 import { CheckoutFooter } from './view/CheckoutFooter';
 import { CheckoutLines } from './view/CheckoutLines';
 import { CouponRow } from './view/CouponRow';
@@ -183,14 +181,15 @@ export function CheckoutScreen() {
   const recalcRef = useRef<string | null>(null);
   // Line the customer is about to remove by decrementing past 1.
   const [confirmRemove, setConfirmRemove] = useState<{ cartItemId: string; name: string } | null>(null);
-  // Online-payment (Tap) flow overlay. null = not paying.
+  // Online-payment flow overlay. null = not paying.
   // sessionId is the checkout-session flow: the order does not exist until
   // payment is verified server-side.
   const [payFlow, setPayFlow] = useState<{ state: PayState; sessionId?: string; message?: string } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
-  // Only ONE Tap run may be in flight at a time. Without this, a fast double-tap
-  // on Continue, or a slow-network mount-recovery racing a manual Place Order,
-  // could push two Tap WebViews and fire two verifies for the same session.
+  // Only ONE payment run may be in flight at a time. Without this, a fast
+  // double-tap on Continue, or a slow-network mount-recovery racing a manual
+  // Place Order, could push two payment WebViews and fire two verifies for the
+  // same session.
   const payRunningRef = useRef(false);
   // Disables Place Order while an interrupted payment is still being resolved on
   // mount, so the user can't start a second run before recovery decides.
@@ -199,8 +198,10 @@ export function CheckoutScreen() {
   const branchOpen = branchIsOpen(selectedBranch);
 
   // Payment availability (admin-controlled; place_order re-validates server-side).
-  const payMethods = availableMethods(payment);
-  const paymentBlocked = checkoutBlocked(payment);
+  // Online is never offered in the web build: the payment WebView cannot run
+  // in a browser (lib/payment.ts).
+  const payMethods = availableMethods(payment, Platform.OS);
+  const paymentBlocked = checkoutBlocked(payment, Platform.OS);
 
   // Keep the chosen method valid as availability changes (e.g. admin turns cash
   // off mid-session). `clearIfUnavailable` can only ever take the choice AWAY —
@@ -209,7 +210,7 @@ export function CheckoutScreen() {
   // not agree to. Losing the selection returns the footer to
   // "Choose a payment method", which is the truthful thing to say.
   useEffect(() => {
-    setPaymentMethod((prev) => clearIfUnavailable(payment, prev));
+    setPaymentMethod((prev) => clearIfUnavailable(payment, prev, Platform.OS));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment.onlineEnabled, payment.cashEnabled]);
 
@@ -293,7 +294,7 @@ export function CheckoutScreen() {
         });
         if (!active) return;
         if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
-        else if (rec.kind === 'resume') { void runTapPaymentSession(rec.sessionId); }
+        else if (rec.kind === 'resume') { void runOnlinePayment(rec.sessionId); }
       } finally {
         // Re-enable Place Order once recovery has decided (a resumed charge takes
         // over the pay flow; anything else leaves a normal, placeable checkout).
@@ -723,7 +724,7 @@ export function CheckoutScreen() {
         clear: clearPendingSession,
       });
       if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
-      if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
+      if (rec.kind === 'resume') { await runOnlinePayment(rec.sessionId); return; }
 
       // Resolve the delivery address. Checkout SELECTS one; it never writes one.
       //
@@ -775,7 +776,7 @@ export function CheckoutScreen() {
         } else {
           // Keep the cart until payment actually succeeds — a failed/abandoned
           // payment must not wipe it, and there is no order to strand.
-          await runTapPaymentSession(session.id);
+          await runOnlinePayment(session.id);
         }
       } else {
         // Cash: unchanged. The order is created + synced to the POS now.
@@ -790,21 +791,22 @@ export function CheckoutScreen() {
     }
   };
 
-  // ---- Tap online-payment flow (open hosted checkout → server verify) --------
-  // Session-based: the order is created by the backend ONLY after the charge is
+  // ---- Online payment (Moyasar hosted invoice → server verify) --------------
+  // Session-based: the order is created by the backend ONLY after the payment is
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
-  const runTapPaymentSession = async (sessionId: string) => {
+  const runOnlinePayment = async (sessionId: string) => {
     // Single-flight: a second concurrent run for the same (or any) session would
-    // stack a duplicate Tap WebView and fire a redundant verify. Bail if one is
-    // already in progress; the ref is reset in the finally below.
+    // stack a duplicate payment WebView and fire a redundant verify. Bail if one
+    // is already in progress; the ref is reset in the finally below.
     if (payRunningRef.current) return;
     payRunningRef.current = true;
     try {
-      // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
-      // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
-      // forget) so the write is committed before we hand off to the in-app WebView —
-      // the exact window this recovery is meant to survive (see pendingSession.ts).
+      // Persist the in-flight session BEFORE opening the payment page so an app
+      // kill / cold start recovers THIS payment instead of opening a new one.
+      // Awaited (not fire-and-forget) so the write is committed before we hand
+      // off to the in-app WebView — the exact window this recovery is meant to
+      // survive (see pendingSession.ts).
       await savePendingSession(sessionId, Date.now());
       setPayFlow({ state: 'opening', sessionId });
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
@@ -814,40 +816,34 @@ export function CheckoutScreen() {
         return;
       }
       if (init.checkoutUrl) {
-        // Present Tap's hosted checkout. TEST → in-app WebView (strict allow-list,
-        // Tap-hosted 3DS). LIVE/unknown → the external auth browser, which can
-        // follow the issuer-bank ACS redirects a live 3DS challenge uses off-Tap.
-        // Hide the overlay first — the chosen surface owns the UI while it's up.
-        // The redirect result is NEVER trusted; verifyPaymentSession (server) below
-        // decides the real outcome for BOTH transports.
+        // Present Moyasar's hosted invoice page in the in-app WebView. There is
+        // no second transport, whatever mode the server reports: the WebView is
+        // where the app sees exactly when the page reaches our return URL, and
+        // where Apple Pay is documented to work; the system auth browser offers
+        // neither. (payment-initiate refuses customer checkout in TEST mode with
+        // status 'disabled', handled above.) Hide the overlay first — the
+        // WebView owns the UI while it is up. The redirect result is NEVER
+        // trusted; verifyPaymentSession (server) below decides the outcome.
         setPayFlow(null);
-        let dismissed = false;
-        if (chooseCheckoutTransport(init.mode) === 'in-app-webview') {
-          const result = await openInAppTapCheckout(sessionId, init.checkoutUrl);
-          dismissed = result === 'dismissed';
-        } else {
-          const result = await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
-          dismissed = result.type === 'cancel' || result.type === 'dismiss';
-        }
-        await verifyPaymentSession(sessionId, { dismissed });
+        const result = await openInAppCheckout(sessionId, init.checkoutUrl);
+        await verifyPaymentSession(sessionId, { dismissed: result === 'dismissed' });
       } else {
         await verifyPaymentSession(sessionId);
       }
     } catch (e) {
-      // FROZEN PATH — left exactly as it was. Improving this message is
-      // payment work under CLAUDE.md section 6 and was never owner-approved;
-      // the branch asserted a "scoped exception" that did not exist. It does
-      // still leak raw provider text to the customer — see docs/OWNER_ACTIONS.md.
+      // Shows the server's error text as it is. payment-initiate writes it in
+      // English only, so an Arabic-speaking customer reads English here; that
+      // is recorded in docs/OWNER_ACTIONS.md and this change does not alter it.
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       payRunningRef.current = false;
     }
   };
 
-  // Push the in-app Tap checkout WebView and await its result. The Tap checkout
-  // URL (which carries a short-lived token) is handed over IN MEMORY only — the
-  // route param is just the non-secret checkout-session id.
-  const openInAppTapCheckout = (sessionId: string, checkoutUrl: string): Promise<CheckoutHandoffResult> => {
+  // Push the in-app payment WebView and await its result. The invoice URL (a
+  // payable link) is handed over IN MEMORY only — the route param is just the
+  // non-secret checkout-session id.
+  const openInAppCheckout = (sessionId: string, checkoutUrl: string): Promise<CheckoutHandoffResult> => {
     const done = startCheckoutHandoff(sessionId, checkoutUrl);
     router.push({ pathname: '/payment/checkout', params: { session: sessionId } });
     return done;
@@ -859,34 +855,24 @@ export function CheckoutScreen() {
     try {
       const res = await payments.verifySession(sessionId);
       if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
-      // Only an EXPLICITLY terminal charge (failed/cancelled/expired) clears the
-      // persisted session. An 'unknown' status — and 'paid' without a resolved
+      // Only an EXPLICITLY terminal outcome (failed/cancelled/expired/refunded)
+      // clears the persisted session — the same set recovery uses, read through
+      // describeVerifyResult. An 'unknown' status — and 'paid' without a resolved
       // order id yet — the backend still treats as open, so we keep the session
-      // and show it as pending (verify again), never abandoning a charge that may
-      // still settle into a second one.
-      const isTerminal = res.status === 'failed' || res.status === 'cancelled' || res.status === 'expired';
-      const state: PayState =
-        res.status === 'cancelled' ? 'cancelled'
-        : res.status === 'expired' ? 'expired'
-        : res.status === 'failed' ? 'failed'
-        : 'pending';
-      if (isTerminal) void clearPendingSession();
+      // and show it as pending (verify again), never abandoning a payment that
+      // may still settle into a second one.
+      //
       // A user who closed the in-app checkout WITHOUT paying, on a still-open
-      // (pending) charge, sees the "not completed — continue or try again" copy.
+      // (pending) payment, sees the "not completed — continue or try again" copy.
       // An automatic verify that simply lands on pending keeps the neutral copy.
-      // Terminal/declined states never show a raw Tap error — only safe strings.
-      const msgKey =
-        state === 'pending' && opts?.dismissed ? 'payNotCompleted'
-        : res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey
-        : state === 'cancelled' ? 'payCancelled'
-        : state === 'expired' ? 'payExpired'
-        : state === 'pending' ? 'payPending'
-        : 'payFailed';
-      setPayFlow({ state, sessionId, message: t(msgKey as never) });
+      // Terminal/declined states never show a raw provider error — only safe strings.
+      const shown = describeVerifyResult(res, { dismissed: opts?.dismissed });
+      if (shown.terminal) void clearPendingSession();
+      setPayFlow({ state: shown.state, sessionId, message: t(shown.messageKey) });
     } catch (e) {
       // Transient verify error — KEEP the persisted session so recovery can
       // resolve it on the next launch / checkout entry (never a new charge).
-      // FROZEN PATH — see the note on the open_checkout catch above.
+      // Raw server text, as in the catch in runOnlinePayment above.
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       setPayBusy(false);
@@ -1128,7 +1114,7 @@ export function CheckoutScreen() {
         onCancel={() => setConfirmRemove(null)}
       />
 
-      {/* Online-payment (Tap) overlay. Dismissing (including Android back) never
+      {/* Online-payment overlay. Dismissing (including Android back) never
           touches the persisted session, so recovery still resolves an in-flight
           charge; it never confirms or creates anything. */}
       <PaymentStatusDialog
@@ -1151,9 +1137,9 @@ export function CheckoutScreen() {
           statusCancelled: t('payStatusCancelled'),
           statusExpired: t('payStatusExpired'),
         }}
-        onContinue={() => payFlow?.sessionId && void runTapPaymentSession(payFlow.sessionId)}
+        onContinue={() => payFlow?.sessionId && void runOnlinePayment(payFlow.sessionId)}
         onVerifyAgain={() => payFlow?.sessionId && void verifyPaymentSession(payFlow.sessionId)}
-        onResume={() => payFlow?.sessionId && void runTapPaymentSession(payFlow.sessionId)}
+        onResume={() => payFlow?.sessionId && void runOnlinePayment(payFlow.sessionId)}
         onRetryFresh={() => void retryFresh()}
         onClose={dismissPayFlow}
       />
