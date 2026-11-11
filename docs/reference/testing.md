@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**211 TypeScript test files declaring 3293 test blocks, plus 82 SQL suites.**
+**212 TypeScript test files declaring 3297 test blocks, plus 82 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -128,7 +128,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-76 files, 1074 declared test blocks.
+77 files, 1078 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -143,6 +143,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
 | `apps/mobile/src/features/auth/guestBrowsingWiring.test.ts` | 13 | the menu is open to a guest |
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
+| `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
