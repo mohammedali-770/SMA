@@ -127,6 +127,29 @@ jobs:
             exit 1
           fi
 
+          # The JWT flag for one function, read from supabase/config.toml when
+          # the job runs, so no list here can drift from it: `verify_jwt =
+          # false` prints --no-verify-jwt, `true` prints nothing, and anything
+          # else (no [functions.<name>] table, no verify_jwt line, any other
+          # value) fails. deployFunctionsWiring.test.ts runs this function
+          # against the real config.toml for every function.
+          jwt_flag() {
+            local value
+            value="$(awk -v table="[functions.$1]" '
+              { line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]*(#.*)?$/, "", line) }
+              line == table { inside = 1; next }
+              line ~ /^\[/ { inside = 0; next }
+              inside && line ~ /^verify_jwt[[:space:]]*=/ {
+                sub(/^verify_jwt[[:space:]]*=[[:space:]]*/, "", line); print line; exit
+              }
+            ' supabase/config.toml)"
+            case "$value" in
+              false) echo "--no-verify-jwt" ;;
+              true) echo "" ;;
+              *) return 1 ;;
+            esac
+          }
+
           FNS="$FNS_INPUT"
           if [ "$FNS" = "all" ]; then
             # Every payment function, the admin sandbox return page included.
@@ -141,18 +164,17 @@ jobs:
               echo "::error::No such function in this checkout: supabase/functions/${fn}/index.ts"
               exit 1
             fi
-            # Exactly the functions supabase/config.toml marks verify_jwt = false:
-            # their callers carry no Supabase JWT (a provider webhook, a browser
-            # GET, a scheduler or the service role), so they deploy with
-            # --no-verify-jwt. All others keep JWT verification ON. config.toml is
-            # the source of truth; deployFunctionsWiring.test.ts fails if this
-            # list and config.toml ever disagree. Until 2026-11-11 the list named
+            # A function whose callers carry no Supabase JWT (a provider
+            # webhook, a browser GET, a scheduler or the service role) is
+            # marked verify_jwt = false in config.toml and deploys with
+            # --no-verify-jwt; every other keeps JWT verification ON. This used
+            # to be a hard-coded list, which drifted: until 2026-11-11 it named
             # only payment-webhook and payment-return, so payment-refund would
             # have deployed with verification on and refused the refund cron.
-            case "$fn" in
-              account-delete-process|account-delete-scheduler|admin-push-dispatch|auth-send-sms-whatsapp|lazywait-sync|lazywait-webhook|operations-alert-dispatch|payment-admin-test-return|payment-refund|payment-return|payment-webhook|push-dispatch|whatsapp-webhook) FLAGS="--no-verify-jwt" ;;
-              *) FLAGS="" ;;
-            esac
+            if ! FLAGS="$(jwt_flag "$fn")"; then
+              echo "::error::supabase/config.toml has no [functions.${fn}] table with verify_jwt = true or false, so its JWT setting is unknown. Add one before deploying it."
+              exit 1
+            fi
             echo "::group::Deploy $fn ($FLAGS)"
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $FLAGS
             echo "::endgroup::"

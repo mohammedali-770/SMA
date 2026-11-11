@@ -251,16 +251,22 @@ function generateEdgeFunctions() {
     .filter((f) => statSync(join(fnDir, f)).isDirectory() && f !== '_shared')
     .sort();
 
-  // Which functions the deploy workflow actually covers. Everything else
-  // reaches production by hand, which is a real operational risk worth showing.
+  // Which functions the deploy workflow actually covers: the set its `all`
+  // preset expands to. Everything else reaches production by hand, which is a
+  // real operational risk worth showing. A manual run can name any function,
+  // so naming is not coverage. This used to be a substring match over the
+  // whole file, which counted a name the workflow merely mentioned, in a
+  // comment or a flag list; on 2026-11-11 that flipped nine rows at once.
   const deployWorkflow = join(ROOT, '.github', 'workflows', 'deploy-functions.yml');
   const deployText = existsSync(deployWorkflow) ? read(deployWorkflow) : '';
+  const deployPreset = deployText.match(/if \[ "\$FNS" = "all" \]; then(?:\s*\n\s*#[^\n]*)*\s*\n\s*FNS="([^"]+)"/);
+  const workflowCovers = new Set(deployPreset ? deployPreset[1].split(/\s+/) : []);
 
   const rows = names.map((name) => {
     const entry = join(fnDir, name, 'index.ts');
     const src = existsSync(entry) ? read(entry) : '';
     const summary = headerSummary(src, name);
-    const automated = deployText.includes(name) ? 'workflow' : 'by hand';
+    const automated = workflowCovers.has(name) ? 'workflow' : 'by hand';
     // The column means the PRIVILEGE, not the helper, so match every way a
     // function can come to hold the service-role key:
     //

@@ -1,24 +1,29 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, describe, expect, it } from 'vitest';
 
 /**
  * A tripwire over `.github/workflows/deploy-functions.yml`, the manual workflow
  * that deploys Edge Functions to Production.
  *
- * The workflow decides a function's JWT setting by NAME, in a `case` statement,
- * rather than by reading `supabase/config.toml`, so the two can drift — and they
- * had. Until 2026-11-11 the `--no-verify-jwt` arm named only payment-webhook and
+ * The workflow used to decide a function's JWT setting from a hard-coded list,
+ * and the list drifted: until 2026-11-11 it named only payment-webhook and
  * payment-return, while config.toml marks eleven more functions
  * `verify_jwt = false`, payment-refund among them. Deployed with JWT
  * verification on, payment-refund would refuse the refund cron's
- * unauthenticated call with a 401. Whether the pinned Supabase CLI would have
- * read config.toml anyway is not relied on: the workflow states the flag, and
- * this file holds that statement to config.toml exactly.
+ * unauthenticated call with a 401. The workflow now reads each function's
+ * verify_jwt from config.toml when the job runs, through its `jwt_flag` shell
+ * function, and this file RUNS that function, as written in the workflow,
+ * against the real config.toml.
  *
- * The `all` preset is held to the payment directories for the same reason: the
- * payment functions deploy as one set, because a new bundle beside an older one
- * can open a Moyasar invoice that nothing confirms.
+ * The `all` preset is held to the payment directories: the payment functions
+ * deploy as one set, because a new bundle beside an older one can open a
+ * Moyasar invoice that nothing confirms.
  */
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const FUNCTIONS_DIR = new URL('../', import.meta.url);
 const workflow = readFileSync(
   new URL('../../../.github/workflows/deploy-functions.yml', import.meta.url),
@@ -30,18 +35,38 @@ const functionDirs = readdirSync(FUNCTIONS_DIR)
   .filter((name) => name !== '_shared' && statSync(new URL(name, FUNCTIONS_DIR)).isDirectory())
   .sort();
 
-function functionsWithVerifyJwt(value: 'true' | 'false'): string[] {
-  return [...config.matchAll(/^\[functions\.([a-z0-9-]+)\]\s*\nverify_jwt = (true|false)$/gm)]
-    .filter((m) => m[2] === value)
-    .map((m) => m[1])
-    .sort();
+/** verify_jwt per function, as config.toml states it. */
+function verifyJwtInConfig(): Map<string, string> {
+  const found = config.matchAll(/^\[functions\.([a-z0-9-]+)\]\s*\nverify_jwt = (true|false)$/gm);
+  return new Map([...found].map((m) => [m[1], m[2]]));
 }
 
-/** The function names in the `case` arm that adds --no-verify-jwt. */
-function noVerifyJwtArm(): string[] {
-  const arm = workflow.match(/^\s*([a-z0-9|-]+)\) FLAGS="--no-verify-jwt" ;;$/m);
-  expect(arm, 'the --no-verify-jwt case arm').not.toBeNull();
-  return arm![1].split('|').sort();
+/** The workflow's jwt_flag shell function, exactly as the deploy step defines it. */
+function jwtFlagSource(): string {
+  const lines = workflow.split('\n');
+  const start = lines.findIndex((line) => /^\s*jwt_flag\(\) \{$/.test(line));
+  expect(start, 'jwt_flag() in the workflow').toBeGreaterThan(-1);
+  const indent = /^\s*/.exec(lines[start])![0];
+  const end = lines.findIndex((line, i) => i > start && line === `${indent}}`);
+  expect(end, 'the end of jwt_flag()').toBeGreaterThan(start);
+  return lines
+    .slice(start, end + 1)
+    .map((line) => line.slice(indent.length))
+    .join('\n');
+}
+
+/** Run jwt_flag for one function, from `cwd`, the way the deploy step does. */
+function jwtFlag(fn: string, cwd = REPO_ROOT): { ok: boolean; flag: string } {
+  try {
+    const out = execFileSync('bash', ['-c', `${jwtFlagSource()}\njwt_flag "$1"`, 'jwt_flag', fn], {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return { ok: true, flag: out.trim() };
+  } catch {
+    return { ok: false, flag: '' };
+  }
 }
 
 /** The functions the `all` preset expands to. */
@@ -53,14 +78,33 @@ function allPreset(): string[] {
 }
 
 describe('deploy-functions.yml', () => {
-  it('deploys every function config.toml marks verify_jwt = false with --no-verify-jwt', () => {
-    expect(noVerifyJwtArm()).toEqual(functionsWithVerifyJwt('false'));
+  it('deploys exactly the functions config.toml marks verify_jwt = false with --no-verify-jwt', () => {
+    const inConfig = verifyJwtInConfig();
+    expect([...inConfig.keys()].sort()).toEqual(functionDirs);
+    for (const fn of functionDirs) {
+      const expected = inConfig.get(fn) === 'false' ? '--no-verify-jwt' : '';
+      expect(jwtFlag(fn), fn).toEqual({ ok: true, flag: expected });
+    }
   });
 
-  it('never strips JWT verification from a function config.toml keeps it on for', () => {
-    const on = new Set(functionsWithVerifyJwt('true'));
-    expect(noVerifyJwtArm().filter((fn) => on.has(fn))).toEqual([]);
-    expect(workflow).toMatch(/^\s*\*\) FLAGS="" ;;$/m);
+  it('turns verification off for payment-refund and the admin return page, and nowhere it is on', () => {
+    expect(jwtFlag('payment-refund')).toEqual({ ok: true, flag: '--no-verify-jwt' });
+    expect(jwtFlag('payment-admin-test-return')).toEqual({ ok: true, flag: '--no-verify-jwt' });
+    expect(jwtFlag('payment-initiate')).toEqual({ ok: true, flag: '' });
+    expect(jwtFlag('payment-test-config')).toEqual({ ok: true, flag: '' });
+  });
+
+  it('stops, rather than guess, for a function config.toml does not list', () => {
+    expect(jwtFlag('no-such-function').ok).toBe(false);
+    expect(workflow).toContain('if ! FLAGS="$(jwt_flag "$fn")"; then');
+    expect(workflow).toMatch(
+      /if ! FLAGS="\$\(jwt_flag "\$fn"\)"; then\n\s*echo "::error::[^\n]*"\n\s*exit 1\n/,
+    );
+  });
+
+  it('passes the flag it read to the CLI, and keeps no list of its own', () => {
+    expect(workflow).toContain('supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $FLAGS');
+    expect(workflow).not.toMatch(/FLAGS="--no-verify-jwt"|^\s*[a-z0-9|-]+\) FLAGS=/m);
   });
 
   it("expands 'all' to every payment function, the admin return page included", () => {
@@ -68,6 +112,48 @@ describe('deploy-functions.yml', () => {
   });
 
   it('names only functions that exist, so a stale name cannot reach the CLI', () => {
-    for (const fn of [...noVerifyJwtArm(), ...allPreset()]) expect(functionDirs).toContain(fn);
+    for (const fn of allPreset()) expect(functionDirs).toContain(fn);
+  });
+});
+
+// The parser, against a config.toml written to catch the mistakes a line-based
+// reader makes: comments, indentation, a table with no verify_jwt, a quoted
+// value, and a name that is a prefix of another.
+describe('jwt_flag reads only the named table', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jwt-flag-'));
+  mkdirSync(join(dir, 'supabase'));
+  writeFileSync(
+    join(dir, 'supabase', 'config.toml'),
+    [
+      '[functions.alpha]',
+      '# a comment',
+      '  verify_jwt = false   # trailing comment',
+      '',
+      '[functions.gamma]',
+      'entrypoint = "index.ts"',
+      '',
+      '[functions.epsilon]',
+      'verify_jwt = false',
+      '',
+      '[functions.beta]',
+      'import_map = "x"',
+      'verify_jwt = true',
+      '',
+      '[functions.delta]',
+      'verify_jwt = "false"',
+      '',
+    ].join('\n'),
+  );
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('reads indented and commented lines inside the right table', () => {
+    expect(jwtFlag('alpha', dir)).toEqual({ ok: true, flag: '--no-verify-jwt' });
+    expect(jwtFlag('beta', dir)).toEqual({ ok: true, flag: '' });
+  });
+
+  it("never borrows the next table's value, and accepts only true or false", () => {
+    expect(jwtFlag('gamma', dir).ok).toBe(false);
+    expect(jwtFlag('delta', dir).ok).toBe(false);
+    expect(jwtFlag('alph', dir).ok).toBe(false);
   });
 });
