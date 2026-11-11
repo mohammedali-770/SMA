@@ -5,6 +5,7 @@ import {
   keyMatchesMode, lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
   selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
+  matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow,
 } from './moyasar.ts';
 import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
 
@@ -421,6 +422,65 @@ describe('HANDLED_WEBHOOK_TYPES', () => {
   it('excludes the card-authentication events', () => {
     expect(HANDLED_WEBHOOK_TYPES.has('card_auth_authenticated')).toBe(false);
     expect(HANDLED_WEBHOOK_TYPES.has('card_auth_failed')).toBe(false);
+  });
+  /** It carries a code for the dashboard, not a payment: nothing to re-fetch or confirm. */
+  it('excludes the webhook verification event', () => {
+    expect(WEBHOOK_VERIFICATION_TYPE).toBe('webhook_verification');
+    expect(HANDLED_WEBHOOK_TYPES.has(WEBHOOK_VERIFICATION_TYPE)).toBe(false);
+  });
+});
+
+describe('webhook verification', () => {
+  // The shape Moyasar documents (https://docs.moyasar.com/api/other/webhooks/verify-webhook).
+  const event = parseWebhookEnvelope({
+    id: 'evt_1', type: 'webhook_verification', created_at: '2026-11-11T10:00:00Z',
+    secret_token: 'whsec_shared', account_name: 'Spicy Meal', live: false,
+    data: { webhook_id: 'b8c4f0a2-6d2e-4f7a-9d61-3b5a3c2e1f00', verification_code: '482913' },
+  });
+
+  it('accepts the token from any configured slot: test, live or shared', () => {
+    for (const slot of [
+      'moyasar_test_webhook_secret_token', 'moyasar_live_webhook_secret_token', 'moyasar_webhook_secret_token',
+    ]) {
+      expect(matchesAnyWebhookSecret('whsec_shared', { [slot]: ' whsec_shared ' }), slot).toBe(true);
+    }
+    expect(matchesAnyWebhookSecret('whsec_live', {
+      moyasar_test_webhook_secret_token: 'whsec_test', moyasar_live_webhook_secret_token: 'whsec_live',
+    })).toBe(true);
+  });
+
+  it('refuses a wrong or missing token, and an unconfigured gateway', () => {
+    const configured = { moyasar_test_webhook_secret_token: 'whsec_test' };
+    expect(matchesAnyWebhookSecret('whsec_wrong', configured)).toBe(false);
+    expect(matchesAnyWebhookSecret('', configured)).toBe(false);
+    expect(matchesAnyWebhookSecret(undefined, configured)).toBe(false);
+    expect(matchesAnyWebhookSecret('anything', {})).toBe(false);
+    expect(matchesAnyWebhookSecret('', { moyasar_webhook_secret_token: '' })).toBe(false);
+    // Only Moyasar's own slots count, not some other gateway's leftover.
+    expect(matchesAnyWebhookSecret('whsec_tap', { webhook_secret: 'whsec_tap' })).toBe(false);
+  });
+
+  it('becomes exactly the row the console reads, with the code in the response only', () => {
+    const row = webhookVerificationLogRow(event);
+    expect(row).toEqual({
+      provider: 'moyasar',
+      direction: 'webhook',
+      status: 'success',
+      request: { type: 'webhook_verification', webhook_id: 'b8c4f0a2-6d2e-4f7a-9d61-3b5a3c2e1f00' },
+      response: { verification_code: '482913' },
+      error: null,
+    });
+    expect(JSON.stringify(row.request)).not.toContain('482913');
+    expect(JSON.stringify(row)).not.toContain('whsec_shared');
+  });
+
+  it('bounds what it stores', () => {
+    const big = parseWebhookEnvelope({
+      type: 'webhook_verification', data: { webhook_id: 'w'.repeat(500), verification_code: 9.9e99 },
+    });
+    const row = webhookVerificationLogRow(big) as { request: { webhook_id: string }; response: { verification_code: string } };
+    expect(row.request.webhook_id).toHaveLength(64);
+    expect(row.response.verification_code.length).toBeLessThanOrEqual(16);
   });
 });
 

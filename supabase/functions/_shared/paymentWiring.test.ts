@@ -322,6 +322,38 @@ describe('payment-webhook', () => {
     expect(src).not.toMatch(/looksLikeMoyasarWebhook|safeParse|provider_not_configured/);
   });
 
+  // Moyasar sends the verification code once and never retries it, so it is
+  // recorded even while the payment row is switched off, and before anything
+  // on the payment path can acknowledge it and drop it.
+  it('records a webhook verification before the enabled check and the payment path', () => {
+    const verification = handler.indexOf(
+      'if (evt.type === WEBHOOK_VERIFICATION_TYPE) return await recordWebhookVerification(admin, cfg, evt);',
+    );
+    expect(verification).toBeGreaterThan(handler.indexOf("if (providerName !== 'moyasar')"));
+    expect(verification).toBeLessThan(handler.indexOf("if (!cfg.enabled) return json({ status: 'ignored'"));
+    expect(count(handler, 'cfg.enabled')).toBe(1);
+    expect(verification).toBeLessThan(handler.indexOf('return await handleMoyasarWebhook(admin, cfg, rawBody);'));
+  });
+
+  it('answers 401 and writes nothing on a token mismatch, and never touches a payment', () => {
+    const v = fnBody(src, 'async function recordWebhookVerification(');
+    const check = v.indexOf('if (!matchesAnyWebhookSecret(evt.secretToken, cfg.secretConfig)) {');
+    const insert = v.indexOf(".from('integration_sync_logs').insert(webhookVerificationLogRow(evt))");
+    expect(check).toBeGreaterThan(-1);
+    expect(insert).toBeGreaterThan(check);
+    expect(v.slice(check, insert)).toContain("return json({ error: 'invalid secret token' }, 401);");
+    expect(count(v, '.insert(')).toBe(1);
+    expect(v).toContain("return json({ status: 'acknowledged', reason: WEBHOOK_VERIFICATION_TYPE }, 200);");
+    expect(v).not.toMatch(/retrieveMoyasar|validateAndConfirm|\.rpc\(|payment_records|fetch\(/);
+  });
+
+  it('keeps the verification code out of every log line and out of the response', () => {
+    const v = fnBody(src, 'async function recordWebhookVerification(');
+    const said = v.split('\n').filter((line) => /console\.|return json\(/.test(line));
+    expect(said.length).toBeGreaterThan(2);
+    for (const line of said) expect(line).not.toMatch(/verification_code|evt\.data|evt\b(?!\.secretToken)/);
+  });
+
   it('still authenticates, filters, re-fetches and binds, in that order, before confirming', () => {
     const h = fnBody(src, 'async function handleMoyasarWebhook(');
     const steps = [

@@ -2,8 +2,9 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
-  HANDLED_WEBHOOK_TYPES, isAdminTestInvoice, parseWebhookEnvelope, resolveMoyasarConfig,
-  verifyWebhookSecretToken,
+  HANDLED_WEBHOOK_TYPES, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice, matchesAnyWebhookSecret,
+  parseWebhookEnvelope, resolveMoyasarConfig, verifyWebhookSecretToken, webhookVerificationLogRow,
+  type MoyasarWebhookEnvelope,
 } from '../_shared/moyasar.ts';
 import {
   retrieveMoyasarPayment, validateAndConfirmMoyasarPayment, type MoyasarAttempt,
@@ -25,7 +26,8 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * Moyasar is the only payment provider. A payment row that is missing,
  * disabled or names any other provider acknowledges the event with 200 and
  * changes nothing; the app's own call to payment-verify still confirms a
- * genuine payment.
+ * genuine payment. The one event a disabled Moyasar row still records is a
+ * `webhook_verification`; see recordWebhookVerification().
  */
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -33,13 +35,52 @@ Deno.serve(async (req: Request) => {
 
   const admin = adminClient();
   const cfg = await getProviderConfig(admin, 'payment');
-  if (!cfg || !cfg.enabled) return json({ status: 'ignored', reason: 'payment provider not configured' }, 200);
+  if (!cfg) return json({ status: 'ignored', reason: 'payment provider not configured' }, 200);
 
   const providerName = (cfg.providerName ?? '').toLowerCase();
   if (providerName !== 'moyasar') return json({ status: 'ignored', reason: `provider is '${providerName}'` }, 200);
 
-  return await handleMoyasarWebhook(admin, cfg, await req.text());
+  // Before the enabled check, on purpose: Moyasar sends the verification code
+  // once and never retries it, so a row that is still switched off while the
+  // webhook is being set up would acknowledge it and lose the only copy.
+  const rawBody = await req.text();
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(rawBody); } catch { /* not JSON: handleMoyasarWebhook answers 400 */ }
+  const evt = parseWebhookEnvelope(parsed);
+  if (evt.type === WEBHOOK_VERIFICATION_TYPE) return await recordWebhookVerification(admin, cfg, evt);
+
+  if (!cfg.enabled) return json({ status: 'ignored', reason: 'payment provider not configured' }, 200);
+
+  return await handleMoyasarWebhook(admin, cfg, rawBody);
 });
+
+// ---------------------------------------------------------------------------
+// Webhook verification
+//
+// A new Moyasar webhook may receive one `webhook_verification` event: a
+// 6-digit code the merchant enters in Moyasar's dashboard within 30 minutes.
+// Until then nothing is delivered, and events from before it never are
+// (https://docs.moyasar.com/api/other/webhooks/verify-webhook). It is not a
+// payment event: nothing is re-fetched, confirmed or changed. The code is kept
+// in one place, a staff-readable integration_sync_logs row the console shows,
+// and never in a log line or the response.
+// ---------------------------------------------------------------------------
+async function recordWebhookVerification(
+  admin: SupabaseClient, cfg: ProviderConfig, evt: MoyasarWebhookEnvelope,
+): Promise<Response> {
+  // Any configured token (test, live or shared): this is the setup step, so
+  // the account the webhook was registered on decides which one it carries.
+  // A mismatch records nothing at all.
+  if (!matchesAnyWebhookSecret(evt.secretToken, cfg.secretConfig)) {
+    return json({ error: 'invalid secret token' }, 401);
+  }
+  const { error } = await admin.from('integration_sync_logs').insert(webhookVerificationLogRow(evt));
+  if (error) {
+    console.error('moyasar webhook verification code could not be stored; request a new code in the Moyasar dashboard');
+    return json({ status: 'error', reason: 'could not record the verification' }, 500);
+  }
+  return json({ status: 'acknowledged', reason: WEBHOOK_VERIFICATION_TYPE }, 200);
+}
 
 // ---------------------------------------------------------------------------
 // Moyasar webhook

@@ -513,6 +513,59 @@ export const HANDLED_WEBHOOK_TYPES = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Webhook verification — a one-time code for the dashboard, not a payment event.
+// ---------------------------------------------------------------------------
+
+/**
+ * Moyasar may require a new webhook to be verified before it delivers
+ * anything. It then sends ONE `webhook_verification` event, with
+ * `data.webhook_id` and a 6-digit `data.verification_code`, never retried; the
+ * code must be entered in the dashboard within 30 minutes, and "Until it's
+ * verified, the webhook receives no events, and they aren't delivered later
+ * either" (https://docs.moyasar.com/api/other/webhooks/verify-webhook,
+ * published 2026-11-11). Deliberately absent from HANDLED_WEBHOOK_TYPES: it
+ * carries no payment, so nothing is re-fetched or confirmed on it.
+ */
+export const WEBHOOK_VERIFICATION_TYPE = 'webhook_verification';
+
+/** Every slot resolveMoyasarConfig reads a webhook token from. */
+const WEBHOOK_SECRET_SLOTS = [
+  'moyasar_test_webhook_secret_token',
+  'moyasar_live_webhook_secret_token',
+  'moyasar_webhook_secret_token',
+] as const;
+
+/**
+ * True when `provided` matches the token in ANY configured slot: test, live or
+ * the shared fallback. A verification event is the step that sets the webhook
+ * up, so it is checked against every slot rather than the one its `live` flag
+ * would pick. Each slot is compared, whatever matched first.
+ */
+export function matchesAnyWebhookSecret(provided: unknown, secretConfig: Record<string, unknown>): boolean {
+  let matched = false;
+  for (const slot of WEBHOOK_SECRET_SLOTS) {
+    if (verifyWebhookSecretToken(provided, String(secretConfig[slot] ?? '').trim())) matched = true;
+  }
+  return matched;
+}
+
+/**
+ * The integration_sync_logs row a verified event becomes. The console reads
+ * the code from `response.verification_code` (staff-only through RLS,
+ * 20260707121300); nothing else may carry it, the console log included.
+ */
+export function webhookVerificationLogRow(evt: MoyasarWebhookEnvelope): Record<string, unknown> {
+  return {
+    provider: 'moyasar',
+    direction: 'webhook',
+    status: 'success',
+    request: { type: WEBHOOK_VERIFICATION_TYPE, webhook_id: String(evt.data.webhook_id ?? '').slice(0, 64) },
+    response: { verification_code: String(evt.data.verification_code ?? '').slice(0, 16) },
+    error: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Response sanitization + error extraction.
 // ---------------------------------------------------------------------------
 
