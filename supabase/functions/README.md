@@ -68,7 +68,7 @@ Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-1
 | --- | --- | --- |
 | `payment-initiate` | true | Opens (or reuses) a Moyasar invoice for the customer's own checkout session or order. Refuses customer checkout while the gateway is in TEST mode (`{status:'disabled', reason:'test_mode'}`), so a test card can never pay for a real order; any other configuration answers `{status:'disabled'}` |
 | `payment-verify` | true | The verification the app trusts: fetches the invoice and its payment from Moyasar and confirms only a clean `paid` |
-| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed |
+| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed. A `webhook_verification` event's one-time code is stored in `integration_sync_logs` for the console, never logged |
 | `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
 | `payment-refund` | false | Refund worker, Moyasar refunds only; automated scheduling (the `payment-refund-worker` cron job) is off |
 | `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
@@ -87,7 +87,8 @@ The `_shared` directory contains reusable server-only contracts, including:
 - integration-secret readers;
 - WhatsApp send/logging helpers;
 - Lazywait client/contracts;
-- Moyasar helpers: invoice construction, verification binding, webhook authentication and refund classification.
+- Moyasar helpers: invoice construction, verification binding, webhook authentication and refund classification;
+- `moyasarHttp.ts`, the only transport for Moyasar calls. Moyasar LIVE accepts secret-key calls only from its Allowed IPs list and Edge Functions have no static outbound IP, so when the `MOYASAR_PROXY_URL` secret is set every call goes through that proxy, and a value it cannot use refuses the call instead of sending it.
 
 A helper being present does not imply its provider is active or approved.
 
@@ -98,6 +99,8 @@ A helper being present does not imply its provider is active or approved.
 The Edge runtime provides the Supabase runtime credentials needed by server functions. The service-role key is server-only.
 
 ### Provider configuration
+
+`MOYASAR_PROXY_URL` is the one payment value held as an Edge Function secret rather than in the payment row. It is an `http://` or `https://` proxy URL and usually carries the proxy's credentials, so it is treated as a secret: never logged, never returned. Setting it is an owner action.
 
 Provider secrets are read server-side from the approved integration/secret storage paths and must never be returned to a client.
 
