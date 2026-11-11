@@ -228,6 +228,36 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**Current position 2026-11-11, read live AFTER the guest-menu policy apply: 144
+repository files on the default branch / 148 live history rows / TWO unapplied
+— `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
+`20260929120000_db_advisor_hardening`, written, validated and awaiting
+approval.** Latest live version `20261111045833`; the most recent apply is
+`20260930120000` (ledger row 103, `docs/MIGRATIONS.md` §52). Reconciled **by
+name** against the default branch at `577e7e7`: 140 files applied, 2 superseded
+(the July `place_order` and `loyalty` files, ledger rows 8-9), and these 2. The
+delta against the 2026-09-20 read is **+2 files and +1 row**: #422 and #423
+merged one file each on 2026-11-10, and only #423's has been applied.
+
+**TWO IS THE SHAPE THAT LOOKS SAFE AND IS NOT.** "Apply the outstanding
+migrations" now has a plausible referent, `20260929120000`, and would still take
+the frozen payment file FIRST, because `20260824100000` sorts ahead of
+everything. **Name the target by version.**
+
+**THE APPLY NEEDED THE OWNER PRESENT, AND A TIMEOUT WAS NOT READ AS A
+FAILURE.** The Supabase connector asked the owner to confirm before running the
+file, and gives 230 seconds to answer. Two attempts timed out unanswered. After
+each, a read-only check found history at 147 and the old policy in place, so
+nothing had landed. The third, with the owner on the web, landed in 14 seconds,
+and exactly one history row carries the name. **A timed-out apply is unknown
+until a read settles it.** The apply changed what a guest can read and nothing
+else, measured as `anon` in SQL and through PostgREST. #424 merged 95 seconds
+later, as its ordering required. Detail: `docs/MIGRATIONS.md` §52.
+
+**Superseded 2026-11-11 — `20260930120000` is APPLIED. The 2026-11-09
+amendments below are kept as written, and the THREE in the second of them is
+no longer the count.**
+
 **AMENDED 2026-11-09 — `20260930120000_product_variants_guest_read` is
 written, validated and awaiting approval.** It repairs one RLS policy:
 `product_variants` read `(is_active OR is_staff())` for anon, and anon cannot
@@ -258,7 +288,8 @@ self-asserted** (`12b6816d…` / `22e2d429…`). Two outstanding is the shape th
 looks safe and is not: `20260824100000` still sorts ahead of everything.
 **Name the target by version.** Detail: `docs/MIGRATIONS.md` §51.
 
-**Current position 2026-09-20, read live AFTER the admin-push closure-queue
+**Superseded, kept because the count is the point — the position read live
+2026-09-20, AFTER the admin-push closure-queue
 apply: 142 repository files on the default branch / 147 live history rows /
 exactly ONE unapplied — `20260824100000_moyasar_payment_provider`, frozen on
 purpose (§6).** Latest live version `20260920061858`; the most recent apply is
@@ -1615,6 +1646,8 @@ If GitHub live settings differ from the documented intention, update `docs/OWNER
 ## 13. Vercel production gating
 
 Source contains CI checks and a controlled deployment path, but source cannot prove whether Vercel auto-deploy or the gated deploy path is currently active in the dashboard.
+
+**Measured 2026-11-11: a merge reaches production without the gated job.** On the #424 merge (`577e7e7`), `Deploy to Vercel (gated on CI)` was **skipped**, because the repository variable `DEPLOY_GATE_ENABLED` is not `'true'`. By 05:15 UTC production `/app` was nevertheless serving that merge's bundle. So something outside this repository's workflows deploys the default branch, most plausibly Vercel's own Git integration. Until that changes, assume every merge to the default branch ships the web build, `/app` included, and order a migration apply ahead of the merge that needs it. This is dashboard state and can change without a commit. Detail: `docs/DEPLOY.md` §9.
 
 Any change to Vercel Production behavior requires explicit owner approval. Follow `docs/OWNER_ACTIONS.md` and `docs/DEPLOY.md`; do not enable a second deployment path blindly and double-deploy every merge.
 
