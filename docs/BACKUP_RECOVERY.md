@@ -341,18 +341,38 @@ made. If none exists, record that in §7 and stop.
    using the CLI. Start the clock.
 4. **Stop all eleven jobs at once** (§4.1), then read `cron.job_run_details` for
    anything that ran before you did. Leave the Vault URLs alone (§4.2).
-5. **Compare** row counts and latest timestamps with a read-only Production reading
+5. **Give the copy a sign-in that sends nothing.** Customers normally sign in
+   through the Send SMS hook (`auth-send-sms-whatsapp`), which the copy deliberately
+   lacks, and Auth settings are not restored anyway (§4.4). In the copy's
+   **Authentication → Sign In / Providers → Phone**:
+   - enable the provider;
+   - configure an SMS provider with placeholder values. Auth requires one to be
+     configured but uses none for a test number. Never point the copy at the
+     WhatsApp hook;
+   - add a **Test Phone Numbers and OTPs** pair for a number the owner controls:
+     their own customer account, never another customer's;
+   - set **Test OTPs Valid Until** to the end of the drill.
+
+   Supabase's [Test auth flows](https://supabase.com/docs/guides/auth/testing-auth-flows)
+   guide (read 2026-11-11) says Auth doesn't send an SMS to a test number.
+
+   Staff sign in with email and password as usual. An admin also needs a TOTP
+   factor for AAL2. If the restored `auth` data did not bring theirs, enrol a fresh
+   one in the copy.
+6. **Compare** row counts and latest timestamps with a read-only Production reading
    taken when the drill started: orders, Auth users, profiles, addresses, the
    loyalty ledger, push devices, branches and products.
-6. **Check the boundaries**, read-only: RLS enabled on every `public` table, the
-   advisors, and a customer and a staff session each reading only what they should.
-7. **Copy Storage separately** (§4.4) and check the 8 files open.
-8. **Point a local build at the copy** and use read journeys only: menu, order
-   history, profile. Placing an order needs `order-intake`, which the copy
-   deliberately lacks.
-9. **Stop the clock** when those journeys work. Record the snapshot age and the
-   elapsed time in §7.
-10. **Delete the copy.** It holds Production personal data and provider credentials
+7. **Check the boundaries**, read-only: RLS enabled on every `public` table, the
+   advisors, and two sessions each reading only what they should:
+   - the customer, signed in with the step 5 test number;
+   - a staff member.
+8. **Copy Storage separately** (§4.4) and check the 8 files open.
+9. **Point a local build at the copy.** Sign in with the step 5 test number and use
+   read journeys only: menu, order history, profile. Placing an order needs
+   `order-intake`, which the copy deliberately lacks.
+10. **Stop the clock** when those journeys work. Record the snapshot age and the
+    elapsed time in §7.
+11. **Delete the copy.** It holds Production personal data and provider credentials
     (§4.3).
 
 Do not use real online payment/refund operations as part of this drill while the payment area is frozen.
