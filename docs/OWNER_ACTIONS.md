@@ -299,6 +299,28 @@ opt-in before marketing push, and under this model the opt-out toggle is the
 in-app consent surface. If App Review rejects on 4.5.4 the revert is one line —
 `promosEnabled: false` in `DEFAULT_DEVICE_PREFS`.
 
+**Amended 2026-11-10 — an in-app consent screen now comes before the OS prompt
+(owner decision 2026-11-09: "keep opt-out, with consent text before the OS
+prompt").** The rule above is unchanged: offers are still on by default and the
+Profile toggle is still the opt-out. What changed is that the customer is told
+first. The first run shows a screen stating order updates **and** occasional
+offers and where to turn offers off, and the OS prompt is raised only from its
+Allow button. Two further consequences:
+
+- **a gap the 2026-08-20 rule did not see is closed.** It treated the OS dialog
+  as the consent moment, but Android 12 and older have no such dialog —
+  notifications are granted at install — so the sign-in claim enrolled those
+  devices in offers with no prompt and no text. They, and a second account on a
+  shared phone, now see the same text once as a notice that writes nothing. No
+  Android device was registered when this was measured (5 devices, all iOS), so
+  no customer was affected;
+- **the trade-off recorded above is unchanged.** A customer still cannot decline
+  offers separately at the moment of granting; the screen now says so plainly
+  and points at the toggle that does it.
+
+The English copy is engineering-drafted and is yours to approve in the pull
+request; the Arabic joins the native read in §35.
+
 The database column keeps `default false`; every registration path passes both
 preferences explicitly through `register_push_device`, so no migration was
 needed and none was written.
@@ -2629,6 +2651,21 @@ running a separate pass; the English it mirrors is in
 
 Not blocking: the previous Arabic was also engineering-drafted, so this is not a
 regression — it is one more string on an existing list.
+
+**Widened 2026-11-10 — read these with it, in the same pass:**
+
+- **the location purpose string again**, rewritten to name every use: the
+  nearest branches on the pickup tab, the delivery pin, and the checkout warning
+  when the pin is far from where the customer is. `ar.json` and the English in
+  `app.json`/`en.json` all changed;
+- **the notification consent screen** (`apps/mobile/src/i18n/strings.ts`, keys
+  `notifConsent*`): a title, two bodies (before the OS prompt, and the one-time
+  notice), and four button labels. This is consent copy, so a wrong word here is
+  a wrong statement about what the customer agreed to — it is the one item on
+  this list worth routing to the PDPL consent review as well;
+- **`notifPromosSub`**, the Profile subtitle, which used to say «فقط إذا اشتركت»
+  ("only if you opt in") while offers were on by default, and now says they are
+  on by default and can be switched off.
 
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 

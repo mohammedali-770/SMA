@@ -72,11 +72,19 @@ export interface DevicePrefs {
 /**
  * Defaults applied when a device registers without an explicit choice.
  *
- * BOTH CHANNELS ON (owner decision 2026-08-20). The consent moment is the OS
- * notification permission dialog: granting it turns on every channel, and the
- * customer never has to switch anything on inside the app. Switching a channel
- * back off is theirs to do — iOS/Android Settings, or the Profile toggles,
- * which stay in place for exactly that purpose.
+ * BOTH CHANNELS ON (owner decision 2026-08-20). Granting the OS notification
+ * permission turns on every channel, and the customer never has to switch
+ * anything on inside the app. Switching a channel back off is theirs to do —
+ * iOS/Android Settings, or the Profile toggles, which stay in place for exactly
+ * that purpose.
+ *
+ * WHAT THE CUSTOMER IS TOLD (since 2026-11-10). The OS dialog cannot say that
+ * offers come with order updates, so the in-app consent screen in front of it
+ * does: order updates AND occasional offers, and where to turn offers off
+ * (NotificationConsentModal). Where the OS never asks — Android 12 and older —
+ * the same text is shown once as a notice (`shouldShowConsentNotice`). These
+ * defaults are unchanged by either: the screen discloses them, it does not
+ * alter who receives what.
  *
  * This REPLACES the previous strictly-opt-in marketing default
  * (`promosEnabled: false`). The database column keeps its own `default false`
@@ -85,10 +93,11 @@ export interface DevicePrefs {
  * `register_push_device`, so the column default never decides a real device's
  * targeting and no migration is needed to change this behaviour.
  *
- * Store-review note: Apple guideline 4.5.4 expects an explicit in-app opt-in
- * before marketing push. Under this model the Profile "Offers & promotions"
- * toggle is the in-app consent surface and it is opt-OUT. Recorded in
- * CLAUDE.md section 7 and docs/OWNER_ACTIONS.md section 10.
+ * Store-review note: Apple guideline 4.5.4 expects consent language in the
+ * app's own UI before marketing push, plus an in-app opt-out. The consent
+ * screen carries the language; the Profile "Offers & promotions" toggle is the
+ * opt-out. Marketing stays opt-OUT. Recorded in CLAUDE.md section 7 and
+ * docs/OWNER_ACTIONS.md section 10.
  */
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
   orderUpdatesEnabled: true,
@@ -105,9 +114,10 @@ export function deviceShouldStayActive(prefs: DevicePrefs): boolean {
 }
 
 /**
- * Permission is requested only WHEN THE CUSTOMER TURNS A TOGGLE ON (clear
- * context — never an app-launch nag). Returns true when the toggle change
- * requires the OS permission flow first.
+ * In Profile, permission is requested only WHEN THE CUSTOMER TURNS A TOGGLE ON
+ * (clear context — never an app-launch nag). The only other way to the OS
+ * prompt is the first-run consent screen's Allow button. Returns true when the
+ * toggle change requires the OS permission flow first.
  */
 export function toggleRequiresPermission(before: DevicePrefs, after: DevicePrefs): boolean {
   const wasOff = !before.orderUpdatesEnabled && !before.promosEnabled;
@@ -157,6 +167,44 @@ export function shouldRegisterOnSignIn(input: {
 }): boolean {
   if (!input.permissionGranted) return false;
   return input.lookup === 'absent';
+}
+
+/**
+ * Whether to show the one-time consent NOTICE: so that offers never reach a
+ * customer who was not told about them.
+ *
+ * Marketing is opt-out here, so a registered device receives offers unless the
+ * customer turns them off. Where the OS asks first (iOS, Android 13+), the
+ * consent screen precedes that prompt and says so. Where it never asks, nobody
+ * would: Android 12 and older grant notifications at install, and a second
+ * account on a shared phone inherits a grant someone else gave — in both, the
+ * sign-in claim registers the device with offers on.
+ *
+ * So the notice is owed whenever THIS customer's row for THIS device has offers
+ * on and they have not seen the consent text on this device. It writes nothing
+ * and changes no one's targeting; it only discloses what the opt-out model
+ * already does, and points at the switch.
+ */
+export function shouldShowConsentNotice(input: {
+  seen: boolean;
+  device: { is_active: boolean; promos_enabled: boolean } | null | undefined;
+}): boolean {
+  if (input.seen || !input.device) return false;
+  return input.device.is_active && input.device.promos_enabled;
+}
+
+/** The tab routes as `usePathname()` reports them (route groups are dropped). */
+export const CONSENT_SCREEN_ROUTES: ReadonlySet<string> = new Set(['/', '/orders', '/profile']);
+
+/**
+ * Where the consent screen may appear: on a tab, and never while the order-type
+ * pop-up is up. Both are native modals, which iOS does not reliably stack; and
+ * after sign-in at checkout the customer must be able to finish the order
+ * before being asked about anything else, so the screen never covers checkout,
+ * a receipt or the branch picker.
+ */
+export function consentScreenVisible(input: { pathname: string; blocked: boolean }): boolean {
+  return !input.blocked && CONSENT_SCREEN_ROUTES.has(input.pathname);
 }
 
 export type RegistrationStep =
