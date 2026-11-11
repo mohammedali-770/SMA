@@ -50,7 +50,7 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 - Account-deletion request/processing workflow.
 - Scheduled operations-health and alerting functions.
 - Payment/Tap source remains in the repository but is **provisional and frozen** while the final gateway decision is pending. Automated refund processing remains disabled. See [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
-- Push notifications are **live**: order updates reach opted-in customers automatically, and marketing broadcasts reach only customers who opted into promotions.
+- Push notifications are **live**: order updates reach customers who allowed notifications automatically, and marketing is opt-out, so a broadcast reaches every one of them who has not switched offers off ([`CLAUDE.md`](CLAUDE.md) §7).
 
 ## Tech stack
 
@@ -87,6 +87,8 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 
 **Node 22 is required.** `.nvmrc` is the repository source of truth. See [`docs/NODE_VERSION.md`](docs/NODE_VERSION.md).
 
+> **The two Expo commands below rewrite a tracked file.** Each runs `expo start`, which rewrites the `include` array of `apps/mobile/tsconfig.json` and drops `.expo/types/**/*.ts` and `expo-env.d.ts` (measured 2026-11-11 with `start` and `web`). Never commit that edit. Revert it with `git checkout -- apps/mobile/tsconfig.json`; `npm run design-system:check` fails while it is present. Detail: [`docs/DEV_VISUAL_REVIEW.md`](docs/DEV_VISUAL_REVIEW.md).
+
 ```bash
 # Match the repository Node version
 nvm use
@@ -109,24 +111,43 @@ Create local environment files from the examples as needed. Client-side Supabase
 
 ## Quality gates
 
+Every check CI runs on a pull request, and the command that reproduces it locally, from the repository root with both dependency trees installed. Each group is headed by the status-check context CI reports; [`docs/reference/ci-and-scripts.md`](docs/reference/ci-and-scripts.md) is the generated list of every workflow and job.
+
 ```bash
-# Root/admin TypeScript
-npm run lint
+# design-system
+npm run format:check                    # new files Prettier-clean, no machine-compressed source
+npm run lint                            # root/admin TypeScript (tsc --noEmit)
+npm --prefix apps/mobile run typecheck  # mobile TypeScript
+npm test                                # every Vitest suite, root and framework-free mobile
+npm run design-system:check             # token mirrors and design-system hygiene
+npm run logo:check && npm run play-icon:check && npm run play-feature-graphic:check && npm run play-screenshots:check
 
-# Root + framework-free mobile unit tests
-npm test
+# Documentation (generated + ownership)
+npm run docs:check                      # generated reference, ownership rules, recorded hashes, test phone numbers
 
-# Mobile TypeScript
-npm --prefix apps/mobile run typecheck
+# Production build (Vite + Expo web export)
+npm run build                           # reinstalls apps/mobile dependencies first, then builds dist/
+find dist -name '*.map'                 # must print nothing: source maps never ship
 
-# Shared design-system sync/hygiene
-npm run design-system:check
+# Edge Function typecheck (Deno), with Deno 2.9.4 as CI pins it
+deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
 
-# Full production build: admin site + Expo web export
-npm run build
+# Dependency audit (high+)
+node scripts/audit-web-high.mjs
+node scripts/audit-mobile-high.mjs
+
+# Change-control guard
+bash .claude/hooks/protect-default-branch.test.sh
+GUARD_TEST_STRICT=1 bash .claude/hooks/test-protect-default-branch.sh
+node scripts/check-workflow-pins.mjs
+
+# Migration chain + SQL suites: a disposable Postgres 16 + PostGIS 3 server only, never Production
+PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres bash .github/sql-ci/run.sh
 ```
 
-Additional SQL and Edge Function checks run in CI. Production database changes must follow the approved migration workflow.
+The SQL harness needs the stub extensions in `.github/sql-ci/extensions/` copied into the server's extension directory first, as `.github/workflows/sql-suites.yml` does, because the chain runs `create extension pg_cron` and `pg_net`. Its CI job is path-gated, so it runs only when SQL changes.
+
+Production database changes must follow the approved migration workflow.
 
 **Migration status verified read-only on 2026-08-12:** the repository contains **79 migration files**, Production contains **85 migration-history rows**, the latest live version is **`20260810115029`**, and all 11 migration names added after the Aug 7 snapshot are represented live. See [`docs/MIGRATION_RECONCILIATION_20260812.md`](docs/MIGRATION_RECONCILIATION_20260812.md). The large historical [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) remains the workflow/provenance ledger; its Aug 7 headline counts are historical.
 
@@ -144,6 +165,7 @@ scripts/                Design-system, audit and repository tooling
 docs/                   Architecture, release, operations and audit documentation
 .github/workflows/       CI, release and controlled deployment workflows
 CLAUDE.md                Mandatory repository change-control rules
+AGENTS.md                The rules an automated reviewer applies, indexed to CLAUDE.md
 PROJECT_STATUS.md        Current engineering/release status
 README_MOBILE.md         Mobile/EAS-specific developer guide
 ```
@@ -162,6 +184,7 @@ Start with [`docs/README.md`](docs/README.md). The most important documents are:
 
 - [`PROJECT_STATUS.md`](PROJECT_STATUS.md) — current project/release status and onboarding.
 - [`CLAUDE.md`](CLAUDE.md) — mandatory change-control and production-safety rules.
+- [`AGENTS.md`](AGENTS.md) — the rules an automated reviewer such as Codex applies, indexed to CLAUDE.md.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current system architecture.
 - [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) — release gates and verification.
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — Vercel/deployment behavior.
@@ -178,7 +201,7 @@ Do not treat this repository like a sandbox:
 - Do not push directly to the production branch; use a fresh branch and PR.
 - Do not use `supabase db push` or `supabase migration repair` against production.
 - Do not modify payment/refund/provider behavior while the payment area is frozen.
-- Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag off without explicit approval; marketing push stays opt-in.
+- Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag on or off without explicit approval. Marketing push has been opt-out since 2026-08-20, so a broadcast reaches nearly the whole active base.
 - Do not commit secrets, service-role keys or provider credentials.
 
 See [`CLAUDE.md`](CLAUDE.md) for the binding rules.

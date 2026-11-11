@@ -2000,6 +2000,29 @@ Risks:
 3. Obtain a Codex review on the final head.
 4. Merge only after explicit owner approval.
 
+**A-note — a migration must keep the argument names clients send.** PostgREST
+resolves `supabase.rpc('fn', { … })` by the function name AND the argument
+names. Renaming or dropping a parameter of a function a client calls, or adding
+one with no DEFAULT, therefore breaks that call with `PGRST202`. On the customer
+app that break outlives the fix: an installed iOS or Android build keeps the
+call shapes it was built with, because there are no over-the-air updates, until
+a new store build reaches each customer.
+
+Until 2026-11-11 nothing caught it. The SQL suites call these functions
+positionally, so a rename replays and passes; the 2026-11-11 reliability
+assessment renamed `request_customer_pos_resend`'s `p_order_id` to `p_id` and
+`manual_only_pos_resend_test.sql` still exited 0. Now
+`apps/mobile/src/services/rpcContractParity.test.ts` replays this directory in
+filename order (overloads, drops and renames included) and fails CI unless every
+`supabase.rpc` call in `apps/mobile/src` and `src` is accepted by exactly one
+live definition. It refuses, rather than skips, a call it cannot read and
+function DDL hidden in a DO block.
+
+**It compares source with source.** A rename made on both sides passes it and
+still breaks every installed build, which keeps sending the old name. Keep the
+old name accepted, as a parameter with a DEFAULT, until no supported build
+sends it.
+
 **B. Pre-live gate** (all read-only)
 1. Verify the repository base commit.
 2. Verify the current live migration count and latest version.
