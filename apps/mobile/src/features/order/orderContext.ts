@@ -143,3 +143,24 @@ export function makeDeliveryContext(
     lastValidatedAt: at,
   };
 }
+
+/**
+ * Whether the order context must be dropped because the signed-in customer
+ * changed (including signing out).
+ *
+ * A delivery context holds a saved address, and a saved address belongs to one
+ * customer. The context is in memory and never reads auth, so before this, user
+ * A's address stayed "valid" in user B's session on the same phone. Guest
+ * browsing makes sign-in and sign-out routine, so that gap is closed here.
+ *
+ * A pickup context names only a public branch and survives. That is what lets a
+ * guest choose a branch, fill a cart and sign in at checkout without losing
+ * either.
+ */
+export function shouldResetOnUserChange(
+  prevUserId: string | null | undefined,
+  nextUserId: string | null | undefined,
+  ctx: OrderContext | null,
+): boolean {
+  return (prevUserId ?? null) !== (nextUserId ?? null) && ctx?.orderType === 'delivery';
+}

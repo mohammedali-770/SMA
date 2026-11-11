@@ -205,10 +205,20 @@ This is the same problem §27 solved for Apple, and it applies to Google
 identically — but §27 is written entirely in App Store Connect terms, so it would
 have been easy to read it as handled and discover otherwise.
 
-**The whole app is behind the login wall.** `apps/mobile/src/app/index.tsx:21`
-redirects to `/(auth)/login` unless `status === 'signed_in'`, and
-`app/(tabs)/_layout.tsx:41` re-redirects any signed-out session that reaches the
-tabs. There is **no guest or browse-only mode** — searched for and found nothing.
+**Superseded from the next EAS build: the menu is browsable as a guest.** Until
+2026-11-09, `apps/mobile/src/app/index.tsx` redirected to `/(auth)/login` unless
+`status === 'signed_in'`, and `app/(tabs)/_layout.tsx` re-redirected any signed-out
+session that reached the tabs. Builds installed before the guest-browsing change
+still behave that way.
+
+From the build that carries it:
+- a guest opens the menu, chooses a pickup branch, views products and fills a cart;
+- sign-in is asked for at checkout, for delivery, and on the Orders and Profile
+  tabs, and returns the customer where they were.
+
+A reviewer still needs the test number to place an order. **That build must not
+ship before `20260930120000_product_variants_guest_read` is applied**
+(`MIGRATIONS.md` §52).
 
 **And login is Saudi-mobile-only, enforced on both sides of the wire.** The
 client rejects a foreign number (`apps/mobile/src/lib/phone.test.ts:52` pins
@@ -480,7 +490,7 @@ to Supabase; **users can request data deletion** — yes, and the URL is below.
 | --- | --- | --- |
 | Does your app collect or share any of the required user data types? | **Yes** | The table above; eleven types are collected |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | Everything is HTTPS to Supabase; no cleartext path exists, and the AAB carries no `android:usesCleartextTraffic` |
-| Which methods of account creation does your app support? | **Phone number** only | There is no email/password, no social sign-in and no guest mode. Login is WhatsApp OTP to a Saudi mobile, enforced client and server side |
+| Which methods of account creation does your app support? | **Phone number** only | There is no email/password and no social sign-in. Login is WhatsApp OTP to a Saudi mobile, enforced client and server side. From the build that carries guest browsing (2026-11-09), browsing the menu needs no account, but an account is still created only by phone number |
 | Do you provide a way for users to request that their account and data be deleted? | **Yes**, with the URL in §7 | Both routes exist: in-app (Profile → Account settings → Delete account) and the public URL Play requires |
 | Do you provide a way to request that *some* data be deleted without deleting the account? | **Yes** | `export_my_data()` and the account-deletion request path; see `GO_LIVE_READINESS.md` A6 |
 
