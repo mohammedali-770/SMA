@@ -116,7 +116,8 @@ describe('payment functions talk to Moyasar only', () => {
 // outbound IP, so every call has to be able to go through MOYASAR_PROXY_URL.
 // One call that bypasses moyasarFetch would work in TEST and fail in LIVE.
 describe('every Moyasar request goes through moyasarFetch', () => {
-  const ENDPOINT = /MOYASAR_API_BASE|api\.moyasar\.com|moyasarPaymentUrl\(|moyasarRefundUrl\(|MOYASAR_INVOICES/;
+  const ENDPOINT =
+    /MOYASAR_API_BASE|api\.moyasar\.com|moyasarPaymentUrl\(|moyasarRefundUrl\(|MOYASAR_INVOICES/;
   const RAW_FETCH = /(?<![\w$.])fetch\s*\(|\b(?:globalThis|self|window)\s*\.\s*fetch\b/;
   const sources = functionSources();
 
@@ -155,7 +156,9 @@ describe('every Moyasar request goes through moyasarFetch', () => {
     expect(get).toMatch(/\} catch \(e\) \{[\s\S]*return \{ ok: false, status: 0, body: \{\} \};/);
     expect(
       section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult'),
-    ).toContain('isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}');
+    ).toContain(
+      'isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}',
+    );
   });
 });
 
@@ -164,8 +167,10 @@ describe('every Moyasar request goes through moyasarFetch', () => {
 describe('payment-test-config names an Allowed IPs refusal', () => {
   const src = code('payment-test-config');
 
-  it('tells test_connection\'s refused address apart from a rejected key', () => {
-    const named = src.indexOf('if (isMoyasarIpNotAllowed(resp.status, refusal)) return json({ ok: false, message: ipNotAllowedMessage(mode) }, 200);');
+  it("tells test_connection's refused address apart from a rejected key", () => {
+    const named = src.indexOf(
+      'if (isMoyasarIpNotAllowed(resp.status, refusal)) return json({ ok: false, message: ipNotAllowedMessage(mode) }, 200);',
+    );
     expect(named).toBeGreaterThan(-1);
     expect(named).toBeLessThan(src.indexOf('secret key was rejected by Moyasar (unauthorized).'));
   });
@@ -199,7 +204,9 @@ describe('payment-initiate', () => {
   });
 
   it('sends every configuration down the Moyasar path, choosing nothing by provider name', () => {
-    expect(handler).toContain('return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);');
+    expect(handler).toContain(
+      'return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);',
+    );
     expect(handler).toContain('return await initiateMoyasar(admin, order, cfg, lang);');
     expect(handler).not.toMatch(/providerName|sessionProvider/);
     expect(src).not.toMatch(/guardCrossProviderAttempt|decideCrossProviderAttempt|provider_switched/);
@@ -246,9 +253,14 @@ describe('payment-initiate hands the app only a Moyasar checkout URL', () => {
 
   it('checks a reused URL too, and never hands out a stored one as it is', () => {
     for (const fn of ['async function initiateMoyasar(', 'async function initiateMoyasarForSession(']) {
-      const reuse = block(fnBody(src, fn), 'if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {');
+      const reuse = block(
+        fnBody(src, fn),
+        'if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {',
+      );
       expect(reuse, fn).toContain('const checkoutUrl = customerCheckoutUrl(attempt.checkout_url, lang);');
-      expect(reuse, fn).toContain("if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');");
+      expect(reuse, fn).toContain(
+        "if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');",
+      );
     }
     expect(src).not.toMatch(/checkoutUrl: (?:attempt\.checkout_url|invoiceUrl|String\()/);
     expect(count(src, 'customerCheckoutUrl(')).toBe(3);
@@ -256,14 +268,20 @@ describe('payment-initiate hands the app only a Moyasar checkout URL', () => {
 
   it('fails closed with a 502 and one log line naming only the scheme and host', () => {
     const refuse = fnBody(src, 'function refuseCheckoutUrl(');
-    expect(refuse).toContain("return json({ error: 'Could not start the payment. Please try again.' }, 502);");
+    expect(refuse).toContain(
+      "return json({ error: 'Could not start the payment. Please try again.' }, 502);",
+    );
     expect(count(refuse, 'console.')).toBe(1);
-    expect(refuse).toMatch(/console\.error\(JSON\.stringify\(\{ event: 'payment_initiate_refused', reason: 'checkout_url_rejected', attempt, scheme, host \}\)\)/);
+    expect(refuse).toMatch(
+      /console\.error\(JSON\.stringify\(\{ event: 'payment_initiate_refused', reason: 'checkout_url_rejected', attempt, scheme, host \}\)\)/,
+    );
   });
 
   it("takes the page's language from the request, defaulting to English", () => {
     expect(handler).toContain("const lang: CheckoutLanguage = body.language === 'ar' ? 'ar' : 'en';");
-    expect(handler).toContain('return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);');
+    expect(handler).toContain(
+      'return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0, lang);',
+    );
     expect(handler).toContain('return await initiateMoyasar(admin, order, cfg, lang);');
     expect(count(src, '    lang,\n  });')).toBe(2);
   });
@@ -397,20 +415,28 @@ describe('a TEST-mode attempt never confirms an order', () => {
 // order, cash included, because recovery runs before either branch.
 describe('verifyMoyasarAttempt closes an invoice Moyasar has closed', () => {
   const verify = stripComments(readFileSync(new URL('./moyasarVerify.ts', import.meta.url), 'utf8'));
-  const fn = section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult');
+  const fn = section(
+    verify,
+    'export async function verifyMoyasarAttempt(',
+    'export interface InvoiceLookupResult',
+  );
 
   it('decides it once the invoice is read, before the "not paid yet" answer and any confirmation', () => {
     const decided = fn.indexOf('const closed = closedInvoiceOutcome(invoice);');
     expect(decided).toBeGreaterThan(fn.indexOf('if (!retrieved.ok) {'));
     expect(decided).toBeLessThan(fn.indexOf('const payment = selectInvoicePayment(invoice);'));
-    expect(decided).toBeLessThan(fn.indexOf('await validateAndConfirmMoyasarPayment(admin, attempt, payment)'));
+    expect(decided).toBeLessThan(
+      fn.indexOf('await validateAndConfirmMoyasarPayment(admin, attempt, payment)'),
+    );
   });
 
   it('closes the attempt, never a paid one, and answers with the closed outcome', () => {
     const closed = block(fn, 'if (closed) {');
     expect(closed).toContain("status: 'failed', failure_code: closed.failureCode,");
     expect(closed).toContain(".eq('id', attempt.id).neq('status', 'paid')");
-    expect(closed).toContain('return { outcome: closed.outcome, paid: false, messageKey: closed.messageKey };');
+    expect(closed).toContain(
+      'return { outcome: closed.outcome, paid: false, messageKey: closed.messageKey };',
+    );
     expect(closed).not.toMatch(/\.rpc\(/);
   });
 });
@@ -464,7 +490,9 @@ describe('payment-webhook', () => {
     expect(verification).toBeGreaterThan(handler.indexOf("if (providerName !== 'moyasar')"));
     expect(verification).toBeLessThan(handler.indexOf("if (!cfg.enabled) return json({ status: 'ignored'"));
     expect(count(handler, 'cfg.enabled')).toBe(1);
-    expect(verification).toBeLessThan(handler.indexOf('return await handleMoyasarWebhook(admin, cfg, rawBody);'));
+    expect(verification).toBeLessThan(
+      handler.indexOf('return await handleMoyasarWebhook(admin, cfg, rawBody);'),
+    );
   });
 
   it('answers 401 and writes nothing on a token mismatch, and never touches a payment', () => {
@@ -564,7 +592,7 @@ describe('payment-test-config', () => {
     const gate = checkout.indexOf("if ((providerName ?? '').toLowerCase() !== 'moyasar') {");
     expect(gate).toBeGreaterThan(-1);
     expect(block(checkout, "if ((providerName ?? '').toLowerCase() !== 'moyasar') {")).toContain(
-      "return json({ ok: false, message: \"Set the payment provider to 'moyasar' first.\" }, 200);",
+      'return json({ ok: false, message: "Set the payment provider to \'moyasar\' first." }, 200);',
     );
     expect(gate).toBeLessThan(checkout.indexOf("resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test')"));
     expect(gate).toBeLessThan(checkout.indexOf('moyasarFetch('));
