@@ -434,16 +434,38 @@ if anything changes.
 | Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`, `otp_challenges.phone_e164`; POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
 | Email address | Yes, **optional** | — | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
 | Address | Yes, optional (delivery only) | POS | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339` |
-| Precise location | Yes, optional | — | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2) |
+| Precise location | Yes, optional | — | App functionality | `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2). **Asked only in context since 2026-11-10** — see the note under this table |
 | Approximate location | Yes, optional | — | App functionality | `ACCESS_COARSE_LOCATION` |
 | Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
 | User IDs | Yes | — | App functionality, Account management | `profiles.id` |
 | Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
 | Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
 | Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
-| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it |
+| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it. Since 2026-11-10 the app says so on screen before the Android 13+ prompt, and once as a notice on Android 12 and older, where the OS never asks (note under this table) |
 | **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
+
+**Permissions are requested in context — changed 2026-11-10, no form answer
+moves.** Play's permission policy expects a permission to be requested where the
+feature that needs it is used. Until this change the first run raised the OS
+**location** prompt straight after sign-in, with nothing on screen to explain it,
+on top of the order-type pop-up. That prompt is gone. Location is now asked in
+two places only: the pickup tab, to list the nearest branches (`Balanced`, so
+approximate would do), and "Use my location" on the delivery map (`Accuracy.High`
+— the reason `ACCESS_FINE_LOCATION` stays). That is the justification to give if
+the Console asks for a precise-location declaration: **the delivery pin decides
+which door the food is taken to.** The declared permissions and the rows above
+are unchanged.
+
+The **notification** prompt (`POST_NOTIFICATIONS`, Android 13+) is now preceded
+by an in-app consent screen stating order updates **and** occasional offers, and
+where to turn offers off. It is raised only from that screen's Allow button.
+**Android 12 and older never show a notification prompt** — the permission is
+granted at install, and expo-notifications reports it as granted — so before this
+change those devices were enrolled in offers at sign-in with no prompt and no
+text. They now see the same text once, as a notice that writes nothing. No
+Android device had registered when this was measured, so no customer was
+affected; the gap would have opened with the first Android release.
 
 **Sentry is configured not to send PII — but "no PII" is too strong, and the
 precise version matters for the form.** `sendDefaultPii: false` with a

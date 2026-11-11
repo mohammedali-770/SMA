@@ -13,6 +13,11 @@ import type { DbPushDevice } from '../../types/db';
 
 export async function hasNotificationPermission(): Promise<boolean> { return false; }
 
+/** Nothing to ask on web, ever — so the first-run consent screen is never offered here. */
+export async function readNotificationPermission(): Promise<{ granted: boolean; canAskAgain: boolean }> {
+  return { granted: false, canAskAgain: false };
+}
+
 export async function ensureNotificationPermission(): Promise<boolean> {
   return false; // never prompts on web
 }

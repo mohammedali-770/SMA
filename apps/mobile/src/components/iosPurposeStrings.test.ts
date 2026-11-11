@@ -122,6 +122,33 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
     );
 
     /**
+     * The base Info.plist string and the English locale are two copies of one
+     * sentence. They drifted once already: the 2026-09-09 rewrite reached the
+     * base and not the locales (GO_LIVE_READINESS C2), so an English device
+     * kept showing the old text.
+     */
+    it('keeps the base when-in-use string identical to the English locale', () => {
+      const en = loaded.find((l) => l.tag === 'en')?.ios ?? {};
+      expect(appJson.expo.ios?.infoPlist?.NSLocationWhenInUseUsageDescription).toBe(
+        en.NSLocationWhenInUseUsageDescription,
+      );
+    });
+
+    /**
+     * The string must name every place the app asks for location. Since the
+     * first-run prompt was removed (2026-11-10) the app asks in exactly two:
+     * "Use my location" on the delivery map, and the pickup tab, which asks in
+     * order to list the nearest branches. For a while the string named only the
+     * delivery pin, which undersold the second to a reviewer.
+     */
+    it('names the branch list, which the pickup tab asks for location to build', () => {
+      const en = loaded.find((l) => l.tag === 'en')?.ios ?? {};
+      const ar = loaded.find((l) => l.tag === 'ar')?.ios ?? {};
+      expect(en.NSLocationWhenInUseUsageDescription).toMatch(/branch/i);
+      expect(ar.NSLocationWhenInUseUsageDescription).toMatch(/الفروع/);
+    });
+
+    /**
      * Not a translation check — nobody can assert that here. It catches the
      * copy-paste that leaves the Arabic file holding the English sentence,
      * which is the failure mode a reviewer would actually see.
