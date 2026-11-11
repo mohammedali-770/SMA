@@ -12,7 +12,6 @@ import { LazywaitPanel } from './LazywaitPanel';
 import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
 import { EmailServerPanel } from './EmailServerPanel';
 import { MoyasarPaymentPanel } from './MoyasarPaymentPanel';
-import { TapPaymentPanel } from './TapPaymentPanel';
 import { PushToolsPanel } from './PushToolsPanel';
 import { StaffAccessPanel } from './StaffAccessPanel';
 
@@ -71,13 +70,11 @@ export const IntegrationsPanel: React.FC = () => {
           {group === 'payments' && (
             <>
               <IntegrationCard providerType="payment" row={rowFor('payment')} disabled={isAccountant} onSave={saveIntegration} />
-              {/* One readiness panel, for the provider that is actually stored.
-                  Showing both would put two conflicting "is the gateway ready?"
-                  answers on one screen — and the readiness that matters is the
-                  one belonging to the provider customers are being sent to. */}
-              {(rowFor('payment')?.provider_name ?? '').toLowerCase() === 'moyasar'
-                ? <MoyasarPaymentPanel disabled={isAccountant} />
-                : <TapPaymentPanel disabled={isAccountant} />}
+              {/* Moyasar is the only payment provider, so its readiness panel
+                  shows whatever the stored row names. A row that still names
+                  another provider is exactly what the panel reports, and saving
+                  the card above stores 'moyasar'. */}
+              <MoyasarPaymentPanel disabled={isAccountant} />
             </>
           )}
 

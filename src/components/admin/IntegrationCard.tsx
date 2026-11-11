@@ -8,7 +8,7 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import { DbIntegrationSetting, UpsertIntegrationInput } from '../../lib/api';
-import { initialProviderName, providerFieldSet } from '../../lib/integrationProvider';
+import { initialProviderName } from '../../lib/integrationProvider';
 
 const SELECT = [
   'ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3',
@@ -27,13 +27,6 @@ export interface ProviderSpec {
   providerOptions?: string[];
   publicFields: PublicField[];
   secretFields: SecretField[];
-  /**
-   * Per-provider field overrides for a slot that offers more than one provider.
-   * The payment slot needs this because Tap and Moyasar genuinely require
-   * different inputs; every other slot leaves it undefined and keeps using the
-   * fields above.
-   */
-  byProvider?: Record<string, { publicFields: PublicField[]; secretFields: SecretField[] }>;
 }
 
 /**
@@ -45,46 +38,33 @@ export interface ProviderSpec {
 export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], ProviderSpec> = {
   payment: {
     title: 'Payment Gateway',
-    subtitle: 'Hosted checkout (Mada/Visa/…). Secrets server-side only. Set TEST mode first — switching to LIVE asks for confirmation. The provider is UNCHOSEN: see docs/PAYMENT_POSTPONEMENT.md.',
-    // Tap is the provisional integration already wired to Production; Moyasar is
-    // the candidate under evaluation. Selecting one here is a configuration
-    // change, not an approval — see CLAUDE.md §5/§6.
-    providerOptions: ['tap', 'moyasar'],
+    subtitle: 'Moyasar hosted checkout. It offers the methods enabled on the Moyasar account (mada, Visa/Mastercard, Apple Pay). Secrets server-side only. Set TEST mode first — switching to LIVE asks for confirmation.',
+    // Moyasar is the only payment provider (owner decision, 2026-11-11).
+    providerOptions: ['moyasar'],
+    // Every name below is one resolveMoyasarConfig reads
+    // (supabase/functions/_shared/moyasar.ts), and IntegrationCard.test.ts checks
+    // that against the server source. They are live data, not labels: the
+    // payment row already stores moyasar_test_publishable_key under this name,
+    // and secret_config is merged on save, so a renamed field would write a new
+    // key beside the old one and leave the server reading the old one. The
+    // moyasar_ prefix is also what keeps a leftover credential from an earlier
+    // gateway, still in the row, from ever being read as Moyasar's.
     publicFields: [
-      { key: 'merchant_id', label: 'Merchant ID', type: 'text', placeholder: 'Tap merchant id' },
       { key: 'mode', label: 'Mode (test / live)', type: 'text', placeholder: 'test' },
       { key: 'currency', label: 'Currency', type: 'text', placeholder: 'SAR' },
-      { key: 'source_id', label: 'Source ID', type: 'text', placeholder: 'src_all' },
-      { key: 'transaction_expiry_minutes', label: 'Charge expiry (minutes, 5–60)', type: 'text', placeholder: '30' },
-      { key: 'statement_descriptor', label: 'Statement descriptor (optional)', type: 'text', placeholder: 'Spicy Meal' },
+      { key: 'invoice_expiry_minutes', label: 'Invoice expiry (minutes, 5–60)', type: 'text', placeholder: '30' },
+      { key: 'moyasar_test_publishable_key', label: 'Test Publishable Key (pk_test_…)', type: 'text', placeholder: 'pk_test_…' },
+      { key: 'moyasar_live_publishable_key', label: 'Live Publishable Key (pk_live_…)', type: 'text', placeholder: 'pk_live_…' },
     ],
     secretFields: [
-      { key: 'test_secret_key', label: 'Test Secret Key (sk_test_…)' },
-      { key: 'live_secret_key', label: 'Live Secret Key (sk_live_…)' },
+      { key: 'moyasar_test_secret_key', label: 'Test Secret Key (sk_test_…)' },
+      { key: 'moyasar_live_secret_key', label: 'Live Secret Key (sk_live_…)' },
+      // Moyasar signs nothing: the webhook's only authentication is this
+      // shared token echoed in the request body. Without it the webhook
+      // cannot be authenticated at all, so the server refuses to act on one.
+      { key: 'moyasar_test_webhook_secret_token', label: 'Test Webhook Secret Token' },
+      { key: 'moyasar_live_webhook_secret_token', label: 'Live Webhook Secret Token' },
     ],
-    byProvider: {
-      moyasar: {
-        publicFields: [
-          { key: 'mode', label: 'Mode (test / live)', type: 'text', placeholder: 'test' },
-          { key: 'invoice_expiry_minutes', label: 'Invoice expiry (minutes, 5–60)', type: 'text', placeholder: '30' },
-          { key: 'moyasar_test_publishable_key', label: 'Test Publishable Key (pk_test_…)', type: 'text', placeholder: 'pk_test_…' },
-          { key: 'moyasar_live_publishable_key', label: 'Live Publishable Key (pk_live_…)', type: 'text', placeholder: 'pk_live_…' },
-        ],
-        // Namespaced so they do NOT collide with Tap's key names. secret_config
-        // is merged on save, so distinct names let both gateways' credentials
-        // live in the one row — which is what keeps a refund still queued for
-        // the previous provider executable after a switch.
-        secretFields: [
-          { key: 'moyasar_test_secret_key', label: 'Test Secret Key (sk_test_…)' },
-          { key: 'moyasar_live_secret_key', label: 'Live Secret Key (sk_live_…)' },
-          // Moyasar signs nothing: the webhook's only authentication is this
-          // shared token echoed in the request body. Without it the webhook
-          // cannot be authenticated at all, so the server refuses to act on one.
-          { key: 'moyasar_test_webhook_secret_token', label: 'Test Webhook Secret Token' },
-          { key: 'moyasar_live_webhook_secret_token', label: 'Live Webhook Secret Token' },
-        ],
-      },
-    },
   },
   sms: {
     title: 'SMS / OTP Gateway',
@@ -184,18 +164,15 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const family = useDsFontClass();
-  // Fields follow the SELECTED provider, not the slot, so switching the payment
-  // provider in the dropdown immediately shows that provider's own inputs.
-  const fields = providerFieldSet(spec, spec.byProvider, providerName);
 
   const handleSave = async () => {
-    // Explicit confirmation before switching Tap to LIVE (real payments).
+    // Explicit confirmation before switching the payment gateway to LIVE (real payments).
     if (providerType === 'payment') {
       const newMode = String((pub.mode as string) ?? '').toLowerCase();
       const oldMode = String(((row?.public_config as Record<string, unknown>)?.mode as string) ?? 'test').toLowerCase();
       if (newMode === 'live' && oldMode !== 'live') {
         const okLive = window.confirm(
-          `Switch ${providerName || 'the payment gateway'} to LIVE mode? Real customer payments will be processed. Make sure the LIVE secret key is configured.`,
+          'Switch Moyasar to LIVE mode? Real customer payments will be processed. Make sure the LIVE secret key and the LIVE webhook secret token are configured.',
         );
         if (!okLive) return;
       }
@@ -244,7 +221,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
           </select>
         </label>
 
-        {fields.publicFields.map(f => (
+        {spec.publicFields.map(f => (
           f.type === 'bool' ? (
             <label key={f.key} className="flex flex-col gap-2">
               <span className={LABEL}>{f.label}</span>
@@ -279,7 +256,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
       {/* Write-only secrets. These are never read back from the server, so the
           placeholder is the only signal of whether one is already stored. */}
       <div className="grid grid-cols-1 gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3 md:grid-cols-2">
-        {fields.secretFields.map(f => (
+        {spec.secretFields.map(f => (
           <div key={f.key} className="space-y-2">
             <span className="flex items-center gap-1">
               <KeyRound className="size-3 shrink-0 text-con-text-2" aria-hidden="true" />
