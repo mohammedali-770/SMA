@@ -20,7 +20,16 @@
  * when the code itself changes.
  */
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, Text as RNText, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  Text as RNText,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputInstance,
+  type ViewStyle,
+} from 'react-native';
 
 import { fontFamily, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { makeStyles } from '../../theme/makeStyles';
@@ -55,7 +64,7 @@ function OtpCodeInputImpl({
   style,
 }: Props) {
   const styles = useStyles();
-  const input = useRef<TextInput | null>(null);
+  const input = useRef<TextInputInstance | null>(null);
   const [focused, setFocused] = useState(false);
   const boxes = useMemo(() => splitCodeToBoxes(value, length), [value, length]);
 

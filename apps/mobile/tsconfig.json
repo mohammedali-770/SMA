@@ -8,6 +8,9 @@
       ],
       "@/assets/*": [
         "./assets/*"
+      ],
+      "react-native-webview": [
+        "./src/types/react-native-webview"
       ]
     }
   },

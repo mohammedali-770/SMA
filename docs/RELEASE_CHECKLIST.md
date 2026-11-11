@@ -150,6 +150,50 @@ Before native store submission, a real device must exercise the native bundle.
 
 PR #200 completed source retention; this physical-device validation remains a separate gate.
 
+### First build on Expo SDK 58 — added 2026-11-10
+
+The upgrade changes the native toolchain and turns on R8 for Android release
+builds. Before that build reaches testers, also check:
+
+- [ ] The EAS log's environment step names the SDK 58 image: Xcode 27.1 on iOS,
+      which is also what Apple requires for uploads from April 2027.
+- [ ] **Android, release build:** it launches, and sign-in, the menu, the delivery
+      map, checkout and a notification tap all work. R8 removes code reached only
+      by reflection, and that fails only at runtime.
+- [ ] A notification tap that cold-starts the app opens the right screen, on both
+      platforms. Expo Router 58 throws if the imperative router is used before its
+      first render. The bridge cannot reach that point by its timing, but this is
+      where it would show.
+- [ ] iOS sign-out returns to the sign-in screen, and a relaunch stays signed out.
+      `expo-secure-store` 58 now rejects a delete the keychain refuses.
+- [ ] The delivery map loads in its WebView (react-native-webview 14) and the pin
+      moves.
+- [ ] **Android phone with its system language set to Arabic**, in BOTH in-app
+      languages: every screen must look exactly as it does on an English-language
+      phone. React Native 0.88 mirrors natively from the system language, and the
+      app mirrors itself, so a missing lock flips everything twice.
+      `plugins/withAndroidRtlLock.js` pins native layout left-to-right. Check the
+      phone field and OTP boxes (digit 1 on the left), the order-type modal, menu
+      chips, the banner carousel, the cart's suggestion rail, the tab bar, the
+      loyalty toggle and the address screens. Look at checkout and the payment
+      screens too, without paying. Nothing here can be caught off a device.
+- [ ] **iOS, the same check, as a question rather than a regression.** Every iOS
+      build, SDK 57 included, ships an Arabic localisation (`ar.lproj`), and on an
+      iPhone set to Arabic React Native's iOS check likely reports right-to-left,
+      so iOS may ALREADY be mirrored twice there. This build does not change it.
+      Compare an Arabic-language iPhone with an English one on the current
+      TestFlight build. If they differ, the fix is the iOS counterpart of the
+      Android lock, as its own change, because it changes shipped behaviour.
+- [ ] **`/app` across a deploy:** keep it open in a phone browser while a
+      production deploy lands, then open a screen not visited yet. It must open.
+      Routes ship as one bundle (`asyncRoutes: false` in `app.json`), because
+      Expo Router 58's lazy route chunks cannot be fetched by a tab opened before
+      the deploy.
+- [ ] **Sentry and R8:** decide BEFORE this build ships whether Sentry must be able
+      to read its native Android frames (`SENTRY_OBSERVABILITY.md`, "Android
+      release builds are minified"). Turning the upload on later does not help
+      builds already shipped.
+
 ## 8. App Store and Play submission
 
 **Store *policy* readiness is a separate, one-time gate:

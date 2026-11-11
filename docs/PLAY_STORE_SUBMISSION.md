@@ -189,6 +189,31 @@ present** — checked by name, not by absence of worry: no SMS or Call Log, no
 advertising SDK** — the only Google Play Services components in the manifest are
 `cloudmessaging` and `common.api`. So the advertising-ID declaration is "no".
 
+### The next bundle is minified with R8 — added 2026-11-10
+
+The bundle above was built on Expo SDK 57 with no code shrinking. From the SDK 58
+upgrade, release builds run R8, set explicitly in `apps/mobile/app.json`
+(`expo-build-properties`, `android.enableMinifyInReleaseBuilds`). A prebuild of the
+SDK 58 project shows the setting reaching the release build type, with Google's
+`proguard-android-optimize.txt`. Resource shrinking is deliberately left off: it
+removes resources looked up by name, and nothing has tested that.
+
+R8 is how the app meets Play's new DEX rule. [Answer 17492799](https://support.google.com/googleplay/android-developer/answer/17492799)
+asks, from February 2027, for *"a minimum of 25% optimization, obfuscation and
+shrinking"* where DEX code exceeds 10 MB.
+
+**Read the first SDK 58 bundle in App bundle explorer** against this one, for
+both the DEX size and the 16 KB page-size field. The cost of R8 is in Sentry:
+native Android frames arrive obfuscated until the mapping is uploaded
+(`SENTRY_OBSERVABILITY.md`).
+
+**R8 is a choice, not an SDK 58 default.** The SDK 58 template still defaults
+`enableMinifyInReleaseBuilds` to false, and the rule above binds only where DEX
+exceeds 10 MB. Whether Sentry must read this bundle's native frames has to be decided
+before it ships, because a mapping uploaded later cannot be matched to a build made
+without Sentry's Gradle plugin. Play Console de-obfuscates either way, from the
+mapping inside the bundle.
+
 
 ---
 

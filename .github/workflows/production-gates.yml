@@ -112,12 +112,11 @@ jobs:
         run: node scripts/audit-web-high.mjs
 
       # Do not weaken this to `|| true`, `--omit`, or a lower audit level.
-      # The script is fail-closed and permits only the reviewed HIGH advisory in
-      # docs/DEPENDENCY_ADVISORIES.md §3.2 (decode-uri-component, shipped inside
-      # expo-router but proven never called by
-      # src/lib/decodeUriComponentReachability.test.ts, which the unit-test job
-      # runs). It names every advisory before any verdict, expires automatically,
-      # and any other high/critical advisory still fails the job.
+      # The script is fail-closed and excepts no HIGH advisory today. The last
+      # exception, decode-uri-component, was retired by the Expo SDK 58 upgrade
+      # (docs/DEPENDENCY_ADVISORIES.md §4.15). A new one is reviewed in §3 first.
+      # It names every advisory before any verdict, and any high or critical
+      # advisory fails the job.
       - name: Audit mobile dependencies
         run: node scripts/audit-mobile-high.mjs
 

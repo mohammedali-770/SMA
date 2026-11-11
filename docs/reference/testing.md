@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**209 TypeScript test files declaring 3279 test blocks, plus 82 SQL suites.**
+**211 TypeScript test files declaring 3293 test blocks, plus 82 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -119,20 +119,21 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/plugins/`
 
-1 files, 7 declared test blocks.
+2 files, 16 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
+| `apps/mobile/plugins/withAndroidRtlLock.test.ts` | 9 | addAndroidRtlLock |
 | `apps/mobile/plugins/withTapCardInterop.test.ts` | 7 | addTapCardInterop |
 
 ### `apps/mobile/src/`
 
-74 files, 1064 declared test blocks.
+76 files, 1074 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `apps/mobile/src/components/headerInset.test.ts` | 6 | header top inset — exactly one source per screen |
-| `apps/mobile/src/components/iosPurposeStrings.test.ts` | 9 | iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1) |
+| `apps/mobile/src/components/iosPurposeStrings.test.ts` | 11 | iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1) |
 | `apps/mobile/src/components/legacyButtonBehaviour.test.ts` | 5 | legacy Button — behaviour is unchanged by the consolidation |
 | `apps/mobile/src/components/locationControl.test.ts` | 25 | shouldStartLocate |
 | `apps/mobile/src/components/stateHierarchy.test.ts` | 9 | looksTechnical |
@@ -185,7 +186,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 7 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
-| `apps/mobile/src/lib/observability/config.test.ts` | 16 | Sentry identity |
+| `apps/mobile/src/lib/observability/config.test.ts` | 19 | Sentry identity |
 | `apps/mobile/src/lib/observability/sanitize.test.ts` | 25 | isSensitiveKey |
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
@@ -196,6 +197,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
+| `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
@@ -203,12 +205,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
+| `apps/mobile/src/types/webviewTypeShim.test.ts` | 4 | react-native-webview type shim |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |
 | `apps/mobile/src/utils/orderLineLabel.test.ts` | 6 | orderLineLabel |
 
 ### `src/`
 
-107 files, 1500 declared test blocks.
+106 files, 1495 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -281,7 +284,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
-| `src/lib/decodeUriComponentReachability.test.ts` | 5 | decode-uri-component (GHSA-qr28-fpjm-wq7f) is shipped but never called |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |

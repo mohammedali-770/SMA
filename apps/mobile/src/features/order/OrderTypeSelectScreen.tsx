@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  type ScrollViewInstance,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -62,7 +63,7 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const askedLocation = useRef(false);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const descOffsetRef = useRef(0);
 
   useEffect(() => {

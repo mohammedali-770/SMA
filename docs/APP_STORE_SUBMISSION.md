@@ -236,6 +236,14 @@ my location". Two cases were added to the test: the base string must equal the
 English locale (the 2026-09-09 rewrite reached one and not the other), and both
 languages must name the branch list. The Arabic joins `OWNER_ACTIONS.md` §35.
 
+**Added 2026-11-10 for Expo SDK 58: `locationFullAccuracyPermission` is `false`.**
+expo-location 58's plugin began writing `NSLocationTemporaryUsageDescriptionDictionary`,
+a generic, English-only "temporary full accuracy" placeholder, unless that prop is
+`false`. Only the separate `expo-location/next` module can make that request, and
+nothing imports it. Measured on an SDK 58 prebuild: the key is present without the
+prop and absent with it, and the when-in-use and motion strings are unchanged. The
+test file pins the prop and the absence of any `expo-location/next` import.
+
 ---
 
 ## 3a. Build 24 — it uploaded, and EAS said it failed
@@ -598,6 +606,14 @@ update both, and Play in particular reuses them for every future review.
 ---
 
 ## 8. What is left, in order
+
+**The next build is the first on Expo SDK 58 (2026-11-10).** Builds 23 to 27 were
+SDK 57. SDK 58's EAS image is Xcode 27.1 with the iOS 27 SDK, and Apple requires
+that from April 2027: *"iOS and iPadOS apps must be built with the iOS 27 &
+iPadOS 27 SDK or later"* ([news, 9 September 2026](https://developer.apple.com/news/?id=k1mtkt1k)).
+`eas.json` names no image, so read the build log to confirm which one ran. The
+first SDK 58 build also needs `RELEASE_CHECKLIST.md` §7's added checks before it
+reaches testers.
 
 1. ~~Merge the purpose-string fix, build, submit.~~ **DONE 2026-09-16.** #388
    merged the fix, #389 cleared the SDK patch drift that `npx expo install

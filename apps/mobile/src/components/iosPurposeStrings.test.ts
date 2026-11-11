@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -81,6 +81,32 @@ describe('iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1)', () => {
       expect(locationProps?.[prop]).toBe(false);
     },
   );
+
+  /**
+   * New with expo-location 58. Its plugin now writes
+   * NSLocationTemporaryUsageDescriptionDictionary (a generic, English-only
+   * "temporary full accuracy" placeholder) unless this prop is `false`. That
+   * request only exists in the separate `expo-location/next` module, which the
+   * app never imports: every call site uses plain 'expo-location', so the
+   * string could never be shown. Unlike the two above this is not about
+   * background location, which is why it is a case of its own. If
+   * `expo-location/next` is adopted later, replace `false` with a real string
+   * in both languages, never the placeholder.
+   */
+  it('keeps the temporary full-accuracy placeholder out of the Info.plist', () => {
+    expect(locationProps?.locationFullAccuracyPermission).toBe(false);
+  });
+
+  it('never imports expo-location/next, the only module that could ask for it', () => {
+    const src = new URL('../', import.meta.url);
+    const files = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter(
+      (f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f),
+    );
+    expect(files.length).toBeGreaterThan(50);
+    for (const f of files) {
+      expect(readFileSync(new URL(f, src), 'utf8'), f).not.toMatch(/expo-location\/next/);
+    }
+  });
 
   it('keeps the when-in-use string on ios.infoPlist, where it is authored', () => {
     const whenInUse = appJson.expo.ios?.infoPlist?.NSLocationWhenInUseUsageDescription;
