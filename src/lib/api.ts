@@ -502,7 +502,7 @@ export interface PaymentGatewayStatus {
   /**
    * Moyasar readiness. Optional because a payment-test-config bundle deployed
    * before Moyasar does not emit them: its key booleans describe another
-   * gateway's keys.
+   * gateway's keys. `isMoyasarShapedStatus` reads their absence as exactly that.
    */
   webhook_secret_set?: boolean;
   key_prefix_ok?: boolean;
@@ -525,6 +525,11 @@ export interface DbPaymentRecord {
   confirmed_at: string | null;
   last_verified_at: string | null;
   created_at: string;
+}
+/** The newest Moyasar webhook-verification code, as `latestWebhookVerification` reads it. */
+export interface DbWebhookVerification {
+  created_at: string;
+  verification_code: string | null;
 }
 async function invokePaymentTestConfig<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('payment-test-config', { body });
@@ -562,6 +567,22 @@ export const paymentGateway = {
    */
   testCheckoutResult: (invoiceId: string) =>
     invokePaymentTestConfig<{ ok: boolean; message?: string; invoiceId?: string; chargeId?: string; status?: string; amount?: number; currency?: string; mode?: string; messageKey?: string }>({ action: 'test_checkout_result', invoiceId, chargeId: invoiceId }),
+  /**
+   * Staff read (RLS: integration_sync_logs_staff_read) of the newest
+   * webhook-verification code payment-webhook recorded, or null. Moyasar sends
+   * that code once, when a webhook is registered; only the time and the code
+   * are selected, nothing else from the logged request or response.
+   */
+  async latestWebhookVerification(): Promise<DbWebhookVerification | null> {
+    const rows = ok<DbWebhookVerification[]>(await supabase
+      .from('integration_sync_logs')
+      .select('created_at, verification_code:response->>verification_code')
+      .eq('provider', 'moyasar')
+      .eq('request->>type', 'webhook_verification')
+      .order('created_at', { ascending: false })
+      .limit(1));
+    return rows[0] ?? null;
+  },
   /** Staff read of the latest safe payment record for an order (no raw/secret). */
   async record(orderId: string): Promise<DbPaymentRecord | null> {
     const rows = ok<DbPaymentRecord[]>(await supabase
