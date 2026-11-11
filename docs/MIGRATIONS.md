@@ -24,6 +24,13 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11 (later) — `20261001120000_prune_operational_run_history`
+> is written, validated and NOT applied, so on merge the count is THREE:**
+> Moyasar (frozen, §6), `20260929120000` (§51) and this file (§53). It keeps the
+> Free-plan database under the 500 MB read-only cap by pruning pg_cron's run log
+> and two monitor ledgers. The two unfrozen files are independent; apply each on
+> its own approval. Moyasar still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-11 — `20260930120000_product_variants_guest_read` is
 > APPLIED, and the count is TWO.** 04:58:33 UTC on explicit owner approval
 > naming the target by version; live version `20261111045833`, history
@@ -6922,3 +6929,109 @@ anon, rather than inspecting the policy text.
 **Applying it is a §5 action, named by version.** Afterwards, verify read-only as
 anon (`set local role anon; select count(*) from public.product_variants`): it
 must return a count, not an error.
+
+## 53. Run-history prune — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261001120000_prune_operational_run_history.sql`. **Written 2026-11-11,
+validated, awaiting owner approval.** App-hardening checklist, capacity finding.
+
+sha256 `da99296b2e7dc8d1c3fa41fce069cb24434918b619eaad5ac4049c1589152f63`,
+289 lines / 13 908 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It adds one function and one daily job, and redefines nothing.** No existing
+function body changes, and no deploy is implied. **MONEY PATH UNTOUCHED, and the
+file asserts it** (`12b6816d…` / `22e2d429…`).
+
+### Why, measured live 2026-11-11
+
+The organisation is on the **Free** plan (`get_organization`), and a Free project
+goes **read-only** once its database passes **500 MB**. From then on every INSERT
+fails, so no order can be placed
+([Supabase: database size](https://supabase.com/docs/guides/platform/database-size)).
+
+| What | Size | Rows | Retention before this file |
+| --- | --- | --- | --- |
+| whole database | 207 MB | | |
+| `cron.job_run_details` | 124 MB | 660 708 since 2026-07-16, ~7 080 a day | none: pg_cron never prunes its own log |
+| `operations_alert_runs` | 22 MB | 33 233, ~115 days of 5-minute runs | none |
+| `order_integrity_runs` | 19 MB | 80 388, ~111 days of 2-minute runs | none |
+| `branch_availability_runs`, `lazywait_sync_requests` | 4–5 MB | ~20 160 each | already 14 days |
+
+At that growth the cap is about six months away.
+
+**The slower damage is already happening.** The operations health snapshot looks
+up each monitored job's newest runs in `cron.job_run_details`. That table has only
+a primary-key index, and it is owned by `supabase_admin`, so it cannot be given
+one: every lookup scans the whole table. The alerts evaluator runs the snapshot
+every five minutes, and its weekly average run time rose in a straight line with
+the table:
+
+| Week of | Evaluator average | Evaluator max |
+| --- | --- | --- |
+| 2026-07-20 | 0.16 s | 0.80 s |
+| 2026-09-07 | 3.27 s | 14.00 s |
+| 2026-10-05 | 6.16 s | 30.38 s |
+| 2026-11-09 | **13.29 s** | **57.69 s** |
+
+The staff console calls the same snapshot under `authenticated`'s 8 s
+`statement_timeout`, and a timed-out call shows every system as unavailable.
+On a local copy at production volume (692 780 rows), the health summary took
+~800 ms. With 14 days kept it took ~140 ms, and with 7 days ~112 ms.
+
+### What it keeps, and why that rule
+
+Every reader of these tables asks for the **newest** row of some kind. None counts
+rows over a window:
+- **`operations_health_snapshot_internal`** reads, per job, the newest run, the
+  newest completed run and the newest success;
+- **the watchdog health card** reads the newest run, the newest decisive run and
+  the newest success;
+- **the alerts summary and digest** read the newest run per kind, and the
+  activation guard asks only whether any successful evaluate run exists.
+
+So each table keeps every row newer than its window (**14 days** for pg_cron's
+log, **30** for the two ledgers) **and every row one of those readers would
+pick, at any age**, including ties.
+
+A job that stopped a month ago therefore still shows its real last run and last
+success. Without that rule it would read "degraded" instead of "failing".
+
+At most 200 000 rows leave each table per run, oldest first. The backlog clears
+over about three days.
+
+### Validation
+
+- **Local chain harness:** the file applies on the full chain, and its
+  self-verification runs the prune once with a batch of one row inside a
+  rolled-back subtransaction. A clean apply therefore also proves the body
+  executes; a `plpgsql` body is not name-resolved when it is created.
+- **Paired suite** `prune_operational_run_history_test.sql`:
+  - **CASE A:** histories whose newest rows are all older than the windows. The
+    whole `operations_health_summary()` is identical before and after.
+  - **CASE B:** a second prune deletes nothing.
+  - **CASE C:** the batch bound holds, oldest first.
+  - **CASE D:** client roles are refused, and the job is scheduled as documented.
+- **Mutation testing: 8 mutants, all killed.** Two were killed by the file's own
+  check: the pg_cron window shortened, and EXECUTE granted to `authenticated`.
+  Six were killed by the suite:
+  - each of the four keepers dropped (newest success, newest completed run, the
+    watchdog's decisive run, the alerts' newest success);
+  - the batch limit removed;
+  - newest-first deletion.
+
+  With the suite's keep-list checks disabled, the whole-summary comparison alone
+  still kills both pg_cron keeper mutants.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261001120000` by name. The job `operational-history-prune` appears at
+   `10 1 * * *` (01:10 UTC).
+2. The next day, read `select count(*) from cron.job_run_details` and the size of
+   the database. Expect the row count to fall by up to 200 000 a day until only
+   the last 14 days remain, about 100 000 rows.
+3. **Optional, and only to shrink the file now:** run
+   `vacuum full cron.job_run_details;` in the SQL editor once the backlog is
+   gone. `postgres` holds MAINTAIN on that table (read live). It locks the table
+   for the seconds the rewrite takes, and pg_cron writes to it every minute, so
+   run it at a quiet time. Without it the database stops growing but does not
+   shrink.
