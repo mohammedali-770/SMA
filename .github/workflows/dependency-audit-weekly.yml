@@ -1,0 +1,68 @@
+name: Dependency audit (weekly)
+
+# Runs both dependency audit gates on a schedule, so a new HIGH/CRITICAL
+# advisory — or a standing exception reaching its expiry date — is reported
+# within a week even when nobody opens a pull request.
+#
+# WHY. The audit gates ran only on pull requests and pushes. No pull request was
+# opened between 2026-10-09 and 2026-11-09, and in that month seven new HIGH
+# advisories landed against the locked dependency tree. Nothing reported them
+# until the next pull request (#418) turned every check red at once, and by then
+# every other open change was blocked behind it.
+#
+# THIS IS NOT THE SCHEDULE THAT WAS REMOVED FROM function-drift.yml. That one
+# failed on every run, on a secret nobody was permitted to create, and a workflow
+# that always fails teaches everybody to ignore failing workflows. This one needs
+# no secret and fails only when there is something to do: an advisory to fix or
+# to except (docs/DEPENDENCY_ADVISORIES.md §5), or an exception whose expiry has
+# come.
+#
+# WHO HEARS ABOUT IT. GitHub emails the account that last changed the cron line
+# below when a scheduled run fails, so merging this file is what arms it. In a
+# public repository GitHub also disables a scheduled workflow after 60 days with
+# no repository activity; re-enable it from the Actions tab if that happens.
+#
+# Read-only: no secrets, `contents: read`, no deploy step. The job name is
+# deliberately NOT the required context `Dependency audit (high+)`, so a red
+# scheduled run on the default branch is never mistaken for a pull request's
+# required check.
+on:
+  schedule:
+    # Mondays 04:23 UTC — 07:23 in Riyadh, before the lunch service. Off the hour
+    # on purpose: scheduled runs at :00 are the ones GitHub delays most.
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-weekly
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Dependency audit (weekly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+
+      # The same two fail-closed scripts as the pull-request gate
+      # (production-gates.yml, job `Dependency audit (high+)`). Do not weaken
+      # them here; a weekly run that cannot fail is worse than none.
+      - name: Audit web dependencies
+        run: node scripts/audit-web-high.mjs
+
+      # Runs even when the web audit failed, so one red run reports both trees.
+      - name: Audit mobile dependencies
+        if: ${{ !cancelled() }}
+        run: node scripts/audit-mobile-high.mjs

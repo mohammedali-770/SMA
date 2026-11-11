@@ -220,13 +220,18 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # An exact Vercel CLI version, not `latest`: npx downloads it at run time
+      # and runs it with the production token. Bump deliberately
+      # (scripts/check-workflow-pins.mjs fails on `latest`). 65.3.1 was two
+      # weeks old when pinned. This job is inert until DEPLOY_GATE_ENABLED is set.
       - name: Deploy
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_CLI: vercel@65.3.1
         run: |
           set -euo pipefail
-          npx --yes vercel@latest pull --yes --environment=production --token="$TOKEN"
-          npx --yes vercel@latest build --prod --token="$TOKEN"
-          npx --yes vercel@latest deploy --prebuilt --prod --token="$TOKEN"
+          npx --yes "$VERCEL_CLI" pull --yes --environment=production --token="$TOKEN"
+          npx --yes "$VERCEL_CLI" build --prod --token="$TOKEN"
+          npx --yes "$VERCEL_CLI" deploy --prebuilt --prod --token="$TOKEN"
