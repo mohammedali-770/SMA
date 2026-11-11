@@ -20,7 +20,7 @@
       },
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your precise location while you are choosing a delivery point, so your pin lands at the right door for the driver. You can always move the pin yourself, and your location is never used in the background.",
+        "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your location only while the app is open: to list the branches nearest to you, to place your delivery pin precisely at your door, and to warn you at checkout if the pin is far from where you are. You can always choose a branch or move the pin yourself, and your location is never used in the background.",
         "LSApplicationQueriesSchemes": [
           "comgooglemaps"
         ]

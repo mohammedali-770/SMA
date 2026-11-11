@@ -1,9 +1,11 @@
 /**
  * Profile → Notifications card. Two per-device toggles:
- *   Order updates (default ON at registration) · Offers & promotions (OPT-IN).
+ *   Order updates · Offers & promotions — BOTH on at registration
+ *   (DEFAULT_DEVICE_PREFS: offers are opt-out, CLAUDE.md §7). This card is
+ *   where a customer turns either one off; the consent screen points here.
  *
- * The OS permission is requested only when the customer first turns a toggle
- * ON (clear context — see notificationPolicy.toggleRequiresPermission). With
+ * Here, the OS permission is requested only when the customer first turns a
+ * toggle ON (clear context — see notificationPolicy.toggleRequiresPermission). With
  * both toggles off the device row is deactivated and its token is never
  * targeted. All writes go through the RLS-scoped client (own rows only);
  * sending is server-side and separately master-flag gated.
