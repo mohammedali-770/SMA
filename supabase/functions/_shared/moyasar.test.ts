@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   amountsMatch, basicAuthHeader, buildInvoicePayload, currencyExponent, extractMoyasarError,
-  fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, keyMatchesMode,
-  lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
+  fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, isMoyasarIpNotAllowed,
+  keyMatchesMode, lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
   selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
 } from './moyasar.ts';
@@ -504,6 +504,35 @@ describe('paymentFailureMessage', () => {
     expect(paymentFailureMessage({})).toBeNull();
     expect(paymentFailureMessage(null)).toBeNull();
     expect(paymentFailureMessage({ source: { message: '   ' } })).toBeNull();
+  });
+});
+
+describe('isMoyasarIpNotAllowed', () => {
+  // The documented refusal, word for word
+  // (https://docs.moyasar.com/guides/dashboard/setting-up-your-ip-whitelist).
+  const refusal = {
+    type: 'authentication_error', message: 'This IP Address is not whitelisted to do this operation', errors: null,
+  };
+
+  it('recognises the documented Allowed IPs refusal', () => {
+    expect(isMoyasarIpNotAllowed(401, refusal)).toBe(true);
+    expect(isMoyasarIpNotAllowed(401, { message: 'IP address not allowed' })).toBe(true);
+  });
+  /** Same status, same type: only the message separates a bad key from a refused address. */
+  it('does not mistake a rejected key for a refused address', () => {
+    expect(isMoyasarIpNotAllowed(401, {
+      type: 'authentication_error', message: 'Invalid authorization credentials',
+    })).toBe(false);
+    // Naming the allow-list without the IP is not enough, nor the IP alone.
+    expect(isMoyasarIpNotAllowed(401, { message: 'This key is not allowed to do this operation' })).toBe(false);
+    expect(isMoyasarIpNotAllowed(401, { message: 'Unknown IP' })).toBe(false);
+  });
+  it('is only ever a 401', () => {
+    for (const status of [200, 400, 403, 404, 429, 500]) expect(isMoyasarIpNotAllowed(status, refusal)).toBe(false);
+  });
+  it('survives a body that is missing or junk', () => {
+    expect(isMoyasarIpNotAllowed(401, null)).toBe(false);
+    expect(isMoyasarIpNotAllowed(401, 'nope')).toBe(false);
   });
 });
 

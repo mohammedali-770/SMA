@@ -617,6 +617,37 @@ export function paymentFailureMessage(payment: unknown): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Allowed IPs — Moyasar LIVE refuses a secret-key call from an unlisted address.
+// ---------------------------------------------------------------------------
+
+/** The reason code for that refusal, wherever it is logged or recorded. */
+export const MOYASAR_IP_NOT_ALLOWED = 'moyasar_ip_not_allowed';
+
+/** What fixes it, in the words every log line uses. */
+export const MOYASAR_IP_NOT_ALLOWED_REMEDY =
+  'configure MOYASAR_PROXY_URL and list the proxy IPs in Moyasar Allowed IPs';
+
+/**
+ * True when Moyasar refused a request because of the account's Allowed IPs
+ * list, not because of the key or the request.
+ *
+ * Dashboard → Settings → API Keys → Allowed IPs restricts secret-key calls by
+ * source address; in LIVE at least one address must be listed, and any other
+ * gets 401 `authentication_error` "This IP Address is not whitelisted to do
+ * this operation" (https://docs.moyasar.com/guides/dashboard/setting-up-your-ip-whitelist).
+ * A wrong or revoked key gets the same status and the same type, so only the
+ * message tells the two apart: it must name the IP and the allow-list.
+ *
+ * The difference matters. A bad key is a credential to fix; a refused address
+ * is a network route to fix (moyasarHttp.ts), and the request itself was fine.
+ */
+export function isMoyasarIpNotAllowed(httpStatus: number, body: unknown): boolean {
+  if (httpStatus !== 401) return false;
+  const message = extractMoyasarError(body).message ?? '';
+  return /\bip\b/i.test(message) && /whitelist|allow/i.test(message);
+}
+
+// ---------------------------------------------------------------------------
 // Verification binding — the security-critical decision, kept pure and tested.
 // ---------------------------------------------------------------------------
 

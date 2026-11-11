@@ -5,6 +5,7 @@ import {
   MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, extractMoyasarError, invoiceExpiryIso,
   mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
 } from '../_shared/moyasar.ts';
+import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -210,7 +211,7 @@ async function createMoyasarInvoice(
 
   let resp: Response;
   try {
-    resp = await fetch(MOYASAR_INVOICES, {
+    resp = await moyasarFetch(MOYASAR_INVOICES, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: basicAuthHeader(m.secretKey) },
       body: JSON.stringify(payload),

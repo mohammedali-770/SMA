@@ -3,10 +3,11 @@ import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
-  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, extractMoyasarError, invoiceExpiryIso,
-  isAdminTestInvoice, keyMatchesMode, mapMoyasarInvoiceStatus, resolveMoyasarConfig,
-  sanitizeMoyasarInvoice,
+  MOYASAR_API_BASE, MOYASAR_IP_NOT_ALLOWED, basicAuthHeader, buildInvoicePayload, extractMoyasarError,
+  invoiceExpiryIso, isAdminTestInvoice, isMoyasarIpNotAllowed, keyMatchesMode, mapMoyasarInvoiceStatus,
+  resolveMoyasarConfig, sanitizeMoyasarInvoice,
 } from '../_shared/moyasar.ts';
+import { MoyasarProxyError, moyasarFetch, moyasarProxyMode } from '../_shared/moyasarHttp.ts';
 import {
   retrieveMoyasarInvoice, verifyMoyasarAttempt, type MoyasarAttempt,
 } from '../_shared/moyasarVerify.ts';
@@ -91,6 +92,24 @@ Deno.serve(async (req: Request) => {
 const MOYASAR_TEST_CONNECTION_ID = '00000000-0000-4000-8000-000000000000';
 
 /**
+ * What an administrator is told when Moyasar refused a call because of the
+ * account's Allowed IPs list. A plain "key rejected" would send them to fix a
+ * key that is fine. Which half needs fixing depends on whether MOYASAR_PROXY_URL
+ * is set, so the message says.
+ */
+function ipNotAllowedMessage(mode: 'test' | 'live'): string {
+  if (moyasarProxyMode() === 'proxy') {
+    return `Moyasar refused the ${mode} key from the proxy in MOYASAR_PROXY_URL: its IP address is not on the account's Allowed IPs list. List every outbound IP of that proxy under Moyasar Dashboard → Settings → API Keys → Allowed IPs.`;
+  }
+  return `Moyasar refused the ${mode} key from this server's IP address, which is not on the account's Allowed IPs list. Supabase Edge Functions have no static outbound IP: set the MOYASAR_PROXY_URL secret to a static-IP proxy and list the proxy's IPs under Moyasar Dashboard → Settings → API Keys → Allowed IPs.`;
+}
+
+/** The admin-facing message for a request that never reached Moyasar. */
+function unreachableMessage(e: unknown): string {
+  return e instanceof MoyasarProxyError ? e.message : 'Could not reach Moyasar. Please try again.';
+}
+
+/**
  * Does this order's newest payment attempt belong to a provider other than
  * Moyasar?
  *
@@ -134,16 +153,20 @@ async function handleMoyasar(
     }
     try {
       // A harmless authorized GET of a non-existent payment — never creates one.
-      const resp = await fetch(`${MOYASAR_API_BASE}/payments/${MOYASAR_TEST_CONNECTION_ID}`, {
+      const resp = await moyasarFetch(`${MOYASAR_API_BASE}/payments/${MOYASAR_TEST_CONNECTION_ID}`, {
         method: 'GET',
         headers: { Authorization: basicAuthHeader(m.secretKey), 'Content-Type': 'application/json' },
         signal: AbortSignal.timeout(12_000),
       });
-      if (resp.status === 401) return json({ ok: false, message: `The ${mode} secret key was rejected by Moyasar (unauthorized).` }, 200);
+      if (resp.status === 401) {
+        const refusal = await resp.json().catch(() => ({}));
+        if (isMoyasarIpNotAllowed(resp.status, refusal)) return json({ ok: false, message: ipNotAllowedMessage(mode) }, 200);
+        return json({ ok: false, message: `The ${mode} secret key was rejected by Moyasar (unauthorized).` }, 200);
+      }
       if (resp.status === 403) return json({ ok: false, message: `The ${mode} key authenticated but is not permitted to read payments.` }, 200);
       return json({ ok: true, message: `Moyasar accepted the ${mode} key. Connection OK.` }, 200);
-    } catch {
-      return json({ ok: false, message: 'Could not reach Moyasar. Please try again.' }, 200);
+    } catch (e) {
+      return json({ ok: false, message: unreachableMessage(e) }, 200);
     }
   }
 
@@ -173,6 +196,9 @@ async function handleMoyasar(
     if (!m.secretKey) return json({ status: 'pending', message: `No ${rec.mode ?? mode} key configured.` }, 200);
 
     const result = await verifyMoyasarAttempt(admin, rec, m.secretKey);
+    if (result.reason === MOYASAR_IP_NOT_ALLOWED) {
+      return json({ status: 'pending', message: ipNotAllowedMessage(rec.mode === 'live' ? 'live' : 'test') }, 200);
+    }
     const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
     return json({ status: outcome, message: result.messageKey }, 200);
   }
@@ -206,7 +232,7 @@ async function handleMoyasar(
       metadata: { purpose: 'admin_test' },
     });
     try {
-      const resp = await fetch(`${MOYASAR_API_BASE}/invoices`, {
+      const resp = await moyasarFetch(`${MOYASAR_API_BASE}/invoices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: basicAuthHeader(m.secretKey) },
         body: JSON.stringify(body),
@@ -220,7 +246,9 @@ async function handleMoyasar(
         console.error('Moyasar admin test invoice failed', { httpStatus: resp.status, type: err.type });
         return json({
           ok: false,
-          message: 'Moyasar did not accept the test invoice.',
+          message: isMoyasarIpNotAllowed(resp.status, result)
+            ? ipNotAllowedMessage('test')
+            : 'Moyasar did not accept the test invoice.',
           providerErrorCode: err.type,
           providerErrorDescription: err.message,
           httpStatus: resp.status,
@@ -230,8 +258,8 @@ async function handleMoyasar(
       const checkoutUrl = String(result.url ?? '');
       if (!invoiceId || !checkoutUrl) return json({ ok: false, message: 'Moyasar did not return a checkout URL.' }, 200);
       return json({ ok: true, invoiceId, chargeId: invoiceId, checkoutUrl, mode: 'test' }, 200);
-    } catch {
-      return json({ ok: false, message: 'Could not reach Moyasar. Please try again.' }, 200);
+    } catch (e) {
+      return json({ ok: false, message: unreachableMessage(e) }, 200);
     }
   }
 
@@ -244,7 +272,14 @@ async function handleMoyasar(
     const m = resolveMoyasarConfig(enabled, 'moyasar', pub, sec, 'test'); // TEST key
     if (!m.secretKey) return json({ ok: false, message: 'Test secret key is not set.' }, 200);
     const retrieved = await retrieveMoyasarInvoice(m.secretKey, invoiceId);
-    if (!retrieved.ok) return json({ ok: false, message: 'Could not retrieve the invoice from Moyasar.' }, 200);
+    if (!retrieved.ok) {
+      return json({
+        ok: false,
+        message: isMoyasarIpNotAllowed(retrieved.status, retrieved.body)
+          ? ipNotAllowedMessage('test')
+          : 'Could not retrieve the invoice from Moyasar.',
+      }, 200);
+    }
     const invoice = retrieved.body;
     // Only ever report the isolated admin test invoice — never a real order's.
     if (!isAdminTestInvoice(invoice)) return json({ ok: false, message: 'That invoice is not an admin test invoice.' }, 200);

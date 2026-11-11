@@ -23,9 +23,11 @@
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
   MOYASAR_API_BASE,
+  MOYASAR_IP_NOT_ALLOWED,
   basicAuthHeader,
   checkPaymentBinding,
   fromMinorUnits,
+  isMoyasarIpNotAllowed,
   lastFourOf,
   mapMoyasarPaymentStatus,
   paymentFailureMessage,
@@ -34,6 +36,7 @@ import {
   selectInvoicePayment,
   type MoyasarOutcome,
 } from './moyasar.ts';
+import { moyasarFetch } from './moyasarHttp.ts';
 
 export { selectInvoicePayment } from './moyasar.ts';
 import { triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from './paymentSync.ts';
@@ -42,18 +45,30 @@ const FETCH_TIMEOUT_MS = 12_000;
 
 export interface RetrievedResource {
   ok: boolean;
+  /** 0 when no HTTP answer arrived at all: a timeout, a network error or a refused proxy. */
   status: number;
   body: Record<string, unknown>;
 }
 
+/**
+ * Every caller treats `ok: false` as "could not find out", which is what a
+ * timeout, a network error and a refused proxy all are. Throwing instead made
+ * payment-verify answer 500 where its contract is 'pending', and the proxy
+ * makes those failures likelier, so they are reported, not thrown.
+ */
 async function moyasarGet(secretKey: string, path: string): Promise<RetrievedResource> {
-  const res = await fetch(`${MOYASAR_API_BASE}${path}`, {
-    method: 'GET',
-    headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
-  const body = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, body: body as Record<string, unknown> };
+  try {
+    const res = await moyasarFetch(`${MOYASAR_API_BASE}${path}`, {
+      method: 'GET',
+      headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    const body = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, body: body as Record<string, unknown> };
+  } catch (e) {
+    console.error(JSON.stringify({ event: 'moyasar_request_failed', error: e instanceof Error ? e.name : 'error' }));
+    return { ok: false, status: 0, body: {} };
+  }
 }
 
 /** GET the invoice (server-to-server) with the mode-appropriate secret key. */
@@ -289,7 +304,16 @@ export async function verifyMoyasarAttempt(
   // mid-flight in the other mode's namespace, so it is reported the same way.
   // Nothing sweeps such an attempt: begin_payment_attempt / begin_session_attempt
   // close it once it has expired, the next time the customer starts a payment.
-  if (!retrieved.ok) return { outcome: 'pending', paid: false, messageKey: 'payPending' };
+  // A refusal by Moyasar's Allowed IPs list is named, so the admin re-verify
+  // can say what to fix; the customer still sees only 'pending'.
+  if (!retrieved.ok) {
+    return {
+      outcome: 'pending',
+      paid: false,
+      messageKey: 'payPending',
+      ...(isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}),
+    };
+  }
 
   const invoice = retrieved.body;
   const payment = selectInvoicePayment(invoice);

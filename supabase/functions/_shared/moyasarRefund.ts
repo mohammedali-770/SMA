@@ -41,7 +41,7 @@
  * of this code rather than an open question about the API.
  * ────────────────────────────────────────────────────────────────────────────
  */
-import { MOYASAR_API_BASE, toMinorUnits } from './moyasar.ts';
+import { MOYASAR_API_BASE, MOYASAR_IP_NOT_ALLOWED, isMoyasarIpNotAllowed, toMinorUnits } from './moyasar.ts';
 
 /** Only these payment statuses mean money has provably gone back. */
 const TERMINAL_SUCCESS = new Set(['refunded']);
@@ -92,6 +92,22 @@ export function classifyMoyasarRefundResponse(
   const status = String(body?.status ?? '').toLowerCase();
 
   if (!ok) {
+    // Refused by the account's Allowed IPs list: Moyasar turned the request
+    // away at authentication, so nothing was refunded, and the same request
+    // succeeds once the route is fixed. That is configuration, not a verdict on
+    // this refund, so it is NOT definitive. It stays 'pending', which
+    // refundFinalStatus() writes as a release, the same non-definitive path a
+    // 429 or a 5xx takes; the next run then reconciles before it posts again.
+    if (isMoyasarIpNotAllowed(httpStatus, body)) {
+      return {
+        outcome: 'pending',
+        providerRef,
+        failureCode: MOYASAR_IP_NOT_ALLOWED,
+        errorSafe:
+          'Moyasar refused the request: this server is not on the account\'s Allowed IPs list. '
+          + 'Configure MOYASAR_PROXY_URL and list the proxy IPs in Moyasar Allowed IPs.',
+      };
+    }
     // A 4xx that is NOT a rate limit is a definitive request-level rejection —
     // the same request will keep being rejected, so mark it failed for manual
     // review. Everything else (429, 5xx, network) stays retryable.

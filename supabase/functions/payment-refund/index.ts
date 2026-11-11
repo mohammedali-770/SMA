@@ -2,6 +2,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { basicAuthHeader, resolveMoyasarConfig, timingSafeEqual, toMinorUnits } from '../_shared/moyasar.ts';
+import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import {
   buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, decideRefundLogging,
   moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview, refundFinalStatus,
@@ -176,7 +177,7 @@ Deno.serve(async (req: Request) => {
      */
     const reconcile = async (): Promise<RefundClassification | null> => {
       try {
-        const lookup = await fetch(moyasarPaymentUrl(moyasarRequest.paymentId), {
+        const lookup = await moyasarFetch(moyasarPaymentUrl(moyasarRequest.paymentId), {
           method: 'GET',
           headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
           signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
@@ -231,7 +232,7 @@ Deno.serve(async (req: Request) => {
     } else {
       let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
       try {
-        const res = await fetch(moyasarRefundUrl(moyasarRequest.paymentId), {
+        const res = await moyasarFetch(moyasarRefundUrl(moyasarRequest.paymentId), {
           method: 'POST',
           headers: {
             Authorization: basicAuthHeader(secretKey),

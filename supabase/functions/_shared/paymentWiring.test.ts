@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -34,11 +34,33 @@ function source(fn: string): string {
  * the explanation of its removal.
  */
 function code(fn: string): string {
-  return source(fn)
+  return stripComments(source(fn));
+}
+
+function stripComments(src: string): string {
+  return src
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
     .filter((line) => !/^\s*\/\//.test(line))
     .join('\n');
+}
+
+/** Every deployable source file under supabase/functions, keyed by its path there. */
+function functionSources(): Map<string, string> {
+  const root = new URL('../', import.meta.url);
+  const out = new Map<string, string>();
+  const walk = (dir: URL, prefix: string) => {
+    for (const name of readdirSync(dir)) {
+      const at = new URL(name, dir);
+      if (statSync(at).isDirectory()) {
+        if (name !== '__fixtures__') walk(new URL(`${name}/`, dir), `${prefix}${name}/`);
+      } else if (name.endsWith('.ts') && !name.endsWith('.test.ts')) {
+        out.set(`${prefix}${name}`, readFileSync(at, 'utf8'));
+      }
+    }
+  };
+  walk(root, '');
+  return out;
 }
 
 /** One top-level declaration, from its first line up to the next one. */
@@ -77,6 +99,78 @@ describe('payment functions talk to Moyasar only', () => {
     const src = code(fn);
     expect(src).not.toMatch(/api\.tap\.company|geidea/i);
     expect(src).not.toMatch(/resolveTapConfig|validateAndConfirmTapCharge|retrieveTapCharge/);
+  });
+});
+
+// Moyasar LIVE refuses a secret-key call from any address not on the
+// account's Allowed IPs list, and Supabase Edge Functions have no static
+// outbound IP, so every call has to be able to go through MOYASAR_PROXY_URL.
+// One call that bypasses moyasarFetch would work in TEST and fail in LIVE.
+describe('every Moyasar request goes through moyasarFetch', () => {
+  const ENDPOINT = /MOYASAR_API_BASE|api\.moyasar\.com|moyasarPaymentUrl\(|moyasarRefundUrl\(|MOYASAR_INVOICES/;
+  const RAW_FETCH = /(?<![\w$.])fetch\s*\(|\b(?:globalThis|self|window)\s*\.\s*fetch\b/;
+  const sources = functionSources();
+
+  it('leaves no raw fetch in any file that names a Moyasar endpoint', () => {
+    const naming = [...sources].filter(([, src]) => ENDPOINT.test(stripComments(src)));
+    expect(naming.map(([path]) => path).sort()).toEqual([
+      '_shared/moyasar.ts',
+      '_shared/moyasarRefund.ts',
+      '_shared/moyasarVerify.ts',
+      'payment-initiate/index.ts',
+      'payment-refund/index.ts',
+      'payment-test-config/index.ts',
+    ]);
+    for (const [path, src] of naming) expect(stripComments(src), path).not.toMatch(RAW_FETCH);
+  });
+
+  it('sends each call site through the helper', () => {
+    const calls = (path: string) => count(stripComments(sources.get(path) ?? ''), 'moyasarFetch(');
+    expect(calls('_shared/moyasarVerify.ts')).toBe(1); // every invoice and payment GET, and the list
+    expect(calls('payment-initiate/index.ts')).toBe(1); // invoice create
+    expect(calls('payment-refund/index.ts')).toBe(2); // reconcile GET, refund POST
+    expect(calls('payment-test-config/index.ts')).toBe(2); // test_connection, test_checkout
+    // The webhook's re-fetch is retrieveMoyasarPayment, so it fetches nothing itself.
+    expect(code('payment-webhook')).not.toMatch(RAW_FETCH);
+  });
+
+  it('keeps the only raw fetch inside moyasarHttp.ts', () => {
+    const http = stripComments(sources.get('_shared/moyasarHttp.ts') ?? '');
+    expect(count(http, RAW_FETCH)).toBe(2); // direct, and through the proxy client
+    expect(http).toContain('res = await fetch(input, { ...init, client });');
+  });
+
+  it('reports a failed GET as a value instead of throwing it at the caller', () => {
+    const verify = stripComments(sources.get('_shared/moyasarVerify.ts') ?? '');
+    const get = fnBody(verify, 'async function moyasarGet(');
+    expect(get).toMatch(/\} catch \(e\) \{[\s\S]*return \{ ok: false, status: 0, body: \{\} \};/);
+    expect(fnBody(verify, 'export async function verifyMoyasarAttempt(')).toContain(
+      'isMoyasarIpNotAllowed(retrieved.status, retrieved.body) ? { reason: MOYASAR_IP_NOT_ALLOWED } : {}',
+    );
+  });
+});
+
+// An administrator told "the key was rejected" goes and replaces a key that is
+// fine. Every admin action that reaches Moyasar names the Allowed IPs refusal.
+describe('payment-test-config names an Allowed IPs refusal', () => {
+  const src = code('payment-test-config');
+
+  it('tells test_connection\'s refused address apart from a rejected key', () => {
+    const named = src.indexOf('if (isMoyasarIpNotAllowed(resp.status, refusal)) return json({ ok: false, message: ipNotAllowedMessage(mode) }, 200);');
+    expect(named).toBeGreaterThan(-1);
+    expect(named).toBeLessThan(src.indexOf('secret key was rejected by Moyasar (unauthorized).'));
+  });
+
+  it('says it in every action that calls Moyasar', () => {
+    expect(src).toContain('if (result.reason === MOYASAR_IP_NOT_ALLOWED) {'); // verify_order
+    expect(count(src, 'isMoyasarIpNotAllowed(resp.status, result)')).toBe(1); // test_checkout
+    expect(count(src, 'isMoyasarIpNotAllowed(retrieved.status, retrieved.body)')).toBe(1); // test_checkout_result
+    expect(count(src, 'ipNotAllowedMessage(')).toBe(5); // the four, plus its definition
+  });
+
+  it('reports an unusable MOYASAR_PROXY_URL instead of a generic network error', () => {
+    expect(src).toContain('return e instanceof MoyasarProxyError ? e.message : ');
+    expect(count(src, 'message: unreachableMessage(e)')).toBe(2);
   });
 });
 
@@ -266,14 +360,14 @@ describe('payment-refund', () => {
     const at = src.indexOf(marker);
     expect(at).toBeGreaterThan(src.indexOf('if (!row) break;'));
     expect(at).toBeLessThan(src.indexOf('resolveMoyasarConfig('));
-    expect(at).toBeLessThan(src.indexOf('fetch('));
+    expect(at).toBeLessThan(src.indexOf('moyasarFetch('));
     expect(src).not.toContain('provider_switched');
   });
 
   it('keeps the lease fence, reconcile-before-post and review parking', () => {
     expect(src).toContain("admin.rpc('claim_order_refund', {");
     const reconcileFirst = src.indexOf('if (mustReconcileBeforePost(row.attempt_count)) {');
-    const post = src.indexOf('await fetch(moyasarRefundUrl(moyasarRequest.paymentId), {');
+    const post = src.indexOf('await moyasarFetch(moyasarRefundUrl(moyasarRequest.paymentId), {');
     expect(reconcileFirst).toBeGreaterThan(-1);
     expect(post).toBeGreaterThan(reconcileFirst);
     expect(src).toContain('if (needsHumanReview(verdict)) {');
