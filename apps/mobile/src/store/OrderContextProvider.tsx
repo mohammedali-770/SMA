@@ -1,7 +1,10 @@
 /** Session-only order type + branch/address context. */
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from './AuthProvider';
 import { useCatalog } from './CatalogProvider';
-import { isOrderContextValid, makeDeliveryContext, makePickupContext, type OrderContext } from '../features/order/orderContext';
+import {
+  isOrderContextValid, makeDeliveryContext, makePickupContext, shouldResetOnUserChange, type OrderContext,
+} from '../features/order/orderContext';
 import type { Branch } from '../types/models';
 
 interface DeliverySelection { branch: Branch; addressId: string | null; lat: number; lng: number; description?: string | null; }
@@ -17,6 +20,17 @@ export function OrderContextProvider({ children }: { children: React.ReactNode }
   const [context, setContext] = useState<OrderContext | null>(null);
   const ready = true;
   const valid = useMemo(() => !loading && isOrderContextValid(context, branches, deliveryZones), [loading, context, branches, deliveryZones]);
+
+  // A delivery context holds one customer's saved address: drop it when the
+  // signed-in customer changes, including on sign-out. Pickup survives, so a
+  // guest's branch choice carries through signing in at checkout.
+  const { userId } = useAuth();
+  const lastUserId = useRef(userId);
+  useEffect(() => {
+    const prev = lastUserId.current;
+    lastUserId.current = userId;
+    setContext((c) => (shouldResetOnUserChange(prev, userId, c) ? null : c));
+  }, [userId]);
 
   useEffect(() => {
     const id = context?.branchId ?? null;

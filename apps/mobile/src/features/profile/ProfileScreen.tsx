@@ -12,6 +12,7 @@ import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { catalog as catalogApi } from '../../services/api';
 import { useAddressBook, useAuth, useCatalog } from '../../store';
+import { SignInPrompt } from '../auth/SignInPrompt';
 import { expiryNotice } from './loyaltyExpiry';
 import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
 import { makeStyles } from '../../theme/makeStyles';
@@ -80,10 +81,15 @@ export function ProfileScreen() {
     points: profile?.loyaltyPoints ?? 0,
     lang,
   });
+  // Signing out leaves the customer here, now as a guest: this screen re-renders
+  // with the sign-in prompt and the menu stays browsable (App Store 5.1.1(v)).
+  // It used to replace to /(auth)/login, which became a dead end once login
+  // stopped being the only way in.
   const onSignOut = async () => {
     await signOut();
-    router.replace('/(auth)/login');
   };
+  const signedIn = status === 'signed_in';
+  const signedOut = status === 'signed_out';
   const addressCount = addressBook.addresses.length;
   const appearanceLabel = (v: ThemePreference) =>
     v === 'system' ? pick('System', 'النظام') : v === 'light' ? pick('Light', 'فاتح') : pick('Dark', 'داكن');
@@ -95,26 +101,42 @@ export function ProfileScreen() {
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={[columnStyles.column, s.column]}>
           <Text variant="display">{t('profile')}</Text>
-          <EditableName />
-          <View style={[s.card, s.loyalty, rtlRow]}>
-            <View style={[s.loyaltyLabel, rtlRow]}>
-              <AwardIcon size={22} color={colors.saffron} />
-              <Text variant="heading" style={{ color: colors.amberInk }}>
-                {t('loyaltyPoints')}
-              </Text>
-            </View>
-            <Text variant="display" style={{ color: colors.amberInk }}>
-              {profile?.loyaltyPoints ?? 0}
-            </Text>
-          </View>
-          {/* The balance is not allowed to vanish unannounced. Shown only when
-              there is genuinely something to lose on a genuinely scheduled
-              date. */}
-          {expiresOn ? (
-            <Text variant="caption" tone="secondary" style={s.expiry}>
-              {t('pointsExpireOn').replace('{date}', expiresOn)}
-            </Text>
-          ) : null}
+          {/* A guest has no name or points to show (guest browsing, App Store
+              5.1.1(v)); they get the way in instead. Language, appearance,
+              socials and the legal pages below stay usable either way. */}
+          {signedOut ? (
+            <SignInPrompt
+              title={pick('Sign in to your account', 'سجّل الدخول إلى حسابك')}
+              body={pick(
+                'Manage your addresses, points and orders.',
+                'أدِر عناوينك ونقاطك وطلباتك.',
+              )}
+              returnTo="/(tabs)/profile"
+            />
+          ) : (
+            <>
+              <EditableName />
+              <View style={[s.card, s.loyalty, rtlRow]}>
+                <View style={[s.loyaltyLabel, rtlRow]}>
+                  <AwardIcon size={22} color={colors.saffron} />
+                  <Text variant="heading" style={{ color: colors.amberInk }}>
+                    {t('loyaltyPoints')}
+                  </Text>
+                </View>
+                <Text variant="display" style={{ color: colors.amberInk }}>
+                  {profile?.loyaltyPoints ?? 0}
+                </Text>
+              </View>
+              {/* The balance is not allowed to vanish unannounced. Shown only when
+                  there is genuinely something to lose on a genuinely scheduled
+                  date. */}
+              {expiresOn ? (
+                <Text variant="caption" tone="secondary" style={s.expiry}>
+                  {t('pointsExpireOn').replace('{date}', expiresOn)}
+                </Text>
+              ) : null}
+            </>
+          )}
           {/*
             Gated on AUTH, not on profile data — the same rule as the delete row
             below, and for the same reason. This read `{profile ? … : null}` until
@@ -125,18 +147,22 @@ export function ProfileScreen() {
             `AuthGate`-wrapped, and AuthGate itself gates on `status`, so it renders
             for exactly the states this condition admits.
           */}
-          {status === 'signed_in' ? (
+          {signedIn ? (
             <MenuRow
               label={t('addrManage')}
               subtitle={addressCount === 0 ? t('addrEmptyTitle') : `${addressCount}`}
               onPress={() => router.push('/profile/addresses')}
             />
           ) : null}
-          <MenuRow
-            label={t('notificationsTitle')}
-            subtitle={pick('Order updates and offers', 'تحديثات الطلب والعروض')}
-            onPress={() => router.push('/profile/notifications')}
-          />
+          {/* Notification settings are per device AND per customer (push_devices
+              is keyed by customer), so a guest has nothing here to set. */}
+          {signedIn ? (
+            <MenuRow
+              label={t('notificationsTitle')}
+              subtitle={pick('Order updates and offers', 'تحديثات الطلب والعروض')}
+              onPress={() => router.push('/profile/notifications')}
+            />
+          ) : null}
           <Text variant="title" style={s.sectionTitle}>
             {pick('Follow us', 'تابعنا')}
           </Text>
@@ -212,17 +238,19 @@ export function ProfileScreen() {
               onPress={() => router.push('/account/delete')}
             />
           ) : null}
-          <Pressable
-            onPress={onSignOut}
-            accessibilityRole="button"
-            accessibilityLabel={t('signOut')}
-            style={({ pressed }) => [s.signOut, rtlRow, pressed && s.pressed]}
-          >
-            <SignOutIcon size={18} color={colors.onEmber} />
-            <Text variant="button" tone="onEmber">
-              {t('signOut')}
-            </Text>
-          </Pressable>
+          {signedIn ? (
+            <Pressable
+              onPress={onSignOut}
+              accessibilityRole="button"
+              accessibilityLabel={t('signOut')}
+              style={({ pressed }) => [s.signOut, rtlRow, pressed && s.pressed]}
+            >
+              <SignOutIcon size={18} color={colors.onEmber} />
+              <Text variant="button" tone="onEmber">
+                {t('signOut')}
+              </Text>
+            </Pressable>
+          ) : null}
           <Text variant="caption" tone="tertiary" align="center" style={s.version}>
             {pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار 1.0.0')}
           </Text>

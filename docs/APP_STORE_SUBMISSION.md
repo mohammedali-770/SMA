@@ -489,8 +489,24 @@ personal address here** — it is shown to every tester.
 ## 7. Reviewer sign-in — still open, and it gates external testing only
 
 Login is **WhatsApp OTP to a Saudi mobile only** (`normalizeSaudiPhoneE164`
-rejects foreign numbers at the hook) and there is **no guest or browse-only
-mode**, so a reviewer outside Saudi Arabia cannot get past the first screen.
+rejects foreign numbers at the hook).
+
+**Guest browsing changes what a reviewer can reach without signing in, but only
+from the build that carries it.** It was added for guideline **5.1.1(v)** on
+2026-11-09 (PR "Let a signed-out customer browse the menu"):
+- a guest can open the menu, choose a pickup branch, view products and fill a cart;
+- an account is asked for only at checkout, for delivery (addresses are saved to
+  an account), and on the Orders and Profile tabs. Each prompt returns the
+  customer where they were after signing in.
+
+**Every build installed before that one still opens on the login screen**, so a
+reviewer outside Saudi Arabia cannot get past the first screen of those builds.
+Either way, a reviewer still needs the test number below to place an order.
+
+**Prerequisite:** the build must not ship before
+`20260930120000_product_variants_guest_read` is applied. A signed-out read of the
+menu's price tiers is refused in Production until then, and a guest would see
+"Something went wrong" on the home screen (`MIGRATIONS.md` §52).
 
 The mechanism is decided and proven: a **Supabase Auth test-OTP number**, needing
 no code change. `OWNER_ACTIONS.md` §27 holds the mechanism and paste-ready review
