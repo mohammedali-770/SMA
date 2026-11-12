@@ -463,6 +463,56 @@ begin
     raise exception 'rls initplan verification failed: set_orders_number no longer fires set_order_number on orders';
   end if;
 
+  -- The order-number year is proven in its own block below (the year-probe block),
+  -- so that the throwaway probe function is never created in a block that
+  -- also names a client-called function (rpcContractParity's replay rule).
+
+
+  -- 4.5 The stored bodies are the ones in this file. md5(prosrc), computed
+  --     from the file before it was applied.
+  if (select md5(prosrc) from pg_proc where oid = 'public.admin_list_orders_with_items(integer)'::regprocedure)
+     is distinct from '7f2f3803b60edc707fe1207a7496525f' then
+    raise exception 'rls initplan verification failed: admin_list_orders_with_items body is not the one in this file';
+  end if;
+  if (select md5(prosrc) from pg_proc where oid = 'public.set_order_number()'::regprocedure)
+     is distinct from 'ed203eebfde6c1a5026e39c625e1dc80' then
+    raise exception 'rls initplan verification failed: set_order_number body is not the one in this file';
+  end if;
+
+  -- 4.6 is_staff() is still callable by the role that evaluates the policies.
+  if not has_function_privilege('authenticated', 'public.is_staff()', 'execute') then
+    raise exception 'rls initplan verification failed: authenticated cannot execute is_staff()';
+  end if;
+
+  -- 4.7 The money path is untouched.
+  select md5(pg_get_functiondef(p.oid)) into v_txt
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'place_order';
+  if v_txt is distinct from '12b6816d256c29b76edf947ae1a7ea77' then
+    raise exception 'place_order moved to %, expected 12b6816d256c29b76edf947ae1a7ea77', coalesce(v_txt, 'NULL');
+  end if;
+  select md5(pg_get_functiondef(p.oid)) into v_txt
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'compute_order_snapshot';
+  if v_txt is distinct from '22e2d42935459e7bf93abb2941b56325' then
+    raise exception 'compute_order_snapshot moved to %, expected 22e2d42935459e7bf93abb2941b56325', coalesce(v_txt, 'NULL');
+  end if;
+
+  raise notice 'rls initplan: three policies call is_staff() once per statement, the live board reads only its id set, and order numbers take the Riyadh year';
+end
+$verify$;
+
+-- 4.4b The order-number year, as an outcome. Kept apart from the verify block
+-- because it creates a pg_temp function, and the RPC contract test refuses
+-- quoted function DDL in a block that mentions a function the app calls.
+do $yearprobe$
+declare
+  v_txt   text;
+  v_pre   text;
+  v_state text;
+  v_tz    text := current_setting('TimeZone');
+  r       record;
+begin
   -- The year, as an outcome. Run the STORED body with now() replaced by a
   -- fixed instant, in the session time zone Production uses. nextval() is
   -- replaced too, so the probe does not use up a real order number (a
@@ -509,39 +559,7 @@ begin
                                     'to_char(now() at time zone ''Asia/Riyadh'', ''YYYY'')') then
     raise exception 'rls initplan verification failed: set_order_number differs from its pre-image by more than the year expression';
   end if;
-
-  -- 4.5 The stored bodies are the ones in this file. md5(prosrc), computed
-  --     from the file before it was applied.
-  if (select md5(prosrc) from pg_proc where oid = 'public.admin_list_orders_with_items(integer)'::regprocedure)
-     is distinct from '7f2f3803b60edc707fe1207a7496525f' then
-    raise exception 'rls initplan verification failed: admin_list_orders_with_items body is not the one in this file';
-  end if;
-  if (select md5(prosrc) from pg_proc where oid = 'public.set_order_number()'::regprocedure)
-     is distinct from 'ed203eebfde6c1a5026e39c625e1dc80' then
-    raise exception 'rls initplan verification failed: set_order_number body is not the one in this file';
-  end if;
-
-  -- 4.6 is_staff() is still callable by the role that evaluates the policies.
-  if not has_function_privilege('authenticated', 'public.is_staff()', 'execute') then
-    raise exception 'rls initplan verification failed: authenticated cannot execute is_staff()';
-  end if;
-
-  -- 4.7 The money path is untouched.
-  select md5(pg_get_functiondef(p.oid)) into v_txt
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'place_order';
-  if v_txt is distinct from '12b6816d256c29b76edf947ae1a7ea77' then
-    raise exception 'place_order moved to %, expected 12b6816d256c29b76edf947ae1a7ea77', coalesce(v_txt, 'NULL');
-  end if;
-  select md5(pg_get_functiondef(p.oid)) into v_txt
-    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-   where n.nspname = 'public' and p.proname = 'compute_order_snapshot';
-  if v_txt is distinct from '22e2d42935459e7bf93abb2941b56325' then
-    raise exception 'compute_order_snapshot moved to %, expected 22e2d42935459e7bf93abb2941b56325', coalesce(v_txt, 'NULL');
-  end if;
-
-  raise notice 'rls initplan: three policies call is_staff() once per statement, the live board reads only its id set, and order numbers take the Riyadh year';
 end
-$verify$;
+$yearprobe$;
 
 drop table if exists rls_initplan_20261006_pre;

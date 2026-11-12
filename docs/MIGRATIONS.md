@@ -7853,8 +7853,8 @@ that applies SELECT policies.
 validated, awaiting owner approval.** Assessment findings P01#2, P01#3 and
 R06#5.
 
-sha256 `3ad19a16377c8ccd71a8b5f6e3e58a4b1202c72a3938e2daa7368e10568a561a`,
-547 lines / 28 981 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `489d7529bcb213b18d64609fd2bbb4bc217b44c274cc8cce1aacc369f53c6c0a`,
+565 lines / 29 606 bytes. **Re-hash the MERGED copy before applying**, per §15.
 
 **It changes no visible row and no order on the live board.** Its one
 customer-visible effect is the order-number year in the first three hours of
@@ -7941,7 +7941,10 @@ order either way.
   `SM-2027`, `SM-2026` and `SM-2026`. `nextval()` is replaced as well, so the
   check does not use up a real order number: a sequence advance survives a
   rollback. The body must also equal its pre-image with only the year
-  expression replaced.
+  expression replaced. This check runs in its own `DO` block, after the main
+  verification. It creates a `pg_temp` probe function, and
+  `rpcContractParity.test.ts` refuses quoted function DDL in any block that
+  also names a function the app calls, here `admin_list_orders_with_items`.
 - Both bodies hash to the values computed from this file before it was applied.
 - The money-path pair is unchanged.
 
