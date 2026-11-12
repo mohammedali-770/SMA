@@ -2733,6 +2733,24 @@ regression — it is one more string on an existing list.
   ("only if you opt in") while offers were on by default, and now says they are
   on by default and can be switched off.
 
+**Widened 2026-11-12 — four console messages and one manual section, same pass.**
+These are staff-facing, not customer-facing, so they rank below the consent copy
+above. All are engineering-drafted.
+
+- **The menu import's four refusals**, in `MENU_CSV_TEXT` in
+  `src/utils/calculations.ts`. An administrator reads them in the Arabic console
+  when a spreadsheet is refused:
+  - the file was not saved as UTF-8, and to save it as «CSV UTF-8» from Excel;
+  - a quotation mark on row N opens a cell and never closes it;
+  - row N has more columns than the template's nine;
+  - row N's calories value is not a plain whole number.
+
+  The first is the one that matters: it is what an administrator on an Arabic
+  Windows computer sees the first time, and it has to name the Excel option in
+  the words Arabic Excel uses. «حفظ باسم» and «CSV UTF-8» are the drafted terms.
+- **`docs/STAFF_MANUAL.md` §9**, the new Arabic half of "Spreadsheets and times":
+  the import steps, the report-export note and the console-times paragraph.
+
 **Widened 2026-11-12 — four order refusals** (`apps/mobile/src/i18n/strings.ts`,
 keys `errOrder*`), shown at checkout when the server refuses an order:
 

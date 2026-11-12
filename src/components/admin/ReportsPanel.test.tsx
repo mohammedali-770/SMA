@@ -146,18 +146,40 @@ async function renderStats() {
   await waitFor(() => expect(screen.queryByText(/Could not load order statistics/)).toBeNull());
 }
 
-/** Capture the CSV text handed to the Blob, without touching the filesystem. */
-function captureCsv(): () => string {
-  let captured = '';
+/** U+FEFF: the byte-order mark the export writes ahead of the CSV (UTF-8 bytes EF BB BF). */
+const BOM = '\uFEFF';
+
+/**
+ * Capture what the export hands to the Blob — EVERY part, in order — without
+ * touching the filesystem.
+ *
+ * `text()` is the CSV after the byte-order mark: the machine contract above,
+ * which the mark must not change. This used to keep `parts[0]` alone, which was
+ * the whole file only until the mark became its own first part. `bytes()` reads
+ * the Blob itself, which is what the browser saves.
+ */
+function captureCsv(): { text: () => string; bytes: () => Promise<Uint8Array> } {
+  let parts: BlobPart[] = [];
+  let blob: Blob | null = null;
   const RealBlob = globalThis.Blob;
   vi.stubGlobal('Blob', class extends RealBlob {
-    constructor(parts: BlobPart[], options?: BlobPropertyBag) {
-      super(parts, options);
-      captured = String(parts[0]);
+    constructor(p: BlobPart[], options?: BlobPropertyBag) {
+      super(p, options);
+      parts = p;
+      blob = this;
     }
   });
   vi.stubGlobal('URL', { ...URL, createObjectURL: () => 'blob:test', revokeObjectURL: () => {} });
-  return () => captured;
+  return {
+    text: () => {
+      const all = parts.map(String).join('');
+      return all.startsWith(BOM) ? all.slice(BOM.length) : all;
+    },
+    bytes: async () => {
+      if (!blob) throw new Error('the export never built a Blob');
+      return new Uint8Array(await blob.arrayBuffer());
+    },
+  };
 }
 
 beforeEach(() => {
@@ -178,7 +200,7 @@ describe('CSV export — the machine contract', () => {
     const csv = captureCsv();
     await renderReports();
     exportNow();
-    expect(csv().split('\n')[0]).toBe(
+    expect(csv.text().split('\n')[0]).toBe(
       'Date,Orders Count,Subtotal (SAR),Delivery Fees (SAR),Discounts (SAR),Net Sales (SAR),VAT Amount (SAR)');
   });
 
@@ -187,7 +209,7 @@ describe('CSV export — the machine contract', () => {
     await renderReports();
     fireEvent.change(screen.getByLabelText('Reporting Metric'), { target: { value: 'sales_by_branch' } });
     exportNow();
-    expect(csv().split('\n')[0]).toBe(
+    expect(csv.text().split('\n')[0]).toBe(
       'Branch,Orders Count,Total Revenue (SAR),Delivery Fees (SAR),Average Ticket (SAR),Discounts (SAR)');
   });
 
@@ -196,7 +218,7 @@ describe('CSV export — the machine contract', () => {
     await renderReports();
     fireEvent.change(screen.getByLabelText('Reporting Metric'), { target: { value: 'lazywait_report' } });
     exportNow();
-    expect(csv().split('\n')[0]).toBe(
+    expect(csv.text().split('\n')[0]).toBe(
       'Order Number,Date,Branch,Total (SAR),Sync Status,Lazywait Reference,Error Log');
   });
 
@@ -205,7 +227,53 @@ describe('CSV export — the machine contract', () => {
     await renderReports();
     exportNow();
     // One delivered order: total 110.00, subtotal 100.00, fee 10.00, no discount.
-    expect(csv()).toContain(`${IN_RANGE_DATE},1,100.00,10.00,0.00,110.00,`);
+    expect(csv.text()).toContain(`${IN_RANGE_DATE},1,100.00,10.00,0.00,110.00,`);
+  });
+});
+
+describe('CSV export — the byte-order mark Excel needs to read Arabic', () => {
+  // Excel opens a CSV that has no byte-order mark in the computer's legacy code
+  // page, so every Arabic branch, product and category name came out as
+  // mojibake — on the export the Arabic console labels "Excel/CSV". The mark is
+  // three bytes in front; the text after it must not change by a single byte.
+  const HEADERS = [
+    ['sales_by_day', 'Date,Orders Count,Subtotal (SAR),Delivery Fees (SAR),Discounts (SAR),Net Sales (SAR),VAT Amount (SAR)'],
+    ['sales_by_branch', 'Branch,Orders Count,Total Revenue (SAR),Delivery Fees (SAR),Average Ticket (SAR),Discounts (SAR)'],
+    ['sales_by_product', 'Product,Category,Quantity Sold,Total Revenue (SAR)'],
+    ['coupon_usage', 'Coupon Code,Usage Count,Total Discounts Saved (SAR)'],
+    ['delivery_fees', 'Branch,Delivery Count,Total Delivery Fees Collected (SAR),Average Delivery Fee (SAR)'],
+    ['lazywait_report', 'Order Number,Date,Branch,Total (SAR),Sync Status,Lazywait Reference,Error Log'],
+  ] as const;
+
+  for (const [report, header] of HEADERS) {
+    it(`${report}: the file starts EF BB BF, then the header row byte-for-byte`, async () => {
+      const csv = captureCsv();
+      await renderReports();
+      fireEvent.change(screen.getByLabelText('Reporting Metric'), { target: { value: report } });
+      fireEvent.click(screen.getByRole('button', { name: /Export Active Audit CSV/i }));
+
+      const bytes = await csv.bytes();
+      expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+      // Everything after the mark is exactly the UTF-8 of the CSV text, so a
+      // reader that strips the mark sees the file this export always wrote.
+      const afterMark = bytes.slice(3);
+      expect(Array.from(afterMark)).toEqual(Array.from(new TextEncoder().encode(csv.text())));
+      expect(new TextDecoder().decode(afterMark).split('\n')[0]).toBe(header);
+      // One mark, not two.
+      expect(Array.from(afterMark.slice(0, 3))).not.toEqual([0xef, 0xbb, 0xbf]);
+    });
+  }
+
+  it('carries Arabic names as UTF-8 behind the mark, in the Arabic console', async () => {
+    const csv = captureCsv();
+    mockContext({ adminLang: 'ar' });
+    await renderReports();
+    fireEvent.change(screen.getByLabelText('نوع التقرير المالي'), { target: { value: 'sales_by_branch' } });
+    fireEvent.click(screen.getByRole('button', { name: 'تصدير التقرير كـ Excel/CSV' }));
+
+    const bytes = await csv.bytes();
+    expect(Array.from(bytes.slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes).split('\n')[1]).toBe('العليا,1,110.00,10.00,110.00,0.00');
   });
 });
 
@@ -216,7 +284,7 @@ describe('report filtering', () => {
     await renderReports();
     fireEvent.click(screen.getByRole('button', { name: /Export Active Audit CSV/i }));
     // Header only — the 2020 order is outside the current-month default range.
-    expect(csv().split('\n').filter(Boolean)).toHaveLength(1);
+    expect(csv.text().split('\n').filter(Boolean)).toHaveLength(1);
   });
 
   it('counts only DELIVERED orders in the revenue summary', async () => {

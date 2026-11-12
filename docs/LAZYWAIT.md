@@ -230,6 +230,11 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    Parsing is **defensive**: handles en/ar/Turkish-only names, multi-price items,
    `branches_ids`, and null addon prices / null group min/max/multi safely.
 
+   The mapping card's **Last pull** line shows the latest run's time in Riyadh
+   time, `YYYY-MM-DD HH:mm:ss` (since 2026-11-12). It used the device's zone and
+   locale, so an administrator outside Saudi Arabia read a different clock from
+   the rest of the console.
+
    **Add-on groups have never imported a single record.** Every
    `lazywait_catalog_pulls` row in Production records `addon_groups: 0` with
    `status: "success"` and no error — an empty parse is not an error, so the

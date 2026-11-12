@@ -7,8 +7,10 @@
  * review — one panel would quietly start calling something "1h ago" that the
  * other still called "59m ago".
  *
- * Behaviour is unchanged: this is the existing implementation, lifted once.
+ * `relativeAge` is that implementation, lifted once and unchanged. `exactTime`
+ * moved to the Riyadh clock on 2026-11-12; see its comment.
  */
+import { formatRiyadhDateTimeSeconds } from '../../../utils/calculations';
 
 export type AdminLang = 'en' | 'ar';
 
@@ -34,10 +36,18 @@ export function relativeAge(
   return lang === 'ar' ? `قبل ${Math.floor(seconds / 86400)} يوم` : `${Math.floor(seconds / 86400)}d ago`;
 }
 
-/** Absolute timestamp for a hover title. */
+/**
+ * Absolute timestamp for a hover title or an audit row: Riyadh time,
+ * "YYYY-MM-DD HH:mm:ss", Latin digits.
+ *
+ * It used to be `toLocaleString('ar-SA' | 'en-GB')`, which is the DEVICE's
+ * zone: an owner abroad read 21:30 for a 00:30 Riyadh event, and Arabic got
+ * Arabic-Indic digits and a 12-hour clock. Reports and receipts were already on
+ * the Riyadh clock; this puts the console's audit trails on it too.
+ *
+ * The output is the same in both languages on purpose. `lang` stays in the
+ * signature because every caller passes it, not because it changes anything.
+ */
 export function exactTime(iso: string | null | undefined, lang: AdminLang): string {
-  if (!iso) return '—';
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '—';
-  return parsed.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB');
+  return formatRiyadhDateTimeSeconds(iso);
 }

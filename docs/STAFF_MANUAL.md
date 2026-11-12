@@ -486,7 +486,73 @@ like it was "redirecting to /app" and there was no way back from inside it.
 - لا تنفذ أوامر SQL أو أوامر إنتاج من مستندات/صور قديمة.
 - لا تحذف بيانات المنيو لمجرد إخفائها مؤقتاً.
 
-## 9. Escalation contacts — جهات التصعيد
+## 9. Spreadsheets and times — الجداول والأوقات
+
+**English**
+
+**Importing the menu from a spreadsheet** — Menu Management → **Excel/CSV Bulk
+Import**. An accountant can preview a file but cannot commit it.
+
+1. Download the template from that screen and fill it in. Keep its nine columns,
+   in the same order.
+2. In Excel choose **Save As**, and as the file type **CSV UTF-8 (Comma
+   delimited)**. The plain **CSV (Comma delimited)** type does not keep Arabic:
+   on an Arabic Windows computer it saves an older encoding, and on an English
+   one it turns every Arabic letter into `?`. The import refuses either file
+   whole and says why, so nothing wrong reaches the menu. A file downloaded from
+   Google Sheets is already UTF-8.
+3. Choose the file, read the preview and every warning, then commit. A cell may
+   contain a comma: Excel puts that cell in quotation marks, and the import
+   reads it as one cell.
+4. A price is a plain number, such as `29` or `29.00`. Calories are a whole
+   number, such as `1200`, or empty. A row with `1,200`, `29 SAR` or anything
+   in a tenth column is refused with its row number, and the other rows still
+   import.
+
+**Report exports** — Financial Reports → **Export Active Audit CSV**. The file
+opens in Excel with Arabic names readable, because it starts with a UTF-8
+byte-order mark. A script that reads these files should open them as
+`utf-8-sig`.
+
+**Times in the console** are Riyadh time with Latin digits, in both languages
+and on any computer: a full time reads `2026-11-12 00:30:05`, a date
+`2026-11-12`. This covers the audit lists, hover times, the live badge, the
+POS-verification card, banner dates and the promo-code and campaign lists. The
+date-and-time fields you type into, such as a promo code's expiry, still use
+your computer's own clock. Outside Saudi Arabia, convert to your local time
+before you type.
+
+**العربية**
+
+**استيراد المنيو من جدول بيانات** — إدارة المنيو ← **رفع منيو بملف Excel/CSV**.
+يستطيع المحاسب معاينة الملف لكنه لا يستطيع اعتماد رفعه.
+
+1. حمّل النموذج من تلك الشاشة واملأه، وحافظ على أعمدته التسعة بالترتيب نفسه.
+2. في Excel اختر **حفظ باسم** ثم نوع الملف **CSV UTF-8**. نوع **CSV** العادي لا
+   يحفظ العربية: على جهاز Windows عربي يحفظها بترميز قديم، وعلى جهاز إنجليزي
+   يحوّل كل حرف عربي إلى `?`. يرفض الاستيراد الملف في الحالتين كاملاً ويوضّح
+   السبب، فلا يصل شيء خاطئ إلى المنيو. الملف المنزَّل من Google Sheets محفوظ
+   بترميز UTF-8 أصلاً.
+3. اختر الملف وراجع المعاينة وكل التنبيهات، ثم اعتمد الرفع. يمكن أن تحتوي الخلية
+   على فاصلة: يضع Excel تلك الخلية بين علامتي اقتباس، ويقرؤها الاستيراد خلية
+   واحدة.
+4. السعر رقم مجرد مثل `29` أو `29.00`. والسعرات الحرارية رقم صحيح مثل `1200` أو
+   خلية فارغة. الصف الذي فيه `1,200` أو `29 SAR` أو أي قيمة في عمود عاشر يُرفض
+   مع ذكر رقمه، وتُستورد بقية الصفوف.
+
+**تصدير التقارير** — التقارير والتحليلات المالية ← **تصدير التقرير كـ Excel/CSV**.
+يُفتح الملف في Excel والأسماء العربية مقروءة، لأنه يبدأ بعلامة ترتيب البايت
+الخاصة بترميز UTF-8. البرنامج الذي يقرأ هذه الملفات آلياً يجب أن يفتحها بترميز
+`utf-8-sig`.
+
+**الأوقات في لوحة التحكم** بتوقيت الرياض وبأرقام لاتينية، في اللغتين وعلى أي جهاز:
+الوقت الكامل يظهر هكذا `2026-11-12 00:30:05`، والتاريخ هكذا `2026-11-12`. يشمل
+ذلك سجلات التدقيق، والوقت الذي يظهر عند تمرير المؤشر، وشارة التحديث المباشر،
+وبطاقة الطلبات التي تحتاج تحققاً، وتواريخ البانرات، وقوائم رموز الخصم والحملات.
+أما حقول التاريخ والوقت التي تكتب فيها، مثل تاريخ انتهاء رمز الخصم، فما زالت تتبع
+ساعة جهازك. إذا كنت خارج المملكة فحوّل الوقت إلى توقيتك المحلي قبل الكتابة.
+
+## 10. Escalation contacts — جهات التصعيد
 
 Fill this in with real operational contacts before printing/distributing the manual.
 
