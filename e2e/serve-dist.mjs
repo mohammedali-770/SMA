@@ -18,10 +18,12 @@
  * Content-Security-Policy carries `upgrade-insecure-requests`, so a browser on
  * a non-localhost name would upgrade every subresource to https.
  *
- * Only the `(.*)` wildcard is understood, which is all vercel.json uses. A
- * `source` with any other pattern syntax stops the server rather than being
- * matched literally — a replica that silently misreads a rule would prove
- * nothing about the real one.
+ * Two pattern forms are understood, which is all vercel.json uses: the `(.*)`
+ * wildcard, and `((?!a/|b/).*)` — a wildcard that must not start with any of
+ * the listed literal prefixes (#451 uses it so a missing hashed asset is a
+ * 404 rather than the HTML shell). A `source` with any other pattern syntax
+ * stops the server rather than being matched literally — a replica that
+ * silently misreads a rule would prove nothing about the real one.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -61,18 +63,39 @@ const TYPES = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-/** `/app/(.*)` -> /^\/app\/(.*)$/, refusing any syntax it does not model. */
+/**
+ * `/app/(.*)` -> /^\/app\/(.*)$/ and `/((?!assets/|app/_expo/).*)` ->
+ * /^\/((?!assets\/|app\/_expo\/).*)$/, refusing any syntax it does not model.
+ */
 export function sourceToRegExp(source) {
-  const parts = source.split('(.*)');
-  for (const literal of parts) {
-    if (/[:()*+?{}[\]|\\^$]/.test(literal)) {
-      throw new Error(
-        `vercel.json source ${JSON.stringify(source)} uses pattern syntax this server does not model`,
-      );
+  const LITERAL = /^[A-Za-z0-9_\-/.]*$/;
+  const escapeLiteral = (s) => s.replace(/[.]/g, '\\.').replace(/\//g, '\\/');
+  const refuse = () => {
+    throw new Error(
+      `vercel.json source ${JSON.stringify(source)} uses pattern syntax this server does not model`,
+    );
+  };
+  let out = '';
+  let rest = source;
+  while (rest.length > 0) {
+    const guarded = /^\(\(\?!([^()]*)\)\.\*\)/.exec(rest);
+    if (guarded) {
+      const prefixes = guarded[1].split('|');
+      if (prefixes.some((p) => p === '' || !LITERAL.test(p))) refuse();
+      out += `((?!${prefixes.map(escapeLiteral).join('|')}).*)`;
+      rest = rest.slice(guarded[0].length);
+    } else if (rest.startsWith('(.*)')) {
+      out += '(.*)';
+      rest = rest.slice(4);
+    } else {
+      const next = rest.search(/\(/);
+      const literal = next === -1 ? rest : rest.slice(0, next);
+      if (literal === '' || !LITERAL.test(literal)) refuse();
+      out += escapeLiteral(literal);
+      rest = rest.slice(literal.length);
     }
   }
-  const escaped = parts.map((s) => s.replace(/[.]/g, '\\.'));
-  return new RegExp(`^${escaped.join('(.*)')}$`);
+  return new RegExp(`^${out}$`);
 }
 
 export function loadRules(configPath) {
