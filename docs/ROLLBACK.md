@@ -1,6 +1,6 @@
 # Rollback and Mitigation
 
-> **Updated 2026-08-12; §5 updated 2026-11-11.** Rollback differs by surface. Use the smallest safe mechanism, preserve auditability, and do not bypass owner/production controls because the word “rollback” sounds safer than “deploy.”
+> **Updated 2026-08-12; §5 updated 2026-11-11; §8 updated 2026-11-12.** Rollback differs by surface. Use the smallest safe mechanism, preserve auditability, and do not bypass owner/production controls because the word “rollback” sounds safer than “deploy.”
 
 ## 1. First identify the failing surface
 
@@ -185,6 +185,8 @@ Verification must prove the actual affected path, not only that a dashboard beca
 - `/` and `/app` load the expected distinct applications.
 - security headers remain present.
 - customer/staff auth reaches the expected role/MFA flow.
+- **Browsers that cached a miss.** A hashed asset that the bad deploy did not have is a 404 that still carries the one-year `immutable` header (`docs/DEPLOY.md` §7, "Caching of hashed assets"), so a browser that requested it during the bad deploy may keep failing from cache after the rollback restores the file. An open staff console repairs this itself: its `vite:preloadError` listener refetches the failing URL with `cache: 'reload'` and reloads once (`src/lib/staleAssetRecovery.ts`). Anyone still stuck — a customer whose `/app` stays blank, a console that fails again within a minute of reloading — needs a hard reload, or clearing the site's cached files. Ask affected staff to do that rather than redeploying again.
+- **Skew Protection** (Vercel project setting, owner decision under CLAUDE.md §5) would keep old clients on their own deploy's assets and remove the case above. It is not enabled by this repository; check the project settings before assuming either way.
 
 ### Backend
 
