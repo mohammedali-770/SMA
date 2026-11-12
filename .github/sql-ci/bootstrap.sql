@@ -396,6 +396,74 @@ grant usage on schema storage to anon, authenticated, service_role;
 grant select on storage.buckets to anon, authenticated, service_role;
 grant select, insert, update, delete on storage.objects to authenticated, service_role;
 
+-- The Storage server's operation helpers, added 2026-11-12 because
+-- `20261005120000_server_input_bounds.sql` scopes two policies with
+-- storage.allow_any_operation. Bodies are the upstream ones
+-- (supabase/storage migrations/tenant/0024-operation-function.sql and
+-- 0058-operation-ergonomics.sql, commit d0461d8), which match what Production
+-- returned for pg_get_functiondef on 2026-11-12. The Storage server sets the
+-- transaction-local `storage.operation` from the route; a suite sets it with
+-- set_config to stand in for that. No grant is made: like upstream, they keep
+-- the default PUBLIC EXECUTE.
+create or replace function storage.operation()
+returns text
+language plpgsql
+stable
+as $$
+begin
+  return current_setting('storage.operation', true);
+end;
+$$;
+
+create or replace function storage.allow_only_operation(expected_operation text)
+returns boolean
+language sql
+stable
+as $$
+  with current_operation as (
+    select storage.operation() as raw_operation
+  ),
+  normalized as (
+    select
+      case when raw_operation like 'storage.%' then substr(raw_operation, 9)
+           else raw_operation end as current_operation,
+      case when expected_operation like 'storage.%' then substr(expected_operation, 9)
+           else expected_operation end as requested_operation
+    from current_operation
+  )
+  select case
+    when requested_operation is null or requested_operation = '' then false
+    else coalesce(current_operation = requested_operation, false)
+  end
+  from normalized;
+$$;
+
+create or replace function storage.allow_any_operation(expected_operations text[])
+returns boolean
+language sql
+stable
+as $$
+  with current_operation as (
+    select storage.operation() as raw_operation
+  ),
+  normalized as (
+    select case when raw_operation like 'storage.%' then substr(raw_operation, 9)
+                else raw_operation end as current_operation
+    from current_operation
+  )
+  select exists (
+    select 1
+    from normalized n
+    cross join lateral unnest(expected_operations) as expected_operation
+    where expected_operation is not null
+      and expected_operation <> ''
+      and n.current_operation = case
+        when expected_operation like 'storage.%' then substr(expected_operation, 9)
+        else expected_operation
+      end
+  );
+$$;
+
 -- ---------------------------------------------------------------------------
 -- 8. vault — referenced when the chain reads integration secrets.
 -- ---------------------------------------------------------------------------

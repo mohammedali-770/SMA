@@ -428,11 +428,13 @@ begin
   -- handle_new_user() then creates the profile row, which is why the insert
   -- below upserts rather than plain-inserts.
   insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
-  insert into public.profiles (id, full_name, phone_number, role, loyalty_points)
-    values (v_cust, 'Wrapper', '+966500000034', 'customer', 0)
+  -- phone_verified: since 20261005120000 the wrapper refuses a customer
+  -- without a verified phone, which every WhatsApp sign-in has.
+  insert into public.profiles (id, full_name, phone_number, role, loyalty_points, phone_verified)
+    values (v_cust, 'Wrapper', '+966500000034', 'customer', 0, true)
   on conflict (id) do update set full_name = excluded.full_name,
     phone_number = excluded.phone_number, role = excluded.role,
-    loyalty_points = excluded.loyalty_points;
+    loyalty_points = excluded.loyalty_points, phone_verified = excluded.phone_verified;
   insert into public.branches (id, name_en, name_ar, address_en, address_ar, phone,
                                latitude, longitude, delivery_fee, min_delivery_order, is_active)
     values (v_branch, 'B', 'ب', 'A', 'ع', '+966500000000', 24.7, 46.7, 15, 40, true);

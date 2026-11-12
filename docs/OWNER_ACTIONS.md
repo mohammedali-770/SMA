@@ -2667,6 +2667,17 @@ regression — it is one more string on an existing list.
   ("only if you opt in") while offers were on by default, and now says they are
   on by default and can be switched off.
 
+**Widened 2026-11-12 — four order refusals** (`apps/mobile/src/i18n/strings.ts`,
+keys `errOrder*`), shown at checkout when the server refuses an order:
+
+- `errOrderPhoneUnverified` — «لتقديم طلب، سجّل الدخول برقم واتساب الخاص بك.»
+- `errOrderOpenLimit` — «لديك عدة طلبات قيد التنفيذ. يرجى الانتظار حتى يجهز أحدها قبل تقديم طلب جديد.»
+- `errOrderHourlyLimit` — «لقد قدّمت عدة طلبات خلال الساعة الماضية. يرجى المحاولة مرة أخرى بعد قليل.»
+- `errOrderQuantityLimit` — «يمكنك طلب 50 قطعة كحد أقصى من الصنف الواحد.» (the number comes from `MAX_LINE_QUANTITY`)
+
+The English for each sits beside it in the same file. «قطعة» ("piece") is the
+word to check first: it reads oddly for a drink or a sauce.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -3576,6 +3587,61 @@ are taken by the PDPL work in an open pull request.)
 **Done looks like:** each step done, with the date written back into the record it
 points at, and the matching `GO_LIVE_READINESS.md` row — B8, B10, C9 to C13 —
 moved off ⬜.
+
+## 48. Server input bounds and customer order limits — three numbers, then one apply
+
+**Opened 2026-11-12.** `20261005120000_server_input_bounds.sql` is written,
+validated and NOT applied. Detail: `docs/MIGRATIONS.md` §57. Section numbers 46
+and 47 are taken by open pull requests.
+
+It makes the database enforce rules the app already had, adds three refusals to
+`place_customer_order`, and lets an administrator's image delete actually
+delete. **It changes live ordering behaviour.** Three of its numbers are your
+decision. Each is a proposal.
+
+| Decision | Proposed | Live fact, read 2026-11-12 | What it changes |
+| --- | --- | --- | --- |
+| Most of one item on one order line | **50** | largest real line: **7**; 0 lines over 20 | a line above it is refused by the database, and the app's + button stops there |
+| Open orders one customer may hold, placed in the last 24 hours | **5** (`app_settings.order_limit_open`) | most orders by one customer in one clock hour: **5**; orders in the last 30 days: **2** | the next order is refused with *"You already have several orders in progress"* until one is delivered or cancelled, or 24 hours pass |
+| Orders one customer may place in one hour | **10** (`app_settings.order_limit_per_hour`) | as above | the next order is refused until the hour has passed |
+
+**And one rule that is also your decision: an order needs a verified phone.**
+Every WhatsApp sign-in has one. On 2026-11-12, 5 customer profiles did not:
+2 email-confirmed accounts (one placed a 26.00 SAR cash pickup order on
+2026-09-26, still `received`), 1 with an unconfirmed email, and 2 with neither.
+All 5 would be refused. No staff account has a verified phone, and none has ever
+ordered.
+
+**Why the open count looks back only 24 hours.** An order's status moves only
+when staff move it in the console. The 2026-09-26 order is still `received`.
+Without the window, a customer whose old orders were never closed would be
+refused for ever.
+
+**What is not covered, on purpose.** The online checkout-session path is frozen
+under CLAUDE.md §6. Before online payment is enabled, `begin_session_attempt`
+must refuse a line above the cap before any payment is taken; that belongs on
+the payment branch. The phone rule and the limits do not cover online orders
+either.
+
+### The steps
+
+1. **Decide the three numbers and the phone rule.** A different number is a
+   one-line change to the migration before merge, or an `app_settings` write
+   after apply (a live write, §5).
+2. **Merge** the pull request. The console change (sign-in only) ships with the
+   web deploy that follows the merge, which today happens on every merge
+   (CLAUDE.md §13). The app change ships with the next EAS build.
+3. **Apply `20261005120000` by name** (§5). Never "the outstanding migrations":
+   the frozen Moyasar file sorts first.
+4. **Check afterwards**, read-only: `order_limit_open` 5 and
+   `order_limit_per_hour` 10; `place_order` `12b6816d…` and
+   `compute_order_snapshot` `22e2d429…` unchanged; Moyasar still absent.
+5. **Optional, a separate §5 write:** remove the 2 banner images no banner
+   references. Before this apply a delete matched nothing; after it, the console
+   delete works.
+
+**Done looks like:** the three numbers confirmed in writing here, the apply
+recorded as a ledger row in `docs/MIGRATIONS.md`, and §57 marked APPLIED.
 
 ## Owner-action closeout rule
 

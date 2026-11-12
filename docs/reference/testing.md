@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**213 TypeScript test files declaring 3301 test blocks, plus 83 SQL suites.**
+**216 TypeScript test files declaring 3319 test blocks, plus 84 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -109,6 +109,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
+- `supabase/tests/server_input_bounds_test.sql`
 - `supabase/tests/staff_access_directory_test.sql`
 - `supabase/tests/staff_mfa_aal2_test.sql`
 - `supabase/tests/staff_role_administration_test.sql`
@@ -129,7 +130,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-78 files, 1082 declared test blocks.
+80 files, 1096 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -146,6 +147,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
+| `apps/mobile/src/features/cart/quantityLimit.test.ts` | 7 | MAX_LINE_QUANTITY |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
@@ -186,7 +188,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
-| `apps/mobile/src/lib/errors/userMessage.test.ts` | 7 | describeFailure |
+| `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
+| `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
 | `apps/mobile/src/lib/observability/config.test.ts` | 19 | Sentry identity |
@@ -214,7 +217,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-106 files, 1495 declared test blocks.
+107 files, 1499 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -251,6 +254,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
+| `src/components/AuthScreen.test.tsx` | 4 | AuthScreen |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
 | `src/components/ops/BranchConsole.test.tsx` | 43 | BranchConsole |

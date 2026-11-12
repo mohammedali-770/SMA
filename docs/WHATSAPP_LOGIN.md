@@ -522,6 +522,29 @@ does not cover (§10).
   UPDATE grant on `profiles.role` (only `full_name`, `email`, `phone_number`), and
   neither trigger sets role. Verified against the live DB.
 - Existing profiles are never overwritten (`on conflict (id) do nothing`).
+- **Since `20261005120000` (written 2026-11-12, NOT applied), a verified phone is
+  what lets an account order.** `place_customer_order` refuses a caller whose
+  profile is not `phone_verified`, with `P0001` and *"Please verify your phone
+  number before placing an order."* The app shows it as *"To place an order,
+  sign in with your WhatsApp number."* / «لتقديم طلب، سجّل الدخول برقم واتساب الخاص
+  بك.» Every WhatsApp sign-in sets the flag, so a real customer never meets it.
+  It stops two other kinds of account:
+  - an email/password account. The staff console offered public sign-up until
+    the same change, and that session is shared with `/app`. Such an account
+    could place cash orders with no phone behind it, outside this file's per-phone
+    OTP budget;
+  - a phone that was never confirmed. The profile carries the number, but
+    nothing proved the caller owns it.
+- **Measured live 2026-11-12:** 7 customer profiles are `phone_verified` (6 also
+  phone-confirmed in Auth, 1 legacy email account with the flag set). 5 are not:
+  2 email-confirmed (one placed a cash pickup order on 2026-09-26, still
+  `received`), 1 with an unconfirmed email, 2 with neither. Those 5 would be
+  refused. No staff profile is `phone_verified` and none has ever ordered.
+  Whether to keep the rule for those accounts is an owner decision
+  (`docs/OWNER_ACTIONS.md` §48).
+- `handle_new_user` now cuts a metadata name to 80 clean characters instead of
+  copying it as given, because the new profile-name bound would otherwise refuse
+  the signup. A phone sign-in carries no name, so this changes nothing for one.
 
 ---
 
