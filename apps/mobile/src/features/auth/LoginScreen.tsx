@@ -1,5 +1,5 @@
 /** Customer authentication for the Spicy Meal app. */
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, ScrollView, Text as RNText, View,
@@ -75,13 +75,15 @@ export function LoginScreen({ returnTo }: { returnTo?: string } = {}) {
 
           <RNText style={styles.policy}>
             {pick('By continuing, you agree to the ', 'بمتابعتك، فإنك توافق على ')}
-            <RNText style={styles.policyLink} onPress={() => router.push('/legal/terms_conditions')}>
+            {/* A Link, not a pressable span: it is role=link and a real <a href>
+                on the web, so Tab reaches it and Enter opens it (R07#5). */}
+            <Link href="/legal/terms_conditions" push style={styles.policyLink} accessibilityRole="link">
               {legalTitle('terms_conditions', lang)}
-            </RNText>
+            </Link>
             {pick(' and ', ' و')}
-            <RNText style={styles.policyLink} onPress={() => router.push('/legal/privacy_policy')}>
+            <Link href="/legal/privacy_policy" push style={styles.policyLink} accessibilityRole="link">
               {legalTitle('privacy_policy', lang)}
-            </RNText>
+            </Link>
             {'.'}
           </RNText>
         </ScrollView>

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**236 TypeScript test files declaring 3690 test blocks, plus 86 SQL suites.**
+**242 TypeScript test files declaring 3741 test blocks, plus 86 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -131,7 +131,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-83 files, 1158 declared test blocks.
+88 files, 1197 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -141,6 +141,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/components/locationControl.test.ts` | 25 | shouldStartLocate |
 | `apps/mobile/src/components/stateHierarchy.test.ts` | 9 | looksTechnical |
 | `apps/mobile/src/design-system/designSystem.test.ts` | 5 | mobile design-system mirror |
+| `apps/mobile/src/design-system/ui/a11yState.test.ts` | 10 | selectedButtonState |
+| `apps/mobile/src/design-system/ui/productCardA11y.test.ts` | 6 | productCardAccessibilityLabel |
+| `apps/mobile/src/design-system/ui/statusInkWiring.test.ts` | 8 | StatusPill foregrounds are inks |
 | `apps/mobile/src/dev/fixtureGate.test.ts` | 10 | fixture gate — fails closed |
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 8 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
@@ -148,6 +151,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
+| `apps/mobile/src/features/auth/signInA11yWiring.test.ts` | 4 | PhoneOtpLogin errors are announced |
 | `apps/mobile/src/features/cart/quantityLimit.test.ts` | 7 | MAX_LINE_QUANTITY |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
@@ -185,6 +189,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/dataExport.test.ts` | 13 | shouldStartExport |
 | `apps/mobile/src/features/profile/loyaltyExpiry.test.ts` | 8 | formatExpiryDate |
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
+| `apps/mobile/src/i18n/documentLang.test.ts` | 6 | applyDocumentLang |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
@@ -213,7 +218,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
-| `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
+| `apps/mobile/src/theme/darkContrastContract.test.ts` | 15 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
 | `apps/mobile/src/types/webviewTypeShim.test.ts` | 4 | react-native-webview type shim |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |
@@ -221,7 +226,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-117 files, 1630 declared test blocks.
+118 files, 1642 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -266,7 +271,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
-| `src/components/AuthScreen.test.tsx` | 4 | AuthScreen |
+| `src/components/AuthScreen.test.tsx` | 7 | AuthScreen |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
 | `src/components/ops/BranchConsole.test.tsx` | 43 | BranchConsole |
@@ -284,7 +289,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
-| `src/design-system/contrastContract.test.ts` | 9 | muted ink clears WCAG AA for normal text |
+| `src/design-system/contrastContract.test.ts` | 12 | muted ink clears WCAG AA for normal text |
 | `src/design-system/fieldState.test.ts` | 15 | resolveFieldState — accessibility wiring |
 | `src/design-system/money.test.ts` | 19 | formatAmount — en-SA |
 | `src/design-system/ui/Button.test.tsx` | 8 | Button (web) |
@@ -303,6 +308,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
+| `src/lib/documentLang.test.ts` | 6 | applyDocumentLang |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |

@@ -17,8 +17,8 @@
  * function, and never fakes a session — Supabase Auth is the login authority.
  */
 import { router } from 'expo-router';
-import React, { useCallback, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Platform, Pressable, View } from 'react-native';
 
 import { fontFamily, hitTarget, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
@@ -55,6 +55,11 @@ export function PhoneOtpLogin({ returnTo }: { returnTo?: string } = {}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // The error texts below are alerts with a polite live region, which the web
+  // and TalkBack announce. VoiceOver honours neither, so iOS is told directly.
+  useEffect(() => {
+    if (error && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(error);
+  }, [error]);
   // The countdown deliberately does NOT live in this component's state: it
   // ticks once per second, and re-rendering the focused OTP field ~60 times per
   // cooldown is one of the two causes of the iOS 26 autofill failure. It owns
@@ -165,7 +170,11 @@ export function PhoneOtpLogin({ returnTo }: { returnTo?: string } = {}) {
           disabled={!isSaudiMobile(national)}
         />
         <Text variant="caption" tone="secondary" align="center">{t('loginCodeOnWhatsapp')}</Text>
-        {error ? <Text variant="caption" tone="danger" align="center">{error}</Text> : null}
+        {error ? (
+          <Text variant="caption" tone="danger" align="center" accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
       </View>
     );
   }
@@ -233,7 +242,11 @@ export function PhoneOtpLogin({ returnTo }: { returnTo?: string } = {}) {
       </OtpResendTimer>
 
       {error ? (
-        <Text variant="caption" tone="danger" align="center">{error}</Text>
+        // Announced: a wrong or expired code, a rate limit or a network failure
+        // otherwise appears in silence (R07#5, WCAG 4.1.3).
+        <Text variant="caption" tone="danger" align="center" accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {error}
+        </Text>
       ) : (
         <Text variant="caption" tone="secondary" align="center">
           {notice ?? t('loginCodeOnWhatsapp')}
