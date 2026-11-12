@@ -122,6 +122,7 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 | [Button and field inventory](BUTTON_FIELD_INVENTORY.md) | Design-system migration inventory |
 | [Health center baseline](OPERATIONS_HEALTH_CENTER_BASELINE.md) · [rollback](OPERATIONS_HEALTH_CENTER_ROLLBACK.md) | Point-in-time operational evidence |
 | [Readiness reviews](readiness/) | Dated pull-request review evidence |
+| [App-hardening checklist, 11–12 Nov 2026](readiness/20261111-app-hardening-checklist.md) | Evidence table for all 43 checklist IDs, with the prioritized action list as it stood on 2026-11-12 |
 | [Development visual review](DEV_VISUAL_REVIEW.md) | Fixture-based review workflow |
 
 ## Where things live
