@@ -49,7 +49,7 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | --- | --- |
 | `account` | 2 |
 | `auth` | 5 |
-| `cart` | 7 |
+| `cart` | 10 |
 | `checkout` | 22 |
 | `legal` | 2 |
 | `menu` | 4 |

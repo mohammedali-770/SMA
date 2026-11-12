@@ -238,7 +238,18 @@ export interface CartItem {
    * Bounded by ITEM_NOTE_MAX_LENGTH; absent rather than '' when there is none.
    */
   note?: string;
+  /**
+   * Set by `repriceCart` when the menu no longer offers what this line names:
+   * the product itself, its price tier, or one of its options. Absent on an
+   * orderable line. Recomputed from fresh menu rows on every reprice, so a
+   * line whose product returns is cleared again. `validateCartForBranch` treats
+   * a flagged line as unorderable, which is what makes checkout name it.
+   */
+  unavailable?: CartLineIssue;
 }
+
+/** What `repriceCart` found missing from a cart line. */
+export type CartLineIssue = 'product' | 'tier' | 'option';
 
 export interface BrandSettings {
   primaryColor: string;

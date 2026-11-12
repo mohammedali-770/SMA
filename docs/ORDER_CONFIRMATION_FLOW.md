@@ -899,6 +899,15 @@ runs *after* the await, so the cart and its idempotency key both persist and a
 retry returns the same order — and only until the customer edits the cart, which
 rotates the key and buys a duplicate.
 
+**Since 2026-11-12 the key rotates on the order BODY, not on every change to the
+cart** (`cartOrderSignature` in `apps/mobile/src/features/cart/cartOrderBody.ts`).
+The cart now re-prices its lines from fresh menu rows (`repriceCart`), and a
+re-price changes `items` without changing anything `place_order` receives, since
+the client sends no price. Under the old rule a catalogue refresh landing
+between a lost response and the retry would have rotated the key and placed a
+second order. An edit the customer makes (quantity, note, tier, option, a line
+added or removed) changes the body and still rotates it.
+
 **The fix returns `place_customer_order`'s own projection when the re-read yields
 no usable row.** The order's existence is not in doubt at that point: `orderId`
 came from the RPC's return and the handler already answered 400 if it was absent.
