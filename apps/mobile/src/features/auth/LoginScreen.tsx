@@ -13,6 +13,7 @@ import { Screen } from '../../components/Screen';
 import { LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { legalTitle } from '../../lib/legal';
+import { useNavigationLatch } from '../../lib/useNavigationLatch';
 import { auth } from '../../services/api';
 import { makeStyles } from '../../theme/makeStyles';
 import { showsUnavailableCard, type WhatsAppLoginAvailability } from './loginAvailability';
@@ -29,7 +30,12 @@ export function LoginScreen({ returnTo }: { returnTo?: string } = {}) {
   // Signing in is optional until the customer needs an account (guest browsing,
   // App Store 5.1.1(v)), so this screen must never be a dead end. Back to where
   // they came from when there is one, otherwise the menu.
-  const keepBrowsing = () => (router.canGoBack() ? router.back() : router.replace(HOME_ROUTE));
+  //
+  // Latched: a double press ran `router.back()` twice and overshot, landing on
+  // Home instead of the screen the customer came from.
+  const guardNavigation = useNavigationLatch();
+  const keepBrowsing = () =>
+    guardNavigation(() => (router.canGoBack() ? router.back() : router.replace(HOME_ROUTE)));
   const [availability, setAvailability] = useState<WhatsAppLoginAvailability | null>(null);
 
   useEffect(() => {

@@ -5,8 +5,10 @@ import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { radius, space, type as typeScale } from '../design-system/generated/tokens';
+import { HOME_ROUTE } from '../features/auth/returnPath';
 import { useI18n } from '../i18n/I18nProvider';
 import { makeStyles } from '../theme/makeStyles';
+import { resolveBack } from './headerBack';
 
 interface Props {
   title?: string;
@@ -22,8 +24,15 @@ export function Header({ title, showBack, onBack, right, left, safeTop }: Props)
   const { isRTL, t, rtlRow } = useI18n();
   const styles = useStyles();
   const back = () => {
-    if (onBack) onBack();
-    else if (router.canGoBack()) router.back();
+    const action = resolveBack({ hasOnBack: Boolean(onBack), canGoBack: router.canGoBack() });
+    if (action === 'custom') onBack?.();
+    else if (action === 'back') router.back();
+    // No history: a direct load or refresh. Without this the chevron was dead.
+    // `dismissTo`, not `replace`, as everywhere that leaves for the tabs: with
+    // nothing to go back to it replaces this screen, and should the tabs ever
+    // be underneath after all it pops to them instead of stacking a second
+    // copy (stackedTabsWiring.test.ts).
+    else router.dismissTo(HOME_ROUTE);
   };
   const chevron = isRTL ? '›' : '‹';
 
