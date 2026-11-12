@@ -288,7 +288,20 @@ function generateEdgeFunctions() {
     //                    2026-11-09), which `account-delete-scheduler` now
     //                    uses instead of the env var — the same function, the
     //                    same mislabel waiting to happen a third time.
-    const usesAdmin = /\badminClient\b|\bserviceTarget\b|\bsecretKey\b|\bSUPABASE_SERVICE_ROLE_KEY\b/.test(src)
+    //
+    // And read every module in the function's OWN directory, not index.ts
+    // alone. On 2026-11-12 `account-delete-scheduler` moved its handler into
+    // handler.ts so a Deno test could call it; index.ts kept only
+    // `Deno.serve(handler)`, and this column flipped to `caller JWT` a fourth
+    // time. Test files are excluded: a test that stubs a key is not the
+    // function holding one.
+    const own = existsSync(join(fnDir, name))
+      ? readdirSync(join(fnDir, name))
+          .filter((f) => f.endsWith('.ts') && !/(?:_test|\.test)\.ts$/.test(f))
+          .map((f) => read(join(fnDir, name, f)))
+          .join('\n')
+      : src;
+    const usesAdmin = /\badminClient\b|\bserviceTarget\b|\bsecretKey\b|\bSUPABASE_SERVICE_ROLE_KEY\b/.test(own)
       ? 'service role'
       : 'caller JWT';
     return `| \`${cell(name)}\` | ${cell(summary || '—')} | ${automated} | ${usesAdmin} |`;
@@ -453,13 +466,28 @@ function generateTesting() {
   const sqlDir = join(ROOT, 'supabase', 'tests');
   const sqlFiles = existsSync(sqlDir) ? readdirSync(sqlDir).filter((f) => f.endsWith('.sql')).sort() : [];
 
+  // Playwright specs under e2e/ — not collected by vitest, run by `npm run test:e2e`.
+  // Deno tests that execute an Edge Function's real handler. Named *_test.ts so
+  // Vitest's supabase/functions/**/*.test.ts pattern never collects them.
+  const fnRoot = join(ROOT, 'supabase', 'functions');
+  const denoRows = walk(fnRoot, (f) => /_test\.ts$/.test(f)).map((f) => {
+    const blocks = (read(f).match(/^Deno\.test\s*\(/gm) ?? []).length;
+    return `| \`${cell(posix(relative(ROOT, f)))}\` | ${blocks} |`;
+  });
+
+  const e2eSpecs = walk(join(ROOT, 'e2e'), (f) => /\.spec\.ts$/.test(f) && !f.includes('test-results'));
+  const e2eRows = e2eSpecs.map((f) => {
+    const blocks = (read(f).match(/^test(?:\.\w+)?\s*\(/gm) ?? []).length;
+    return `| \`${cell(posix(relative(ROOT, f)))}\` | ${blocks} |`;
+  });
+
   const fileTotal = sections.reduce((n, s) => n + s.count, 0);
   const blockTotal = sections.reduce((n, s) => n + s.blocks, 0);
 
   return (
     banner(
       'Test inventory',
-      '`vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`',
+      '`vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `supabase/functions/*/*_test.ts`, `e2e/*.spec.ts`',
       'What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.',
     ) +
     [
@@ -476,6 +504,8 @@ function generateTesting() {
       '| `npm run lint` | TypeScript, no emit |',
       '| `npm run design-system:check` | Design-system mirrors and hygiene |',
       '| `npm run docs:check` | Documentation drift and ownership |',
+      '| `npm run test:e2e` | The Playwright specs in `e2e/`, against a built `dist/` (run `npm run build` first) |',
+      '| `deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts` | The Edge Function handler tests, with Deno as CI pins it |',
       '',
       'Vitest runs under the **Node** environment, not jsdom or a device; suites that need a DOM opt in per file with a `@vitest-environment jsdom` docblock. A mobile test file therefore cannot import `react-native`. This is why feature modules keep their rules in pure, framework-free files — those are the parts under test.',
       '',
@@ -483,7 +513,25 @@ function generateTesting() {
       '',
       'SQL suites run against a **disposable** database, never Production (CLAUDE.md §10). `.github/workflows/sql-suites.yml` gates them, and the heavier migration-chain job is path-gated so it only runs when SQL changes.',
       '',
+      'The same job ends with `.github/sql-ci/existing-data.sh`: the change\'s migrations applied onto a database that already holds rows (`.github/sql-ci/existing-data.sql`, written through the real RPCs), with invariants and a fingerprint diff. It is report-only until `SQL_CI_EXISTING_DATA_BLOCKING` is set.',
+      '',
       ...sqlFiles.map((f) => `- \`supabase/tests/${f}\``),
+      '',
+      '## Edge Function handler tests (Deno)',
+      '',
+      'Each calls a function\'s real request handler, exported from a module beside its `index.ts`, with `fetch` stubbed and without `--allow-net`, so nothing leaves the machine. The `Edge Function typecheck (Deno)` CI job runs them after `deno check`.',
+      '',
+      '| File | Tests |',
+      '| --- | --- |',
+      ...denoRows,
+      '',
+      '## End-to-end specs',
+      '',
+      'Playwright, against the **built** web app: `npm run build` produces `dist/`, `e2e/serve-dist.mjs` serves it with `vercel.json`\'s headers and rewrites, and every Supabase and Sentry request is answered or refused inside the browser, so nothing reaches Production. The `Production build` CI job runs them straight after the build.',
+      '',
+      '| File | Tests |',
+      '| --- | --- |',
+      ...e2eRows,
       '',
       '## TypeScript suites',
       '',
