@@ -8,6 +8,7 @@ import {
   LazywaitCatalogEntity, LazywaitMappingEntity, LazywaitPriceRef,
 } from '../../lib/api';
 import { suggestBestMatch, MatchLevel } from '../../lib/lazywaitMatch';
+import { exactTime } from './view/adminTime';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Notice } from '../../design-system/ui/Notice';
@@ -214,7 +215,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
         <div className="min-w-0">
           <Text variant="label" tone="secondary" as="p">Catalog Mapping</Text>
           <Text variant="caption" tone="tertiary" numeric as="p" className="mt-0.5">
-            {status?.last_pull_at ? `Last pull ${new Date(status.last_pull_at).toLocaleString()}` : 'Not pulled yet'}
+            {status?.last_pull_at ? `Last pull ${exactTime(status.last_pull_at, 'en')}` : 'Not pulled yet'}
           </Text>
         </div>
         <div className="flex items-center gap-1.5">

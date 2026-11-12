@@ -492,6 +492,14 @@ whose target has been deleted shows `(deleted)` rather than an empty cell —
 because an empty cell reads as *everything*, which is the opposite of what a
 narrowed campaign does.
 
+**The list's dates are Riyadh calendar dates (since 2026-11-12).** PostgREST
+returns `starts_at` and `ends_at` in UTC, the Production session zone, and the
+list sliced that string. A campaign starting at midnight Riyadh is 21:00 UTC the
+day before, so it was listed as starting a day early. Only the display changed:
+the form still reads what the administrator types in the browser's own zone,
+and the resolver compares instants, not dates. The 2026-11-11 assessment read
+Production read-only and found 0 campaigns, so no live campaign was shown wrong.
+
 ## 6. Testing
 
 | Suite | Covers |

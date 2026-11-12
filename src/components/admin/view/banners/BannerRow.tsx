@@ -16,6 +16,7 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
 import type { DbHomepageBanner } from '../../../../lib/api';
+import { riyadhDateOnly } from '../../../../utils/calculations';
 
 const ICON_BTN = [
   'ds-motion inline-flex size-7 items-center justify-center rounded-[var(--radius-ds-sm)]',
@@ -75,8 +76,10 @@ export function BannerRow({
         </div>
         <Text variant="caption" tone="tertiary" as="p">
           {isRTL ? 'الترتيب' : 'Order'} <span className="num">{b.sort_order}</span>
-          {b.starts_at ? ` • ${isRTL ? 'من' : 'from'} ${new Date(b.starts_at).toLocaleDateString()}` : ''}
-          {b.ends_at ? ` • ${isRTL ? 'إلى' : 'to'} ${new Date(b.ends_at).toLocaleDateString()}` : ''}
+          {/* Riyadh calendar dates: the device's own date format and zone put
+              a banner scheduled for midnight Riyadh on the previous day. */}
+          {b.starts_at ? ` • ${isRTL ? 'من' : 'from'} ${riyadhDateOnly(b.starts_at)}` : ''}
+          {b.ends_at ? ` • ${isRTL ? 'إلى' : 'to'} ${riyadhDateOnly(b.ends_at)}` : ''}
         </Text>
       </div>
 

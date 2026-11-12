@@ -16,11 +16,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  boundsEndsAt,
   couponRisks,
   couponState,
   couponsApi,
   normaliseCode,
   toIso,
+  toLocalInputValue,
   validateDraft,
   type Coupon,
   type CouponDraft,
@@ -310,6 +312,130 @@ describe('updateBounds changes what a code is bounded by, never what it is', () 
       max_discount_amount: null,
       usage_limit: null,
       ends_at: null,
+    });
+  });
+});
+
+/**
+ * Run `fn` with the process in `zone`, then put the zone back. Node re-reads
+ * TZ when it is assigned. CI runs in UTC, which is precisely the zone in which
+ * the Bounds defect could not be seen, so these cases never use the default.
+ */
+async function inZone<T>(zone: string, fn: () => T | Promise<T>): Promise<T> {
+  const before = process.env.TZ;
+  process.env.TZ = zone;
+  try {
+    return await fn();
+  } finally {
+    if (before === undefined) delete process.env.TZ;
+    else process.env.TZ = before;
+  }
+}
+
+describe('toLocalInputValue — the exact inverse of toIso, in every zone', () => {
+  // Riyadh midnight; both 2026 daylight-saving changes in London and Los
+  // Angeles, either side of each; seconds and milliseconds; and UTC.
+  const CASES: [zone: string, iso: string, shown: string][] = [
+    ['Asia/Riyadh', '2026-11-30T21:00:00Z', '2026-12-01T00:00'],
+    ['Asia/Riyadh', '2026-12-31T20:59:00Z', '2026-12-31T23:59'],
+    ['Asia/Riyadh', '2026-11-30T21:00:30Z', '2026-12-01T00:00:30'],
+    ['Asia/Riyadh', '2026-11-30T21:00:00.250Z', '2026-12-01T00:00:00.250'],
+    ['Europe/London', '2026-03-29T00:59:00Z', '2026-03-29T00:59'],
+    ['Europe/London', '2026-03-29T01:00:00Z', '2026-03-29T02:00'],
+    ['Europe/London', '2026-07-01T23:00:00Z', '2026-07-02T00:00'],
+    ['Europe/London', '2026-10-25T00:30:00Z', '2026-10-25T01:30'],
+    ['Europe/London', '2026-10-25T02:00:00Z', '2026-10-25T02:00'],
+    ['Europe/London', '2026-12-01T00:00:00Z', '2026-12-01T00:00'],
+    ['America/Los_Angeles', '2026-03-08T09:59:00Z', '2026-03-08T01:59'],
+    ['America/Los_Angeles', '2026-03-08T10:00:00Z', '2026-03-08T03:00'],
+    ['America/Los_Angeles', '2026-11-01T08:30:00Z', '2026-11-01T01:30'],
+    ['America/Los_Angeles', '2026-11-01T10:00:00Z', '2026-11-01T02:00'],
+    ['America/Los_Angeles', '2026-12-01T08:00:00Z', '2026-12-01T00:00'],
+    ['UTC', '2026-11-30T21:00:00Z', '2026-11-30T21:00'],
+  ];
+
+  it.each(CASES)('%s: %s shows as %s and converts back to the same instant', async (zone, iso, shown) => {
+    await inZone(zone, () => {
+      expect(toLocalInputValue(iso)).toBe(shown);
+      expect(toIso(toLocalInputValue(iso))).toBe(new Date(iso).toISOString());
+    });
+  });
+
+  it('cannot round-trip the second pass of a repeated hour — the one thing a wall clock cannot name', async () => {
+    // London's clocks go back at 02:00 BST on 25 October 2026, so 01:30 happens
+    // twice. The field can only say "01:30", and new Date() reads that as the
+    // first one. This is why an UNTOUCHED field is not re-parsed on save.
+    await inZone('Europe/London', () => {
+      expect(toLocalInputValue('2026-10-25T01:30:00Z')).toBe('2026-10-25T01:30');
+      expect(toIso('2026-10-25T01:30')).toBe('2026-10-25T00:30:00.000Z');
+    });
+    await inZone('America/Los_Angeles', () => {
+      expect(toLocalInputValue('2026-11-01T09:30:00Z')).toBe('2026-11-01T01:30');
+      expect(toIso('2026-11-01T01:30')).toBe('2026-11-01T08:30:00.000Z');
+    });
+  });
+
+  it('is blank for no value or a value that is not an instant', () => {
+    expect(toLocalInputValue(null)).toBe('');
+    expect(toLocalInputValue(undefined)).toBe('');
+    expect(toLocalInputValue('')).toBe('');
+    expect(toLocalInputValue('not a date')).toBe('');
+  });
+});
+
+describe('a Bounds save writes an untouched expiry back exactly, in every zone', () => {
+  const mockUpdate = async () => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ update });
+    return update;
+  };
+  const bounds = (endsAt: string) => ({ minOrderAmount: '', maxDiscountAmount: '', usageLimit: '150', endsAt });
+
+  const STORED: [zone: string, stored: string][] = [
+    // The shape PostgREST returns, for 00:00 on 1 December in Riyadh.
+    ['Asia/Riyadh', '2026-11-30T21:00:00+00:00'],
+    // The second 01:30 of the night the clocks go back: the round trip alone
+    // would write it an hour earlier.
+    ['Europe/London', '2026-10-25T01:30:00+00:00'],
+    ['America/Los_Angeles', '2026-11-01T09:30:00+00:00'],
+    // Microseconds, which a JavaScript Date cannot even hold.
+    ['Asia/Riyadh', '2026-11-30T21:00:00.123456+00:00'],
+  ];
+
+  it.each(STORED)('%s: writes %s back unchanged when only the usage limit moved', async (zone, stored) => {
+    const update = await mockUpdate();
+    await inZone(zone, () => couponsApi.updateBounds('c1', bounds(toLocalInputValue(stored)), stored));
+    expect(update.mock.calls[0][0]).toMatchObject({ usage_limit: 150, ends_at: stored });
+  });
+
+  it('writes the new instant when the operator changed the expiry', async () => {
+    const update = await mockUpdate();
+    await inZone('Asia/Riyadh', () =>
+      couponsApi.updateBounds('c1', bounds('2026-12-02T00:00'), '2026-11-30T21:00:00+00:00'),
+    );
+    expect(update.mock.calls[0][0].ends_at).toBe('2026-12-01T21:00:00.000Z');
+  });
+
+  it('clears the expiry when the operator blanked the field', async () => {
+    const update = await mockUpdate();
+    await couponsApi.updateBounds('c1', bounds(''), '2026-11-30T21:00:00+00:00');
+    expect(update.mock.calls[0][0].ends_at).toBeNull();
+  });
+
+  it('a caller that omits the stored instant gets the plain conversion', async () => {
+    const update = await mockUpdate();
+    await inZone('Asia/Riyadh', () => couponsApi.updateBounds('c1', bounds('2026-12-01T00:00')));
+    expect(update.mock.calls[0][0].ends_at).toBe('2026-11-30T21:00:00.000Z');
+  });
+
+  it('boundsEndsAt is the rule on its own', async () => {
+    await inZone('Europe/London', () => {
+      const stored = '2026-10-25T01:30:00+00:00';
+      expect(boundsEndsAt(toLocalInputValue(stored), stored)).toBe(stored);
+      expect(boundsEndsAt('2026-10-25T01:30', null)).toBe('2026-10-25T00:30:00.000Z');
+      expect(boundsEndsAt('', stored)).toBeNull();
     });
   });
 });

@@ -12,7 +12,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Coupon } from '../../lib/couponsApi';
+import { toIso, type Coupon } from '../../lib/couponsApi';
 
 const api = vi.hoisted(() => ({
   list: vi.fn(),
@@ -255,6 +255,79 @@ describe('an existing code can be re-bounded — the thing the screen is for', (
     await waitFor(() => expect(api.updateBounds).toHaveBeenCalledTimes(1));
     expect(api.updateBounds.mock.calls[0][0]).toBe('c1');
     expect(api.updateBounds.mock.calls[0][1]).toMatchObject({ usageLimit: '25' });
+  });
+});
+
+describe('dates are Riyadh dates, and an untouched expiry stays where it is', () => {
+  // PostgREST returns timestamptz in the database session zone — UTC in
+  // Production — so this is what the panel receives for an expiry set to the
+  // start of 1 December in Riyadh.
+  const STORED = '2026-11-30T21:00:00+00:00';
+  let zoneBefore: string | undefined;
+
+  beforeEach(() => {
+    // Node re-reads TZ when it is assigned. Riyadh is the zone every operator's
+    // browser is expected to be in; CI runs in UTC, the one zone that hid this.
+    zoneBefore = process.env.TZ;
+    process.env.TZ = 'Asia/Riyadh';
+    api.list.mockResolvedValue([
+      coupon({
+        starts_at: '2026-11-14T21:00:00+00:00',
+        ends_at: STORED,
+        usage_limit: 100,
+        max_discount_amount: 20,
+      }),
+    ]);
+  });
+
+  afterEach(() => {
+    if (zoneBefore === undefined) delete process.env.TZ;
+    else process.env.TZ = zoneBefore;
+  });
+
+  const openBounds = async () => {
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    fireEvent.click(screen.getByRole('button', { name: /^Bounds$/i }));
+    return (await screen.findByLabelText('Expires', { selector: '#cb-end-c1' })) as HTMLInputElement;
+  };
+
+  it('shows the Riyadh calendar date in the list, not the UTC one', async () => {
+    // Slicing the UTC string read these as 2026-11-14 and 2026-11-30.
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    expect(screen.getByText('2026-11-15 → 2026-12-01')).toBeTruthy();
+  });
+
+  it("opens Bounds with the stored expiry on the operator's own clock", async () => {
+    // It showed 2026-11-30T21:00 — the UTC wall clock — which the save then
+    // read as Riyadh time.
+    expect((await openBounds()).value).toBe('2026-12-01T00:00');
+  });
+
+  it('a save that changes only the usage limit keeps the expiry instant', async () => {
+    await openBounds();
+    fireEvent.change(screen.getByLabelText('Usage limit', { selector: '#cb-limit-c1' }), {
+      target: { value: '150' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save bounds/i }));
+
+    await waitFor(() => expect(api.updateBounds).toHaveBeenCalledTimes(1));
+    const [id, bounds, storedEndsAt] = api.updateBounds.mock.calls[0];
+    expect(id).toBe('c1');
+    expect(bounds.usageLimit).toBe('150');
+    // 18:00Z before the fix: three hours earlier on every save, compounding.
+    expect(toIso(bounds.endsAt)).toBe('2026-11-30T21:00:00.000Z');
+    // The instant it was opened with travels with it, so couponsApi can write
+    // an untouched expiry back exactly (see boundsEndsAt).
+    expect(storedEndsAt).toBe(STORED);
+  });
+
+  it("reads an edited expiry in the operator's zone, as the create form does", async () => {
+    fireEvent.change(await openBounds(), { target: { value: '2026-12-02T00:00' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save bounds/i }));
+    await waitFor(() => expect(api.updateBounds).toHaveBeenCalledTimes(1));
+    expect(toIso(api.updateBounds.mock.calls[0][1].endsAt)).toBe('2026-12-01T21:00:00.000Z');
   });
 });
 
