@@ -10,6 +10,7 @@ import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Product } from '../../types/models';
 import { motion, radius, space, type as typeScale } from '../generated/tokens';
+import { productCardAccessibilityLabel } from './productCardA11y';
 import { Text } from './Text';
 
 interface Props {
@@ -35,13 +36,14 @@ interface Props {
 
 export const ProductCard = React.memo(function ProductCard({ product, needsChoice, showFromPrice = false, available = true, onAdd }: Props) {
   const colors = useThemeColors();
-  const { t, pick, rtlRow } = useI18n();
+  const { t, pick, lang, rtlRow } = useI18n();
   const styles = useStyles();
   const [imgFailed, setImgFailed] = useState(false);
   const name = pick(product.nameEn, product.nameAr);
   const description = pick(product.descriptionEn, product.descriptionAr);
   const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
   const actionLabel = needsChoice ? t('choose') : t('addToCart');
+  const pricePrefix = showFromPrice ? t('fromPrice') : undefined;
   const showImage = !!product.imageUrl && !imgFailed;
   const content = (
     <>
@@ -51,8 +53,17 @@ export const ProductCard = React.memo(function ProductCard({ product, needsChoic
         <Text variant="heading" numberOfLines={2}>{name}</Text>
         {description ? <Text variant="caption" tone="secondary" numberOfLines={2}>{description}</Text> : null}
         <View style={[styles.bottom, rtlRow]}>
-          <View><Price amount={product.price} size={typeScale.body.size} weight="700" prefix={showFromPrice ? t('fromPrice') : undefined} />{kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}</View>
-          {available ? (
+          <View><Price amount={product.price} size={typeScale.body.size} weight="700" prefix={pricePrefix} />{kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}</View>
+          {available && needsChoice ? (
+            // The CARD is the button here and performs this same action, so
+            // "Choose" is drawn, not pressable: a second button inside the
+            // first is nested interactive content (R07#3). Same style, so a
+            // sighted customer sees the same button and the tap lands on the
+            // card either way.
+            <View style={styles.add}>
+              <Text variant="label" tone="onEmber" align="center">{actionLabel}</Text>
+            </View>
+          ) : available ? (
             <Pressable onPress={(event) => { event.stopPropagation(); onAdd(product, needsChoice); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}
               style={({ pressed }) => [styles.add, pressed && styles.addPressed]}>
               <Text variant="label" tone="onEmber" align="center">{actionLabel}</Text>
@@ -76,7 +87,7 @@ export const ProductCard = React.memo(function ProductCard({ product, needsChoic
     );
   }
   if (needsChoice) {
-    return <Pressable onPress={() => onAdd(product, true)} accessibilityRole="button" accessibilityLabel={name} accessibilityHint={pick('Opens item options', 'يفتح خيارات المنتج')}
+    return <Pressable onPress={() => onAdd(product, true)} accessibilityRole="button" accessibilityLabel={productCardAccessibilityLabel(name, product.price, lang, pricePrefix)} accessibilityHint={pick('Opens item options', 'يفتح خيارات المنتج')}
       style={({ pressed }) => [styles.card, rtlRow, pressed && styles.cardPressed]}>{content}</Pressable>;
   }
   return <View style={[styles.card, rtlRow]}>{content}</View>;

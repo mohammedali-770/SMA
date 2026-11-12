@@ -102,6 +102,18 @@ Important distinction:
 
 The Aug 11 iOS release-readiness work recorded `SENTRY_AUTH_TOKEN` in the EAS production environment and verified the resolved production config included the Sentry plugin.
 
+**What CI checks, since 2026-11-12.** A `production` run of
+`.github/workflows/eas-build.yml` lists the EAS `production` environment's
+variable names (`eas env:list production --format short`, project and account
+scope, eas-cli 25.3.0) and refuses to start the build unless
+`SENTRY_AUTH_TOKEN` is among them. The listing's output is captured and never
+printed, because a plaintext variable's value would be in it; only the answer
+and a count reach the log. Before that date the step tested a **GitHub Actions
+secret** of the same name, which the cloud build never reads: it passed when EAS
+had lost the token and blocked a correct build when only EAS held it. That
+GitHub secret is no longer read by any workflow. The check proves the variable
+exists, not that the token works.
+
 Do **not** reintroduce the old action item “create the token” as if it is still known missing. Instead, for every production release verify the current secret/environment and successful upload because secrets can expire, be rotated or be removed outside Git.
 
 Never:

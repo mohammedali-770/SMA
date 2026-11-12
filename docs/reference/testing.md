@@ -2,7 +2,7 @@
      GENERATED FILE — DO NOT EDIT.
      Regenerate with: npm run docs:generate
      CI fails if this file drifts from its source (npm run docs:check).
-     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`
+     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `supabase/functions/*/*_test.ts`, `e2e/*.spec.ts`
      Describes the REPOSITORY, not live Production.
      ------------------------------------------------------------------ -->
 
@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**251 TypeScript test files declaring 3847 test blocks, plus 88 SQL suites.**
+**259 TypeScript test files declaring 3919 test blocks, plus 89 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -23,6 +23,8 @@ What is tested, where those tests live, and how to run them. Use it to find whet
 | `npm run lint` | TypeScript, no emit |
 | `npm run design-system:check` | Design-system mirrors and hygiene |
 | `npm run docs:check` | Documentation drift and ownership |
+| `npm run test:e2e` | The Playwright specs in `e2e/`, against a built `dist/` (run `npm run build` first) |
+| `deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts` | The Edge Function handler tests, with Deno as CI pins it |
 
 Vitest runs under the **Node** environment, not jsdom or a device; suites that need a DOM opt in per file with a `@vitest-environment jsdom` docblock. A mobile test file therefore cannot import `react-native`. This is why feature modules keep their rules in pure, framework-free files — those are the parts under test.
 
@@ -30,12 +32,15 @@ Vitest runs under the **Node** environment, not jsdom or a device; suites that n
 
 SQL suites run against a **disposable** database, never Production (CLAUDE.md §10). `.github/workflows/sql-suites.yml` gates them, and the heavier migration-chain job is path-gated so it only runs when SQL changes.
 
+The same job ends with `.github/sql-ci/existing-data.sh`: the change's migrations applied onto a database that already holds rows (`.github/sql-ci/existing-data.sql`, written through the real RPCs), with invariants and a fingerprint diff. It is report-only until `SQL_CI_EXISTING_DATA_BLOCKING` is set.
+
 - `supabase/tests/account_deletion_fencing_test.sql`
 - `supabase/tests/account_deletion_lock_test.sql`
 - `supabase/tests/account_deletion_manual_review_resolution_test.sql`
 - `supabase/tests/account_deletion_resolution_note_privacy_test.sql`
 - `supabase/tests/account_deletion_test.sql`
 - `supabase/tests/address_single_default_test.sql`
+- `supabase/tests/admin_loyalty_stats_test.sql`
 - `supabase/tests/admin_push_closure_notifications_test.sql`
 - `supabase/tests/admin_push_subscriptions_test.sql`
 - `supabase/tests/admin_ranged_orders_and_stats_test.sql`
@@ -119,6 +124,22 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/staff_mfa_aal2_test.sql`
 - `supabase/tests/staff_role_administration_test.sql`
 
+## Edge Function handler tests (Deno)
+
+Each calls a function's real request handler, exported from a module beside its `index.ts`, with `fetch` stubbed and without `--allow-net`, so nothing leaves the machine. The `Edge Function typecheck (Deno)` CI job runs them after `deno check`.
+
+| File | Tests |
+| --- | --- |
+| `supabase/functions/account-delete-scheduler/handler_test.ts` | 10 |
+
+## End-to-end specs
+
+Playwright, against the **built** web app: `npm run build` produces `dist/`, `e2e/serve-dist.mjs` serves it with `vercel.json`'s headers and rewrites, and every Supabase and Sentry request is answered or refused inside the browser, so nothing reaches Production. The `Production build` CI job runs them straight after the build.
+
+| File | Tests |
+| --- | --- |
+| `e2e/guest-journey.spec.ts` | 2 |
+
 ## TypeScript suites
 
 Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,tsx}`, `supabase/functions/**/*.test.ts`, `apps/mobile/src/**/*.test.{ts,tsx}`, `apps/mobile/plugins/**/*.test.ts`.
@@ -133,7 +154,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-90 files, 1224 declared test blocks.
+96 files, 1281 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -144,6 +165,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/components/locationControl.test.ts` | 25 | shouldStartLocate |
 | `apps/mobile/src/components/stateHierarchy.test.ts` | 9 | looksTechnical |
 | `apps/mobile/src/design-system/designSystem.test.ts` | 5 | mobile design-system mirror |
+| `apps/mobile/src/design-system/ui/a11yState.test.ts` | 10 | selectedButtonState |
+| `apps/mobile/src/design-system/ui/productCardA11y.test.ts` | 6 | productCardAccessibilityLabel |
+| `apps/mobile/src/design-system/ui/statusInkWiring.test.ts` | 8 | StatusPill foregrounds are inks |
 | `apps/mobile/src/dev/fixtureGate.test.ts` | 10 | fixture gate — fails closed |
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 8 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
@@ -151,6 +175,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
+| `apps/mobile/src/features/auth/signInA11yWiring.test.ts` | 4 | PhoneOtpLogin errors are announced |
 | `apps/mobile/src/features/cart/quantityLimit.test.ts` | 7 | MAX_LINE_QUANTITY |
 | `apps/mobile/src/features/cart/repriceCart.test.ts` | 24 | repriceCart — the price the cart shows is the price the menu now asks |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
@@ -190,6 +215,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/dataExport.test.ts` | 13 | shouldStartExport |
 | `apps/mobile/src/features/profile/loyaltyExpiry.test.ts` | 8 | formatExpiryDate |
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
+| `apps/mobile/src/i18n/documentLang.test.ts` | 6 | applyDocumentLang |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
@@ -213,6 +239,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
+| `apps/mobile/src/lib/webExportSourceMaps.test.ts` | 18 | planWebExport without SENTRY_AUTH_TOKEN |
 | `apps/mobile/src/lib/webIndexTemplate.test.ts` | 5 | apps/mobile/public/index.html |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
@@ -222,7 +249,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
 | `apps/mobile/src/store/catalogMapping.test.ts` | 1 | mapPricedMenu |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
-| `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
+| `apps/mobile/src/theme/darkContrastContract.test.ts` | 15 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
 | `apps/mobile/src/types/webviewTypeShim.test.ts` | 4 | react-native-webview type shim |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |
@@ -230,7 +257,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-122 files, 1698 declared test blocks.
+124 files, 1713 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -275,7 +302,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
-| `src/components/AuthScreen.test.tsx` | 4 | AuthScreen |
+| `src/components/AuthScreen.test.tsx` | 7 | AuthScreen |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
 | `src/components/ops/BranchConsole.test.tsx` | 43 | BranchConsole |
@@ -293,7 +320,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
-| `src/design-system/contrastContract.test.ts` | 9 | muted ink clears WCAG AA for normal text |
+| `src/design-system/contrastContract.test.ts` | 12 | muted ink clears WCAG AA for normal text |
 | `src/design-system/fieldState.test.ts` | 15 | resolveFieldState — accessibility wiring |
 | `src/design-system/money.test.ts` | 19 | formatAmount — en-SA |
 | `src/design-system/ui/Button.test.tsx` | 8 | Button (web) |
@@ -312,6 +339,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
+| `src/lib/documentLang.test.ts` | 6 | applyDocumentLang |
+| `src/lib/e2eServeDist.test.ts` | 3 | e2e/serve-dist.mjs source patterns |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
 | `src/lib/imageUpload.test.ts` | 21 | fitWithin |

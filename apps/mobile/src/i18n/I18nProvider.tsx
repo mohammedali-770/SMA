@@ -9,8 +9,10 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { LANGUAGE_STORAGE_KEY as STORAGE_KEY } from '../lib/storageKeys';
+import { applyDocumentLang } from './documentLang';
 import { rtlRow, rtlText } from './rtl';
 import { STRINGS, type Lang, type StringKey } from './strings';
 
@@ -41,6 +43,14 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(() => {});
   }, []);
+
+  // Web only: a screen reader reads Arabic with English rules under the
+  // export's `<html lang="en">`. Sets `lang` and never `dir` — see
+  // documentLang.ts for why `dir` would double-flip every `rtlRow`.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    applyDocumentLang(lang, document);
+  }, [lang]);
 
   const setLang = useCallback((l: Lang) => {
     setLangState(l);

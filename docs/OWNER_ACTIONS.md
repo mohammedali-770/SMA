@@ -499,7 +499,13 @@ Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. 
 
 - **EAS (native).** The August 11 iOS release-readiness work added `SENTRY_AUTH_TOKEN` to the EAS production environment and aligned the Sentry React Native compatibility line. Do not reintroduce the old documentation claim that the EAS token is simply missing. For each production release, verify source-map upload through the current Sentry release gates rather than assuming a historical secret still exists/works.
 - **Vercel (admin web): the token was not in the production build, measured 2026-11-11.** The production console bundle for commit `622a133` carries no Sentry debug ID. The upload plugin injects one into every chunk whenever it runs, so it did not run (`docs/SENTRY_WEB_OBSERVABILITY.md`). **Action:** add `SENTRY_AUTH_TOKEN` to the Vercel project's Production environment as a sensitive variable, never as a `VITE_*` one. A Vercel Production settings change is an owner action (CLAUDE.md §5). The next production `main-*.js` containing `sentry-dbid` shows it worked; an approved admin-web test event with a readable stack confirms it.
-- **`/app` (customer web): a token alone does not help.** The export produces no source maps at all, so there is nothing to upload. That needs a change to `apps/mobile/scripts/export-web.js`, not a setting.
+- **`/app` (customer web): the same token now covers it, changed 2026-11-12.** Until then the export produced no source maps, so a token alone would not have helped. `apps/mobile/scripts/export-web.js` now produces maps when `SENTRY_AUTH_TOKEN` is present, uploads them, deletes them from `dist/app`, and fails the build if any is left (`docs/SENTRY_WEB_OBSERVABILITY.md`). Both surfaces are built by the same `npm run build`, so **adding the token for the console also starts the `/app` upload, in the same production build**. There is no separate `/app` setting to make. What to expect:
+  - every production build uploads about 15 MB more and takes a little longer;
+  - a failed upload prints `WARNING: /app source maps were NOT uploaded to Sentry` and the build still succeeds, as the console's does;
+  - the build log should show `[export-web] /app source maps uploaded to Sentry.`, and an approved `/app` test event with readable frames confirms it;
+  - if the token is added to Preview as well as Production, preview builds upload too.
+
+  The token needs the same Sentry scopes the console upload uses. `/app` uploads into the same `react-native` project.
 
 ## 12. Migration ledger reconciliation — resolved 2026-08-12
 
@@ -2857,6 +2863,20 @@ It is deliberately not the "sold out" wording beside it (`soldOutNow`): a sold-o
 item comes back by itself, and this one has been withdrawn. Check that «ضمن
 القائمة» reads as "on the menu" rather than "in the list".
 
+**Widened 2026-11-12 — the accessibility pass (R07).** One new visible string and
+one new spoken composition, both engineering-drafted:
+
+- **Console sign-in footer**, `authSecuredBy` in `src/components/ops/opsStrings.ts`
+  (staff-facing, live on merge): «محمي عبر Supabase Auth · صلاحيات حسب الدور» —
+  English: *"Secured by Supabase Auth · role-based access"*. Until now the footer
+  was English in both languages.
+- **The menu card's spoken name**, heard only with VoiceOver or TalkBack on, for an
+  item that opens its options: the product name, a comma, then the price as
+  `priceAccessibilityLabel` already speaks it — for example «وجبة برجر, من 14.00
+  ريال سعودي». Nothing new is translated; what to check is whether the Latin comma
+  and the order read naturally, or whether «،» belongs there
+  (`apps/mobile/src/design-system/ui/productCardA11y.ts`).
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -4341,10 +4361,47 @@ There is no number to decide, and nothing to deploy.
 **Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
 and §58 marked APPLIED.
 
-## 50. Audit trail — one apply, then two deploys, in that order
+## 50. Loyalty totals in the console — merge, apply, then merge #456
+
+**Opened 2026-11-12.** `20261008120000_admin_loyalty_stats.sql` is written,
+validated and NOT applied. Detail: `docs/MIGRATIONS.md` §59. *This number may
+need renumbering: a parallel pull request also adds an owner-action section.*
+
+Settings → Loyalty used to sum its four tiles in the browser over every
+profile, downloaded on every staff sign-in. Past 1 000 customers PostgREST's
+row cap made those tiles silently wrong. The tiles now read
+`admin_loyalty_stats()`, and the customer ledger is read 50 rows at a time when
+the Loyalty section is opened. Who can see the figures does not change: admin
+or accountant, at AAL2, as before.
+
+**The ordering matters.** This pull request carries the migration alone, so
+merging it changes nothing anyone sees. The console change that reads the new
+function is #456, and a merge deploys the console (Vercel's Git integration,
+CLAUDE.md §13). If #456 merged first, the four tiles would show "—" until the
+apply, a regression from today's numbers. So: **merge this, apply it, and only
+then merge #456.**
+
+### The step
+
+1. **Merge this pull request**, then **apply `20261008120000` by name** (§5),
+   re-hashing the merged copy first. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. It is independent of every other
+   outstanding file.
+2. **Check afterwards**, read-only: one `admin_loyalty_stats()` overload;
+   `anon` cannot execute it and `authenticated` can; `place_order`
+   `12b6816d…` and `compute_order_snapshot` `22e2d429…` are unchanged.
+3. **Then merge #456.** After its deploy, open Settings → Loyalty as an admin
+   at AAL2: the tiles show numbers and no notice.
+
+There is no number to decide and no function to deploy.
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
+and §59 marked APPLIED.
+
+## 51. Audit trail — one apply, then two deploys, in that order
 
 **Opened 2026-11-12.** `20261007120000_audit_trail.sql` is written, validated
-and NOT applied. Detail: `docs/MIGRATIONS.md` §59.
+and NOT applied. Detail: `docs/MIGRATIONS.md` §60.
 
 It closes checklist gaps S09#1-3. After it:
 
@@ -4388,7 +4445,7 @@ changes, and the money path is asserted unchanged.
    `22e2d429…` unchanged.
 
 **Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`
-and §59 marked APPLIED, then both deploys recorded with their versions.
+and §60 marked APPLIED, then both deploys recorded with their versions.
 
 ## Owner-action closeout rule
 

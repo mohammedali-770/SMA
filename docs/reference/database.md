@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **151**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261007120000_audit_trail.sql`.
+Migration files in the repository: **152**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261008120000_admin_loyalty_stats.sql`.
 
 ## Tables
 
@@ -109,6 +109,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_list_orders_with_items` | 5 | `20261006120000_rls_initplan_live_board_order_year.sql` |
 | `admin_list_role_change_audit` | 1 | `20260810141000_staff_access_directory.sql` |
 | `admin_list_staff` | 1 | `20260810140000_staff_role_administration.sql` |
+| `admin_loyalty_stats` | 1 | `20261008120000_admin_loyalty_stats.sql` |
 | `admin_order_stats` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
 | `admin_push_availability_copy` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `admin_push_delivery_copy` | 1 | `20260928120000_admin_push_closure_notifications.sql` |

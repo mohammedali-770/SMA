@@ -295,13 +295,24 @@ before the deploy it must follow.
 
 **AMENDED 2026-11-12 (later) — `20261007120000_audit_trail` is written,
 validated and awaiting approval. On merge it joins the unapplied set**, which
-is the SEVEN named in the `20261006120000` note below, so EIGHT. It adds
+is the EIGHT named in the `20261008120000` note below, so NINE. It adds
 append-only `order_status_audit` and `admin_action_audit`, and
 `notification_log.sent_by`/`content`; it redefines no existing function and the
 money path is self-asserted. It must be applied BEFORE `push-dispatch` and
-`staff-accounts` are deployed (`docs/OWNER_ACTIONS.md` §50). `20260824100000`
+`staff-accounts` are deployed (`docs/OWNER_ACTIONS.md` §51). `20260824100000`
 still sorts ahead of it, so a bulk apply would take the Moyasar file first.
-**Name the target by version.** Detail: `docs/MIGRATIONS.md` §59.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §60.
+
+**AMENDED 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
+written, validated and awaiting approval, so on merge it joins the unapplied
+set, making it EIGHT:** the seven named below and this file. It adds one
+read-only function, `admin_loyalty_stats()`, gated on `is_staff()` exactly as
+`profiles_select_own_or_staff` is, for the console's Loyalty tiles. It redefines
+nothing and the money path is self-asserted. It merges ALONE: the console change
+that reads it (#456) merges only after this file is applied, because a merge
+deploys the console (§13). `20260824100000` still sorts first, so a bulk apply
+would take the Moyasar files first. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §59, owner step `docs/OWNER_ACTIONS.md` §50.
 
 **AMENDED 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
 is written, validated and awaiting approval, so on merge the outstanding set is

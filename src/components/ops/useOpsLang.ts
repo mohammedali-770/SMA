@@ -4,6 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { applyDocumentLang } from '../../lib/documentLang';
 import { OPS_STRINGS, OpsLang, OpsStringKey, opsT } from './opsStrings';
 
 /**
@@ -61,6 +62,10 @@ export function useOpsLang(fallback: OpsLang = 'ar'): OpsLangValue {
   const chosen = useRef(false);
 
   useEffect(() => {
+    // The DOCUMENT follows the language on mount and on every change, the
+    // default included — unlike storage, which records only a choice. A
+    // screen reader picks its pronunciation from `<html lang>`.
+    applyDocumentLang(lang);
     if (!chosen.current) return;
     try { window.localStorage.setItem(KEY, lang); } catch { /* private mode */ }
   }, [lang]);
