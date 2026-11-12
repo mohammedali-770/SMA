@@ -1,6 +1,6 @@
 # Rollback and Mitigation
 
-> **Updated 2026-08-12.** Rollback differs by surface. Use the smallest safe mechanism, preserve auditability, and do not bypass owner/production controls because the word “rollback” sounds safer than “deploy.”
+> **Updated 2026-08-12; §5 updated 2026-11-11.** Rollback differs by surface. Use the smallest safe mechanism, preserve auditability, and do not bypass owner/production controls because the word “rollback” sounds safer than “deploy.”
 
 ## 1. First identify the failing surface
 
@@ -80,9 +80,69 @@ Production database changes are forward-only:
 - never run `supabase migration repair` to force history alignment;
 - create a new corrective migration and apply it only through the approved process.
 
-If the problem is **data loss/corruption**, a corrective DDL migration may not recover data. Follow `BACKUP_RECOVERY.md` and verify actual backup/PITR availability before promising recovery.
+If the problem is **data loss/corruption**, a corrective DDL migration may not recover data. Follow `BACKUP_RECOVERY.md` before promising recovery: on 2026-11-11 the project is on Supabase's Free plan, which keeps no backups at all.
 
-`docs/MIGRATIONS.md` contains the migration workflow/history, but its Aug 7 live-count snapshot needs the reconciliation recorded in `OWNER_ACTIONS.md` §12 before those counts are treated as current.
+For the current applied and unapplied migrations, read CLAUDE.md §8 and `MIGRATIONS.md` §1. The counts move with every apply.
+
+### A recorded rollback is valid only against the schema it was written for
+
+Many migrations end with a rollback footer, and `MIGRATIONS.md` §9-B.4 captures
+rollback SQL before each apply. Both describe how to undo that migration **against
+the schema as it was then**. Every later migration can make them wrong, and nothing
+warns you:
+
+- **A `DROP FUNCTION` succeeds while other functions still call the dropped one.**
+  PostgreSQL records a dependency for a view, a trigger or a column default, but not
+  for a call made inside a function body written as a string. That covers every
+  `plpgsql` function and every `language sql` function written `as $$ … $$`, which is
+  all of them in this chain: it has no SQL-standard (`begin atomic`) bodies. So
+  `pg_depend` sees none of the calls between its functions. The DROP reports
+  success, and the failure arrives at the next call.
+- **Re-applying an old function body silently reverts every later change to that
+  function.**
+
+So before you run any recorded rollback:
+
+1. **Re-derive it** from the function's current definition, the last migration that
+   defines it, not from the file the footer came from.
+2. **Search the live function bodies for callers of each function it drops.**
+   `pg_depend` will not find them. This is read-only:
+
+   ```sql
+   select n.nspname, p.proname
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where p.prosrc ~* '\morder_note_normalized\s*\('   -- the dropped name
+     and p.proname <> 'order_note_normalized'
+   order by 1, 2;
+   ```
+
+   Every row is a caller the rollback breaks, unless the same rollback also drops
+   it. A comment that mentions the name matches too, so read each hit.
+3. **For each function it re-applies, list the later migrations that define it:**
+   `grep -l "create or replace function public.<name>(" supabase/migrations/*.sql`.
+   Every file after the one the rollback came from is a change the rollback would
+   undo.
+4. **Then treat it as a corrective migration like any other:** reviewed, tested on
+   the local chain, applied by name on owner approval.
+
+**Two documented rollbacks are already unsafe for exactly these reasons.** Both were
+measured on a disposable copy of the full chain on 2026-11-11:
+
+- **`20260819120000_order_note_length_limit`** (`MIGRATIONS.md` §27). Its footer
+  drops `order_note_normalized(text)`, which five later functions call:
+  `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`,
+  `enforce_order_item_note` (the trigger on every `order_items` insert) and
+  `order_item_note_is_acceptable`. Every DROP succeeded, and the next call raised
+  `function public.order_note_normalized(text) does not exist`. Following that
+  footer stops every order.
+- **`20260807150000_order_flow_health_card`** (`MIGRATIONS.md` §25). Its footer
+  re-applies a July body of `operations_health_snapshot_internal`, which three later
+  migrations have redefined. The snapshot lost the branch-availability card along
+  with the order-flow card, and raised no error. The footer's second step, dropping
+  the five-argument `operations_health_overall_state`, makes the current snapshot
+  raise on every call.
+
+Migration files are never edited, so both footers still read as they were written.
 
 ## 6. Configuration rollback
 

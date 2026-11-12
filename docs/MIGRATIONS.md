@@ -2048,7 +2048,10 @@ sends it.
 1. Verify the repository base commit.
 2. Verify the current live migration count and latest version.
 3. Verify the expected live object state (the migration's preconditions).
-4. Capture rollback SQL for every change the migration makes.
+4. Capture rollback SQL for every change the migration makes. It is valid only
+   against the schema it was captured from: before it is ever run, re-derive it
+   and check its callers in the live function bodies (`ROLLBACK.md` §5). Two
+   documented rollbacks are already unsafe (§25, §27).
 5. Verify the migration has not already been applied **semantically** (object
    state, not just history rows).
 6. Record before-state fingerprints for everything the migration touches.
@@ -3536,6 +3539,38 @@ a separate live history write needing its own explicit owner approval, and class
   at 0, the console does not yet have the coverage this migration was written to
   provide. The mechanism is in place; the data is not.
 
+### Rollback: the footer is SUPERSEDED and UNSAFE (2026-11-11)
+
+The file's footer says to re-apply the `operations_health_snapshot_internal` body
+from `20260723140000_operations_automation_cron_health.sql:59-863`, then drop the
+five-argument `operations_health_overall_state`. **Do not follow it.** Three later
+migrations redefined that function, each deriving its body from the one before:
+
+- `20260820150000_sweeper_operations_health` puts `branch-availability-sweep` on the
+  jobs board;
+- `20260820160000_branch_availability_health_card` adds the branch-availability
+  card;
+- `20260925120000_health_card_variant_coverage` extends that card to per-size
+  closures.
+
+The July body predates all three, so re-applying it removes them along with the
+order-flow card, and says nothing. Measured on a disposable copy of the full chain
+on 2026-11-11: the snapshot listed 10 cards before and 8 after, with `order_flow`
+and `branch_availability` gone and no error raised. The July body never mentions
+`branch-availability-sweep`; the current one names it four times.
+
+The second step on its own is worse. The current body calls the five-argument
+overload, PostgreSQL records no dependency for that call, so the DROP succeeds and
+the next `operations_health_snapshot_internal()` raises. That breaks its three
+callers: `operations_alerts_evaluate` (the five-minute alerts evaluator),
+`operations_digest_build` and `operations_health_summary` (the console's Operations
+Health Center).
+
+To remove the order-flow card today, derive a corrective migration from the current
+body (`20260925120000`), the way that file was derived from its predecessor, and
+check its dependents per `ROLLBACK.md` §5. The footer stays as written: applied
+files are never edited.
+
 ## 26. Applied migration: order-flow alert condition (applied 2026-08-07, class B)
 
 | | |
@@ -3876,9 +3911,28 @@ twice — dropping both triggers makes it fail at CASE 2, and re-introducing the
 fail at CASE 1 — so its green run means the guard is present and correct rather
 than merely that the file executed.
 
-**Rollback.** Drop the two triggers and the three functions; the commands are in
-the migration footer. No row is modified, no column type changes, and the rule
-is strictly narrowing — every value accepted after it was accepted before.
+**Rollback: SUPERSEDED 2026-11-11, and UNSAFE to follow.** This paragraph used to
+say "drop the two triggers and the three functions; the commands are in the
+migration footer". Do not run that footer. Since `20260821170000_order_item_notes`
+(§31), five later functions call `public.order_note_normalized(text)`:
+`place_order` and `compute_order_snapshot` (last defined in `20260924120000`),
+`insert_order_from_snapshot` (last defined in `20260921120000`), and
+`enforce_order_item_note` (the trigger function behind every `order_items`
+insert) with `order_item_note_is_acceptable` (both in `20260821170000`).
+PostgreSQL records no dependency for a call made inside a function body, so every
+DROP in the footer succeeds and the next order fails. Measured on a disposable copy
+of the full chain on 2026-11-11: no `pg_depend` row referenced the function, all
+five DROPs succeeded, and the next call raised `function
+public.order_note_normalized(text) does not exist`.
+
+What stays true is that the migration modified no row and changed no column type,
+and that the rule is strictly narrowing: every value accepted after it was accepted
+before. What no longer holds is the footer. As of 2026-11-11 nothing outside the
+footer depends on the two triggers, `enforce_order_note()` or
+`order_note_is_acceptable(text)`, so a rollback of the rule would drop those four
+and keep `order_note_normalized`. Re-check that per `ROLLBACK.md` §5 before relying
+on it, because the next migration to call any of them makes it false. The footer
+stays as written: applied files are never edited.
 
 ---
 
