@@ -46,7 +46,7 @@ checkout shows it in the customer's language (`userMessage.ts`):
 | no verified phone | *Please verify your phone number before placing an order.* | `errOrderPhoneUnverified` |
 | `order_limit_open` open orders (default 5) placed in the last 24 h | *You already have N orders in progress. …* | `errOrderOpenLimit` |
 | `order_limit_per_hour` orders (default 10) in the last hour | *You have placed N orders in the last hour. …* | `errOrderHourlyLimit` |
-| more than 50 of one item | the `order_items_quantity_max` check violation | `errOrderQuantityLimit` |
+| more than 50 of one item on a line | *order_items_quantity_max: at most 50 of one item per order line.* (SQLSTATE 23514) | `errOrderQuantityLimit` |
 
 A retry with the idempotency key of an order that already exists still returns
 that order. The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in

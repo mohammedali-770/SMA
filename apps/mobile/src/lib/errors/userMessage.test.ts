@@ -90,7 +90,7 @@ describe('order refusals from place_customer_order', () => {
     ['Please verify your phone number before placing an order.', 'order_phone_unverified', 'errOrderPhoneUnverified'],
     ['You already have 5 orders in progress. Please wait until one is ready before placing another.', 'order_open_limit', 'errOrderOpenLimit'],
     ['You have placed 10 orders in the last hour. Please try again later.', 'order_hourly_limit', 'errOrderHourlyLimit'],
-    ['new row for relation "order_items" violates check constraint "order_items_quantity_max"', 'order_quantity_limit', 'errOrderQuantityLimit'],
+    ['order_items_quantity_max: at most 50 of one item per order line.', 'order_quantity_limit', 'errOrderQuantityLimit'],
   ] as const;
 
   it.each(REFUSALS)('maps %j to its own copy', (raw, kind, key) => {
@@ -118,7 +118,7 @@ describe('order refusals from place_customer_order', () => {
     expect(sql).toContain("message = 'Please verify your phone number before placing an order.'");
     expect(sql).toContain("'You already have %s orders in progress. Please wait until one is ready before placing another.'");
     expect(sql).toContain("'You have placed %s orders in the last hour. Please try again later.'");
-    expect(sql).toContain('add constraint order_items_quantity_max');
+    expect(sql).toContain("message    = 'order_items_quantity_max: at most 50 of one item per order line.';");
   });
 
   it('leaves other order errors on the generic apology, as before', () => {

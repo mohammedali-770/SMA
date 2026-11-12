@@ -7,7 +7,7 @@
 -- sets ON_ERROR_STOP) aborts non-zero. To see every case on an older chain,
 -- run it with -v ON_ERROR_STOP=0 -v ON_ERROR_ROLLBACK=on.
 --
---   CASE 1   S04#1  quantity above 50 refused on both order paths; 50 accepted
+--   CASE 1   S04#1  a cash line above 50 refused; 50 accepted; snapshot path unchanged
 --   CASE 2   S04#2  name and email bounds; existing rows stay updatable
 --   CASE 3   S04#2  address label and coordinate bounds; same guarantee
 --   CASE 4   villa  'villa' is a usable landmark; vertical tabs are whitespace
@@ -127,6 +127,14 @@ begin
   if r not like '23514%' then
     raise exception 'CASE 1 FAILED: 1,000,000 of one item gave "%"', r;
   end if;
+  -- place_order reads a quantity sent as a JSON string the same way, so the
+  -- wrapper must too; and one bad line refuses the whole order.
+  r := pg_temp.try_order(v_c, v_branch, jsonb_build_array(
+         jsonb_build_object('product_id', v_prod, 'quantity', 1),
+         jsonb_build_object('product_id', v_prod, 'quantity', '51')));
+  if r not like '23514%order_items_quantity_max%' then
+    raise exception 'CASE 1 FAILED: a second line of "51" (a JSON string) gave "%"', r;
+  end if;
   if exists (select 1 from public.orders where customer_id = v_c) then
     raise exception 'CASE 1 FAILED: a refused order left an order row';
   end if;
@@ -136,17 +144,21 @@ begin
     raise exception 'CASE 1 FAILED: exactly 50 was refused: %', r;
   end if;
 
-  -- The table bound also covers the snapshot path, which inserts lines itself.
+  -- The snapshot path (insert_order_from_snapshot) writes a paid order's
+  -- lines itself, after the charge is captured, and is frozen under
+  -- CLAUDE.md section 6. This file must not change what that insert does, so
+  -- a direct line of 51, its shape, still lands.
   v_order := substr(r, 4)::uuid;
-  begin
-    insert into public.order_items (order_id, product_id, name_en, name_ar,
-                                    unit_price, quantity, line_total)
-      values (v_order, v_prod, 'P', 'م', 10, 51, 510);
-    raise exception 'CASE 1 FAILED: a direct order_items insert of 51 succeeded';
-  exception when check_violation then null;
-  end;
+  insert into public.order_items (order_id, product_id, name_en, name_ar,
+                                  unit_price, quantity, line_total)
+    values (v_order, v_prod, 'P', 'م', 10, 51, 510);
+  if exists (select 1 from pg_constraint c
+              where c.conrelid = 'public.order_items'::regclass
+                and c.conname = 'order_items_quantity_max') then
+    raise exception 'CASE 1 FAILED: a table constraint binds the frozen snapshot insert';
+  end if;
 
-  raise notice 'CASE 1 ok: 51 and 1,000,000 refused with 23514 and no order; 50 accepted; direct insert bounded';
+  raise notice 'CASE 1 ok: 51, "51" and 1,000,000 refused with 23514 and no order; 50 accepted; snapshot-path insert unchanged';
 end $$;
 
 -- ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `order_integrity_incidents` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
 | `order_integrity_runs` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
 | `order_item_modifiers` | `20260707120500_orders.sql` | 0 | 2 |
-| `order_items` | `20260707120500_orders.sql` | 3 | 2 |
+| `order_items` | `20260707120500_orders.sql` | 2 | 2 |
 | `order_refunds` | `20260724120000_order_confirmation_state_machine.sql` | 0 | 1 |
 | `orders` | `20260707120500_orders.sql` | 7 | 2 |
 | `otp_challenges` | `20260710140000_whatsapp_otp.sql` | 1 | **none declared** |

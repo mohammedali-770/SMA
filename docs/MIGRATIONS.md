@@ -7215,8 +7215,8 @@ awaiting owner approval.** App-hardening checklist gaps S02#1, S04#1, S04#2,
 S05#3 and S07#1, plus one bug found while fixing them. The section number skips
 55–56, which the open Moyasar pull request uses.
 
-sha256 `5e3660a817f241fa468e02b66c177282646b5b2cda83106020facf850612466e`,
-730 lines / 37 089 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `1879deaee3bf962245bf7b7b5f37ba07670097d5ab120e9f585d8fe392a4f8f7`,
+747 lines / 38 126 bytes. **Re-hash the MERGED copy before applying**, per §15.
 
 **It changes live ordering behaviour.** A customer with no verified phone, or
 over either order limit, is refused from the moment it is applied. Its three
@@ -7232,7 +7232,7 @@ the console half with the next web deploy.
 
 | Gap | Change | Before, measured on the local chain |
 | --- | --- | --- |
-| S04#1 | `order_items_quantity_max`: `CHECK (quantity <= 50)`, added `NOT VALID` then validated | a cash order of 51, or of 1,000,000, of one item was accepted |
+| S04#1 | `place_customer_order` refuses a line of more than 50 of one item, read exactly as `place_order` reads it, with SQLSTATE `23514` and the name `order_items_quantity_max` in the message. **Not a table CHECK**: see below | a cash order of 51, or of 1,000,000, of one item was accepted |
 | S04#2 | `trg_profiles_text_bounds`: `full_name` normalised, at most 80 characters, no control or bidirectional formatting characters; `email` at most 254 | a 9,934-character name with a newline and U+202E was stored |
 | S04#2 | `trg_addresses_bounds`: `label` at most 60; latitude −90..90, longitude −180..180 | a 10,000-character label at (999, −999) was stored |
 | S04#2 | `handle_new_user` cuts a metadata name to 80 clean characters instead of letting the trigger refuse the signup; an email over 254 is not copied | a 152-character staff name was stored as given |
@@ -7279,12 +7279,21 @@ matches it. An administrator still cannot list either bucket.
 
 ### What it does not cover
 
-- **The online checkout-session path** is frozen under CLAUDE.md §6.
-  `compute_order_snapshot` still accepts a session line above 50, and
-  `insert_order_from_snapshot` would then fail AFTER payment. Before online
-  payment is enabled, `begin_session_attempt` must refuse such a snapshot before
-  a charge is created. The phone rule and the order limits do not cover online
-  orders either. Online payment is off, so neither is reachable today.
+- **The online checkout-session path** is frozen under CLAUDE.md §6, and this
+  file leaves it exactly as it is. That is why the line cap is a guard in the
+  cash wrapper and not a `CHECK` on `order_items`. The first version of this
+  file added the CHECK; Codex review on #445 pointed out that it also binds
+  `insert_order_from_snapshot`, which writes a paid order's lines after the
+  charge is captured, so a 51-unit online snapshot would have been charged and
+  then failed. That changes frozen payment behaviour even while it is dormant.
+  The file's assertion 6.1 now refuses to apply if any upper bound on
+  `order_items.quantity` exists, and the suite's CASE 1 inserts a 51-unit line
+  the way the snapshot path does and expects it to land. `compute_order_snapshot`
+  still accepts a line above 50, as it does today. Before online payment is
+  enabled, the payment change must refuse such a snapshot before any charge,
+  and can add the table CHECK then. The phone rule and the order limits do not
+  cover online orders either. Online payment is off, so none of this is
+  reachable today.
 - **The thresholds have no console control.** Changing them is a live write to
   `app_settings`, a §5 action.
 
@@ -7311,7 +7320,10 @@ that applies SELECT policies.
   phone-verified.
 - **Mutation testing: 34 mutants, all killed by the suite** with the file's own
   check stripped out. The file's own check also refuses 23 of them before they
-  land. Ten of the 34 were added after review, because three plausible mutants
+  land. **Five more after the line cap moved into the wrapper**, each killed by
+  both: the guard disabled with `if false and`, the bound at 51, only the first
+  line read, a quantity sent as a JSON string skipped, and the table CHECK put
+  back. Ten of the 34 were added after review, because three plausible mutants
   survived the first suite: the hourly window cut to 1 minute, the open window
   cut to 2 hours, and `object.list` added to the administrator's policy. The
   suite now places orders at 59 minutes and 23 hours and expects them to count,
@@ -7320,7 +7332,8 @@ that applies SELECT policies.
 - **The file's check on the wrapper reads statements, not tokens.** Its first
   version looked for `phone_verified` and `pg_advisory_xact_lock` anywhere in
   the body, and a body with the lock commented out still applied. It now
-  strips comments and requires each of eight guard statements exactly once.
+  strips comments and requires each of eleven guard statements exactly once
+  (eight when it was first written; the line cap added three).
   That proves the statements are stored; it does not prove they refuse the
   right callers, which is the suite's job. The storage check compares the
   policy's operation list exactly, so an added `object.list` refuses the

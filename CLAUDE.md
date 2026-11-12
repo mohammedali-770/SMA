@@ -240,8 +240,9 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 validated and awaiting approval. On merge it joins the unapplied set.** On the base
 branch at `9a90253` that set is Moyasar (frozen, §6),
 `20260929120000_db_advisor_hardening` and `20261002120000_staff_actor_fk_set_null`
-(#436), so on merge it is FOUR. The new file bounds order-line
-quantity at 50, bounds customer-editable names, emails, address labels and
+(#436), so on merge it is FOUR. The new file caps a cash order
+line at 50 of one item (in `place_customer_order`, not as a table CHECK, so the
+frozen snapshot insert is untouched), bounds customer-editable names, emails, address labels and
 coordinates, fixes the landmark trim that treated the letter v as whitespace,
 lets an administrator's image delete actually delete, and makes
 `place_customer_order` refuse a caller with no verified phone or over the

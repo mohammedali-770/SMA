@@ -9,15 +9,17 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 
 describe('MAX_LINE_QUANTITY', () => {
   it('is the number the database enforces', () => {
-    // The CHECK the server adds. If either side changes alone, an honest
-    // customer could build a line the server refuses, or be stopped short of
-    // one it would accept.
+    // The guard place_customer_order adds. If either side changes alone, an
+    // honest customer could build a line the server refuses, or be stopped
+    // short of one it would accept.
     const sql = read('supabase/migrations/20261005120000_server_input_bounds.sql');
-    const match = sql.match(/add constraint order_items_quantity_max check \(quantity <= (\d+)\) not valid/);
-    expect(match, 'order_items_quantity_max not found in the migration').not.toBeNull();
+    const match = sql.match(/where coalesce\(\(e\.value ->> 'quantity'\)::int, 0\) > (\d+)\) then\n/);
+    expect(match, 'the line guard was not found in the migration').not.toBeNull();
     expect(Number(match![1])).toBe(MAX_LINE_QUANTITY);
-    // ...and its own verification block asserts the same number.
-    expect(sql).toContain(`'CHECK ((quantity <= ${MAX_LINE_QUANTITY}))'`);
+    // ...its own verification block asserts the same number, and so does the
+    // message the app maps.
+    expect(sql).toContain(`'where coalesce((e.value ->> ''quantity'')::int, 0) > ${MAX_LINE_QUANTITY}) then',`);
+    expect(sql).toContain(`message    = 'order_items_quantity_max: at most ${MAX_LINE_QUANTITY} of one item per order line.';`);
   });
 });
 

@@ -8,8 +8,12 @@
 --
 --  1. S04#1. order_items.quantity had no upper bound. A cash order of 1,000,000
 --     units of one item passed every check, reached the POS sync queue and
---     wrote a 27,000,000-point earn_pending row. New CHECK: quantity <= 50.
---     The largest real line in Production is 7 (read 2026-11-12).
+--     wrote a 27,000,000-point earn_pending row. place_customer_order now
+--     refuses a line above 50 (item 5). The largest real line in Production is
+--     7 (read 2026-11-12). It is a guard in the cash wrapper, not a table
+--     CHECK: a CHECK on order_items would also bind insert_order_from_snapshot,
+--     which writes a paid order's lines after the charge is captured, and that
+--     path is frozen (CLAUDE.md section 6; Codex review on #445).
 --
 --  2. S04#2. profiles.full_name, profiles.email, addresses.label and the
 --     address coordinates were validated only in the app. A name of 9,934
@@ -39,14 +43,16 @@
 --  5. S07#1 and S02#1, in public.place_customer_order ONLY. That wrapper is
 --     what customers can execute; place_order is not granted to them
 --     (20260724200000). The wrapper now:
+--       - refuses a line of more than 50 of one item, for every caller and
+--         every call, retries included;
 --       - serialises one customer's calls with a transaction advisory lock;
 --       - refuses a profile that is not phone_verified;
 --       - refuses a customer who already has order_limit_open open orders
 --         placed in the last 24 hours (default 5);
 --       - refuses a customer who placed order_limit_per_hour orders in the
 --         last hour (default 10).
---     An idempotent retry of an order that already exists skips all three,
---     so a lost response can still be recovered.
+--     An idempotent retry of an order that already exists skips the last
+--     three, so a lost response can still be recovered.
 --
 -- WHAT THIS DOES NOT TOUCH
 --   - place_order and compute_order_snapshot. The money-path pair is asserted
@@ -54,14 +60,15 @@
 --   - The online checkout-session path (begin_checkout_session,
 --     begin_*_attempt, insert_order_from_snapshot). It is frozen under
 --     CLAUDE.md section 6. Two consequences, stated rather than hidden:
---       a. a session line above 50 is still accepted by compute_order_snapshot
---          and would fail at insert AFTER payment. Before online payment is
---          enabled, begin_session_attempt must refuse such a snapshot before
---          any charge is created. That belongs on the payment branch.
+--       a. the line cap does not cover online orders: compute_order_snapshot
+--          accepts a line above 50, exactly as it does today, and this file
+--          leaves the snapshot insert alone. Before online payment is
+--          enabled, the payment change must refuse such a snapshot before any
+--          charge is created; a table-wide CHECK can follow it then.
 --       b. the phone rule and the order limits do not cover online orders.
 --     Online payment is disabled today, so neither is reachable.
---   - Existing rows. The quantity CHECK is validated against the table, and the
---     triggers do not run on existing rows. Production complies (2026-11-12:
+--   - Existing rows. The triggers do not run on existing rows. Production
+--     complies (2026-11-12:
 --     longest name 13, longest email 29, longest label 24, 0 coordinates out
 --     of range across 3 addresses, largest quantity 7).
 --
@@ -99,23 +106,16 @@ $pre$;
 -- ---------------------------------------------------------------------------
 -- 1. S04#1 — order_items.quantity upper bound
 -- ---------------------------------------------------------------------------
--- A table CHECK covers both order-creation paths (place_order and
--- insert_order_from_snapshot) without redefining either. NOT VALID first, then
--- VALIDATE, so the scan does not hold the stronger lock that ADD CONSTRAINT
--- takes while it checks existing rows.
+-- Enforced in place_customer_order (section 5), which every customer order
+-- goes through, app and console alike. NOT as a CHECK on order_items: a
+-- constraint there would also bind insert_order_from_snapshot, the frozen
+-- payment path that writes a paid order's lines after the charge is captured,
+-- so a 51-unit snapshot would be charged and then fail. Its own verification
+-- (6.1) refuses to land if any upper bound on order_items.quantity exists.
 --
 -- 50 is a proposal the owner must confirm (docs/OWNER_ACTIONS.md section 48).
 -- The app caps its steppers at the same number (apps/mobile/src/features/cart/
 -- quantityLimit.ts), and a test fails if the two disagree.
-alter table public.order_items
-  drop constraint if exists order_items_quantity_max;
-alter table public.order_items
-  add constraint order_items_quantity_max check (quantity <= 50) not valid;
-alter table public.order_items
-  validate constraint order_items_quantity_max;
-
-comment on constraint order_items_quantity_max on public.order_items is
-  'At most 50 of one item per order line (20261005120000). Mirrors MAX_LINE_QUANTITY in the mobile app.';
 
 
 -- ---------------------------------------------------------------------------
@@ -445,6 +445,18 @@ declare
   v_open       integer;
   v_hour       integer;
 begin
+  -- S04#1. At most 50 of one item per line, read exactly as place_order reads
+  -- it. The constraint name in the message is what the app matches on.
+  if jsonb_typeof(p_items) = 'array' and exists (
+       select 1 from jsonb_array_elements(p_items) as e(value)
+        where coalesce((e.value ->> 'quantity')::int, 0) > 50) then
+    raise exception
+      using
+        errcode    = '23514',
+        constraint = 'order_items_quantity_max',
+        message    = 'order_items_quantity_max: at most 50 of one item per order line.';
+  end if;
+
   -- No caller: place_order raises its own 28000, unchanged.
   if v_uid is not null then
     perform pg_advisory_xact_lock(hashtext('spicymeal:place-customer-order:' || v_uid::text));
@@ -555,14 +567,16 @@ declare
   v_open integer;
   v_hour integer;
 begin
-  -- 6.1 The quantity bound exists, is validated, and says 50.
-  select pg_get_constraintdef(c.oid) into v_txt
+  -- 6.1 No upper bound on order_items.quantity. One there would bind the
+  -- frozen snapshot insert too; the cap lives in the wrapper (6.7).
+  select count(*) into v_n
     from pg_constraint c
    where c.conrelid = 'public.order_items'::regclass
-     and c.conname = 'order_items_quantity_max'
-     and c.convalidated;
-  if v_txt is distinct from 'CHECK ((quantity <= 50))' then
-    raise exception 'server input bounds: order_items_quantity_max is %, expected a validated CHECK ((quantity <= 50))', coalesce(v_txt, 'NULL');
+     and c.contype = 'c'
+     and (c.conname = 'order_items_quantity_max'
+          or pg_get_constraintdef(c.oid) ~* 'quantity\s*(<|<=)');
+  if v_n is distinct from 0 then
+    raise exception 'server input bounds: % upper bound(s) on order_items.quantity, which would change the frozen snapshot path', v_n;
   end if;
 
   -- 6.2 Both triggers exist, are enabled, and fire on the guarded columns.
@@ -686,6 +700,9 @@ begin
   end if;
   select count(*) into v_n
     from unnest(array[
+      'if jsonb_typeof(p_items) = ''array'' and exists (',
+      'select 1 from jsonb_array_elements(p_items) as e(value)',
+      'where coalesce((e.value ->> ''quantity'')::int, 0) > 50) then',
       'perform pg_advisory_xact_lock(hashtext(''spicymeal:place-customer-order:'' || v_uid::text));',
       'select p.phone_verified into v_verified',
       'if v_verified is distinct from true then',
@@ -696,8 +713,8 @@ begin
       'if v_hour >= v_hour_limit then'
     ]) as shape(t)
    where (char_length(v_txt) - char_length(replace(v_txt, shape.t, ''))) = char_length(shape.t);
-  if v_n is distinct from 8 then
-    raise exception 'server input bounds: place_customer_order is missing its guard (% of 8 statements found exactly once)', v_n;
+  if v_n is distinct from 11 then
+    raise exception 'server input bounds: place_customer_order is missing its guard (% of 11 statements found exactly once)', v_n;
   end if;
 
   -- 6.8 handle_new_user still claims comp membership and now bounds the name.
@@ -725,6 +742,6 @@ begin
     raise exception 'compute_order_snapshot moved to %, expected 22e2d42935459e7bf93abb2941b56325', coalesce(v_txt, 'NULL');
   end if;
 
-  raise notice 'server input bounds: quantity <= 50, name/email/label/coordinate triggers, landmark trim fixed, admin delete-scoped image SELECT, customer order limits; money path unchanged';
+  raise notice 'server input bounds: at most 50 per cash order line, name/email/label/coordinate triggers, landmark trim fixed, admin delete-scoped image SELECT, customer order limits; money path unchanged';
 end
 $verify$;

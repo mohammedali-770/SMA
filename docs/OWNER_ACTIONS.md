@@ -3645,17 +3645,20 @@ the two numbers with that in mind: if branches rarely advance orders in the
 console, the open limit is the daily cap.
 
 **What is not covered, on purpose.** The online checkout-session path is frozen
-under CLAUDE.md §6. Before online payment is enabled, `begin_session_attempt`
-must refuse a line above the cap before any payment is taken; that belongs on
-the payment branch. The phone rule and the limits do not cover online orders
+under CLAUDE.md §6, which is why the line cap is a guard in the cash wrapper
+and not a table CHECK: a CHECK would also bind the frozen snapshot insert,
+which runs after a payment is captured. Before online payment is enabled, the
+payment change must refuse a line above the cap before any payment is taken;
+that belongs on the payment branch. The phone rule and the limits do not cover online orders
 either.
 
 ### The steps
 
 1. **Decide the three numbers and the phone rule.** Before merge, a different
    number is a change to the pull request, and it is not one line:
-   - **the line cap** is in four places that must agree: the CHECK, the file's
-     own assertion 6.1, the constraint comment, and `MAX_LINE_QUANTITY` in
+   - **the line cap** is in four places that must agree: the guard in
+     `place_customer_order`, the file's own assertion 6.7, the refusal
+     message, and `MAX_LINE_QUANTITY` in
      `apps/mobile/src/features/cart/quantityLimit.ts`.
      `quantityLimit.test.ts` fails if the migration and the constant disagree,
      and the suite's CASE 1 tests 50 and 51;
