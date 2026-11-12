@@ -134,6 +134,13 @@ Before native store submission, a real device must exercise the native bundle.
 
 - [ ] Owner explicitly approved starting the EAS build.
 - [ ] EAS build uses the intended profile/environment.
+- [ ] **For a production build, the EAS preflight passed.** Since 2026-11-12 the
+      `eas-build.yml` preflight asks the EAS `production` environment, by name
+      only, whether it holds `SENTRY_AUTH_TOKEN` (`eas env:list production
+      --format short`, project and account scope), because that is what the
+      cloud build reads. It used to test a GitHub secret of the same name, which
+      the build never reads. A pass proves the variable exists, not that the
+      token is valid: the source-map item below still decides.
 - [ ] Build installs on a physical device.
 - [ ] Cold launch succeeds.
 - [ ] WhatsApp/Supabase login succeeds.

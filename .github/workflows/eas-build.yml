@@ -64,6 +64,15 @@ jobs:
           eas-version: 25.3.0
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # --ignore-scripts: EXPO_TOKEN is already in this job's environment (the
+      # Setup EAS step exports it), so every package install script would run with
+      # it. Only one package in this tree has one (@sentry/cli, which fetches a
+      # binary this job never calls), and the cloud build does its own install.
+      # Measured 2026-11-10: the resolved Expo config, public and prebuild, is
+      # byte-identical with and without scripts. docs/DEPENDENCY_ADVISORIES.md.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
       # A production build without SENTRY_AUTH_TOKEN succeeds and ships — it just
       # uploads no source maps, so every crash in that release arrives as
       # unsymbolicated minified frames and is effectively undiagnosable. The
@@ -74,28 +83,47 @@ jobs:
       # deliberately unaffected: they set SENTRY_DISABLE_AUTO_UPLOAD=true in
       # eas.json and are not expected to symbolicate.
       #
-      # The secret is read via env, never interpolated into the script, so its
-      # value cannot reach the log.
-      - name: Preflight — a production build must be able to symbolicate
+      # ASK THE STORE THE BUILD READS. The cloud build evaluates app.config.js
+      # with the EAS `production` environment (eas.json: build.production
+      # .environment), not with this job's environment, so the check is against
+      # EAS. Until 2026-11-12 it tested a GitHub secret of the same name instead,
+      # which the build never reads: it passed while EAS had lost the token, and
+      # blocked a correct build where only EAS held it.
+      #
+      # `eas env:list production --format short --scope <project|account>` is
+      # the eas-cli 25.3.0 form, confirmed from that version's --help and source
+      # (it has no --non-interactive flag; the positional environment means it
+      # never prompts). It is a read. It prints NAME=value lines, and a
+      # plaintext variable's value is printed in full, so its output is captured
+      # and never echoed: only the names are extracted, and only the answer for
+      # SENTRY_AUTH_TOKEN and a count are logged. Must run after the install
+      # step: eas reads the project id from the app config.
+      - name: Preflight — the EAS production environment must hold SENTRY_AUTH_TOKEN
         if: ${{ (inputs.profile || 'preview') == 'production' }}
         env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          FORCE_COLOR: "0"
         run: |
           set -euo pipefail
-          if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
-            echo "::error::SENTRY_AUTH_TOKEN is not set, so this production build would ship without source maps and every crash report would be unreadable. Add it under Settings -> Secrets and variables -> Actions (see issue #81 and docs/SENTRY_OBSERVABILITY.md), or run the preview profile instead."
+          err="$RUNNER_TEMP/eas-env-list.err"
+          names() {
+            local out
+            if ! out="$(eas env:list production --format short --scope "$1" 2>"$err")"; then
+              # stderr: this runs inside $(...), whose stdout is captured.
+              echo "::error::Could not list the EAS production environment ($1 scope), so this preflight cannot tell whether source maps will upload." >&2
+              sed 's/^/  /' "$err" >&2
+              exit 1
+            fi
+            printf '%s\n' "$out" | sed 's/\x1b\[[0-9;]*m//g' | grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' | tr -d '=' || true
+          }
+          project="$(names project)"
+          account="$(names account)"
+          echo "EAS production environment: $(printf '%s\n' "$project" | grep -c . || true) project and $(printf '%s\n' "$account" | grep -c . || true) account variable name(s) listed (values not shown)."
+          if printf '%s\n%s\n' "$project" "$account" | grep -qx 'SENTRY_AUTH_TOKEN'; then
+            echo "SENTRY_AUTH_TOKEN is defined in the EAS production environment — source maps will upload."
+          else
+            echo "::error::SENTRY_AUTH_TOKEN is not in the EAS production environment, so this production build would ship without source maps and every crash report would be unreadable. Add it with visibility 'secret' (eas env:create --environment production --name SENTRY_AUTH_TOKEN --visibility secret), see docs/SENTRY_OBSERVABILITY.md, or run the preview profile instead."
             exit 1
           fi
-          echo "SENTRY_AUTH_TOKEN present — source maps will upload."
-
-      # --ignore-scripts: EXPO_TOKEN is already in this job's environment (the
-      # step above exports it), so every package install script would run with
-      # it. Only one package in this tree has one (@sentry/cli, which fetches a
-      # binary this job never calls), and the cloud build does its own install.
-      # Measured 2026-11-10: the resolved Expo config, public and prebuild, is
-      # byte-identical with and without scripts. docs/DEPENDENCY_ADVISORIES.md.
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
 
       # NOTE: a `mobile-build-*` tag push has no `inputs`, so it falls through to
       # the `preview` profile — an INTERNAL APK, not a submittable production
