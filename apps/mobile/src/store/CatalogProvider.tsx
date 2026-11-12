@@ -17,9 +17,11 @@ import {
   buildAvailabilityMatrix, buildModifierAvailabilityMatrix, buildVariantAvailabilityMatrix,
   mapBranch, mapBrandSettings, mapCategory,
   mapDeliveryZone, mapLoyaltySettings,
-  mapModifierGroup, mapPaymentMethodSettings, mapProduct, mapSupportSettings,
+  mapPaymentMethodSettings, mapSupportSettings,
 } from '../lib/mappers';
+import { mapPricedMenu } from './catalogMapping';
 import { productOrderable } from '../lib/orderability';
+import type { DbModifierGroup, DbProductModifierGroup } from '../types/db';
 import type { Branch, BrandSettings, Category, DeliveryZone, LoyaltySettings, ModifierGroup, Product } from '../types/models';
 import type { PaymentMethodSettings } from '../lib/payment';
 import type { SupportSettings } from '../lib/supportContact';
@@ -60,8 +62,13 @@ export interface CatalogValue {
    * The catalog otherwise loads once per mount, which meant a customer already
    * browsing never learned that a branch had closed an item — they discovered it
    * as a raw server error at checkout. This is cheap enough to run on every
-   * foreground and every return to the menu; prices, categories and modifiers
-   * still need the full `reload()`.
+   * foreground and every return to the menu.
+   *
+   * It also re-reads PRICES: products, price tiers and options, which carry
+   * both the price and whether the item is still sold. Without that a running
+   * app kept the prices it launched with, and the cart (re-priced from these
+   * rows by CartProvider) previewed an old total that place_order did not
+   * charge. Categories, option groups and settings still need `reload()`.
    *
    * Returns the freshly built matrix so a caller can act on it immediately —
    * React state set inside this call is not visible to the awaiting closure,
@@ -144,9 +151,16 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const loadSeq = useRef(0);
   // The matrix seeds every product x branch to available before applying stored
   // exceptions, so a partial refresh needs the same id lists the full load used.
+  //
+  // It also keeps the option groups and product links from the full load, which
+  // the price refresh re-maps fresh products and options against.
   const matrixSeed = useRef<{
     products: { id: string }[]; modifiers: { id: string }[]; branches: { id: string }[];
-  }>({ products: [], modifiers: [], branches: [] });
+    modifierGroups: DbModifierGroup[]; links: DbProductModifierGroup[];
+  }>({ products: [], modifiers: [], branches: [], modifierGroups: [], links: [] });
+  // Only the newest price refresh may write. Bumped by a full load too, so a
+  // refresh that started before a reload cannot overwrite the reload's rows.
+  const priceSeq = useRef(0);
 
   // NOTE: the branch itself is not persisted here — OrderContextProvider owns
   // the persisted pickup/delivery decision and mirrors its (re-validated)
@@ -157,6 +171,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     mounted.current = true;
     const seq = ++loadSeq.current;
+    priceSeq.current += 1;
     const isCurrent = () => mounted.current && seq === loadSeq.current;
     setLoading(true);
     setErrorKey(null);
@@ -165,16 +180,15 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         const raw = await catalog.all();
         if (!isCurrent()) return;
         const mappedBranches = raw.branches.map(mapBranch);
-        const mappedProducts = raw.products.map((p) => mapProduct(p, raw.links, raw.productVariants));
-        const groups: Record<string, ModifierGroup> = {};
-        for (const g of raw.modifierGroups) {
-          groups[g.id] = mapModifierGroup(g, raw.modifiers);
-        }
+        const menu = mapPricedMenu(raw);
         setBranches(mappedBranches);
         setCategories(raw.categories.map(mapCategory));
-        setProducts(mappedProducts);
-        setModifierGroupsById(groups);
-        matrixSeed.current = { products: raw.products, modifiers: raw.modifiers, branches: raw.branches };
+        setProducts(menu.products);
+        setModifierGroupsById(menu.modifierGroupsById);
+        matrixSeed.current = {
+          products: raw.products, modifiers: raw.modifiers, branches: raw.branches,
+          modifierGroups: raw.modifierGroups, links: raw.links,
+        };
         setAvailability(buildAvailabilityMatrix(raw.products, raw.branches, raw.availability));
         setModifierAvailability(
           buildModifierAvailabilityMatrix(raw.modifiers, raw.branches, raw.modifierAvailability));
@@ -211,6 +225,27 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const refreshAvailability = useCallback(async (): Promise<AvailabilitySnapshot | null> => {
     const seed = matrixSeed.current;
     if (seed.products.length === 0) return null;   // nothing loaded yet
+    // Prices are read alongside, not inside, the availability batch: a failed
+    // price read must not take availability down with it, because the checkout
+    // pre-check treats a null snapshot as "could not check". A failed price
+    // read just keeps the prices the customer already has.
+    const seq = ++priceSeq.current;
+    const prices = Promise.all([
+      catalog.products(), catalog.productVariants(), catalog.modifiers(),
+    ]).then(([products, productVariants, modifiers]) => {
+      if (!mounted.current || seq !== priceSeq.current) return;
+      const menu = mapPricedMenu({
+        products, productVariants, modifiers,
+        modifierGroups: matrixSeed.current.modifierGroups, links: matrixSeed.current.links,
+      });
+      setProducts(menu.products);
+      setModifierGroupsById(menu.modifierGroupsById);
+      // A product or option that appeared since the full load needs its seed
+      // entry, or the matrices below would treat it as unknown.
+      matrixSeed.current = { ...matrixSeed.current, products, modifiers };
+    }).catch(() => {
+      // Deliberately silent, for the same reason as the availability refresh.
+    });
     try {
       // Branches come too. A call-centre operator can pause delivery while the
       // customer is mid-order, and `deliveryTemporarilyClosed` decides whether
@@ -243,6 +278,8 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       // customer already has; a failed refresh must not replace a working menu
       // with an error, and place_order re-checks availability regardless.
       return null;
+    } finally {
+      await prices;
     }
   }, []);
 

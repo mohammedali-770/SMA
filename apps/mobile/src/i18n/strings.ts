@@ -71,6 +71,9 @@ export const STRINGS = {
     productBlockedBySizes: 'Every size is out of stock at this branch right now.',
     soldOutNow: 'Sold out just now',
     soldOutBody: 'These items sold out while you were ordering. Remove them to continue.',
+    // A cart line whose product, size or option the menu no longer offers at
+    // all (repriceCart). Not "sold out": a sold-out item comes back on its own.
+    cartLineUnavailable: 'No longer on the menu. Remove it to continue.',
     customizeAdd: 'Customize & Add',
     kcal: 'kcal',
     noProducts: 'No items match your search.',
@@ -441,6 +444,7 @@ export const STRINGS = {
     productBlockedBySizes: 'جميع الأحجام غير متوفرة في هذا الفرع حالياً.',
     soldOutNow: 'نفد الصنف للتو',
     soldOutBody: 'نفدت هذه الأصناف أثناء إتمام طلبك. احذفها للمتابعة.',
+    cartLineUnavailable: 'لم يعد ضمن القائمة. احذفه للمتابعة.',
     customizeAdd: 'تخصيص وإضافة',
     kcal: 'سعرة',
     noProducts: 'لا توجد عناصر مطابقة لبحثك.',
