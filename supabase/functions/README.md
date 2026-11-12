@@ -60,21 +60,23 @@ Push went live on 2026-08-17. `push-dispatch` still reads the `integration_setti
 
 Because this function now messages real customers, changes to its status copy, targeting or dispatch behaviour are customer-facing changes. Its `order_status` and `pos_sync` paths are idempotent per `(order_id, status)` under a claim/fencing lifecycle; `broadcast` is immediate, non-recallable, and restricted to devices with `promos_enabled = true`.
 
-## Payment/refund functions — PROVISIONAL AND FROZEN
+## Payment/refund functions — PROVISIONAL
+
+*Superseded 2026-11-11: Moyasar is the payment provider (`CLAUDE.md` §6). Repository work that keeps Moyasar the only provider is no longer frozen; every live payment step is still its own owner approval. The Moyasar-only change is pull request #446.* The table below describes the Tap-era functions as they stand on this branch.
 
 The repository still contains the existing payment implementation and historical provider scaffolding:
 
 | Function | `verify_jwt` | Current treatment |
 | --- | --- | --- |
-| `payment-initiate` | true | frozen provisional payment initiation; source contains Tap path plus older Geidea scaffold |
-| `payment-verify` | true | frozen Tap verification path |
-| `payment-webhook` | false | frozen provider webhook path |
-| `payment-return` | false | frozen public return/redirect path |
-| `payment-refund` | false | frozen refund processor; automated scheduling remains disabled |
-| `payment-test-config` | true | frozen admin payment diagnostics/test tooling |
-| `tap-admin-test-return` | false | frozen isolated Tap test return page |
+| `payment-initiate` | true | Tap-era: provisional payment initiation; source contains Tap path plus older Geidea scaffold |
+| `payment-verify` | true | Tap-era: Tap verification path |
+| `payment-webhook` | false | Tap-era: provider webhook path |
+| `payment-return` | false | Tap-era: public return/redirect path |
+| `payment-refund` | false | Tap-era: refund processor; automated scheduling remains disabled |
+| `payment-test-config` | true | Tap-era: admin payment diagnostics/test tooling |
+| `tap-admin-test-return` | false | Tap-era: isolated Tap test return page |
 
-**Do not treat Tap or the old Geidea scaffold as the final payment architecture.** The owner decision is that the final payment provider has not been selected and payment/refund work is postponed.
+**Do not treat Tap or the old Geidea scaffold as the final payment architecture.** The owner chose Moyasar on 2026-11-11 (`CLAUDE.md` §6); #446 removes Tap and Geidea.
 
 Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`:
 
@@ -134,12 +136,12 @@ Do **not** copy old README commands that directly deploy a set of functions to p
 
 Production Edge Function deployment is an explicit owner-approved action governed by `CLAUDE.md` and the controlled GitHub workflow. The deployment workflow is manual, production-branch constrained and requires named functions/confirmation.
 
-Payment functions remain frozen even though the workflow can technically deploy them.
+Deploying a payment function is its own owner approval (`CLAUDE.md` §5, §6), even though the workflow can technically deploy it.
 
 ## Related docs
 
 - [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) — system/trust architecture.
-- [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) — binding payment/refund freeze.
+- [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) — the payment/refund freeze, superseded 2026-11-11 (`CLAUDE.md` §6).
 - [`../../docs/ORDER_CONFIRMATION_FLOW.md`](../../docs/ORDER_CONFIRMATION_FLOW.md) — order/POS confirmation lifecycle.
 - [`../../docs/OPERATIONS_ALERTS_DIGEST.md`](../../docs/OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
 - [`../../docs/MIGRATIONS.md`](../../docs/MIGRATIONS.md) — database migration authority.
