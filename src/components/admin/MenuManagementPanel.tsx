@@ -300,7 +300,7 @@ export const MenuManagementPanel: React.FC = () => {
       alert(adminLang === 'en' ? 'Please paste CSV lines first' : 'الرجاء لصق خطوط CSV أولاً');
       return;
     }
-    const result = parseCSVMenu(rawCsvText, categories);
+    const result = parseCSVMenu(rawCsvText, categories, adminLang);
     setCsvResult(result);
     if (result.errors.length > 0) {
       setCsvMsg(adminLang === 'en' ? 'Warnings detected. Inspect list below.' : 'تم كشف تنبيهات بالتنسيق. افحص القائمة أدناه.');
@@ -360,12 +360,16 @@ export const MenuManagementPanel: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // readAsText decodes as UTF-8 (a leading byte-order mark is dropped) and
+    // writes U+FFFD wherever the bytes are not UTF-8 — which is what Excel's
+    // plain "CSV (Comma delimited)" produces on an Arabic Windows PC.
+    // parseCSVMenu refuses such text whole and says to save as "CSV UTF-8".
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
         setRawCsvText(text);
-        const result = parseCSVMenu(text, categories);
+        const result = parseCSVMenu(text, categories, adminLang);
         setCsvResult(result);
         if (result.errors.length > 0) {
           setCsvMsg(adminLang === 'en' ? 'Spreadsheet has layout warnings' : 'الجدول يحتوي على تحذيرات بالتنسيق');

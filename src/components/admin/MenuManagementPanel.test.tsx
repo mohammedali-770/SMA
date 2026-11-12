@@ -289,3 +289,74 @@ describe('CSV bulk upload', () => {
     expect(bulkUploadMenu).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CSV import — what a chosen FILE really contains', () => {
+  // Through jsdom's real FileReader, which decodes the way a browser does:
+  // UTF-8, a leading byte-order mark dropped, bytes that are not UTF-8 turned
+  // into U+FFFD. Only bulkUploadMenu (the write) is mocked.
+  const HEADER =
+    'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url';
+
+  /** windows-1256 bytes — Excel's plain "CSV (Comma delimited)" on Arabic Windows. */
+  function encode1256(s: string): Uint8Array {
+    const decoder = new TextDecoder('windows-1256');
+    const byteOf = new Map<string, number>();
+    for (let b = 0; b < 256; b++) byteOf.set(decoder.decode(Uint8Array.of(b)), b);
+    return Uint8Array.from([...s].map((ch) => {
+      const b = byteOf.get(ch);
+      if (b === undefined) throw new Error(`not in windows-1256: ${ch}`);
+      return b;
+    }));
+  }
+
+  function chooseFile(tabName: string, bytes: Uint8Array) {
+    fireEvent.click(tab(tabName));
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File([bytes], 'menu.csv', { type: 'text/csv' })] } });
+  }
+
+  const ANSI_SHEET = `${HEADER}\r\nBurgers,برجر,Spicy Volcano,فولكانو دجاج,Super spicy,دجاج حار جدا,29.00,710,\r\n`;
+
+  it('refuses an Arabic windows-1256 file whole, and offers nothing to commit', async () => {
+    render(<MenuManagementPanel />);
+    chooseFile('Excel/CSV Bulk Import', encode1256(ANSI_SHEET));
+
+    expect(await screen.findByText(/not saved as UTF-8/)).toBeTruthy();
+    expect(screen.getByText(/"CSV UTF-8 \(Comma delimited\)"/)).toBeTruthy();
+    // Before the fix this file previewed one product whose Arabic name was a
+    // run of U+FFFD, and it could be committed to the live menu as it stood.
+    expect(screen.getByText('Detected products: 0')).toBeTruthy();
+    const commit = screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' }) as HTMLButtonElement;
+    expect(commit.disabled).toBe(true);
+    fireEvent.click(commit);
+    expect(bulkUploadMenu).not.toHaveBeenCalled();
+  });
+
+  it('gives the same refusal in Arabic in the Arabic console', async () => {
+    mockContext({ adminLang: 'ar' });
+    render(<MenuManagementPanel />);
+    chooseFile('رفع منيو بملف Excel/CSV', encode1256(ANSI_SHEET));
+    expect(await screen.findByText(/«CSV UTF-8»/)).toBeTruthy();
+    expect(bulkUploadMenu).not.toHaveBeenCalled();
+  });
+
+  it('reads a "CSV UTF-8" file with a quoted comma, previews it, and commits the right price', async () => {
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    bulkUploadMenu.mockResolvedValue({ success: true, count: 1, skipped: 0 });
+    const sheet =
+      '\uFEFF' + `${HEADER}\r\n` +
+      'Wings,أجنحة,"Wings, 12 pcs",أجنحة دجاج,Hot wings,12 قطعة حارة,29.00,450,\r\n';
+    render(<MenuManagementPanel />);
+    chooseFile('Excel/CSV Bulk Import', new TextEncoder().encode(sheet));
+
+    expect(await screen.findByText('Wings, 12 pcs')).toBeTruthy();
+    expect(screen.getByText('450 kcal')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' }));
+    await vi.waitFor(() => expect(bulkUploadMenu).toHaveBeenCalledTimes(1));
+    const [, products] = bulkUploadMenu.mock.calls[0];
+    expect(products).toHaveLength(1);
+    expect(products[0]).toMatchObject({
+      nameEn: 'Wings, 12 pcs', nameAr: 'أجنحة دجاج', price: 29, calories: 450,
+    });
+  });
+});
