@@ -33,7 +33,9 @@ describe('order refusal wiring', () => {
     const body = api.slice(start, api.indexOf('\n  },', start));
     expect(body).toContain('if (error) throw new Error(await functionErrorText(error));');
     expect(body).not.toContain('if (error) throw new Error(error.message);');
-    expect(api).toMatch(/async function functionErrorText\([^)]*\): Promise<string> \{[\s\S]*?ctx\.json\(\)[\s\S]*?body\.error[\s\S]*?return error\.message;/);
+    expect(api).toMatch(
+      /async function functionErrorText\([^)]*\): Promise<string> \{[\s\S]*?ctx\.json\(\)[\s\S]*?body\.error[\s\S]*?return error\.message;/,
+    );
   });
 
   it('the cash checkout renders the failure through failureMessage', () => {

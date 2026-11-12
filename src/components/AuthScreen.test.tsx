@@ -25,7 +25,11 @@ const { AuthScreen } = await import('./AuthScreen');
 beforeEach(() => {
   signIn.mockReset();
   signIn.mockResolvedValue(undefined);
-  try { window.localStorage.clear(); } catch { /* private mode */ }
+  try {
+    window.localStorage.clear();
+  } catch {
+    /* private mode */
+  }
 });
 afterEach(() => cleanup());
 
