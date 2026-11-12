@@ -59,6 +59,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
 - `_shared/cors.ts`
+- `_shared/emailTestConfigWiring.test.ts`
 - `_shared/geidea.ts`
 - `_shared/lazywait.test.ts`
 - `_shared/lazywait.ts`

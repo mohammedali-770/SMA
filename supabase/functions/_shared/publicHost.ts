@@ -17,6 +17,13 @@
  * `10./172.16./192.168.` is the inside of somebody's network, so an IP literal
  * is refused outright rather than range-checked: no push service and no mail
  * relay this product uses is ever addressed by one.
+ *
+ * WHAT IT CANNOT SEE: where a name points. Every rule here reads the string and
+ * nothing resolves it, so `10.0.0.5.sslip.io` — a well-formed public name that
+ * wildcard DNS answers with 10.0.0.5 — is a "public hostname" by these rules.
+ * Only an allowlist closes that, which is why the push sender now defaults to
+ * the browser push services (`adminPush.ts`) and why `SMTP_ALLOWED_HOSTS` must
+ * be set before alert mail is turned on (`smtpTarget.ts`). Measured 2026-11-11.
  */
 
 /** Every spelling of an IPv4 literal a resolver would still accept. */
@@ -60,9 +67,10 @@ export function isPublicHostname(host: string): boolean {
 }
 
 /**
- * An OPTIONAL operator allowlist, for an installation that wants an endpoint
- * pinned rather than merely public. Unset means "any public hostname", which is
- * the behaviour every existing deployment already has.
+ * An operator allowlist, matched by suffix. An empty one means "any public
+ * hostname", and that is what the SMTP guard passes when `SMTP_ALLOWED_HOSTS`
+ * is unset. The push sender never passes an empty list: it substitutes the
+ * browser push services (`adminPush.ts`).
  */
 export function isAllowedHost(host: string, allowlist: string | null | undefined): boolean {
   const raw = (allowlist ?? '').trim();
