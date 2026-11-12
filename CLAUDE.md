@@ -236,6 +236,20 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-11 (later) — `20261002120000_staff_actor_fk_set_null` is
+written, validated and awaiting approval, so on merge the outstanding set is
+THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
+file. `20261001120000_prune_operational_run_history` is not among them: it was
+applied at 12:30:50 UTC the same day, live version `20261111123050`. This file
+makes four actor keys `ON DELETE SET NULL`, so a staff account that filed,
+resolved or revealed something can be deleted; before it, the console's staff
+Delete failed with 23503. It redefines nothing; the money path is
+self-asserted. The two unfrozen files are independent, each on its own
+approval, and `20260824100000` still sorts first. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §54.
+
+**Superseded on the count by the note above, kept for its record of the prune apply:** with #436 merged, the default branch holds 146 repository files and THREE unapplied (Moyasar, `20260929120000`, `20261002120000`). The live read below stays true for its date.
+
 **Current position 2026-11-11, read live AFTER the run-history prune apply: 145
 repository files on the default branch / 149 live history rows / TWO unapplied
 — `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
