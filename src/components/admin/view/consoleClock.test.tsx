@@ -18,7 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ordersApi = vi.hoisted(() => ({ posConfirmationRequired: vi.fn() }));
 const catalogApi = vi.hoisted(() => ({
-  branches: vi.fn(), categories: vi.fn(), products: vi.fn(), modifierGroups: vi.fn(), modifiers: vi.fn(),
+  branches: vi.fn(),
+  categories: vi.fn(),
+  products: vi.fn(),
+  modifierGroups: vi.fn(),
+  modifiers: vi.fn(),
 }));
 const lazywaitCatalogApi = vi.hoisted(() => ({ items: vi.fn(), status: vi.fn() }));
 vi.mock('../../../lib/api', async (importOriginal) => ({
@@ -141,11 +145,22 @@ describe('the Lazywait mapping card says when the catalog was last pulled, in Ri
     lazywaitCatalogApi.items.mockResolvedValue([]);
     const count = { total: 0, mapped: 0 };
     lazywaitCatalogApi.status.mockResolvedValue({
-      branches: count, categories: count, products: count, modifier_groups: count, modifiers: count,
-      blocked_orders: 0, secrets_configured: true,
+      branches: count,
+      categories: count,
+      products: count,
+      modifier_groups: count,
+      modifiers: count,
+      blocked_orders: 0,
+      secrets_configured: true,
       // 00:30:05 on 12 November in Riyadh; 21:30:05 on the 11th in London and UTC.
       last_pull_at: '2026-11-11T21:30:05Z',
-      readiness: { secrets: true, branch_mapped: false, active_products_mapped: false, no_blocked_orders: true, ready: false },
+      readiness: {
+        secrets: true,
+        branch_mapped: false,
+        active_products_mapped: false,
+        no_blocked_orders: true,
+        ready: false,
+      },
     });
     render(<LazywaitCatalogMapping disabled />);
     // It read "Last pull 11/11/2026, 21:30:05" here, London's clock. A
