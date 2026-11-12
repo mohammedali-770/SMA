@@ -134,7 +134,12 @@ begin
   if v_txt ilike '%Bob%' or v_txt like '%966500000902%' or v_txt ilike '%bob@example.test%' then
     raise exception 'FAIL 2: another customer''s data appears in the export';
   end if;
-  if v_txt like '%999%' then
+  -- Bob's balance and his ledger row are both 999. Matched as a standalone
+  -- number, not a substring: the export's own timestamps carry microseconds, and
+  -- '%999%' failed whenever one of them read .999… or …999 (about one run in a
+  -- hundred, 2026-11-12). A leaked balance is serialised as a JSON number, so it
+  -- is bounded by non-digits on both sides; a timestamp fragment never is.
+  if v_txt ~ '(^|[^0-9.])999($|[^0-9])' then
     raise exception 'FAIL 2: another customer''s balance appears in the export';
   end if;
 
