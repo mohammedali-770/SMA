@@ -18,8 +18,12 @@ describe('MAX_LINE_QUANTITY', () => {
     expect(Number(match![1])).toBe(MAX_LINE_QUANTITY);
     // ...its own verification block asserts the same number, and so does the
     // message the app maps.
-    expect(sql).toContain(`'where coalesce((e.value ->> ''quantity'')::int, 0) > ${MAX_LINE_QUANTITY}) then',`);
-    expect(sql).toContain(`message    = 'order_items_quantity_max: at most ${MAX_LINE_QUANTITY} of one item per order line.';`);
+    expect(sql).toContain(
+      `'where coalesce((e.value ->> ''quantity'')::int, 0) > ${MAX_LINE_QUANTITY}) then',`,
+    );
+    expect(sql).toContain(
+      `message    = 'order_items_quantity_max: at most ${MAX_LINE_QUANTITY} of one item per order line.';`,
+    );
   });
 });
 
