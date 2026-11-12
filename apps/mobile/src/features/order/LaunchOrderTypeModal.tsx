@@ -14,7 +14,15 @@ import type { OrderType } from '../../types/models';
 export function LaunchOrderTypeModal({ onChoose }: { onChoose: (type: OrderType) => void }) {
   const styles = useStyles(); const colors = useThemeColors(); const { pick, rtlRow } = useI18n();
   return <Modal visible transparent animationType="fade" onRequestClose={() => {}}><View style={styles.backdrop}><View style={styles.card}>
-    <Image source={require('../../../assets/logo-mark.png')} style={styles.logo} contentFit="contain" />
+    {/* The chooser's LCP image on a first visit: eager and high
+        priority on web, like the launch intro's (app/index.tsx). */}
+    <Image
+      source={require('../../../assets/logo-mark.png')}
+      style={styles.logo}
+      contentFit="contain"
+      priority="high"
+      loading="eager"
+    />
     <Text variant="title" align="center">{pick('Choose order type','اختر نوع الطلب')}</Text>
     <Text variant="body" tone="secondary" align="center">{pick('Choose how you’d like to receive your order.','اختر طريقة استلام طلبك.')}</Text>
     <View style={[styles.choices,rtlRow]}>

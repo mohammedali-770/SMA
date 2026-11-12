@@ -292,6 +292,18 @@ Moyasar-only files. **Name the target by version.** A bulk
 apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
 
+**AMENDED 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
+is written, validated and awaiting approval, so on merge the outstanding set is
+SEVEN:** `20260824100000`, `20260929120000`, `20261002120000`,
+`20261003120000`, `20261004120000`, `20261005120000` and this file. It makes
+three own-or-staff RLS policies call `is_staff()` once per statement instead of
+once per row, gives `admin_list_orders_with_items` one UNION id set, and takes
+the order-number year in Riyadh time. It changes no visible row and redefines
+nothing on the money path, which it self-asserts. `checkout_sessions` is not
+touched. `20260824100000` still sorts first, so a bulk apply would take the
+Moyasar files first. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §58.
+
 **AMENDED 2026-11-12 — `20261005120000_server_input_bounds` is written,
 validated and awaiting approval. On merge it joins the unapplied set.** On the base
 branch at `9a90253` that set is Moyasar (frozen, §6),

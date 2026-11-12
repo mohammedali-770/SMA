@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isAllowedBannerSize, isAllowedBannerType, bannerStoragePath, selectActiveBanners,
-  MAX_BANNER_BYTES, type ActiveBannerRow,
+  MAX_BANNER_BYTES, BANNER_MAX_EDGE, planBannerUpload, type ActiveBannerRow,
 } from './banners';
 
 const NOW = Date.parse('2026-07-12T12:00:00Z');
@@ -94,5 +94,26 @@ describe('bannerStoragePath', () => {
   });
   it('never reuses the same path for different unique ids', () => {
     expect(bannerStoragePath('a.jpg', 'A')).not.toBe(bannerStoragePath('a.jpg', 'B'));
+  });
+});
+
+describe('banner resize decision', () => {
+  it('bounds a stored banner at a full-width banner, 390 pt at 3x', () => {
+    expect(BANNER_MAX_EDGE).toBe(1200);
+  });
+
+  it('scales a wide banner down by its longest edge', () => {
+    expect(planBannerUpload({ width: 3000, height: 1000, bytes: 900_000 })).toEqual({
+      action: 'encode',
+      target: { width: 1200, height: 400 },
+    });
+  });
+
+  it('leaves an already-small banner alone', () => {
+    expect(planBannerUpload({ width: 1170, height: 420, bytes: 120_000 })).toEqual({ action: 'keep' });
+  });
+
+  it('stores a re-encoded WebP under a .webp path', () => {
+    expect(bannerStoragePath('hero.webp', '1-u')).toBe('banners/1-u.webp');
   });
 });

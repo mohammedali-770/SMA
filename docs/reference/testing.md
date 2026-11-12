@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**247 TypeScript test files declaring 3800 test blocks, plus 86 SQL suites.**
+**254 TypeScript test files declaring 3875 test blocks, plus 87 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -110,6 +110,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/prune_operational_run_history_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
+- `supabase/tests/rls_initplan_live_board_order_year_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
 - `supabase/tests/server_input_bounds_test.sql`
 - `supabase/tests/staff_access_directory_test.sql`
@@ -131,7 +132,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-93 files, 1256 declared test blocks.
+95 files, 1263 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -173,6 +174,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 19 | shouldRequestFirstRunPermissions |
 | `apps/mobile/src/features/onboarding/permissionPromptsWiring.test.ts` | 10 | location is asked only where it is used |
+| `apps/mobile/src/features/order/brandMarkPriority.test.ts` | 2 | first-screen brand marks load eagerly at high priority |
 | `apps/mobile/src/features/order/cartValidation.test.ts` | 21 | validateCartForBranch |
 | `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
@@ -215,6 +217,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
+| `apps/mobile/src/lib/webIndexTemplate.test.ts` | 5 | apps/mobile/public/index.html |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
 | `apps/mobile/src/services/rpcContractParity.test.ts` | 23 | the SQL reader |
@@ -231,7 +234,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-118 files, 1642 declared test blocks.
+123 files, 1710 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -306,7 +309,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/legal/prerender.test.ts` | 17 | escapeHtml — the whole reason this module can use string concatenation |
 | `src/lib/adminPushApi.test.ts` | 7 | sendAdminPushConfirmation |
 | `src/lib/api.test.ts` | 6 | admin.deleteBranch |
-| `src/lib/banners.test.ts` | 13 | selectActiveBanners |
+| `src/lib/banners.test.ts` | 17 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
 | `src/lib/branchImport.test.ts` | 47 | splitRows |
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
@@ -316,6 +319,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/documentLang.test.ts` | 6 | applyDocumentLang |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
+| `src/lib/imageUpload.test.ts` | 21 | fitWithin |
+| `src/lib/immutableAssetNames.test.ts` | 3 | findUnhashedAssets |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
@@ -341,7 +346,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/payment.test.ts` | 17 | checkout payment availability |
 | `src/lib/paymentGatewayApi.test.ts` | 5 | paymentGateway.testCheckoutResult |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
-| `src/lib/productImages.test.ts` | 15 | product image type gate |
+| `src/lib/productImages.test.ts` | 19 | product image type gate |
 | `src/lib/pwa/adminPushState.test.ts` | 9 | resolveAdminPushState |
 | `src/lib/pwa/pushSubscription.test.ts` | 13 | urlBase64ToUint8Array |
 | `src/lib/pwa/pushSupport.test.ts` | 16 | pushReadiness |
@@ -349,8 +354,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
+| `src/lib/staleAssetRecovery.test.ts` | 15 | failedAssetUrl |
 | `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
+| `src/lib/vercelConfig.test.ts` | 13 | vercel.json is expressible by this model |
+| `src/lib/webBudget.test.ts` | 8 | startupFontNames |
 | `src/utils/calculations.test.ts` | 64 | getVATBreakdown |
 | `src/utils/csvReader.test.ts` | 15 | readCsv — fields and records |
 

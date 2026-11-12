@@ -108,7 +108,8 @@ describe('injectPrerender — atomic, or not at all', () => {
 
 describe('legal.html must stay CSP-clean', () => {
   // `vercel.json` serves `script-src 'self' https://maps.googleapis.com` on
-  // `/(.*)` with no nonce, hash or 'unsafe-inline'. An inline <script> here is
+  // `/(.*)` with no nonce or 'unsafe-inline', and one hash: that of index.html's
+  // theme script (pinned by src/lib/vercelConfig.test.ts). An inline <script> here is
   // therefore blocked in production and NOWHERE ELSE — not in `vite build`, not
   // in `vite preview`, not in any test that does not serve the real headers. The
   // first version of this page hid the snapshot from such a script; the failure

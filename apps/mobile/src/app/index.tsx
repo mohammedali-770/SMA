@@ -56,10 +56,14 @@ function BrandIntro() {
       <View style={styles.markStage}>
         <Animated.View style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
         <Animated.View style={{ opacity, transform: [{ scale }] }}>
+          {/* The launch screen's LCP image: eager and high priority on web, or it
+              queues behind 700 KB of fonts. Only this mark and the chooser's. */}
           <Image
             source={require('../../assets/logo-mark.png')}
             style={styles.introMark}
             contentFit="contain"
+            priority="high"
+            loading="eager"
           />
         </Animated.View>
       </View>
