@@ -1,6 +1,9 @@
 node_modules/
 build/
 dist/
+# Playwright output (screenshots, error context) from `npm run test:e2e`.
+e2e/test-results/
+playwright-report/
 coverage/
 .DS_Store
 *.log

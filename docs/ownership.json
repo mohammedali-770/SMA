@@ -327,6 +327,17 @@
       "docs": [
         "docs/store/LISTING_COPY.md"
       ]
+    },
+    {
+      "id": "web-source-maps",
+      "why": "The /app export decides whether source maps are produced, uploaded to Sentry and removed before deploy. Until 2026-11-12 it produced none, and SENTRY_WEB_OBSERVABILITY.md was the only record of that. The two properties that matter are both invisible in a diff that only 'tidies the export': without SENTRY_AUTH_TOKEN the export must stay byte-identical to what it was, and with it no .map file or sourceMappingURL comment may reach dist/app. A failed upload deliberately warns and does not fail the build, because Vercel's Git integration builds production on every merge (CLAUDE.md section 13).",
+      "sources": [
+        "apps/mobile/scripts/export-web.js",
+        "apps/mobile/scripts/webExportSourceMaps.js"
+      ],
+      "docs": [
+        "docs/SENTRY_WEB_OBSERVABILITY.md"
+      ]
     }
   ]
 }

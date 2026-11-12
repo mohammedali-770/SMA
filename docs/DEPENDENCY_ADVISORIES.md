@@ -761,8 +761,16 @@ there.
 | Vercel CLI | `production-gates.yml`, gated deploy job | `VERCEL_TOKEN` | `vercel@65.3.1` |
 | `eas-cli` | `eas-build.yml`, `eas-status.yml` | `EXPO_TOKEN` | `25.3.0` |
 | Supabase CLI | `deploy-functions.yml`, `function-drift.yml` | `SUPABASE_ACCESS_TOKEN` — never created (`OWNER_ACTIONS.md` §15) | `2.122.0` |
+| Playwright's Chromium headless shell | `production-gates.yml`, build job (`npx --no-install playwright install`) | none | the build named by `@playwright/test` `1.64.1`, exact in `package.json` and the lockfile |
 
-**All three were `latest` until 2026-11-10.** Each pin was at least two weeks
+**The browser row is pinned differently, and on purpose.** `npx --no-install`
+runs the Playwright already in `node_modules` and refuses to download one, and
+each Playwright release names exactly one browser build. Bumping
+`@playwright/test` is therefore the only way that row changes. It was added
+2026-11-12 for the end-to-end spec; 1.64.1 was four weeks old, has no install
+script (nor do `playwright` and `playwright-core`), and 1.65.0 was a week old.
+
+**The first three were `latest` until 2026-11-10.** Each pin was at least two weeks
 old when chosen. Where a new major line had just appeared, the pin is the last
 release of the previous line instead: `eas-cli` 26.0.0 was superseded within two
 days, and the Supabase CLI's 3.0.0 was a week old. Bump a pin deliberately, in a
