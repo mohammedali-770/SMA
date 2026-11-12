@@ -4361,6 +4361,43 @@ There is no number to decide, and nothing to deploy.
 **Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
 and §58 marked APPLIED.
 
+## 50. Loyalty totals in the console — merge, apply, then merge #456
+
+**Opened 2026-11-12.** `20261008120000_admin_loyalty_stats.sql` is written,
+validated and NOT applied. Detail: `docs/MIGRATIONS.md` §59. *This number may
+need renumbering: a parallel pull request also adds an owner-action section.*
+
+Settings → Loyalty used to sum its four tiles in the browser over every
+profile, downloaded on every staff sign-in. Past 1 000 customers PostgREST's
+row cap made those tiles silently wrong. The tiles now read
+`admin_loyalty_stats()`, and the customer ledger is read 50 rows at a time when
+the Loyalty section is opened. Who can see the figures does not change: admin
+or accountant, at AAL2, as before.
+
+**The ordering matters.** This pull request carries the migration alone, so
+merging it changes nothing anyone sees. The console change that reads the new
+function is #456, and a merge deploys the console (Vercel's Git integration,
+CLAUDE.md §13). If #456 merged first, the four tiles would show "—" until the
+apply, a regression from today's numbers. So: **merge this, apply it, and only
+then merge #456.**
+
+### The step
+
+1. **Merge this pull request**, then **apply `20261008120000` by name** (§5),
+   re-hashing the merged copy first. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. It is independent of every other
+   outstanding file.
+2. **Check afterwards**, read-only: one `admin_loyalty_stats()` overload;
+   `anon` cannot execute it and `authenticated` can; `place_order`
+   `12b6816d…` and `compute_order_snapshot` `22e2d429…` are unchanged.
+3. **Then merge #456.** After its deploy, open Settings → Loyalty as an admin
+   at AAL2: the tiles show numbers and no notice.
+
+There is no number to decide and no function to deploy.
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
+and §59 marked APPLIED.
+
 ## Owner-action closeout rule
 
 When an item is completed:
