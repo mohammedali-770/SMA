@@ -2863,6 +2863,20 @@ It is deliberately not the "sold out" wording beside it (`soldOutNow`): a sold-o
 item comes back by itself, and this one has been withdrawn. Check that «ضمن
 القائمة» reads as "on the menu" rather than "in the list".
 
+**Widened 2026-11-12 — the accessibility pass (R07).** One new visible string and
+one new spoken composition, both engineering-drafted:
+
+- **Console sign-in footer**, `authSecuredBy` in `src/components/ops/opsStrings.ts`
+  (staff-facing, live on merge): «محمي عبر Supabase Auth · صلاحيات حسب الدور» —
+  English: *"Secured by Supabase Auth · role-based access"*. Until now the footer
+  was English in both languages.
+- **The menu card's spoken name**, heard only with VoiceOver or TalkBack on, for an
+  item that opens its options: the product name, a comma, then the price as
+  `priceAccessibilityLabel` already speaks it — for example «وجبة برجر, من 14.00
+  ريال سعودي». Nothing new is translated; what to check is whether the Latin comma
+  and the order read naturally, or whether «،» belongs there
+  (`apps/mobile/src/design-system/ui/productCardA11y.ts`).
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

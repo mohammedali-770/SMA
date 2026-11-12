@@ -34,7 +34,7 @@ export function LoyaltyToggle({
       style={({ pressed }) => [styles.row, rtlRow, pressed && styles.pressed]}
       onPress={onToggle}
       accessibilityRole="switch"
-      accessibilityState={{ checked: on }}
+      aria-checked={on}
       accessibilityLabel={label}
     >
       <View style={[styles.track, on && styles.trackOn]}>

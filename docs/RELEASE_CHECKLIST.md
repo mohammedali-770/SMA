@@ -195,6 +195,36 @@ devices only; the console's sandbox test does not open the app.
 - [ ] **The web build offers no online option.** Open `/app` in a browser with
       online payment on. Checkout offers cash only.
 
+### Screen readers — added 2026-11-12
+
+The accessibility pass (R07) was measured on the web export, where axe and the
+browser's accessibility tree can see it. VoiceOver and TalkBack can only be
+checked on a device. Run once per platform, with the screen reader on, in English
+and then Arabic.
+
+- [ ] **Sign-in errors are spoken.** Enter a code that is wrong, wait for the
+      message, and listen. TalkBack reads it through its live region. VoiceOver is
+      told directly (`AccessibilityInfo.announceForAccessibility`), because iOS
+      honours neither the alert role nor a live region. Do NOT send a code to a
+      real customer's number for this; use the owner's own test number.
+- [ ] **The two policy links are links.** Swipe to Terms & Conditions and to the
+      Privacy Policy: each is announced as a link, and a double-tap opens it.
+- [ ] **A menu card that opens options says its price.** Swipe to such a card: one
+      element, read as the name and then the price ("from …" when the sizes
+      differ), with the "opens item options" hint. "Choose" is no longer a
+      separate stop. Tapping the visible Choose button still opens the item.
+- [ ] **Chosen options are announced as chosen.** On a product with sizes and
+      options, the selected size is "selected" or "checked" and the others are
+      not, and the state follows a tap. Same for the Pickup and Delivery tabs, the
+      chosen pickup branch, the loyalty switch, the delete-account checkbox and a
+      saved address. These now use `aria-*` props instead of
+      `accessibilityState`; the announcement should be unchanged from before.
+- [ ] **Status pills and red text are readable** in light and dark appearance:
+      Open/Closed, Pickup, order statuses, Required, the cart's Remove. The inks
+      changed colour (`mintInk`, `skyInk`, `dangerInk`, `emberText`); the
+      contrast is pinned by the two contrast contracts, so this is a look, not a
+      measurement.
+
 ### First build on Expo SDK 58 — added 2026-11-10
 
 The upgrade changes the native toolchain and turns on R8 for Android release

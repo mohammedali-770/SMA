@@ -70,7 +70,8 @@ export function Button({
       testID={testID}
       accessibilityRole={state.accessibility.role}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: state.accessibility.disabled, busy: state.accessibility.busy }}
+      aria-disabled={state.accessibility.disabled}
+      aria-busy={state.accessibility.busy}
       onPress={handlePress}
       disabled={state.inert}
       style={({ pressed }) => [

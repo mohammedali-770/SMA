@@ -24,7 +24,7 @@ function Ghost({ children }: { children: React.ReactNode }) {
       accessible
       accessibilityRole="progressbar"
       accessibilityLabel={t('loading')}
-      accessibilityState={{ busy: true }}
+      aria-busy
       accessibilityLiveRegion="polite"
       style={styles.flex}
     >

@@ -304,7 +304,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           onPress={useMyLocation}
           accessibilityRole="button"
           accessibilityLabel={labels.useMyLocation}
-          accessibilityState={{ busy: locating, disabled: locating }}
+          aria-busy={locating}
+          aria-disabled={locating}
           accessibilityHint={labels.locateHint}
           hitSlop={8}
           style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
