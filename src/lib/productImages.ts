@@ -7,6 +7,8 @@
  * are kept separate on purpose (see the migration header): a cleanup that
  * empties banners must not be able to delete the menu's photography.
  */
+import { planImageUpload, UPLOAD_IMAGE_MAX_EDGE, type Size, type UploadPlan } from './imageUpload';
+
 export const PRODUCT_IMAGE_BUCKET = 'product-images';
 export const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB — mirrors the bucket cap.
 export const ALLOWED_PRODUCT_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -39,6 +41,20 @@ export function productImageStoragePath(originalName: string, unique: string): s
   const raw = (originalName.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const ext = (ALLOWED_PRODUCT_IMAGE_EXT as readonly string[]).includes(raw) ? raw : 'jpg';
   return `products/${unique}.${ext}`;
+}
+
+/**
+ * Longest edge of a stored menu photo: the product hero, 390 pt wide on the
+ * largest phone at 3x. The menu card shows the same file at 104x129 pt.
+ */
+export const PRODUCT_IMAGE_MAX_EDGE = UPLOAD_IMAGE_MAX_EDGE;
+
+/**
+ * Keep a picked menu photo as-is, or resize/re-encode it before upload
+ * (`imageUploadBrowser.ts` applies the answer). Rules in `imageUpload.ts`.
+ */
+export function planProductImageUpload(input: Size & { bytes: number }): UploadPlan {
+  return planImageUpload(input, PRODUCT_IMAGE_MAX_EDGE);
 }
 
 /**

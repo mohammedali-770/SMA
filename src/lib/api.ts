@@ -9,8 +9,10 @@
  * RPC, which recomputes all amounts server-side.
  */
 import { supabase } from './supabase';
-import { BANNER_BUCKET, bannerStoragePath } from './banners';
-import { PRODUCT_IMAGE_BUCKET, productImagePathFromUrl, productImageStoragePath } from './productImages';
+import { BANNER_BUCKET, bannerStoragePath, planBannerUpload } from './banners';
+import { UPLOADED_IMAGE_CACHE_CONTROL } from './imageUpload';
+import { prepareImageForUpload } from './imageUploadBrowser';
+import { PRODUCT_IMAGE_BUCKET, planProductImageUpload, productImagePathFromUrl, productImageStoragePath } from './productImages';
 import { classifyWatchdogProbe, WatchdogCapability } from './orderIntegrityCapability';
 import {
   BranchDependencyCounts, BranchHasDependenciesError,
@@ -1055,12 +1057,17 @@ export const banners = {
    * its stored path + public URL. RLS on storage.objects enforces admin. Uses a
    * unique path (no overwrite). `upsert:false` also guards against collisions.
    */
-  async uploadImage(file: File): Promise<{ path: string; publicUrl: string }> {
+  async uploadImage(picked: File): Promise<{ path: string; publicUrl: string }> {
+    // Resized to 1200 px and re-encoded (WebP) first, unless already small;
+    // any failure there uploads the picked file unchanged. src/lib/imageUpload.ts.
+    const file = await prepareImageForUpload(picked, planBannerUpload);
     const unique = `${Date.now()}-${crypto.randomUUID()}`;
     const path = bannerStoragePath(file.name, unique);
+    // A year, because this path is never reused (unique name, upsert:false) —
+    // see UPLOADED_IMAGE_CACHE_CONTROL before changing either.
     const { error } = await supabase.storage
       .from(BANNER_BUCKET)
-      .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+      .upload(path, file, { cacheControl: UPLOADED_IMAGE_CACHE_CONTROL, upsert: false, contentType: file.type || undefined });
     if (error) throw new Error(error.message);
     const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(path);
     return { path, publicUrl: data.publicUrl };
@@ -1113,12 +1120,17 @@ export const productImages = {
    * existing object; `upsert:false` makes a collision an error rather than a
    * silent replacement.
    */
-  async upload(file: File): Promise<{ path: string; publicUrl: string }> {
+  async upload(picked: File): Promise<{ path: string; publicUrl: string }> {
+    // Resized to 1200 px and re-encoded (WebP) first, unless already small;
+    // any failure there uploads the picked file unchanged. src/lib/imageUpload.ts.
+    const file = await prepareImageForUpload(picked, planProductImageUpload);
     const unique = `${Date.now()}-${crypto.randomUUID()}`;
     const path = productImageStoragePath(file.name, unique);
+    // A year, because this path is never reused (unique name, upsert:false) —
+    // see UPLOADED_IMAGE_CACHE_CONTROL before changing either.
     const { error } = await supabase.storage
       .from(PRODUCT_IMAGE_BUCKET)
-      .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+      .upload(path, file, { cacheControl: UPLOADED_IMAGE_CACHE_CONTROL, upsert: false, contentType: file.type || undefined });
     if (error) throw new Error(error.message);
     const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
     return { path, publicUrl: data.publicUrl };
