@@ -54,3 +54,25 @@ While only legacy keys exist the wire format is unchanged; once a secret key
 exists it travels on `apikey` alone. The Vault-held `x-process-secret` path is
 untouched. Deploy order (processor before its callers) and rollback:
 `docs/SUPABASE_API_KEYS.md` §3.
+
+## Tests (2026-11-12)
+
+The gateway's request handler lives in
+`supabase/functions/account-delete-scheduler/handler.ts`; `index.ts` keeps only
+`Deno.serve(handler)`. The handler body was moved verbatim, so the deployed
+function's behaviour is unchanged and **no redeploy is needed or implied**. The
+next deploy, whenever one is approved, simply bundles one more local module.
+
+`handler_test.ts` beside it calls that handler under `deno test`, with `fetch`
+stubbed and no `--allow-net`, and pins every branch: CORS preflight, 405 for
+any other method, 503 when `SUPABASE_URL` or the service key is missing, 403
+with no `x-process-secret`, 403 when the RPC refuses, errors or answers anything
+but `true` (the processor is never called), the forward to
+`account-delete-process` in both key formats (legacy: `apikey` and a bearer;
+opaque: `apikey` only, on the RPC call as well), the processor's status, body
+and content type relayed, and 502 when the processor is unreachable. The
+`Edge Function typecheck (Deno)` CI job runs it:
+
+```bash
+deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts
+```

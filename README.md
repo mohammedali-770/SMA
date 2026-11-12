@@ -128,9 +128,12 @@ npm run docs:check                      # generated reference, ownership rules, 
 # Production build (Vite + Expo web export)
 npm run build                           # reinstalls apps/mobile dependencies first, then builds dist/
 find dist -name '*.map'                 # must print nothing: source maps never ship
+npx playwright install --only-shell chromium  # once per Playwright version; the lockfile fixes which build
+npm run test:e2e                        # a guest's journey through dist/, hermetic (e2e/guest-journey.spec.ts)
 
 # Edge Function typecheck (Deno), with Deno 2.9.4 as CI pins it
 deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
+deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts  # handlers, fetch stubbed
 
 # Dependency audit (high+)
 node scripts/audit-web-high.mjs
@@ -143,6 +146,8 @@ node scripts/check-workflow-pins.mjs
 
 # Migration chain + SQL suites: a disposable Postgres 16 + PostGIS 3 server only, never Production
 PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres bash .github/sql-ci/run.sh
+# run.sh ends with the existing-data stage (report-only); to point it at chosen files:
+SQL_CI_NEW_MIGRATIONS='<file>.sql' PGHOST=127.0.0.1 PGUSER=postgres bash .github/sql-ci/existing-data.sh
 ```
 
 The SQL harness needs the stub extensions in `.github/sql-ci/extensions/` copied into the server's extension directory first, as `.github/workflows/sql-suites.yml` does, because the chain runs `create extension pg_cron` and `pg_net`. Its CI job is path-gated, so it runs only when SQL changes.

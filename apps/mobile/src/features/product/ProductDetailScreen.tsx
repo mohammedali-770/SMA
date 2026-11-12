@@ -176,7 +176,7 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
                     style={[styles.modRow, rtlRow, checked && styles.modRowOn]}
                     onPress={() => setVariant(v)}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked }}
+                    aria-checked={checked}
                   >
                     <View style={[styles.check, styles.radio, checked && styles.checkOn]}>
                       {checked ? <Text variant="label" tone="onEmber" align="center">✓</Text> : null}
@@ -206,9 +206,9 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
                     <StatusPill label={t('optionOutOfStock')} tone="neutral" />
                   </View>;
                 }
-                return <Pressable key={m.id} style={[styles.modRow, rtlRow, checked && styles.modRowOn]} onPress={() => toggle(g, m)} accessibilityRole={g.maxSelection === 1 ? 'radio' : 'checkbox'} accessibilityState={{ checked }}>
+                return <Pressable key={m.id} style={[styles.modRow, rtlRow, checked && styles.modRowOn]} onPress={() => toggle(g, m)} accessibilityRole={g.maxSelection === 1 ? 'radio' : 'checkbox'} aria-checked={checked}>
                   <View style={[styles.check, g.maxSelection === 1 ? styles.radio : null, checked && styles.checkOn]}>{checked ? <Text variant="label" tone="onEmber" align="center">✓</Text> : null}</View>
-                  <Text variant="body" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>{m.price > 0 ? <Price amount={m.price} prefix="+" size={typeScale.label.size} color={colors.ember} weight="700" /> : null}
+                  <Text variant="body" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>{m.price > 0 ? <Price amount={m.price} prefix="+" size={typeScale.label.size} color={colors.emberText} weight="700" /> : null}
                 </Pressable>;
               })}</View>
             </View>;

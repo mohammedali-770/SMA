@@ -2098,6 +2098,23 @@ still breaks every installed build, which keeps sending the old name. Keep the
 old name accepted, as a parameter with a DEFAULT, until no supported build
 sends it.
 
+**A-note — CI now applies a change's migrations to a database that holds rows,
+and reports what they did (report-only since 2026-11-12).** Every other SQL stage
+replays the chain onto an EMPTY database, so no backfill had ever met a row in
+CI: with `20260801120000`'s normalization mutated to demote every default
+address, the whole run stayed green. `.github/sql-ci/existing-data.sh`, called
+from `run.sh`, builds the schema from the migrations that predate the change,
+writes a small production-shaped fixture through the real RPCs
+(`.github/sql-ci/existing-data.sql`), applies the change's files one transaction
+each, asserts a handful of invariants (no NOT VALID constraint added, no
+business row lost, one default address kept, balance equals ledger, one `earn`
+per order, an order can still be placed and settled) and prints a fingerprint
+diff of every table whose existing rows changed. That mutant now fails it.
+**It does not replace step B below**: synthetic rows prove only the shapes they
+contain, and Production holds shapes this fixture does not. It is report-only
+until it has run clean on real pull requests; making it blocking is one line
+(`SQL_CI_EXISTING_DATA_BLOCKING: '1'` in `sql-suites.yml`) and an owner decision.
+
 **B. Pre-live gate** (all read-only)
 1. Verify the repository base commit.
 2. Verify the current live migration count and latest version.

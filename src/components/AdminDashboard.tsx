@@ -15,6 +15,7 @@ import { NewOrderAlertBar } from './admin/view/NewOrderAlertBar';
 import { parseTabFromHash, tabToHash, type AdminTab } from './admin/view/adminNav';
 import { useApp } from '../context/AppContext';
 import { useOnline } from '../lib/useOnline';
+import { applyDocumentLang } from '../lib/documentLang';
 import { orderIntegrity } from '../lib/api';
 import { operationsHealth } from '../lib/operationsHealthApi';
 import { operationsAlerts } from '../lib/operationsAlertsApi';
@@ -93,6 +94,15 @@ export const AdminDashboard: React.FC = () => {
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
+
+  // `adminLang` lives in AppContext, but AppContext is mounted for EVERY
+  // audience, so an effect there would also run under the sign-in screen and
+  // the ops consoles — and, being the parent, after theirs on mount, stamping
+  // the admin's English over an Arabic console. The dashboard is where
+  // `adminLang` is the language on screen, so the document follows it here.
+  useEffect(() => {
+    applyDocumentLang(adminLang);
+  }, [adminLang]);
   const online = useOnline();
   const isAccountant = currentUser.role === 'accountant';
   const canTriage = canTriageRole(currentUser.role);

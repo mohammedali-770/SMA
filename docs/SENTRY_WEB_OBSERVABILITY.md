@@ -1,8 +1,10 @@
 # Spicy Meal — Web / Admin Sentry Observability
 
-> **Updated 2026-11-11.** Companion to `SENTRY_OBSERVABILITY.md` for the two browser surfaces built and deployed together.
+> **Updated 2026-11-12.** Companion to `SENTRY_OBSERVABILITY.md` for the two browser surfaces built and deployed together.
 >
-> **Measured 2026-11-11: neither web surface sends readable stack traces from production.** The admin-web source-map upload did not run for the production build, and `/app` has no source-map path at all. Detail under "Source maps" below.
+> **Measured 2026-11-11: neither web surface sends readable stack traces from production.** The admin-web source-map upload did not run for the production build, and `/app` had no source-map path at all.
+>
+> **Changed 2026-11-12: `/app` now has one, behind the same `SENTRY_AUTH_TOKEN` gate as the console.** Neither surface uploads until that token is in the Vercel build. One setting then turns both on in the same build (`OWNER_ACTIONS.md` §11). Detail under "Source maps" below.
 
 ## Surfaces
 
@@ -21,7 +23,7 @@ The web/admin surfaces use the same Sentry organization/project strategy as mobi
 - DSN is a public ingestion identifier and may be present in browser configuration.
 - `SENTRY_AUTH_TOKEN` is a **server/build secret** used for source-map upload tooling and must never be exposed through `VITE_*` or `EXPO_PUBLIC_*`.
 
-The Aug 11 native release work recorded the EAS production token setup. Vercel remains a separate environment: verify its current `SENTRY_AUTH_TOKEN` before relying on **admin-web** production symbolication rather than treating a historical setup statement as permanent truth.
+The Aug 11 native release work recorded the EAS production token setup. Vercel remains a separate environment: verify its current `SENTRY_AUTH_TOKEN` before relying on **admin-web** or **`/app`** production symbolication rather than treating a historical setup statement as permanent truth.
 
 **Read on 2026-11-11, it was not there.** The production console build carried none of the marks the upload leaves (next section), so the token was absent from the environment that built it.
 
@@ -58,23 +60,42 @@ For admin-web production symbolication:
 - [ ] Vite source maps are not published as public assets.
 - [ ] an approved **admin-web** test event resolves to the correct release and readable stack.
 
-### Expo web (`/app`) — upload path not implemented yet
+### Expo web (`/app`) — implemented in source 2026-11-12, waiting for the token
 
-`apps/mobile/scripts/export-web.js` currently runs:
+`apps/mobile/scripts/export-web.js` asks `planWebExport` in `apps/mobile/scripts/webExportSourceMaps.js` what to run. The gate is `Boolean(process.env.SENTRY_AUTH_TOKEN)`, the same test `vite.config.ts` and `apps/mobile/app.config.js` use.
+
+**Without the token nothing changed.** The export runs exactly as it did before:
 
 ```text
 expo export --platform web --clear --output-dir ../../dist/app
 ```
 
-It injects public release/environment metadata, but it **does not generate/upload a separate Expo-web source-map set to Sentry** and deliberately does not read/forward `SENTRY_AUTH_TOKEN`.
+Measured 2026-11-12: a no-token export after the change was byte-identical to one before it, over all 58 files in `dist/app`, and so was its log. CI has no token, so CI takes this path.
 
-**Measured 2026-11-11:** the production `/app` entry, `entry-cd9713086d63a9e558548cd8274fe48b.js` (commit `622a133`, about 4.4 MB), carries one Sentry debug ID but no `sourceMappingURL`, and a GET for its `.map` returns 403. No map is ever produced, so there is nothing to upload even once a token exists, and every `/app` event reaches Sentry with minified frames. Adding the token to Vercel does not change this; the export itself has to produce and upload maps.
+**With the token, five steps run, in this order:**
+
+1. The same export plus `--source-maps`. Metro writes `entry-<hash>.js.map` beside the bundle, appends `//# sourceMappingURL=/app/…js.map` and `//# debugId=<id>`, and embeds the same Debug ID in the code.
+2. `sentry-expo-upload-sourcemaps dist/app`, the uploader `@sentry/react-native` 8.28 ships. It runs `sentry-cli sourcemaps upload <bundle> <map>` from `@sentry/cli` 3.8.0, with org `first-taste-trading-company` and project `react-native` read from the `@sentry/react-native/expo` entry in `app.json`. Sentry matches events to maps by Debug ID, so no release name is needed. `SENTRY_URL` from the environment overrides the URL in `app.json`.
+3. Every `*.map` under `dist/app` is deleted. This always runs, even when the export or the upload failed.
+4. The `sourceMappingURL` comment is removed, so the shipped bundle does not point at a file that is not there. This matches the console's `sourcemap: 'hidden'`. The `//# debugId=` comment stays, because Sentry matches on it.
+5. `dist/app` is scanned again. **The build fails** if any `.map` file or `sourceMappingURL` comment is left.
+
+**If the upload fails, the build warns and carries on.** That is what the console does: the Sentry Vite plugin passes an upload error to `handleRecoverableError(e, false)` in `@sentry/bundler-plugins`, which logs it and does not throw. Vercel's Git integration builds production on every merge (CLAUDE.md §13). If the build failed here, a Sentry outage or an expired token would block a release. A map shipping is the failure that matters, and step 5 fails the build for that.
+
+The console's own `filesToDeleteAfterUpload: ['dist/**/*.map']` cannot cover `/app`: `vite build` finishes before the export starts, so step 3 does that job here.
+
+**Measured locally 2026-11-12 with a fake token (no request reached Sentry):**
+
+- With a stub `sentry-cli` (`SENTRY_CLI_EXECUTABLE`), it uploaded the bundle and its 15 MB map, then left 0 `.map` files and 0 `sourceMappingURL` comments. The shipped entry kept the no-token build's file name and byte content, plus one trailing `//# debugId=` line whose ID matches the uploaded map.
+- When the upload failed, the build printed the warning, exited 0, and produced the same 58 files. This held both with a stub that exits 1 and with the real `sentry-cli` in a network-less namespace.
+
+**Not yet verified:** a real upload, and a symbolicated `/app` event. Both need the token in Vercel. After the next production deploy with the token, the build log should show `[export-web] /app source maps uploaded to Sentry.`, then an approved `/app` test event should show readable frames.
 
 Therefore:
 
-- Expo-web runtime events can still reach Sentry with environment/release/surface metadata;
-- a configured Vercel token and successful Vite upload prove **admin-web** symbolication only;
-- do **not** mark `/app` source-map verification complete until a dedicated Expo-web map generation/upload path is implemented and tested;
+- Expo-web runtime events reach Sentry with environment/release/surface metadata either way;
+- until the token is in the Vercel build, `/app` frames stay minified, as they always have;
+- do **not** mark `/app` symbolication verified until a production build log shows the upload and an approved `/app` test event resolves;
 - do not reuse/publish source maps as public assets as a workaround.
 
 This is an observability gap, not a reason to expose the auth token to the customer bundle.
@@ -157,7 +178,7 @@ After an approved web release:
 - [ ] customer web events carry `app_surface=expo-web`.
 - [ ] environments/releases are distinguishable.
 - [ ] approved **admin-web** test event is symbolicated when the Vercel upload token is configured.
-- [ ] Expo-web event routing/tags are verified separately; **source-map symbolication remains pending until a dedicated upload path exists**.
+- [ ] Expo-web event routing/tags are verified separately; **`/app` symbolication is verified only when the build log shows `[export-web] /app source maps uploaded to Sentry.` and an approved `/app` test event resolves**.
 - [ ] sanitized payload contains no customer/payment/auth secrets.
 
 Use `docs/DEPLOY.md` for production-artifact verification; an arbitrary HTTP 200 does not prove the current bundle is served.
@@ -167,7 +188,8 @@ Use `docs/DEPLOY.md` for production-artifact verification; an arbitrary HTTP 200
 - `src/lib/observability/` — admin browser implementation.
 - `apps/mobile/src/lib/observability/` — shared/mobile/expo-web implementation.
 - `vite.config.ts` — **admin/Vite** source-map/plugin gate.
-- `apps/mobile/scripts/export-web.js` — Expo web export; currently no separate Sentry map upload.
+- `apps/mobile/scripts/export-web.js` — Expo web export; runs the token-gated `/app` source-map path.
+- `apps/mobile/scripts/webExportSourceMaps.js` — that path: plan, upload, delete, strip, verify (tests: `apps/mobile/src/lib/webExportSourceMaps.test.ts`).
 - `docs/SENTRY_OBSERVABILITY.md` — native/mobile runbook.
 - `docs/DEPLOY.md` — deployment verification.
 - `docs/RELEASE_CHECKLIST.md` — release gates.

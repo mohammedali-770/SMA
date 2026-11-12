@@ -402,7 +402,7 @@ export function HomeMenuScreen({
         <>
           {!branchOpen ? (
             <View style={styles.closedNotice}>
-              <Text variant="label" style={{ color: colors.danger }}>
+              <Text variant="label" style={{ color: colors.dangerInk }}>
                 {t('branchClosedNotice')}
               </Text>
             </View>

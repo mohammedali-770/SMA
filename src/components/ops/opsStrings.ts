@@ -156,6 +156,7 @@ export const OPS_STRINGS = {
     authPassword: 'كلمة المرور',
     authWorking: 'جارٍ المتابعة…',
     authFailed: 'تعذّر تسجيل الدخول',
+    authSecuredBy: 'محمي عبر Supabase Auth · صلاحيات حسب الدور',
 
     // signed in, but not with a staff account (console shows this instead of
     // silently forwarding to the customer app)
@@ -371,6 +372,7 @@ export const OPS_STRINGS = {
     authPassword: 'Password',
     authWorking: 'Working…',
     authFailed: 'Authentication failed',
+    authSecuredBy: 'Secured by Supabase Auth · role-based access',
 
     // signed in, but not with a staff account (console shows this instead of
     // silently forwarding to the customer app)

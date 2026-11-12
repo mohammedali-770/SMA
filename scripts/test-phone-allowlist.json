@@ -154,7 +154,23 @@
     },
     {
       "number": "+966500000301",
-      "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql", "supabase/tests/server_input_bounds_test.sql"]
+      "used_in": [
+        ".github/sql-ci/existing-data.sql",
+        "supabase/tests/lazywait_delivery_sync_test.sql",
+        "supabase/tests/server_input_bounds_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000302",
+      "used_in": [".github/sql-ci/existing-data.sql"]
+    },
+    {
+      "number": "+966500000303",
+      "used_in": [".github/sql-ci/existing-data.sql"]
+    },
+    {
+      "number": "+966500000304",
+      "used_in": [".github/sql-ci/existing-data.sql"]
     },
     {
       "number": "+966500000777",
