@@ -7050,8 +7050,8 @@ awaiting owner approval.** App-hardening checklist gaps S02#1, S04#1, S04#2,
 S05#3 and S07#1, plus one bug found while fixing them. The section number skips
 54–56, which open pull requests already use.
 
-sha256 `4165198d46b0eafacc3d1a99851659d70920a8befe62482bbd3485e9b4141231`,
-683 lines / 34 038 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `5e3660a817f241fa468e02b66c177282646b5b2cda83106020facf850612466e`,
+730 lines / 37 089 bytes. **Re-hash the MERGED copy before applying**, per §15.
 
 **It changes live ordering behaviour.** A customer with no verified phone, or
 over either order limit, is refused from the moment it is applied. Its three
@@ -7087,6 +7087,19 @@ would be refused for ever.
 
 **An idempotent retry is exempt.** A retry with the key of an order that
 already exists gets that order back, as before, even at the limit.
+
+**The two limits interact.** Only `admin_set_order_status` writes
+`orders.status`; no other function on the chain and no Edge Function sets it
+(checked 2026-11-12). For a customer whose orders staff do not advance, the
+effective rule is therefore 5 orders in any rolling 24 hours, and the hourly
+limit of 10 cannot bind first. `docs/OWNER_ACTIONS.md` §48 puts this next to
+the two numbers.
+
+**The bidirectional formatting characters are written as regex escapes**
+(U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069), not as raw characters.
+A raw one is invisible in a diff and in SQL sent inline, so a changed one would
+change the name rule with nothing to see. The file calls the rule on each of
+the twelve, and on their neighbours, before it finishes.
 
 **The storage operation names were read from source, not guessed:**
 `supabase/storage` `src/http/routes/operations.ts` at commit
@@ -7131,9 +7144,22 @@ that applies SELECT policies.
 - **One existing suite changed, on purpose:** `order_read_contracts_test.sql`
   CASE 10 places an order through the wrapper, so its customer is now
   phone-verified.
-- **Mutation testing: 24 mutants, all killed by the suite** with the file's own
-  check stripped out. The file's own check also refuses 12 of them before they
-  land.
+- **Mutation testing: 34 mutants, all killed by the suite** with the file's own
+  check stripped out. The file's own check also refuses 23 of them before they
+  land. Ten of the 34 were added after review, because three plausible mutants
+  survived the first suite: the hourly window cut to 1 minute, the open window
+  cut to 2 hours, and `object.list` added to the administrator's policy. The
+  suite now places orders at 59 minutes and 23 hours and expects them to count,
+  and lists as an administrator under every read route the Storage server
+  names.
+- **The file's check on the wrapper reads statements, not tokens.** Its first
+  version looked for `phone_verified` and `pg_advisory_xact_lock` anywhere in
+  the body, and a body with the lock commented out still applied. It now
+  strips comments and requires each of eight guard statements exactly once.
+  That proves the statements are stored; it does not prove they refuse the
+  right callers, which is the suite's job. The storage check compares the
+  policy's operation list exactly, so an added `object.list` refuses the
+  apply.
 - **A defect the first draft had, and how the suite now catches it.** The draft
   revoked the two name helpers from `authenticated`. The profile trigger runs as
   the customer, so every name edit through the app would have failed with

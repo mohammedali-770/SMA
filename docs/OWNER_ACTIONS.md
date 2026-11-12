@@ -3617,6 +3617,16 @@ when staff move it in the console. The 2026-09-26 order is still `received`.
 Without the window, a customer whose old orders were never closed would be
 refused for ever.
 
+**What that means for the two limits together.** Only
+`admin_set_order_status` writes `orders.status` (checked on the local chain on
+2026-11-12: no other function or Edge Function sets it; the POS webhook writes
+`lazywait_status`). So for a customer whose orders staff do not advance, the
+rule that actually applies is **5 orders in any rolling 24 hours**. The 5th
+order blocks the 6th, so the 10-per-hour limit never gets a chance to bind. The
+hourly limit only matters when staff deliver or cancel orders quickly. Decide
+the two numbers with that in mind: if branches rarely advance orders in the
+console, the open limit is the daily cap.
+
 **What is not covered, on purpose.** The online checkout-session path is frozen
 under CLAUDE.md §6. Before online payment is enabled, `begin_session_attempt`
 must refuse a line above the cap before any payment is taken; that belongs on
@@ -3625,9 +3635,19 @@ either.
 
 ### The steps
 
-1. **Decide the three numbers and the phone rule.** A different number is a
-   one-line change to the migration before merge, or an `app_settings` write
-   after apply (a live write, §5).
+1. **Decide the three numbers and the phone rule.** Before merge, a different
+   number is a change to the pull request, and it is not one line:
+   - **the line cap** is in four places that must agree: the CHECK, the file's
+     own assertion 6.1, the constraint comment, and `MAX_LINE_QUANTITY` in
+     `apps/mobile/src/features/cart/quantityLimit.ts`.
+     `quantityLimit.test.ts` fails if the migration and the constant disagree,
+     and the suite's CASE 1 tests 50 and 51;
+   - **the two order limits** are each a column default and assertion 6.6 in
+     the migration, plus the suite's CASES 7, 8 and 11, which count to them.
+
+   After apply, the two order limits are an `app_settings` write instead (a live
+   write, §5). The line cap is not a setting: changing it after apply needs a
+   new migration.
 2. **Merge** the pull request. The console change (sign-in only) ships with the
    web deploy that follows the merge, which today happens on every merge
    (CLAUDE.md §13). The app change ships with the next EAS build.

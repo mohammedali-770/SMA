@@ -173,6 +173,18 @@ begin
   if r <> '23514' then raise exception 'CASE 2 FAILED: an 81-character name gave %', r; end if;
   r := pg_temp.as_customer(v_c, format('update public.profiles set full_name = %L where id = %L', 'Ali' || chr(8238) || 'evil', v_c));
   if r <> '23514' then raise exception 'CASE 2 FAILED: a bidi override gave %', r; end if;
+  -- Each of the twelve bidi formatting characters, one at a time. The rule
+  -- holds them as \uXXXX escapes; a slip in one escape shows up here.
+  declare c int;
+  begin
+    foreach c in array array[1564, 8206, 8207, 8234, 8235, 8236, 8237, 8238, 8294, 8295, 8296, 8297] loop
+      r := pg_temp.as_customer(v_c, format('update public.profiles set full_name = %L where id = %L', 'Ali' || chr(c) || 'b', v_c));
+      if r <> '23514' then raise exception 'CASE 2 FAILED: U+% in a name gave %', upper(to_hex(c)), r; end if;
+    end loop;
+    -- A zero-width non-joiner, which Persian and some Arabic names carry, is not refused.
+    r := pg_temp.as_customer(v_c, format('update public.profiles set full_name = %L where id = %L', 'Ali' || chr(8204) || 'b', v_c));
+    if r <> 'OK' then raise exception 'CASE 2 FAILED: U+200C in a name gave %', r; end if;
+  end;
   r := pg_temp.as_customer(v_c, format('update public.profiles set full_name = %L where id = %L', 'Ali' || chr(7), v_c));
   if r <> '23514' then raise exception 'CASE 2 FAILED: a control character gave %', r; end if;
   r := pg_temp.as_customer(v_c, format('update public.profiles set email = %L where id = %L', repeat('x', 243) || '@example.com', v_c));
@@ -345,6 +357,16 @@ begin
   if r <> '0' then raise exception 'CASE 5 FAILED: an administrator lists % objects outside a delete', r; end if;
   r := pg_temp.storage_count('authenticated', v_admin, 'aal2', 'storage.object.list_v2', 'select 1 from storage.objects');
   if r <> '0' then raise exception 'CASE 5 FAILED: an administrator lists % objects under list_v2', r; end if;
+  r := pg_temp.storage_count('authenticated', v_admin, 'aal2', 'storage.object.list', 'select 1 from storage.objects');
+  if r <> '0' then raise exception 'CASE 5 FAILED: an administrator lists % objects under list', r; end if;
+  -- Any other operation the Storage server names, too: reading one object,
+  -- getting its info, signing a URL.
+  r := pg_temp.storage_count('authenticated', v_admin, 'aal2', 'storage.object.get_authenticated', 'select 1 from storage.objects');
+  if r <> '0' then raise exception 'CASE 5 FAILED: an administrator sees % objects under get_authenticated', r; end if;
+  r := pg_temp.storage_count('authenticated', v_admin, 'aal2', 'object.get_authenticated_info', 'select 1 from storage.objects');
+  if r <> '0' then raise exception 'CASE 5 FAILED: an administrator sees % objects under get_authenticated_info', r; end if;
+  r := pg_temp.storage_count('authenticated', v_admin, 'aal2', 'storage.object.sign', 'select 1 from storage.objects');
+  if r <> '0' then raise exception 'CASE 5 FAILED: an administrator sees % objects under sign', r; end if;
 
   -- Inside a delete, the rows are visible to an administrator at AAL2 only.
   r := pg_temp.storage_count('authenticated', v_cust, 'aal1', 'storage.object.delete_many', 'select 1 from storage.objects');
@@ -473,6 +495,17 @@ begin
   r := pg_temp.try_order(v_c, v_branch, v_items);
   if r not like 'OK %' then raise exception 'CASE 7 FAILED: an order after one was delivered was refused: %', r; end if;
 
+  -- An order nobody closed still counts at 23 hours: the window is a day,
+  -- not two hours or one.
+  set local session_replication_role = replica;
+  update public.orders set created_at = now() - interval '23 hours'
+   where customer_id = v_c and status = 'received';
+  set local session_replication_role = origin;
+  r := pg_temp.try_order(v_c, v_branch, v_items);
+  if r not like 'P0001 You already have 5 orders in progress.%' then
+    raise exception 'CASE 7 FAILED: five open orders placed 23 hours ago gave "%", expected the open-order refusal', r;
+  end if;
+
   -- An order nobody closed stops counting after 24 hours.
   set local session_replication_role = replica;
   update public.orders set created_at = now() - interval '25 hours'
@@ -481,7 +514,7 @@ begin
   r := pg_temp.try_order(v_c, v_branch, v_items);
   if r not like 'OK %' then raise exception 'CASE 7 FAILED: stale open orders still counted: %', r; end if;
 
-  raise notice 'CASE 7 ok: 5 honest orders accepted, the 6th refused, retries and other customers unaffected, delivered and stale orders free slots';
+  raise notice 'CASE 7 ok: 5 honest orders accepted, the 6th refused (also at 23 hours), retries and other customers unaffected, delivered and stale orders free slots';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -512,6 +545,15 @@ begin
     raise exception 'CASE 8 FAILED: an eleventh order in the hour gave "%"', r;
   end if;
 
+  -- At 59 minutes they still count: the window is an hour, not a minute.
+  set local session_replication_role = replica;
+  update public.orders set created_at = now() - interval '59 minutes' where customer_id = v_c;
+  set local session_replication_role = origin;
+  r := pg_temp.try_order(v_c, v_branch, v_items);
+  if r not like 'P0001 You have placed 10 orders in the last hour.%' then
+    raise exception 'CASE 8 FAILED: ten orders placed 59 minutes ago gave "%", expected the hourly refusal', r;
+  end if;
+
   -- Once the hour has passed, ordering works again.
   set local session_replication_role = replica;
   update public.orders set created_at = now() - interval '61 minutes' where customer_id = v_c;
@@ -519,7 +561,7 @@ begin
   r := pg_temp.try_order(v_c, v_branch, v_items);
   if r not like 'OK %' then raise exception 'CASE 8 FAILED: an order after the hour was refused: %', r; end if;
 
-  raise notice 'CASE 8 ok: 10 orders in the hour accepted, the 11th refused, accepted again after the hour';
+  raise notice 'CASE 8 ok: 10 orders in the hour accepted, the 11th refused (also at 59 minutes), accepted again after the hour';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -575,6 +617,20 @@ begin
      or v_name <> btrim(v_name) then
     raise exception 'CASE 10 FAILED: provisioned name is % (% chars)', v_name, char_length(v_name);
   end if;
+
+  -- Every bidi formatting character in a metadata name is removed, so the
+  -- signup still succeeds and the stored name is clean.
+  declare v_bidi uuid := gen_random_uuid();
+  begin
+    insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data)
+      values (v_bidi, 'bounds-bidi@example.test', now(),
+              jsonb_build_object('full_name', 'Sara' || chr(1564) || chr(8206) || chr(8207) || chr(8234) || chr(8235)
+                || chr(8236) || chr(8237) || chr(8238) || chr(8294) || chr(8295) || chr(8296) || chr(8297) || ' Ali'));
+    select full_name into v_name from public.profiles where id = v_bidi;
+    if v_name is distinct from 'Sara Ali' then
+      raise exception 'CASE 10 FAILED: a metadata name with bidi characters was stored as % (% chars)', v_name, char_length(v_name);
+    end if;
+  end;
 
   -- CASE 5 restored the production jwt_has_aal2() for this transaction, so the
   -- administrator needs a real aal2 claim here.

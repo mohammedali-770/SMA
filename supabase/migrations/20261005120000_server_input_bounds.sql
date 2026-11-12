@@ -149,6 +149,11 @@ comment on function public.profile_name_normalized(text) is
 revoke all on function public.profile_name_normalized(text) from public, anon;
 grant execute on function public.profile_name_normalized(text) to authenticated;
 
+-- The bidirectional formatting characters are written as \uXXXX regex escapes,
+-- not as raw characters: a raw one is invisible in a diff and in the SQL an
+-- inline apply transports, so a changed or dropped one would change this rule
+-- with nothing to see. The set is U+061C, U+200E, U+200F, U+202A-U+202E and
+-- U+2066-U+2069; 6.3 below calls the function on each of the twelve.
 create or replace function public.profile_name_has_control_chars(p_name text)
 returns boolean
 language sql
@@ -156,7 +161,7 @@ immutable
 set search_path = public, pg_temp
 as $$
   select coalesce(
-    p_name ~ '[\x01-\x1f\x7f-\x9f؜‎‏‪-‮⁦-⁩]',
+    p_name ~ '[\x01-\x1f\x7f-\x9f\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]',
     false);
 $$;
 
@@ -235,7 +240,7 @@ begin
   v_name := public.profile_name_normalized(
     regexp_replace(
       coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name'),
-      '[\x01-\x08\x0e-\x1f\x7f-\x9f؜‎‏‪-‮⁦-⁩]', '', 'g'));
+      '[\x01-\x08\x0e-\x1f\x7f-\x9f\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]', '', 'g'));
   v_name := public.profile_name_normalized(left(v_name, 80));
 
   insert into public.profiles (id, full_name, phone_number, email, phone_verified, phone_verified_at)
@@ -589,6 +594,21 @@ begin
      or public.profile_name_has_control_chars('a' || chr(7) || 'b') is distinct from true then
     raise exception 'server input bounds: the control-character rule is wrong';
   end if;
+  -- Each of the twelve bidi formatting characters is refused, and the
+  -- joiners Arabic and Persian names can carry (U+200C, U+200D) and the
+  -- neighbours of each range are not.
+  select count(*) into v_n
+    from unnest(array[1564, 8206, 8207, 8234, 8235, 8236, 8237, 8238, 8294, 8295, 8296, 8297]) c
+   where public.profile_name_has_control_chars('a' || chr(c) || 'b') is true;
+  if v_n is distinct from 12 then
+    raise exception 'server input bounds: % of the 12 bidi formatting characters are refused, expected 12', v_n;
+  end if;
+  select count(*) into v_n
+    from unnest(array[1563, 1565, 8204, 8205, 8233, 8239, 8293, 8298]) c
+   where public.profile_name_has_control_chars('a' || chr(c) || 'b') is distinct from false;
+  if v_n is distinct from 0 then
+    raise exception 'server input bounds: % characters outside the bidi set are refused, expected 0', v_n;
+  end if;
 
   -- 6.4 The trim set holds a vertical tab and not the letter v.
   if public.address_description_is_usable('villa') is distinct from true
@@ -608,7 +628,14 @@ begin
      and p.cmd = 'SELECT' and p.permissive = 'PERMISSIVE'
      and p.roles = array['authenticated']::name[]
      and p.qual like '%is_admin()%'
-     and p.qual like '%allow_any_operation%object.delete%object.delete_many%'
+     -- The operation list must be EXACTLY the two delete routes. A like over
+     -- the qual would still match with 'object.list' appended, which would
+     -- let an administrator list both buckets.
+     and substring(p.qual from 'allow_any_operation\((ARRAY\[[^]]*\])\)')
+           is not distinct from 'ARRAY[''object.delete''::text, ''object.delete_many''::text]'
+     and (char_length(p.qual) - char_length(replace(p.qual, 'allow_any_operation', '')))
+           = char_length('allow_any_operation')
+     and p.qual !~* '\mor\M'
      and p.qual like '%bucket_id = ''' ||
            case p.policyname when 'product_images_admin_delete_select' then 'product-images'
                              else 'banner-images' end || '''%';
@@ -630,7 +657,8 @@ begin
   end if;
 
   -- 6.7 The wrapper: one overload, definer, anon cannot execute it,
-  -- authenticated can, and it carries the lock and all three refusals.
+  -- authenticated can, and its stored body holds the lock and the three
+  -- refusal statements (checked as statements, comments stripped).
   select count(*) into v_n
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'place_customer_order';
@@ -643,24 +671,43 @@ begin
        'public.place_customer_order(uuid,public.order_type,jsonb,uuid,text,text,integer,uuid,text)', 'execute') then
     raise exception 'server input bounds: place_customer_order grants moved';
   end if;
-  select p.prosrc into v_txt
+  -- The guard statements, read from the body with comments stripped, so a
+  -- comment naming a token cannot satisfy the check. Each is a STATEMENT
+  -- shape and must appear exactly once. This proves the statements are in
+  -- the stored body; it does not prove they run in the right order or
+  -- refuse the right callers. That is the paired suite's job
+  -- (supabase/tests/server_input_bounds_test.sql, CASES 6-9 and 11).
+  select regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g')
+    into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'place_customer_order' and p.prosecdef;
-  if v_txt is null
-     or position('pg_advisory_xact_lock' in v_txt) = 0
-     or position('phone_verified' in v_txt) = 0
-     or position('order_limit_open' in v_txt) = 0
-     or position('order_limit_per_hour' in v_txt) = 0 then
-    raise exception 'server input bounds: place_customer_order is missing its guard';
+  if v_txt is null then
+    raise exception 'server input bounds: place_customer_order is not a SECURITY DEFINER function';
+  end if;
+  select count(*) into v_n
+    from unnest(array[
+      'perform pg_advisory_xact_lock(hashtext(''spicymeal:place-customer-order:'' || v_uid::text));',
+      'select p.phone_verified into v_verified',
+      'if v_verified is distinct from true then',
+      'into v_open_limit, v_hour_limit',
+      'and o.created_at > now() - interval ''24 hours'';',
+      'if v_open >= v_open_limit then',
+      'and o.created_at > now() - interval ''1 hour'';',
+      'if v_hour >= v_hour_limit then'
+    ]) as shape(t)
+   where (char_length(v_txt) - char_length(replace(v_txt, shape.t, ''))) = char_length(shape.t);
+  if v_n is distinct from 8 then
+    raise exception 'server input bounds: place_customer_order is missing its guard (% of 8 statements found exactly once)', v_n;
   end if;
 
   -- 6.8 handle_new_user still claims comp membership and now bounds the name.
-  select p.prosrc into v_txt
+  select regexp_replace(regexp_replace(p.prosrc, '/\*.*?\*/', '', 'g'), '--[^\n]*', '', 'g')
+    into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'handle_new_user';
   if v_txt is null
      or position('claim_comp_membership' in v_txt) = 0
-     or position('left(v_name, 80)' in v_txt) = 0 then
+     or position('v_name := public.profile_name_normalized(left(v_name, 80));' in v_txt) = 0 then
     raise exception 'server input bounds: handle_new_user lost its comp claim or its name bound';
   end if;
 
