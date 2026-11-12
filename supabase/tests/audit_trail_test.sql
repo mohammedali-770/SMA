@@ -49,9 +49,9 @@ insert into auth.users (id, email) values
   (:clerk, 'audit-clerk@x');
 
 insert into public.profiles (id, role, full_name, phone_number, loyalty_points) values
-  (:eater, 'customer',   'Audit Eater', '+966500000701', 0),
-  (:admin, 'admin',      'Audit Admin', '+966500000702', 0),
-  (:clerk, 'accountant', 'Audit Clerk', '+966500000703', 0)
+  (:eater, 'customer',   'Audit Eater', '+966500000001', 0),
+  (:admin, 'admin',      'Audit Admin', '+966500000002', 0),
+  (:clerk, 'accountant', 'Audit Clerk', '+966500000003', 0)
 on conflict (id) do update set role = excluded.role,
   full_name = excluded.full_name, phone_number = excluded.phone_number,
   loyalty_points = excluded.loyalty_points;

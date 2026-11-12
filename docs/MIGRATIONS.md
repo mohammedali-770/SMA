@@ -7949,7 +7949,7 @@ The residue is a few identity values on the two audit tables.
 
 ### Validation
 
-- **Local chain harness:** 150 migrations apply; 87 suites run, 84 pass, the 2
+- **Local chain harness:** 150 migrations apply; 87 suites run, 85 pass, the 2
   quarantined fail as before, **0 new failures**; the 5 known files fail the
   idempotency re-run as before (report only). This file re-applies cleanly.
 - **Paired suite** `audit_trail_test.sql`, 12 cases: placement writes no row;
