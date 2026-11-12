@@ -109,7 +109,7 @@ Automated refund processing remains disabled. The authoritative decision is [`do
 
 Enabled end-to-end on 2026-08-17. The mobile client gate (`PUSH_CLIENT_ENABLED`) is open, the `expo-notifications` plugin and `google-services.json` ship in `apps/mobile/app.json`, EAS holds iOS APNs (Sandbox & Production) and Android FCM V1 credentials, and the `integration_settings` push master flag is **enabled**.
 
-Order-status notifications reach opted-in customers automatically (`order_updates_enabled` defaults TRUE). Admin promotional broadcasts reach only devices with `promos_enabled = true`, which defaults FALSE and is customer-controlled — marketing is strictly opt-in.
+Order-status notifications reach customers who allowed notifications automatically (`order_updates_enabled` is TRUE at registration). Admin promotional broadcasts reach devices with `promos_enabled = true`. Marketing has been opt-out since the owner's decision of 2026-08-20: granting the OS notification permission registers the device with offers on (`DEFAULT_DEVICE_PREFS`), and the Profile "Offers & promotions" toggle is the in-app opt-out. The column default is still FALSE, but every registration passes both preferences, so it never decides a live device. Since 2026-11-10 an in-app consent screen says this before the OS prompt (`CLAUDE.md` §7).
 
 Sending a broadcast, changing the audience model, or turning the master flag off are owner-approval actions (`CLAUDE.md` §5).
 
