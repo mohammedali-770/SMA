@@ -491,6 +491,8 @@ function generateTesting() {
       '',
       'SQL suites run against a **disposable** database, never Production (CLAUDE.md §10). `.github/workflows/sql-suites.yml` gates them, and the heavier migration-chain job is path-gated so it only runs when SQL changes.',
       '',
+      'The same job ends with `.github/sql-ci/existing-data.sh`: the change\'s migrations applied onto a database that already holds rows (`.github/sql-ci/existing-data.sql`, written through the real RPCs), with invariants and a fingerprint diff. It is report-only until `SQL_CI_EXISTING_DATA_BLOCKING` is set.',
+      '',
       ...sqlFiles.map((f) => `- \`supabase/tests/${f}\``),
       '',
       '## End-to-end specs',

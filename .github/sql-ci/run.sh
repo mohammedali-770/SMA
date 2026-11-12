@@ -189,6 +189,20 @@ while IFS= read -r f; do
 done < <(find "$TESTS_DIR" -maxdepth 1 -name '*.sql' | sort)
 
 # ---------------------------------------------------------------------------
+step "Existing data — this change's migrations onto a database that holds rows (REPORT ONLY)"
+# Everything above starts from an EMPTY database, so no backfill in the chain
+# has ever met a row. existing-data.sh builds the schema as it stood before this
+# change, fills it through the real RPCs, applies the change's files on top and
+# checks what happened to those rows. See the header of that script.
+#
+# REPORT ONLY until it has proven stable on real pull requests: a failure is
+# printed and annotated, and does not fail the job. To make it a gate, set
+# SQL_CI_EXISTING_DATA_BLOCKING: '1' in the suites job's env in
+# .github/workflows/sql-suites.yml.
+existing_rc=0
+"$HERE/existing-data.sh" || existing_rc=$?
+
+# ---------------------------------------------------------------------------
 step "Summary"
 printf '  migrations : %d applied (clean re-run: %s)\n' \
   "$migration_count" "$([ "$idem_failed" -eq 0 ] && echo yes || echo 'no — report only')"
@@ -196,6 +210,15 @@ printf '  suites     : %d run, %d passed, %d quarantined, %d NEW failures\n' \
   "$suite_total" \
   "$((suite_total - suite_failed - suite_known - suite_unexpected_pass))" \
   "$suite_known" "$suite_failed"
+
+if [ "$existing_rc" -eq 0 ]; then
+  printf '  existing   : the change applied onto existing rows and every check held\n'
+elif [ "${SQL_CI_EXISTING_DATA_BLOCKING:-0}" = "1" ]; then
+  printf '  existing   : FAILED (blocking)\n'
+else
+  printf '  existing   : FAILED (report only — not failing the job)\n'
+  printf '::warning::existing-data stage failed (report only): see "Existing data" in this log\n'
+fi
 
 if [ "$suite_total" -eq 0 ]; then
   printf '\n\033[31mNo suites were discovered — that is a harness bug, not a pass.\033[0m\n'
@@ -213,8 +236,12 @@ if [ "$suite_failed" -ne 0 ]; then
 fi
 
 # Only NEW failures and stale quarantine entries fail the build. Idempotence is
-# reported, not enforced — see the note on that step.
+# reported, not enforced — see the note on that step. The existing-data stage
+# fails it only once SQL_CI_EXISTING_DATA_BLOCKING=1.
 if [ "$suite_failed" -ne 0 ] || [ "$suite_unexpected_pass" -ne 0 ]; then
+  exit 1
+fi
+if [ "$existing_rc" -ne 0 ] && [ "${SQL_CI_EXISTING_DATA_BLOCKING:-0}" = "1" ]; then
   exit 1
 fi
 

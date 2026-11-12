@@ -145,6 +145,8 @@ node scripts/check-workflow-pins.mjs
 
 # Migration chain + SQL suites: a disposable Postgres 16 + PostGIS 3 server only, never Production
 PGHOST=127.0.0.1 PGPORT=5432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres bash .github/sql-ci/run.sh
+# run.sh ends with the existing-data stage (report-only); to point it at chosen files:
+SQL_CI_NEW_MIGRATIONS='<file>.sql' PGHOST=127.0.0.1 PGUSER=postgres bash .github/sql-ci/existing-data.sh
 ```
 
 The SQL harness needs the stub extensions in `.github/sql-ci/extensions/` copied into the server's extension directory first, as `.github/workflows/sql-suites.yml` does, because the chain runs `create extension pg_cron` and `pg_net`. Its CI job is path-gated, so it runs only when SQL changes.

@@ -31,6 +31,8 @@ Vitest runs under the **Node** environment, not jsdom or a device; suites that n
 
 SQL suites run against a **disposable** database, never Production (CLAUDE.md §10). `.github/workflows/sql-suites.yml` gates them, and the heavier migration-chain job is path-gated so it only runs when SQL changes.
 
+The same job ends with `.github/sql-ci/existing-data.sh`: the change's migrations applied onto a database that already holds rows (`.github/sql-ci/existing-data.sql`, written through the real RPCs), with invariants and a fingerprint diff. It is report-only until `SQL_CI_EXISTING_DATA_BLOCKING` is set.
+
 - `supabase/tests/account_deletion_fencing_test.sql`
 - `supabase/tests/account_deletion_lock_test.sql`
 - `supabase/tests/account_deletion_manual_review_resolution_test.sql`
