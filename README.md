@@ -4,7 +4,7 @@ Spicy Meal is the production codebase for First Taste Trading Company's customer
 
 This repository is **not the old prototype/emulator anymore**. The customer app is a real Expo / React Native application, the staff console is a separate React web application, and Supabase is the server-side source of truth for authentication, catalog data, orders, operations, and integrations.
 
-> **Current development state:** pre-launch / release-readiness. The production branch contains the current application and backend definition, but native store/device validation is still a release gate. Payment/refund work remains deliberately frozen until the final payment provider is selected.
+> **Current development state:** pre-launch / release-readiness. The production branch contains the current application and backend definition, but native store/device validation is still a release gate. Moyasar is the payment provider (owner decision, 2026-11-11, [`CLAUDE.md`](CLAUDE.md) §6); online payment stays off until each live step has its own owner approval.
 
 ## Product surfaces
 
@@ -49,7 +49,7 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 - WhatsApp login-delivery and profile phone-verification flows.
 - Account-deletion request/processing workflow.
 - Scheduled operations-health and alerting functions.
-- Payment/Tap source remains in the repository but is **provisional and frozen** while the final gateway decision is pending. Automated refund processing remains disabled. See [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
+- Payment source in the repository is still the Tap-era code until the Moyasar-only change (#446) merges; Moyasar is the chosen provider ([`CLAUDE.md`](CLAUDE.md) §6). Automated refund processing remains disabled. History of the freeze: [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 - Push notifications are **live**: order updates reach customers who allowed notifications automatically, and marketing is opt-out, so a broadcast reaches every one of them who has not switched offers off ([`CLAUDE.md`](CLAUDE.md) §7).
 
 ## Tech stack

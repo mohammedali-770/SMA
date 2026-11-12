@@ -1,5 +1,13 @@
 # Payment & Refund Work — POSTPONED
 
+> **SUPERSEDED 2026-11-11 — kept as history.** The owner chose **Moyasar** as
+> the payment provider ([`CLAUDE.md`](../CLAUDE.md) §6). The repository-work
+> freeze this document records no longer applies to work that keeps Moyasar the
+> only provider. Every live payment step (a migration apply, a payment deploy,
+> keys and provider configuration, enabling online payment, the refund job, any
+> live payment) is still its own owner approval (§5). Read what follows for why
+> the code and the documents looked the way they did, not for what applies now.
+
 > **Status: POSTPONED (owner decision, 2026-07-29).**
 > The payment gateway provider has **not been selected yet**. Until it is,
 > nothing in the payment / payment-processing / refund area may be modified,

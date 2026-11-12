@@ -44,7 +44,7 @@ An unsatisfied hook is safer than an unauthorized production-branch write.
 - applying migrations or writing migration history
 - Edge Function deployments/deletions
 - Auth configuration changes
-- **payment/refund/provider work of any kind while the freeze is active**
+- **payment work that reaches Production** (§6): applying a payment migration, deploying or deleting a payment function, payment keys, tokens, secrets and provider configuration, Moyasar dashboard changes, enabling online payment, re-enabling the refund worker, and any live payment or refund
 - sending a push broadcast, changing push targeting/audience, or turning the push master flag on or off
 - Vercel Production changes
 - EAS/APK/TestFlight/store builds
@@ -53,7 +53,37 @@ An unsatisfied hook is safer than an unauthorized production-branch write.
 
 Approval for one action is not blanket approval for later actions.
 
-## 6. Payment / refund / provider freeze
+## 6. Payments — Moyasar is the provider (owner decision, 2026-11-11)
+
+**The decision, in the owner's words (2026-11-11, in conversation):** "our payment is confirmed it will be through moyasar / make the required edits and remove unnecessary pices of code for other payment gateway and keep moyasar". The owner's answers the same day:
+- the Moyasar account has test and live keys;
+- mada, Visa / Mastercard and Apple Pay are enabled;
+- a cancelled paid order is refunded automatically through Moyasar;
+- sandbox first, then live;
+- Moyasar's live Allowed IPs are met through a static-IP proxy service.
+
+**What it lifts.** The freeze recorded below no longer applies to repository work that keeps Moyasar the only provider: code, tests and documents, on a purpose branch, through a pull request, merged on the owner's word. The implementation (Tap and Geidea removed, every payment path Moyasar-only, and the runbook `docs/PAYMENTS.md`) is pull request #446, judged against this section once it is on the base branch. API contract: `docs/integrations/Moyasar_API_Reference.md`.
+
+**What it does not lift. Nothing live follows from a merge.** Each of these is its own §5 approval, named when due:
+- applying `20260824100000_moyasar_payment_provider`, then `20261003120000_moyasar_only_payments`, then (after the deploy below) `20261004120000_drop_tap_payment_rpcs`, each by version. The last two arrive with #446. The second refuses to apply before the first, and the third before the second;
+- deploying the seven payment functions as one set (`payment-initiate`, `-verify`, `-webhook`, `-return`, `-refund`, `-test-config`, and `-admin-test-return`, which #446 renames from `tap-admin-test-return`), and later deleting the retired `tap-admin-test-return` function;
+- payment keys, webhook tokens, the `MOYASAR_PROXY_URL` secret (read by #446's code), and any Moyasar dashboard change (Allowed IPs, webhook registration and its one-time verification code);
+- switching the payment row to live, enabling it, and turning on `app_settings.online_payment_enabled`;
+- generating `refund_trigger_secret` (read from the payment row's secret config by both the refund driver and `payment-refund`; no migration creates it) and re-enabling the `payment-refund-worker` cron job;
+- the EAS build that ships the app half;
+- any live payment or refund, including the planned small live payment with its automatic refund;
+- the customer documents and store answers that must change before customers can pay by card: naming Moyasar in the live privacy policy, updating the payment and cancellation/refund policies (both still say payment is cash only), the App Store and Play payment answers, the cash-only listing claim, and the App Review notes.
+
+**Live state, read-only, 2026-11-11:**
+- online payment is OFF since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode, which customers could not have completed; the owner switched it off;
+- the payment row is provider `moyasar`, enabled, mode `test`;
+- every deployed payment function is still a July Tap-era bundle;
+- `20260824100000` is unapplied, so `begin_payment_attempt`, `begin_session_attempt` and `payment_records.provider_checkout_ref` do not exist in Production;
+- `payment_records` holds only `tap` rows, none paid, and `order_refunds` is empty.
+
+**Superseded 2026-11-11: the freeze below is kept as history.** Read it for why the code and the documents looked the way they did, not for what applies now.
+
+### History: the payment / refund / provider freeze (to 2026-11-11)
 
 The final payment provider has **not been selected**. The repository contains provisional Tap/payment/refund code, older Geidea scaffold/history, and — since 2026-08-24 — a complete but **inert** Moyasar integration. None of it is the approved final architecture.
 
@@ -74,7 +104,7 @@ Automated refund processing is intended to remain disabled while the freeze is a
 
 **Exception granted 2026-08-24 — `payment-test-config`'s admin gate, and nothing else.** That function authorized callers on `profile.role = 'admin'` alone, the same defect fixed in the four non-frozen admin Edge Functions on 2026-08-23. It is not a read-only diagnostics endpoint: its `verify_order` action reaches `validateAndConfirmTapCharge`, which can mark a real order paid — it cannot invent a payment, since it confirms only on a genuine CAPTURED charge retrieved from Tap, but an AAL1 caller could drive payment-state writes on real orders through the service-role client, which bypasses RLS. The gate now calls `public.is_admin()` (role **and** AAL2). **No provider behaviour, charge construction, verification logic or configuration was touched**, and `adminAuthWiring.test.ts` pins that surface — the four actions, the forced TEST key, the TEST-mode guard on charge creation, and the confirm call — so a payment change cannot ride in under an auth fix. Deploying it is still a separate §5 action and is NOT covered by this exception.
 
-Authoritative product decision: `docs/PAYMENT_POSTPONEMENT.md`.
+Authoritative product decision while the freeze stood: `docs/PAYMENT_POSTPONEMENT.md`, superseded on 2026-11-11 by the decision above.
 
 ## 7. Push notifications — LIVE
 
@@ -1627,7 +1657,7 @@ Never commit or expose:
 - Meta app secret;
 - SMTP password;
 - `SENTRY_AUTH_TOKEN`;
-- payment/refund secrets;
+- payment/refund secrets, including Moyasar's secret keys and webhook secret tokens, `refund_trigger_secret`, and `MOYASAR_PROXY_URL` (it can carry the proxy's own credentials);
 - user JWT/session/cookie/OTP values;
 - customer PII in logs/test fixtures/PR descriptions when it is not necessary and authorized.
 
