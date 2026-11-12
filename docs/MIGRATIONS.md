@@ -24,6 +24,14 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11 (later still) — `20261002120000_staff_actor_fk_set_null`
+> is written, validated and NOT applied, so on merge the count is THREE:**
+> Moyasar (frozen, §6), `20260929120000` (§51) and this file (§54).
+> `20261001120000` (§53) is not among them: it was applied at 12:30:50 UTC the
+> same day. This file lets a staff account that filed, resolved or revealed
+> something be deleted. The two unfrozen files are independent; apply each on
+> its own approval. Moyasar still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-11 (later) — `20261001120000_prune_operational_run_history`
 > is written, validated and NOT applied, so on merge the count is THREE:**
 > Moyasar (frozen, §6), `20260929120000` (§51) and this file (§53). It keeps the
@@ -2000,11 +2008,50 @@ Risks:
 3. Obtain a Codex review on the final head.
 4. Merge only after explicit owner approval.
 
+**A-note — a migration must keep the argument names clients send.** PostgREST
+resolves `supabase.rpc('fn', { … })` by the function name AND the argument
+names. Renaming or dropping a parameter of a function a client calls, or adding
+one with no DEFAULT, therefore breaks that call with `PGRST202`. On the customer
+app that break outlives the fix: an installed iOS or Android build keeps the
+call shapes it was built with, because there are no over-the-air updates, until
+a new store build reaches each customer.
+
+Until 2026-11-11 nothing caught it for the RPCs clients actually call. Most SQL
+suites call these functions positionally (`manual_only_pos_resend_test.sql`
+passes a bare uuid), so a rename replays and passes: the 2026-11-11 reliability
+assessment renamed `request_customer_pos_resend`'s `p_order_id` to `p_id` and
+that suite still exited 0. The one exception is `compute_campaign_discount`.
+`discounts_campaigns_test.sql` and `promo_disclosure_test.sql` call it by name,
+so renaming any of its parameters already failed the SQL suites; its only client
+call, `src/lib/campaigns.ts`, is not wired into any surface.
+
+Now `apps/mobile/src/services/rpcContractParity.test.ts` replays this directory
+in filename order (overloads, function drops and renames included) and fails CI
+unless every `supabase.rpc` call in `apps/mobile/src` and `src` is accepted by
+exactly one live definition. It refuses, rather than skips, what it cannot
+follow: a call it cannot read; function DDL in a DO block, a function body or a
+string it may EXECUTE, when that DDL mentions a called function; and any DROP …
+CASCADE of a table, view, type, domain, schema, extension or language, or DROP
+OWNED, because each can remove a function without naming it. In a review
+experiment on a local PG16 replay (2026-11-12, never Production), a rebuild of
+`push_devices` ending in `drop table … cascade` applied cleanly and took
+`register_push_device` with the table's rowtype, while the test still counted
+it live and passed. Write such a drop without CASCADE and drop the dependent
+functions by name, so that Postgres refuses rather than removes.
+
+**It compares source with source.** A rename made on both sides passes it and
+still breaks every installed build, which keeps sending the old name. Keep the
+old name accepted, as a parameter with a DEFAULT, until no supported build
+sends it.
+
 **B. Pre-live gate** (all read-only)
 1. Verify the repository base commit.
 2. Verify the current live migration count and latest version.
 3. Verify the expected live object state (the migration's preconditions).
-4. Capture rollback SQL for every change the migration makes.
+4. Capture rollback SQL for every change the migration makes. It is valid only
+   against the schema it was captured from: before it is ever run, re-derive it
+   and check its callers in the live function bodies (`ROLLBACK.md` §5). Two
+   documented rollbacks are already unsafe (§25, §27).
 5. Verify the migration has not already been applied **semantically** (object
    state, not just history rows).
 6. Record before-state fingerprints for everything the migration touches.
@@ -3492,6 +3539,38 @@ a separate live history write needing its own explicit owner approval, and class
   at 0, the console does not yet have the coverage this migration was written to
   provide. The mechanism is in place; the data is not.
 
+### Rollback: the footer is SUPERSEDED and UNSAFE (2026-11-11)
+
+The file's footer says to re-apply the `operations_health_snapshot_internal` body
+from `20260723140000_operations_automation_cron_health.sql:59-863`, then drop the
+five-argument `operations_health_overall_state`. **Do not follow it.** Three later
+migrations redefined that function, each deriving its body from the one before:
+
+- `20260820150000_sweeper_operations_health` puts `branch-availability-sweep` on the
+  jobs board;
+- `20260820160000_branch_availability_health_card` adds the branch-availability
+  card;
+- `20260925120000_health_card_variant_coverage` extends that card to per-size
+  closures.
+
+The July body predates all three, so re-applying it removes them along with the
+order-flow card, and says nothing. Measured on a disposable copy of the full chain
+on 2026-11-11: the snapshot listed 10 cards before and 8 after, with `order_flow`
+and `branch_availability` gone and no error raised. The July body never mentions
+`branch-availability-sweep`; the current one names it four times.
+
+The second step on its own is worse. The current body calls the five-argument
+overload, PostgreSQL records no dependency for that call, so the DROP succeeds and
+the next `operations_health_snapshot_internal()` raises. That breaks its three
+callers: `operations_alerts_evaluate` (the five-minute alerts evaluator),
+`operations_digest_build` and `operations_health_summary` (the console's Operations
+Health Center).
+
+To remove the order-flow card today, derive a corrective migration from the current
+body (`20260925120000`), the way that file was derived from its predecessor, and
+check its dependents per `ROLLBACK.md` §5. The footer stays as written: applied
+files are never edited.
+
 ## 26. Applied migration: order-flow alert condition (applied 2026-08-07, class B)
 
 | | |
@@ -3832,9 +3911,28 @@ twice — dropping both triggers makes it fail at CASE 2, and re-introducing the
 fail at CASE 1 — so its green run means the guard is present and correct rather
 than merely that the file executed.
 
-**Rollback.** Drop the two triggers and the three functions; the commands are in
-the migration footer. No row is modified, no column type changes, and the rule
-is strictly narrowing — every value accepted after it was accepted before.
+**Rollback: SUPERSEDED 2026-11-11, and UNSAFE to follow.** This paragraph used to
+say "drop the two triggers and the three functions; the commands are in the
+migration footer". Do not run that footer. Since `20260821170000_order_item_notes`
+(§31), five later functions call `public.order_note_normalized(text)`:
+`place_order` and `compute_order_snapshot` (last defined in `20260924120000`),
+`insert_order_from_snapshot` (last defined in `20260921120000`), and
+`enforce_order_item_note` (the trigger function behind every `order_items`
+insert) with `order_item_note_is_acceptable` (both in `20260821170000`).
+PostgreSQL records no dependency for a call made inside a function body, so every
+DROP in the footer succeeds and the next order fails. Measured on a disposable copy
+of the full chain on 2026-11-11: no `pg_depend` row referenced the function, all
+five DROPs succeeded, and the next call raised `function
+public.order_note_normalized(text) does not exist`.
+
+What stays true is that the migration modified no row and changed no column type,
+and that the rule is strictly narrowing: every value accepted after it was accepted
+before. What no longer holds is the footer. As of 2026-11-11 nothing outside the
+footer depends on the two triggers, `enforce_order_note()` or
+`order_note_is_acceptable(text)`, so a rollback of the rule would drop those four
+and keep `order_note_normalized`. Re-check that per `ROLLBACK.md` §5 before relying
+on it, because the next migration to call any of them makes it false. The footer
+stays as written: applied files are never edited.
 
 ---
 
@@ -7035,3 +7133,71 @@ over about three days.
    for the seconds the rewrite takes, and pg_cron writes to it every minute, so
    run it at a quiet time. Without it the database stops growing but does not
    shrink.
+
+## 54. Staff accounts can be deleted after ordinary work — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261002120000_staff_actor_fk_set_null.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** App-hardening checklist, finding D01.
+
+sha256 `2fb83cfd710bf6b38418f0648a8d3d375bb86f460617b6f9f080fbc76fbe5577`,
+120 lines / 6 370 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It changes four foreign keys and one NOT NULL, and nothing else.** No function
+is redefined, no row is written, and no deploy is implied. **MONEY PATH
+UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`).
+
+### The defect, reproduced
+
+Deleting a staff account removes its `auth.users` row, which cascades to its
+profile. Four actor columns pointed at `profiles` with the default
+`ON DELETE NO ACTION`. Once a staff member had used one of these features, the
+cascade was refused with **23503**, and the console's staff **Delete** failed:
+
+| Column | Written when |
+| --- | --- |
+| `branch_delivery_requests.requested_by` (also NOT NULL) | a branch operator files a delivery-closure request |
+| `branch_delivery_requests.resolved_by` | the call centre resolves one |
+| `branch_reference_entries.created_by` | an admin creates a reference entry |
+| `branch_reference_reveals.revealed_by` | an operator reveals a reference secret |
+
+Read live 2026-11-11: Production carries **exactly these four** NO ACTION keys
+into `profiles`, and none into `auth.users`. The checklist assessment found two
+of the three manageable staff accounts already in that state.
+
+Offboarding therefore fell back to demotion, which keeps the person's name,
+phone and email. That is the opposite of what the delete is for.
+
+### The fix, and its one cost
+
+All four become `ON DELETE SET NULL`, and `requested_by` becomes nullable. That
+is the convention every other actor column already follows (`role_change_audit`,
+`comp_member_audit`, `branch_delivery_events`, `loyalty_transactions`).
+
+The cost: after an account is deleted, its requests, entries and reveal records
+stay, but no longer say who acted. `bdr_resolution_coherent` allows that, since
+a resolved request must carry `resolved_at`, not `resolved_by`. The console reads
+none of the four columns, so nothing renders a missing actor.
+
+### Validation
+
+- **Paired suite** `staff_account_deletion_test.sql`:
+  - **CASE 1:** an operator files a request, the call centre declines it, an
+    admin creates a secret entry and a second operator reveals it. Then every
+    account is deleted, plus a control operator with no history. Every delete
+    succeeds, and every record stays with its actor cleared.
+  - **CASE 2:** no foreign key anywhere in `public` may block deleting a profile
+    or an account. This is also asserted by the file itself, so a future table
+    recording an actor with the default NO ACTION fails CI.
+- **Reproduced first:** without the file, CASE 1 fails with the production error,
+  `23503 … branch_delivery_requests_requested_by_fkey`.
+- **Mutation testing: 4 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by the suite:
+  - `requested_by` left NOT NULL, which turns 23503 into 23502;
+  - `resolved_by` left NO ACTION;
+  - `revealed_by` left NO ACTION;
+  - `revealed_by` made `ON DELETE CASCADE`, which would delete the reveal audit
+    along with the person.
+
+**Applying it is a §5 action, named by version.** Afterwards, a staff **Delete**
+in the console succeeds for an account that has history.
+

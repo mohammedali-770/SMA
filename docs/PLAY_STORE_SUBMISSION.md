@@ -495,10 +495,15 @@ affected; the gap would have opened with the first Android release.
 **Sentry is configured not to send PII — but "no PII" is too strong, and the
 precise version matters for the form.** `sendDefaultPii: false` with a
 `beforeSend` scrubber, on native (`observability/index.ts:106,116`) and on web
-(`webCore.ts:125,145`). **What it does keep is the pseudonymous user id:**
-`sanitize.ts:223-226` reduces `event.user` to `{ id }` and drops every other
-field. So crash reports are linkable to an account, which is exactly why "User
-IDs" is declared above and why the Sentry rows say REQUIRED.
+(`webCore.ts:125,145`). **It would keep a pseudonymous user id, and nothing sets
+one; corrected 2026-11-11.** `sanitize.ts:228-233` reduces a user object to
+`{ id }`, but no code calls `Sentry.setUser` on any surface, so the app attaches no
+account id to a report. This paragraph used to conclude that crash reports are
+linkable to an account, and that rested on the id being set. "User IDs" stays
+declared because the account itself is one, `profiles.id` (the row above), and the
+Sentry rows say REQUIRED because the customer gets no opt-out. Neither depends on
+the id. Whether the native SDKs add an installation-scoped id of their own was not
+checked on a device.
 
 **The "Shared" column is deliberately NOT answered here, and that is a
 correction rather than an omission.** This table's first version marked all four

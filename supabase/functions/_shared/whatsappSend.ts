@@ -1,11 +1,17 @@
 /**
  * WhatsApp OTP send orchestration (Deno runtime — uses env + fetch + service
  * role, so it is NOT unit-tested here; the pure helpers it calls live in
- * `whatsapp.ts` and are covered by `whatsapp.test.ts`).
+ * `whatsapp.ts` and are covered by `whatsapp.test.ts`). The send timeout below,
+ * and the login hook's use of this module, are pinned at source level by
+ * `whatsappLoginSendWiring.test.ts`.
  *
- * Shared by `whatsapp-send-otp` (customer) and `whatsapp-test-config` (admin
- * test send). NEVER logs the OTP or the access token; only a sanitized provider
- * response is persisted.
+ * Bundled into five functions: `auth-send-sms-whatsapp` (customer login),
+ * `whatsapp-send-otp` (phone verification), `account-delete-request` (deletion
+ * re-verification), `whatsapp-test-config` (admin test send) and
+ * `whatsapp-verify-otp` (pepper only; it never sends). Supabase bundles a
+ * function's imports at deploy time, so a change here reaches Production only
+ * through a redeploy of each function that uses it. NEVER logs the OTP or the
+ * access token; only a sanitized provider response is persisted.
  */
 import { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { getProviderConfig } from './secrets.ts';
@@ -14,6 +20,36 @@ import {
 } from './whatsapp.ts';
 
 const GRAPH_BASE = 'https://graph.facebook.com';
+
+/**
+ * The longest the Meta Graph send may take before it is abandoned.
+ *
+ * Until 2026-11-11 the send had no bound. Against a Graph API that accepted the
+ * connection and never answered, the login hook was still waiting at 20 s: no
+ * `whatsapp_message_logs` row, its rate-limit reservation still held, and no
+ * answer for Supabase Auth, which stops listening at 5 s.
+ *
+ * WHY 3 s. Supabase Auth gives an HTTP hook "a time budget of 5s for the entire
+ * webhook invocation, including retry requests" (Auth Hooks guide,
+ * supabase.com/docs/guides/auth/auth-hooks, read 2026-11-11). On the login path
+ * this send is one step of that invocation: `auth-send-sms-whatsapp` makes three
+ * database round trips before it (two reads of `integration_settings`, then
+ * `otp_reserve_send`) and up to two after it (`record_whatsapp_message`, then
+ * `otp_release_send` when the send failed). 3 s leaves about 2 s for those five,
+ * so a timed-out send still writes its log row, hands the reservation back and
+ * returns the hook's own error while Auth is still listening. No Auth retry
+ * competes for the budget: the hook answers HTTP 200 even on failure, and Auth
+ * retries only a 429 or 503 status. What those round trips cost from wherever the
+ * hook actually runs has not been measured (docs/WHATSAPP_LOGIN.md).
+ *
+ * A TIMED-OUT SEND IS AMBIGUOUS. Abandoning the request does not recall it: Meta
+ * may already have accepted the message and may still deliver it. The customer is
+ * told the code could not be sent and may receive it anyway, and a retry can
+ * produce a second code. A dropped connection always had that ambiguity; the
+ * timeout only stops the wait being unbounded. It bounds every caller of this
+ * module, not only the login hook.
+ */
+export const WHATSAPP_SEND_TIMEOUT_MS = 3_000;
 
 export type Language = 'ar' | 'en';
 export type SendOutcome = 'disabled' | 'rate_limited' | 'sent' | 'error';
@@ -155,11 +191,18 @@ export async function deliverOtpTemplate(
       method: 'POST',
       headers: { 'Authorization': `Bearer ${cfg.accessToken}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      // The signal also bounds the body read below. If the headers arrive and the
+      // body stalls, `resp.json()` rejects at the deadline and the send is recorded
+      // `failed` with no error code, like any unreadable body.
+      signal: AbortSignal.timeout(WHATSAPP_SEND_TIMEOUT_MS),
     });
     const parsed = await resp.json().catch(() => ({}));
     sanitized = sanitizeProviderResponse(parsed);
     providerStatus = resp.ok && sanitized.message_id ? 'sent' : 'failed';
   } catch {
+    // A timeout before the response headers lands here as a TimeoutError and is
+    // recorded as `network_error`, exactly like a refused connection. So the row
+    // cannot tell "never reached Meta" from "Meta may still deliver".
     sanitized = { message_id: null, error_code: 'network_error', error_message: 'send failed' };
   }
 

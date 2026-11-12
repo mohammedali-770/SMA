@@ -37,7 +37,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Know which environment variables exist and which are public | [Environment variables](reference/environment.md) |
 | Know which CI check is which | [CI gates and scripts](reference/ci-and-scripts.md) |
 | Write or change a migration | [Migration workflow](MIGRATIONS.md) · [latest live reconciliation](MIGRATION_RECONCILIATION_20260812.md) |
-| Follow the repository's change-control rules | [CLAUDE.md](../CLAUDE.md) |
+| Follow the repository's change-control rules | [CLAUDE.md](../CLAUDE.md) · [AGENTS.md](../AGENTS.md), the rules an automated reviewer applies |
 | Add or change documentation | [Contributing to the documentation](CONTRIBUTING.md) |
 
 ### I am operating the system
@@ -130,6 +130,7 @@ README.md              project overview and local setup
 README_MOBILE.md       Expo, EAS and mobile builds
 PROJECT_STATUS.md      engineering and release status
 CLAUDE.md              mandatory change-control rules
+AGENTS.md              the rules an automated reviewer applies, indexed to CLAUDE.md
 SECURITY.md            vulnerability reporting
 
 docs/
