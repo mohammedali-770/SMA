@@ -10,7 +10,7 @@
       "destination": "/app/index.html"
     },
     {
-      "source": "/app/(.*)",
+      "source": "/app/((?!_expo/|assets/).*)",
       "destination": "/app/index.html"
     },
     {
@@ -34,13 +34,22 @@
       "destination": "/legal.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|app/_expo/|app/assets/).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
       "source": "/app/_expo/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/app/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
@@ -62,7 +71,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' https://maps.googleapis.com; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://o4511778933243904.ingest.de.sentry.io; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
+          "value": "default-src 'self'; script-src 'self' 'sha256-xsnFLkXSUMJKhiwLutY7ZVGuc4mCrO61R/9Q5aNG/Ek=' https://maps.googleapis.com; worker-src 'self' blob:; child-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mapbox.com https://events.mapbox.com https://*.tiles.mapbox.com https://maps.googleapis.com https://places.googleapis.com https://maps.gstatic.com https://o4511778933243904.ingest.de.sentry.io; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests"
         },
         {
           "key": "X-Content-Type-Options",

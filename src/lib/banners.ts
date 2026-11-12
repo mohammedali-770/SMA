@@ -4,6 +4,8 @@
  * relies on server-side via RLS: which banners are "live", how they sort, and
  * what image files are accepted for upload.
  */
+import { planImageUpload, UPLOAD_IMAGE_MAX_EDGE, type Size, type UploadPlan } from './imageUpload';
+
 export const BANNER_BUCKET = 'banner-images';
 export const MAX_BANNER_BYTES = 5 * 1024 * 1024; // 5 MB — mirrors the bucket cap.
 export const ALLOWED_BANNER_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -31,6 +33,17 @@ export function bannerStoragePath(originalName: string, unique: string): string 
   const raw = (originalName.split('.').pop() ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const ext = (ALLOWED_BANNER_EXT as readonly string[]).includes(raw) ? raw : 'jpg';
   return `banners/${unique}.${ext}`;
+}
+
+/** Longest edge of a stored banner: a full-width home banner, 390 pt at 3x. */
+export const BANNER_MAX_EDGE = UPLOAD_IMAGE_MAX_EDGE;
+
+/**
+ * Keep a picked banner as-is, or resize/re-encode it before upload
+ * (`imageUploadBrowser.ts` applies the answer). Rules in `imageUpload.ts`.
+ */
+export function planBannerUpload(input: Size & { bytes: number }): UploadPlan {
+  return planImageUpload(input, BANNER_MAX_EDGE);
 }
 
 export interface ActiveBannerRow {

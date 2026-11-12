@@ -1,6 +1,6 @@
 # Deploying Spicy Meal Web Surfaces to Vercel
 
-> **Updated 2026-08-12.** This runbook describes the current two-surface build. It does not document native EAS/store deployment; use `README_MOBILE.md` and `RELEASE_CHECKLIST.md` for that.
+> **Updated 2026-08-12; §2 and §7 updated 2026-11-12.** This runbook describes the current two-surface build. It does not document native EAS/store deployment; use `README_MOBILE.md` and `RELEASE_CHECKLIST.md` for that.
 
 ## 1. What Vercel serves
 
@@ -38,7 +38,31 @@ The root script intentionally:
 
 1. installs the mobile dependency tree;
 2. builds the Vite/admin application;
-3. exports the Expo customer web app into `dist/app`.
+3. exports the Expo customer web app into `dist/app`;
+4. scans every shipped bundle for build-tool libraries that must never ship (`scripts/bundle-forbidden-libs.mjs`);
+5. fails if any file under `dist/app/assets/` or `dist/app/_expo/` lacks a 32-hex content hash in its name (`scripts/check-immutable-asset-names.mjs`) — `vercel.json` serves both as `immutable` for a year, which is only correct for content-hashed names;
+6. enforces the web performance budget (`scripts/web-budget.mjs`, below).
+
+Steps 4-6 run inside the build rather than beside it, because `npm run build` is what Vercel runs: a failure there is a deploy that does not happen.
+
+### Web performance budget
+
+`scripts/web-budget.mjs` fails the build when `/app` grows past a threshold set just above what it measured on 2026-11-12. Sizes are brotli quality 4, the stand-in the assessment used for Vercel's on-the-fly compression; Vercel's own encoding measured about 6% larger for the entry, so compare these numbers with each other, not with a production transfer size.
+
+| Measure | Threshold | Measured 2026-11-12 | Why it matters |
+| --- | --- | --- | --- |
+| `/app` entry bundle (br) | 1040 KB | 1 014 118 B | One bundle by design; every first visit downloads all of it before anything renders. |
+| First load: entry + the 8 start-up fonts + brand mark (br) | 1900 KB | 1 862 605 B (entry 1 014 118, fonts 720 895, mark 127 592) | What a cold visit must fetch before the chooser is usable. With the old 885 px mark it was 2 123 038 B, which fails. |
+| Any UI image under `dist/app/assets/assets/` or `dist/*.png` (raw) | 150 KB | largest 127 587 B (the brand mark) | PNG does not compress on the wire. `dist/logo.png` (430 KB) is exempt by name: it is the iOS `apple-touch-icon` and the logo master, and neither UI draws it. |
+
+The start-up fonts are read from `DESIGN_SYSTEM_FONTS` in `apps/mobile/src/design-system/fonts.ts`, so registering another font is counted without editing the script. `src/lib/webBudget.test.ts` fails if the thresholds above drift from the script's.
+
+**Lower a threshold when a change makes room; raise one only in a change that says why the growth is worth it.** The experience targets the budget stands in for, measured with the assessment's throttled-phone harness (400 kbps, 400 ms RTT, 4x CPU), and not enforced in CI:
+
+- cold first paint under 2 s — met by the `/app` splash (first paint about 0.5 s; it was 22 s of blank page);
+- cold chooser usable under 26.5 s now, 15 s as the target;
+- warm chooser under 3.5 s, warm transfer under 60 KB, and **zero** revalidations of hashed assets on a warm load;
+- total long tasks under 1.5 s at 4x CPU.
 
 Do not reorder the mobile install behind the Vite build: root web source imports/transforms mobile/shared code whose TypeScript config depends on the Expo dependency tree.
 
@@ -148,12 +172,24 @@ Where the built application embeds the Vercel commit SHA, compare the deployed S
 
 ### Do not trust an arbitrary HTTP 200
 
-The SPA catch-all can return `index.html` with HTTP 200 for an invalid application/asset path. Therefore:
+The SPA catch-all returns `index.html` with HTTP 200 for any unknown application path. Therefore:
 
 - a 200 at `/` is only liveness evidence;
-- a guessed asset URL returning 200 does not prove the asset exists;
 - use actual asset references from the deployed entry document/bundle;
 - use the deployment/commit SHA as the authoritative staleness check.
+
+**Since 2026-11-12 a missing file under a hashed-asset prefix is a 404, not the shell.** The two catch-all rewrites exclude `/assets/`, `/app/_expo/` and `/app/assets/` (`vercel.json`, pinned by `src/lib/vercelConfig.test.ts`). Before that, a chunk a deploy had removed came back as the HTML shell, 200, under the one-year `immutable` header, so a browser cached HTML under a script URL for a year. Every SPA route still resolves: the test derives the `/app` routes from `apps/mobile/src/app` and resolves each one.
+
+### Caching of hashed assets
+
+`/assets/` (console, Vite), `/app/_expo/` (customer bundle) and `/app/assets/` (customer fonts and images, added 2026-11-12) are served `public, max-age=31536000, immutable`. Until `/app/assets/` was added, every warm `/app` load revalidated 9 hashed files — the 8 fonts and the brand mark — before it could use them. Everything else gets Vercel's default `public, max-age=0, must-revalidate`, which is what keeps `index.html` fresh after a deploy.
+
+**A 404 under those prefixes still carries the `immutable` header.** Vercel attaches `headers` by request path before it looks for a file — `vercel build` compiles them to `continue: true` routes ahead of `{ handle: 'filesystem' }` — and `vercel.json` has no way to condition a header on status. A browser can therefore hold a miss for a year. That only matters for a client that asked for a file the current deploy does not have, i.e. a tab that outlived its deploy, and two things cover it:
+
+- the staff console listens for `vite:preloadError` (`src/lib/staleAssetRecovery.ts`): it refetches the failing URL with `cache: 'reload'`, which overwrites the cached miss, then reloads once, guarded by a sessionStorage timestamp so a broken deploy cannot loop. Measured on a local replica of these rules: a chunk cached as 404, restored by a rollback, still failed from cache on a plain request; after the listener ran it loaded, with one reload;
+- the customer app is one bundle, so it has no lazy chunk to miss. Its only exposure is an `index.html` fetched from one deploy whose entry request lands on the next; a reload fixes that, because `index.html` is revalidated every time.
+
+**Vercel Skew Protection is the complete fix and is an owner option, not configured here.** With it, a client keeps receiving the assets of the deploy it loaded, so a removed chunk is never requested from a deploy that lacks it. It is a project setting in the Vercel dashboard, available by plan, and changing it is a Vercel Production change under CLAUDE.md §5. Nothing in this repository depends on it.
 
 ### Security headers
 
