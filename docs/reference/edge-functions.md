@@ -97,4 +97,5 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/webhookReliabilityWiring.test.ts`
 - `_shared/whatsapp.test.ts`
 - `_shared/whatsapp.ts`
+- `_shared/whatsappLoginSendWiring.test.ts`
 - `_shared/whatsappSend.ts`
