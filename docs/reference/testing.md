@@ -2,7 +2,7 @@
      GENERATED FILE — DO NOT EDIT.
      Regenerate with: npm run docs:generate
      CI fails if this file drifts from its source (npm run docs:check).
-     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `e2e/*.spec.ts`
+     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `supabase/functions/*/*_test.ts`, `e2e/*.spec.ts`
      Describes the REPOSITORY, not live Production.
      ------------------------------------------------------------------ -->
 
@@ -24,6 +24,7 @@ What is tested, where those tests live, and how to run them. Use it to find whet
 | `npm run design-system:check` | Design-system mirrors and hygiene |
 | `npm run docs:check` | Documentation drift and ownership |
 | `npm run test:e2e` | The Playwright specs in `e2e/`, against a built `dist/` (run `npm run build` first) |
+| `deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts` | The Edge Function handler tests, with Deno as CI pins it |
 
 Vitest runs under the **Node** environment, not jsdom or a device; suites that need a DOM opt in per file with a `@vitest-environment jsdom` docblock. A mobile test file therefore cannot import `react-native`. This is why feature modules keep their rules in pure, framework-free files — those are the parts under test.
 
@@ -119,6 +120,14 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/staff_account_deletion_test.sql`
 - `supabase/tests/staff_mfa_aal2_test.sql`
 - `supabase/tests/staff_role_administration_test.sql`
+
+## Edge Function handler tests (Deno)
+
+Each calls a function's real request handler, exported from a module beside its `index.ts`, with `fetch` stubbed and without `--allow-net`, so nothing leaves the machine. The `Edge Function typecheck (Deno)` CI job runs them after `deno check`.
+
+| File | Tests |
+| --- | --- |
+| `supabase/functions/account-delete-scheduler/handler_test.ts` | 10 |
 
 ## End-to-end specs
 

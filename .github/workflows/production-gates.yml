@@ -112,6 +112,14 @@ jobs:
       - name: Typecheck all Edge Function entrypoints
         run: deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
 
+      # Tests that CALL a handler rather than read its source. Each function
+      # under test exports its handler from a module beside index.ts, which
+      # keeps only `Deno.serve(handler)`. `*_test.ts`, not `*.test.ts`: the
+      # latter are Vitest files. No --allow-net, so a request the test did not
+      # stub fails with a permission error instead of reaching anything.
+      - name: Edge Function handler tests
+        run: deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts
+
   audit:
     name: Dependency audit (high+)
     runs-on: ubuntu-latest

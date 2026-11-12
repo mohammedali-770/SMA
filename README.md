@@ -133,6 +133,7 @@ npm run test:e2e                        # a guest's journey through dist/, herme
 
 # Edge Function typecheck (Deno), with Deno 2.9.4 as CI pins it
 deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
+deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts  # handlers, fetch stubbed
 
 # Dependency audit (high+)
 node scripts/audit-web-high.mjs
