@@ -126,6 +126,61 @@ describe('status tints stay legible in dark', () => {
   });
 });
 
+/**
+ * R07#2 (2026-11-12): StatusPill drew its label in the status HUE on that hue's
+ * own tint, and Text's `success` / `danger` / `ember` tones drew the hue or the
+ * fill as body ink. Measured in light: 3.01 (mint), 3.63 (sky), 4.23 (danger),
+ * 4.08-4.29 (ember) — all under AA at caption and label size. Each pill
+ * foreground and each status text tone now has an ink, and every pair the
+ * components actually draw is pinned here, in BOTH palettes, because the
+ * components are theme-agnostic and a pair that held in only one theme would
+ * be a defect in the other.
+ */
+const PILL_PAIRS = [
+  ['mintInk', 'mintTint'],
+  ['dangerInk', 'dangerTint'],
+  ['amberInk', 'warnTint'],
+  ['skyInk', 'infoTint'],
+  ['appText2', 'appSurface2'],
+] as const;
+
+/** The grounds status TEXT lands on outside a pill: page, card, selected row. */
+const TEXT_GROUNDS = ['appBg', 'appSurface', 'appSurface2'] as const;
+
+describe('status inks clear AA on their tints, in both palettes', () => {
+  it.each(PILL_PAIRS)('dark: %s on %s', (ink, tint) => {
+    expect(contrast(darkPalette[ink], darkPalette[tint])).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it.each(PILL_PAIRS)('light: %s on %s', (ink, tint) => {
+    expect(contrast(lightPalette[ink], lightPalette[tint])).toBeGreaterThanOrEqual(AA_NORMAL);
+  });
+
+  it.each(['mintInk', 'dangerInk', 'emberText'] as const)('%s clears AA on every text ground, in both palettes', (ink) => {
+    for (const ground of TEXT_GROUNDS) {
+      expect(contrast(darkPalette[ink], darkPalette[ground])).toBeGreaterThanOrEqual(AA_NORMAL);
+      expect(contrast(lightPalette[ink], lightPalette[ground])).toBeGreaterThanOrEqual(AA_NORMAL);
+    }
+  });
+
+  it('the light HUES fail as pill labels, which is why the inks exist', () => {
+    // Asserted as a failure on purpose, like `ember` above: if a hue edit made
+    // the hue legible, somebody decides deliberately whether its ink is still
+    // earning its place.
+    expect(contrast(lightPalette.mint, lightPalette.mintTint)).toBeLessThan(AA_NORMAL);
+    expect(contrast(lightPalette.sky, lightPalette.infoTint)).toBeLessThan(AA_NORMAL);
+    expect(contrast(lightPalette.danger, lightPalette.dangerTint)).toBeLessThan(AA_NORMAL);
+  });
+
+  it('the inks are separate keys from the hues they pair with', () => {
+    // Same value in dark today, different in light. Separate keys so a hue
+    // edit cannot silently move the text drawn in it.
+    expect(lightPalette.mintInk).not.toBe(lightPalette.mint);
+    expect(lightPalette.skyInk).not.toBe(lightPalette.sky);
+    expect(lightPalette.dangerInk).not.toBe(lightPalette.danger);
+  });
+});
+
 describe('disabled foreground is exempt from AA but still floored', () => {
   it('measures below AA and that is accepted, not a defect', () => {
     // WCAG 1.4.3 exempts inactive components. Recorded so a future sweep does

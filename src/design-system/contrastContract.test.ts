@@ -94,6 +94,40 @@ describe('muted ink clears WCAG AA for normal text', () => {
   });
 });
 
+describe('status inks clear WCAG AA (R07#2)', () => {
+  // StatusPill drew its label in the status HUE on that hue's own tint:
+  // 3.01 (mint), 3.63 (sky), 4.23 (danger). The pill and the Text tones now
+  // draw the inks. The dark half is pinned in
+  // apps/mobile/src/theme/darkContrastContract.test.ts.
+  it.each([
+    ['mintInk', 'mintTint', 4.85],
+    ['skyInk', 'infoTint', 5.02],
+    ['dangerInk', 'dangerTint', 5.52],
+    ['amberInk', 'warnTint', 5.74],
+    ['appText2', 'appSurface2', 5.05],
+  ] as const)('%s on %s measures %s:1', (ink, tint, ratio) => {
+    const c = contrast((color as Record<string, string>)[ink], (color as Record<string, string>)[tint]);
+    expect(c).toBeGreaterThanOrEqual(AA_NORMAL);
+    expect(c).toBeCloseTo(ratio, 1);
+  });
+
+  it.each(['mintInk', 'skyInk', 'dangerInk', 'emberText'] as const)(
+    '%s clears AA on every cream and white ground',
+    (ink) => {
+      for (const ground of [color.appBg, color.appSurface, color.appSurface2]) {
+        expect(contrast(color[ink], ground)).toBeGreaterThanOrEqual(AA_NORMAL);
+      }
+    },
+  );
+
+  it('the hues and ember do not, which is why the inks exist', () => {
+    expect(contrast(color.mint, color.mintTint)).toBeLessThan(AA_NORMAL);
+    expect(contrast(color.sky, color.infoTint)).toBeLessThan(AA_NORMAL);
+    expect(contrast(color.danger, color.dangerTint)).toBeLessThan(AA_NORMAL);
+    expect(contrast(color.ember, color.appSurface2)).toBeLessThan(AA_NORMAL);
+  });
+});
+
 describe('the ink hierarchy stays ordered', () => {
   it('text-3 is lighter than text-2, which is lighter than text', () => {
     // Darkening text-3 until it clears AA "more comfortably" would collapse it

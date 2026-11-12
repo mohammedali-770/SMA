@@ -109,7 +109,7 @@ export function CartLine({ item, name, modifierSummary: summary, lineAmount, rem
         {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}
         {item.note ? <Text variant="caption" tone="ember" numberOfLines={2}>{item.note}</Text> : null}</View>
     </Pressable>
-    <View style={[styles.lineBottom, rtlRow]}><QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small /><Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}><Text variant="caption" align="center" style={{ color: colors.danger }}>{removeLabel}</Text></Pressable></View>
+    <View style={[styles.lineBottom, rtlRow]}><QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small /><Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}><Text variant="caption" align="center" style={{ color: colors.dangerInk }}>{removeLabel}</Text></Pressable></View>
   </View>;
 }
 const useStyles = makeStyles((color) => ({
