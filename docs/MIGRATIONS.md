@@ -37,6 +37,15 @@ to Production.**
 > before the first, and the fourth before the second. `20260824100000` still
 > sorts ahead of everything. **Name the target by version.**
 
+> **Updated 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
+> written, validated and NOT applied, so on merge the outstanding set is
+> EIGHT:** the seven below and this file (§59). It adds one `is_staff()`-gated
+> read-only function for the console's Loyalty tiles and changes nothing else.
+> The money path is self-asserted unchanged. The console half deploys on merge
+> and shows "—" until the file is applied, so apply it before or right after
+> the merge. Moyasar's `20260824100000` still sorts first. **Name the target by
+> version.**
+
 > **Updated 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
 > is written, validated and NOT applied, so on merge the outstanding set is
 > SEVEN:** `20260824100000`, `20260929120000` (§51), `20261002120000` (§54),
@@ -7979,3 +7988,100 @@ order either way.
    is_staff))`; `checkout_sessions_select_own` is unchanged; `place_order`
    `12b6816d…` and `compute_order_snapshot` `22e2d429…` are unchanged; and the
    Moyasar file is still unapplied unless it was applied on its own approval.
+
+## 59. Admin loyalty stats — WRITTEN, NOT APPLIED (2026-11-12)
+
+`20261008120000_admin_loyalty_stats.sql`. **Written 2026-11-12, validated,
+awaiting owner approval.** Assessment finding P04#2. Owner step:
+`docs/OWNER_ACTIONS.md` §50.
+
+sha256 `97cef0ec765cae6d004ba5f7518851d721aff655a2ce1d64383178a8f48c8007`,
+176 lines / 8 400 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It adds one function and changes nothing else.** No table, policy or
+existing function is altered, no row is written, and no deploy is implied.
+**MONEY PATH UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`).
+
+### Why
+
+Every staff sign-in read `profiles` with `select('*')` and no bound, so that
+Settings → Loyalty could count customers and sum their points in the browser.
+PostgREST caps a response at 1 000 rows, so past that the tiles were wrong and
+looked right: measured at 5 000 customers, 196 136 points shown against
+1 000 079 held. Every customer's name, phone and email also reached every
+staff browser on every sign-in.
+
+### What it does
+
+`admin_loyalty_stats()` returns `{member_count, points_total}`: the number of
+profiles with role `customer`, and the sum of their `loyalty_points`. Staff
+balances are excluded, as the client's filter excluded them. `SECURITY
+DEFINER`, `STABLE`, `search_path = public`, no arguments.
+
+**Access is not widened.** It is gated on `is_staff()` (admin or accountant at
+AAL2), the predicate `profiles_select_own_or_staff` applies, so exactly the
+callers who could compute the figures before can read them now. It follows
+`admin_order_stats()` (`20260806130000`). EXECUTE is revoked from `public`
+**and** `anon` explicitly, because `pg_default_acl` grants `anon` directly
+(CLAUDE.md §8), and granted to `authenticated`.
+
+The console derives the value and the per-customer average from the two
+figures and the configured rate, as before. The ledger below the tiles is an
+ordinary RLS-scoped select, 50 rows a page, ordered by `full_name` and then
+`id` so that paging is total.
+
+### What the file checks
+
+- One overload, no arguments, `SECURITY DEFINER`, `search_path=public`.
+  Cardinality is checked first.
+- `anon` cannot execute it; `authenticated` can.
+- **The gate as an outcome:** called as `authenticated` with no identity, it
+  refuses with `42501`, read back as a value.
+- The aggregate is run read-only with the identical predicate, because the gate
+  raises before the function's own select and a `plpgsql` body is not
+  name-resolved at creation.
+- The money-path pair, one overload each first.
+
+No block in the file contains function DDL, so `rpcContractParity.test.ts` has
+nothing to refuse.
+
+### Validation
+
+- **Local chain harness:** all 151 migrations apply. 88 suites run: 86 pass,
+  the 2 quarantined fail as before, 0 new failures. The idempotence replay
+  (report-only) lists the 5 known scheduler and seed files; this file
+  re-applies cleanly.
+- **Production-shaped chain:** the chain without the eight files Production
+  lacks (the seven outstanding and this one), then this file applied onto it,
+  twice. Both applies pass their own verification.
+- **Paired suite** `admin_loyalty_stats_test.sql`, 4 cases, with the
+  production `jwt_has_aal2()` restored inside the transaction: exact totals over
+  1 200 seeded customers, staff balances excluded, checked against a direct
+  count (case 1); a customer, an admin at AAL1 and an accountant at AAL1 refused
+  with `42501` (case 2); `anon` refused, `authenticated` granted (case 3); the
+  `(full_name, id)` page order visits every customer exactly once with seven
+  distinct names among 1 201 rows, and a customer or an AAL1 admin paging it
+  sees only their own row or nothing (case 4).
+- **Mutation testing, 7 mutants:**
+  - EXECUTE granted to `anon`, refused by the file's own check;
+  - revoked from `public` only, the default-ACL trap, refused by the file;
+  - the gate removed, refused by the file;
+  - the gate reduced to the role without AAL2, refused by the file, and failed
+    by suite case 2 with the file's check stripped out;
+  - staff balances counted (role filter dropped), failed by suite case 1;
+  - the gate narrowed to `is_admin()`, which would lock accountants out, failed
+    by suite case 1;
+  - the grant to `authenticated` removed: **survives, and is equivalent.**
+    `pg_default_acl` grants `authenticated` EXECUTE on new functions directly,
+    on the harness and in Production, so the explicit grant states the
+    intent but is not what carries it.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261008120000` by name. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. It is independent of every other
+   outstanding file.
+2. Afterwards, read-only: one overload; `has_function_privilege('anon', …)`
+   false and `('authenticated', …)` true; `place_order` `12b6816d…` and
+   `compute_order_snapshot` `22e2d429…` unchanged; and the Moyasar file still
+   unapplied unless it was applied on its own approval.
