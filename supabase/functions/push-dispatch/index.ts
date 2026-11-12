@@ -3,6 +3,7 @@ import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { isServiceCall } from '../_shared/apiKeys.ts';
+import { logBroadcast } from './broadcastLog.ts';
 
 /**
  * push-dispatch — Expo Push sender (COMPLETE implementation; replaces the old
@@ -24,6 +25,8 @@ import { isServiceCall } from '../_shared/apiKeys.ts';
  *       Caller: authenticated ADMIN. Immediate promotional broadcast to
  *       OPTED-IN devices only (is_active AND promos_enabled). Returns
  *       delivery counts. No scheduling / segmentation / topics / sounds.
+ *       Its notification_log row also records the sending admin and the four
+ *       strings (sent_by, content; 20261007120000, see broadcastLog.ts).
  *
  * MASTER FLAG: integration_settings (provider_type='push') must be ENABLED
  * with provider 'expo' — otherwise every action no-ops with
@@ -521,7 +524,18 @@ Deno.serve(async (req: Request) => {
       en: { title: titleEn, body: bodyEn },
       ar: { title: titleAr, body: bodyAr },
     }, { type: 'promo' });
-    await admin.from('notification_log').insert({ kind: 'broadcast', ...result });
+    // Who sent it and what it said (20261007120000). The broadcast has already
+    // gone out, so the log write must never change the response: an admin told
+    // it failed would send it again. See broadcastLog.ts for the fallback.
+    const logged = await logBroadcast(
+      (row) => admin.from('notification_log').insert(row),
+      adminId,
+      { titleEn, titleAr, bodyEn, bodyAr },
+      result,
+    );
+    if (logged !== 'logged') {
+      console.error(`push-dispatch: broadcast sent; log row ${logged}`);
+    }
     return json({ status: 'ok', ...result }, 200);
   }
 

@@ -125,6 +125,7 @@ Push is an **active production customer channel**. Both gates are open:
 - order-status transitions push to real customers automatically — `order_updates_enabled` defaults **TRUE** at device registration, so an opted-in customer receives preparing/ready/out_for_delivery/delivered without any further action. **Changed 2026-08-27: `received` is no longer pushed when an order is placed.** `order-intake` used to fire it unconditionally with copy claiming the kitchen had the order — untrue for delivery, which had not been sent anywhere yet. The POS outcome now owns the customer's first message (`pos_confirmed` on success, `pos_retrying`/`pos_confirmation_required`/`pos_failed` otherwise), and `lazywait-sync` dispatches it. `received` remains reachable from the admin status path, which is a real transition made by a human;
 - **`ready` is order-type aware as of `push-dispatch` v6, deployed 2026-09-03.** Every delivery order passes through `ready` on the way to `out_for_delivery`, and until v6 it was sent the PICKUP body in both languages — *"Your order is ready for pickup."* / «طلبك جاهز للاستلام.» — then contradicted minutes later by "On the way". `ready` now branches on `orders.order_type`, read from the order row the function already fetches; pickup copy is byte-identical to what it always was. It is the only status whose meaning differs by fulfilment, and `_shared/pushReadyCopyWiring.test.ts` pins the branch, the widened select and both bodies. **The delivery Arabic is engineering-drafted and has not had a native read** (`docs/OWNER_ACTIONS.md` §26);
 - admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true` — which since 2026-08-20 means **every device that granted OS notification permission and has not switched offers off**, not the small hand-raised subset it used to be. The confirm line's count is now close to the whole active base; read it before clicking;
+- **a broadcast's `notification_log` row records who sent it and what it said** (`sent_by`, and `content` with the four strings) once `20261007120000` is applied and `push-dispatch` redeployed; written 2026-11-12, neither done yet. Only the log row changed: targeting, copy, the gate and the response did not (`_shared/auditTrailWiring.test.ts`);
 - signing out no longer silences a device. Sign-out used to deactivate the `push_devices` row while the first-run permission flag is device-scoped and never re-raised, so push stayed dead after signing back in. The row is now left alone and the token is re-claimed at the next sign-in (`usePushDeviceSync`). Account **deletion** still deactivates;
 - a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code;
 - **admin actions on `push-dispatch` require AAL2, not just the admin role** — fixed and **deployed to Production 2026-08-23** (v4). `verify_jwt = false` for this function, so its caller check is the only gate on the path; it previously tested `profile?.role === 'admin'` alone, which let an administrator who had not completed TOTP send an unrecallable broadcast. It now asks Postgres for `is_admin()` through the caller's own client — role **and** AAL2, the same predicate every RLS policy uses. The service-role path used by `order-intake` and `lazywait-webhook` is unchanged. An admin without an enrolled TOTP factor cannot send a broadcast or a manual order-status push; automated order pushes are unaffected. The redeploy was the owner-approved §5 action that made this live.
@@ -291,6 +292,16 @@ SIX:** `20260824100000`, `20260929120000`, `20261002120000` (#436, merged
 Moyasar-only files. **Name the target by version.** A bulk
 apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
+
+**AMENDED 2026-11-12 (later) — `20261007120000_audit_trail` is written,
+validated and awaiting approval. On merge it joins the unapplied set**, which
+is the EIGHT named in the `20261008120000` note below, so NINE. It adds
+append-only `order_status_audit` and `admin_action_audit`, and
+`notification_log.sent_by`/`content`; it redefines no existing function and the
+money path is self-asserted. It must be applied BEFORE `push-dispatch` and
+`staff-accounts` are deployed (`docs/OWNER_ACTIONS.md` §51). `20260824100000`
+still sorts ahead of it, so a bulk apply would take the Moyasar file first.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §60.
 
 **AMENDED 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
 written, validated and awaiting approval, so on merge it joins the unapplied

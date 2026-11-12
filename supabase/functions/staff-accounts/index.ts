@@ -35,6 +35,13 @@
 //
 //  4. Passwords are never logged, never echoed back, and never stored anywhere
 //     by this function. They exist only in the request body and the GoTrue call.
+//
+//  5. reset_password and delete write an admin_action_audit row through the
+//     service-role-only record_admin_action RPC (20261007120000), with the
+//     verified caller as actor and the target's id and role. It is written
+//     after the Admin API call succeeds and cannot fail the request. See
+//     audit.ts. ('create' was already audited: admin_set_user_role writes
+//     role_change_audit under the caller's JWT, boundary 3.)
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
@@ -47,6 +54,7 @@ import {
   requiresBranch,
   sanitizeError as sanitize,
 } from './guards.ts';
+import { recordStaffAction, staffAuditArgs } from './audit.ts';
 
 function str(v: unknown): string { return typeof v === 'string' ? v : ''; }
 
@@ -206,6 +214,13 @@ Deno.serve(async (req: Request) => {
       if (!stillOk.allowed) return json({ error: stillOk.error, code: stillOk.code }, stillOk.status);
       const { error } = await admin.auth.admin.updateUserById(targetId, { password });
       if (error) return json({ error: sanitize(error.message) }, 400);
+      // Recorded only once the reset has happened, and never able to turn it
+      // into a failure. See audit.ts.
+      const audited = await recordStaffAction(
+        (args) => admin.rpc('record_admin_action', args),
+        staffAuditArgs('staff_password_reset', user.id, targetId, String(target.role)),
+      );
+      if (!audited) console.error('staff-accounts: password reset done; audit row not written');
       return json({ id: targetId, updated: true }, 200);
     }
 
@@ -217,6 +232,11 @@ Deno.serve(async (req: Request) => {
     if (!stillAdmin.allowed) return json({ error: stillAdmin.error, code: stillAdmin.code }, stillAdmin.status);
     const { error } = await admin.auth.admin.deleteUser(targetId);
     if (error) return json({ error: sanitize(error.message) }, 400);
+    const audited = await recordStaffAction(
+      (args) => admin.rpc('record_admin_action', args),
+      staffAuditArgs('staff_account_delete', user.id, targetId, String(target.role)),
+    );
+    if (!audited) console.error('staff-accounts: account deleted; audit row not written');
     return json({ id: targetId, deleted: true }, 200);
   }
 
