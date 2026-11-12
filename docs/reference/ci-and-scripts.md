@@ -33,7 +33,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 
 | Command | Runs |
 | --- | --- |
-| `npm run build` | `npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web && node scripts/bundle-forbidden-libs.mjs dist` |
+| `npm run build` | `npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web && node scripts/bundle-forbidden-libs.mjs dist && node scripts/check-immutable-asset-names.mjs dist && node scripts/web-budget.mjs dist` |
 | `npm run clean` | `rm -rf dist` |
 | `npm run design-system:check` | `node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs` |
 | `npm run design-system:sync` | `node scripts/sync-design-system.mjs` |
@@ -68,6 +68,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/build-play-screenshots.mjs` — Composes the Google Play phone screenshots from the owner's device captures
 - `scripts/bundle-forbidden-libs.mjs` — Fail if code from a build-tool library that must never ship reaches a bundle
 - `scripts/check-design-system-hygiene.mjs` — Guards the NEW design-system code against re-introducing raw values
+- `scripts/check-immutable-asset-names.mjs` — Fail the build if a file the CDN serves as `immutable` is not content-hashed
 - `scripts/check-play-screenshots.mjs` — Validates the Google Play phone screenshots in `assets/store/screenshots/`
 - `scripts/check-recorded-hashes.mjs` — Every sha256 recorded in prose must still describe a file in the tree
 - `scripts/check-test-phone-numbers.mjs` — @license SPDX-License-Identifier: Apache-2.0
@@ -79,3 +80,4 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/lib`
 - `scripts/sync-design-system.mjs` — Mirrors the canonical design-system modules into each app
 - `scripts/test-phone-allowlist.json`
+- `scripts/web-budget.mjs` — Web performance budget for the customer app at /app. Fails the build when a shipped artifact grows past its threshold

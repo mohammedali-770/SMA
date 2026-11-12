@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>%WEB_TITLE%</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+      }
+    </style>
+    <!--
+      Spicy Meal: this comment, the style block after it and the splash inside
+      #root are the only changes to Expo's default template (@expo/cli
+      static/template/index.html, which the export uses when this file is absent).
+
+      The splash is what a visitor sees while the ~1 MB bundle downloads and runs.
+      Without it /app was a blank white page for the whole of that wait: 22 s on a
+      throttled phone profile. React replaces #root's children on its first render,
+      so it disappears by itself and needs no script — which it must not have: the
+      production CSP (vercel.json) allows no inline script, while style-src allows
+      inline styles. Colours are the app's own launch-screen ground (appBg) and
+      ember, light and dark, so the hand-off to the app does not flash.
+      Pinned by apps/mobile/src/lib/webIndexTemplate.test.ts.
+    -->
+    <style id="sm-splash">
+      /* Fixed to the viewport: the template does not reset body's 8px margin
+         (react-native-web does, on mount), and a white frame around a dark
+         splash would be its own flash. */
+      .sm-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #fff7ef;
+        color: #241436;
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          'Noto Sans Arabic',
+          sans-serif;
+      }
+      .sm-splash-spinner {
+        width: 44px;
+        height: 44px;
+        box-sizing: border-box;
+        border-radius: 50%;
+        border: 4px solid #f0e3d4;
+        border-top-color: #e02d3d;
+        animation: sm-splash-spin 0.9s linear infinite;
+      }
+      .sm-splash-name {
+        font-size: 18px;
+        font-weight: 700;
+      }
+      @keyframes sm-splash-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        .sm-splash {
+          background: #151318;
+          color: #f7f3f1;
+        }
+        .sm-splash-spinner {
+          border-color: #48414a;
+          border-top-color: #d63245;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sm-splash-spinner {
+          animation-duration: 2.4s;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript> You need to enable JavaScript to run this app. </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root">
+      <div class="sm-splash" role="progressbar" aria-label="Loading · جارٍ التحميل">
+        <div class="sm-splash-spinner"></div>
+        <div class="sm-splash-name">Spicy Meal · سبايسي ميل</div>
+      </div>
+    </div>
+  </body>
+</html>

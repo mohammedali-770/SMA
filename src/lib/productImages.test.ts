@@ -4,9 +4,11 @@ import {
   ALLOWED_PRODUCT_IMAGE_MIME,
   MAX_PRODUCT_IMAGE_BYTES,
   PRODUCT_IMAGE_BUCKET,
+  PRODUCT_IMAGE_MAX_EDGE,
   isAllowedProductImageSize,
   isAllowedProductImageType,
   productImagePathFromUrl,
+  planProductImageUpload,
   productImageStoragePath,
 } from './productImages';
 
@@ -108,5 +110,26 @@ describe('path recovery from a public URL', () => {
   it('returns null when the prefix is present but the path is empty', () => {
     expect(productImagePathFromUrl(`${base}products/`)).toBeNull();
     expect(productImagePathFromUrl(base)).toBeNull();
+  });
+});
+
+describe('product photo resize decision', () => {
+  it('bounds a stored menu photo at the hero size, 390 pt at 3x', () => {
+    expect(PRODUCT_IMAGE_MAX_EDGE).toBe(1200);
+  });
+
+  it('re-encodes the measured 28 MP upload to 1200 px', () => {
+    expect(planProductImageUpload({ width: 5305, height: 5305, bytes: 989_037 })).toEqual({
+      action: 'encode',
+      target: { width: 1200, height: 1200 },
+    });
+  });
+
+  it('leaves an already-small photo alone', () => {
+    expect(planProductImageUpload({ width: 600, height: 750, bytes: 80_000 })).toEqual({ action: 'keep' });
+  });
+
+  it('stores a re-encoded WebP under a .webp path', () => {
+    expect(productImageStoragePath('IMG_0042.webp', '1-u')).toBe('products/1-u.webp');
   });
 });

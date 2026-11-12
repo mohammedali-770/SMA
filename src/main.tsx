@@ -4,6 +4,7 @@ import App from './App.tsx';
 import {ObservabilityErrorBoundary} from './components/ObservabilityErrorBoundary.tsx';
 import {initAdminObservability} from './lib/observability/index.ts';
 import {registerConsoleServiceWorker} from './lib/pwa/registerServiceWorker.ts';
+import {installStaleAssetRecovery} from './lib/staleAssetRecovery.ts';
 import './index.css';
 import './theme-dark.css';
 
@@ -22,6 +23,11 @@ if (import.meta.env.DEV) {
 // registration is deliberately fire-and-forget: it resolves to null on any
 // failure and can never stop the console rendering.
 void registerConsoleServiceWorker();
+
+// A tab opened before a deploy asks for chunk names the deploy removed. This
+// refetches the miss past the HTTP cache and reloads once, guarded so a broken
+// deploy cannot loop. See src/lib/staleAssetRecovery.ts.
+installStaleAssetRecovery();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
