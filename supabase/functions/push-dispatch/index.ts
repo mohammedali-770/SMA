@@ -4,6 +4,7 @@ import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { isServiceCall } from '../_shared/apiKeys.ts';
 import { logBroadcast } from './broadcastLog.ts';
+import { expoPushHeaders } from './expoHeaders.ts';
 
 /**
  * push-dispatch — Expo Push sender (COMPLETE implementation; replaces the old
@@ -218,7 +219,7 @@ async function sendToDevices(
     try {
       const res = await fetch(EXPO_PUSH_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: expoPushHeaders(Deno.env.get('EXPO_ACCESS_TOKEN')),
         body: JSON.stringify(messages),
         signal: AbortSignal.timeout(EXPO_SEND_TIMEOUT_MS),
       });

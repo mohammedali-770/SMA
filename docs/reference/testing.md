@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**259 TypeScript test files declaring 3919 test blocks, plus 89 SQL suites.**
+**260 TypeScript test files declaring 3926 test blocks, plus 89 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -388,7 +388,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-38 files, 916 declared test blocks.
+39 files, 923 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -428,5 +428,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/whatsappLoginSendWiring.test.ts` | 10 | whatsappSend.ts — the Meta send has a deadline |
 | `supabase/functions/payment-return/returnLink.test.ts` | 11 | sanitizeUuid |
 | `supabase/functions/push-dispatch/broadcastLog.test.ts` | 9 | broadcast log row |
+| `supabase/functions/push-dispatch/expoHeaders.test.ts` | 7 | expoPushHeaders |
 | `supabase/functions/staff-accounts/audit.test.ts` | 4 | staffAuditArgs |
 | `supabase/functions/staff-accounts/guards.test.ts` | 9 | staff-accounts manageable-role allow-list |
