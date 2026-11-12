@@ -12,7 +12,7 @@ Before release work:
 - [ ] A PR targets `claude/project-build-ie4b56`.
 - [ ] No direct production-branch push/merge is being used.
 - [ ] Any action that requires explicit owner approval has that approval in the conversation.
-- [ ] Payment/refund code is untouched unless a separate payment exception was explicitly approved.
+- [ ] Payment/refund code keeps Moyasar the only provider, and every live payment action (a payment migration, a payment deploy, a key, a dashboard change, a switch, a live payment or refund) has its own explicit owner approval. *Changed 2026-11-11: this used to require a freeze exception for any payment change. The owner chose Moyasar that day (CLAUDE.md §6); the go-live steps are `OWNER_ACTIONS.md` §47.*
 - [ ] Push is LIVE: any change to notification copy, targeting or dispatch behaviour is a change to real customer messaging and was explicitly approved. Marketing is **opt-OUT** since the owner decision of 2026-08-20 — `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so granting the OS notification prompt enrols the device in offers, and the Profile toggle is the opt-out (CLAUDE.md §7). Since 2026-11-10 an in-app consent screen says so before the OS prompt, and once as a notice where the OS never asks (Android 12 and older); changing that copy is a change to what the customer agreed to. The column default `push_devices.promos_enabled` stays FALSE and never decides a live device's targeting.
 
 See `CLAUDE.md`.
@@ -96,7 +96,7 @@ Never run `supabase db push` or `supabase migration repair` against production.
 - [ ] Deployment is separately approved by the owner.
 - [ ] The controlled deployment workflow is used; do not copy old direct deploy commands from historical docs.
 
-Payment functions remain frozen regardless of whether the generic deploy workflow can technically deploy them.
+The seven payment functions deploy only together, and only after `20260824100000` and then `20261003120000` are applied (`DEPLOY.md` §12, `OWNER_ACTIONS.md` §47.4). The workflow takes each function's `verify_jwt` from `supabase/config.toml`; a deploy by hand must match it. *Changed 2026-11-11: this used to say the payment functions were frozen.*
 
 ## 5. Web/admin release verification
 
@@ -126,7 +126,7 @@ When an end-to-end order test is approved:
 - [ ] Customer-visible order reference is safe/external (`#…` where applicable), not an internal SMA row identifier.
 - [ ] No unexpected stranded/confirmation-required state is introduced.
 
-Payment/refund behavior is not part of ordinary smoke testing while the payment freeze is active.
+Payment/refund behaviour is not part of ordinary smoke testing. A live online payment or refund is its own owner approval; the planned one is `OWNER_ACTIONS.md` §47.18. *Changed 2026-11-11: this used to cite the payment freeze.*
 
 ## 7. Native preview / Build 5 gate
 
@@ -150,6 +150,43 @@ Before native store submission, a real device must exercise the native bundle.
 - [ ] Sentry/native source-map path is verified for production builds.
 
 PR #200 completed source retention; this physical-device validation remains a separate gate.
+
+### Online payment (Moyasar) — added 2026-11-12
+
+Run these on the first build that carries the Moyasar-only app half, and again
+on any build that changes checkout, the payment screen or `react-native-webview`.
+**They need online payment switched on and Moyasar in live mode**, because
+customer checkout is refused in TEST mode. So they are part of the small live
+payment in `OWNER_ACTIONS.md` §47.18, which is its own owner approval. Real
+devices only; the console's sandbox test does not open the app.
+
+- [ ] **Apple Pay sheet, iPhone with a card in Wallet.** Choose online payment,
+      reach Moyasar's page inside the app, and pick Apple Pay. The Apple Pay sheet
+      must open inside the payment screen. Moyasar does not document Apple Pay on
+      its hosted page inside an app's WebView, so this is the only proof.
+- [ ] **3-D Secure challenge, on iOS and on Android.** Pay with a card that asks
+      for a bank challenge. The bank's page opens inside the payment screen, the
+      challenge completes, and the app continues. The payment screen allows any
+      `https` page and blocks every other scheme.
+- [ ] **Return to the app.** After paying, the payment screen closes by itself and
+      the app shows the order. It closes on our own return address only.
+- [ ] **Close and come back.** Close the payment screen before paying, then return
+      to checkout. The app asks the server about the saved session instead of
+      starting a second payment. Pressing Place order does nothing while a
+      payment run is in flight.
+- [ ] **Expired and refunded outcomes.** An abandoned payment that expires shows
+      the expired message, and a payment refunded before the order was confirmed
+      shows the failed state with "We could not confirm the payment. Please contact
+      support if an amount was deducted." In both cases
+      the app lets the customer start again, cash included. Neither must leave the
+      app refusing every order.
+- [ ] **A total under 1.00 SAR.** Redeem enough points to bring an online total
+      under 1.00 SAR. The app shows "Online payment needs a total of at least
+      1.00 SAR. Use fewer points, or pay in cash." and opens no payment page.
+- [ ] **Arabic.** The payment screen footer and Moyasar's own page read in Arabic
+      when the app is in Arabic.
+- [ ] **The web build offers no online option.** Open `/app` in a browser with
+      online payment on. Checkout offers cash only.
 
 ### First build on Expo SDK 58 — added 2026-11-10
 
@@ -288,7 +325,8 @@ line on the page. The answers behind these boxes are in
       content, or anything age-restricted to the menu, changes the answers.
 - [ ] **App content → App access** still carries working reviewer credentials.
 - [ ] **The listing copy's claims table** re-read against live settings — points are
-      still pickup-only, payment is still cash, prices still include VAT. A claim that
+      still pickup-only, payment is still cash (claim C-CASH becomes false the day
+      online payment is switched on), prices still include VAT. A claim that
       was true when drafted is the failure mode that table exists to prevent.
 - [ ] **Screenshots still show the shipped build.** They are one build behind as of
       2026-09-16, and they can be replaced without a new release.
@@ -304,7 +342,7 @@ Before a major release, re-verify as appropriate:
 - [ ] Whether Vercel auto-deploy or the gated deploy path is actually active.
 - [ ] GitHub required status checks/ruleset.
 - [ ] Supabase backup/PITR status.
-- [ ] `payment-refund-worker` remains disabled while payment work is frozen.
+- [ ] `payment-refund-worker` is in its expected state: inactive until `OWNER_ACTIONS.md` §47.16, active after it.
 - [ ] External monitoring/incident contacts are operational if the release depends on them.
 
 Record changed dashboard facts in the owning doc; do not leave them as chat-only knowledge.
@@ -316,7 +354,7 @@ Do not release when:
 - a required gate is red/unexplained;
 - database/client rollout order is unsafe;
 - a native dependency change has not been proven on a device;
-- payment/refund code changed without a separately approved exception;
+- payment/refund code describes or calls a provider other than Moyasar, or a live payment action happened without its own approval;
 - production deployment cannot be tied to the intended commit;
 - no one is available to observe/mitigate the release.
 

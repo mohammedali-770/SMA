@@ -133,7 +133,7 @@ call out, and only `pg_cron` calls them (catalog read, 2026-11-11).
 | `account-deletion-processor` | every minute | yes | **yes** | `account-delete-scheduler`, which works through account-deletion requests |
 | `admin-push-dispatch` | every minute | yes | **yes** | `admin-push-dispatch`, web push to staff browsers, only while `app_settings.admin_push_enabled` is on |
 | `operations-alert-dispatch` | every 5 minutes | yes | **yes** | `operations-alert-dispatch`, alert email, only while `external_dispatch_enabled` is on |
-| `payment-refund-worker` | every 5 minutes | **no** | **yes** | `payment-refund`. Frozen; it must stay off (§5) |
+| `payment-refund-worker` | every 5 minutes | **no** | **yes** | `payment-refund`. Off until the owner re-enables it after the Moyasar go-live steps (`OWNER_ACTIONS.md` §47.16); until then it must stay off (§5) |
 | `branch-availability-sweep` | every minute | yes | no | |
 | `order-integrity-watchdog` | every 2 minutes | yes | no | |
 | `operations-alerts-evaluator` | every 5 minutes | yes | no | |
@@ -222,7 +222,7 @@ backup and every data dump carries them. Key names on 2026-11-11; no value was r
 | `lazywait` | `api_token`, `sync_trigger_secret`, `webhook_secret` |
 | `whatsapp` (`meta_cloud`) | `access_token`, `otp_hmac_secret`, `send_sms_hook_secret`, `webhook_verify_token` |
 | `email` (`smtp`) | `password` |
-| `payment` (`tap`) | `live_secret_key`, `refund_trigger_secret`, `test_secret_key`. Frozen area, CLAUDE.md §6 |
+| `payment` (`tap`) | `live_secret_key`, `refund_trigger_secret`, `test_secret_key`. *2026-11-12: the provider is Moyasar (CLAUDE.md §6). The live read of 2026-11-11 recorded in CLAUDE.md §6 found this row named `moyasar`, so the two readings were taken at different times. Moyasar's keys and webhook tokens join these once entered (`OWNER_ACTIONS.md` §47)* |
 | `push` (`expo`), `sms` (`sandbox`) | none |
 
 `push_devices` holds the push token of every registered device: 5 rows on 2026-11-11.
@@ -285,7 +285,11 @@ when the restore is decided, not against this list, which holds names only:
 
 - **`integration_settings.enabled`**, one row per provider: `email`, `lazywait`,
   `payment`, `push`, `sms`, `whatsapp`. The `push` row is the master flag for live
-  customer push (CLAUDE.md §7). `payment` must stay disabled while the freeze stands.
+  customer push (CLAUDE.md §7). `payment`: compare it with the last Production
+  reading. *Changed 2026-11-12: this said it must stay disabled while the freeze
+  stands. The freeze is lifted for repository work; the payment row's live state
+  follows `OWNER_ACTIONS.md` §47.* `online_payment_enabled` must not come back on
+  unless the restored payment functions and row match the last live state.
 - **`app_settings`**: `loyalty_enabled`, `online_payment_enabled`,
   `cash_payment_enabled`, `payment_outage_mode_enabled`, `support_phone_enabled`,
   `support_whatsapp_enabled`, `support_email_enabled`, `loyalty_pickup_only`,
@@ -301,10 +305,11 @@ restores no business data.
 
 - **Name every exclusion by version.** Never replay "whatever is in the
   directory". On 2026-11-11 two repository files are unapplied in Production:
-  `20260824100000_moyasar_payment_provider` (frozen, CLAUDE.md §6) and
+  `20260824100000_moyasar_payment_provider` (frozen until 2026-11-11; now step 1 of the Moyasar apply order, CLAUDE.md §8) and
   `20260929120000_db_advisor_hardening` (awaiting approval). Read the current set from
   CLAUDE.md §8 and `MIGRATIONS.md` §1 on the day; do not copy this list forward. A
-  replay that includes the Moyasar file installs the frozen payment objects.
+  replay that includes the Moyasar file installs payment objects Production does
+  not have yet.
 - The two superseded July files, `20260707120700_place_order` and
   `20260707120800_loyalty`, replay as normal; later files replace what they define.
 - A rebuild schedules all twelve jobs, `payment-refund-worker` among them, as
@@ -315,7 +320,7 @@ restores no business data.
 
 ## 5. Critical restore safety: payment refund worker
 
-The payment/refund area remains frozen and automated refund processing is intended to stay disabled.
+Automated refund processing stays disabled until the owner re-enables it as `OWNER_ACTIONS.md` §47.16. *Changed 2026-11-12: this said the payment area remains frozen.*
 
 A restore/rebuild must **not** assume that the manually disabled Production cron state is reproduced by the migration chain.
 
@@ -327,9 +332,11 @@ from cron.job
 where jobname = 'payment-refund-worker';
 ```
 
-Expected while the payment freeze is active: `active = false`.
+Expected: `active = false`, until §47.16 is done. After that, `active = true` is
+correct only once the restored payment row, its keys and the payment functions are
+verified to match Production.
 
-If it is active, do not allow the restored environment to process refunds. Correcting live cron state is a Production write and requires the normal explicit approval path.
+If it is active when it should not be, do not allow the restored environment to process refunds. Correcting live cron state is a Production write and requires the normal explicit approval path.
 
 ## 6. Restore drill: not yet recorded
 
@@ -379,7 +386,7 @@ made. If none exists, record that in §7 and stop.
 11. **Delete the copy.** It holds Production personal data and provider credentials
     (§4.3).
 
-Do not use real online payment/refund operations as part of this drill while the payment area is frozen.
+Do not use real online payment/refund operations as part of this drill. A live payment or refund is its own owner approval (CLAUDE.md §5).
 
 ## 7. Drill record
 
@@ -393,7 +400,7 @@ Before reopening customer traffic:
 
 - [ ] Production database endpoint/project identity is the intended restored environment.
 - [ ] The five call-out jobs were stopped before anything else ran (§4.1), and each was re-enabled only after its target and credentials were checked.
-- [ ] `payment-refund-worker` is disabled while the freeze remains active.
+- [ ] `payment-refund-worker` is in its expected state (§5).
 - [ ] The four `*_project_url` Vault entries name the restored project (§4.2).
 - [ ] No test/scratch provider credentials can reach live providers.
 - [ ] The Send SMS hook points at the restored project, and `auth-send-sms-whatsapp` holds that hook's secret (§4.4). Otherwise every customer sign-in fails.
@@ -414,7 +421,7 @@ Function source is in Git, but a name-level drift check cannot prove byte-for-by
 
 Recovery should therefore deploy required functions from a **known reviewed production commit**, using the controlled owner-approved deployment workflow. Do not restore by copying an unknown deployed function back into Git.
 
-Payment functions remain frozen and require a separate exception/decision even during recovery unless restoring the last known running state is explicitly approved.
+Payment functions deploy only as the seven-function set, after the two payment migrations (`DEPLOY.md` §12). Even during recovery that deploy is its own owner approval. *Changed 2026-11-12: this said the payment functions were frozen.*
 
 ## 10. What Git can and cannot recover
 

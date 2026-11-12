@@ -20,7 +20,7 @@ const SENSITIVE_KEY_PARTS = [
   'authorization', 'cookie', 'token', 'jwt', 'secret', 'password', 'passwd',
   'otp', 'apikey', 'api_key', 'api-key', 'session', 'phone', 'mobile',
   'msisdn', 'email', 'e-mail', 'address', 'street', 'latitude', 'longitude',
-  'payment', 'tap', 'card', 'cvv', 'customer', 'profile', 'push_token',
+  'payment', 'moyasar', 'tap', 'card', 'cvv', 'customer', 'profile', 'push_token',
   'device_token', 'lazywait', 'anon_key', 'service_role', 'bearer',
   'credential', 'private',
 ] as const;
@@ -46,6 +46,11 @@ const VALUE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   // publishable key is public, but a log is the wrong place for any key, and a
   // secret key must never survive into one even by mistake.
   [/\bsb_(?:publishable|secret)_[A-Za-z0-9_-]{8,}/g, '[redacted-api-key]'],
+  // Moyasar's API keys (sk_test_… / sk_live_… secret, pk_test_… / pk_live_…
+  // publishable). The app never holds one — the secret keys live server-side
+  // and the hosted invoice needs no publishable key — so this is defence in
+  // depth: a key that reached a log by mistake is still not kept.
+  [/\b[sp]k_(?:test|live)_[A-Za-z0-9_-]{8,}/g, '[redacted-api-key]'],
   // Authorization schemes with their value
   [/\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '[redacted-auth]'],
   // Email addresses
@@ -57,7 +62,8 @@ const VALUE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\+\d{10,15}\b/g, '[redacted-phone]'],
   // Card-like long digit runs (13-19 digits, with or without separators)
   [/\b(?:\d[ -]?){13,19}\b/g, '[redacted-number]'],
-  // Tap / payment style references (chg_..., tok_..., src_..., card_...)
+  // Prefixed payment references and tokens (chg_..., tok_..., src_..., card_...,
+  // auth_...). Moyasar's 3-D Secure URL carries a `token=auth_...` value.
   [/\b(?:chg|tok|src|card|cus|auth)_[A-Za-z0-9]{6,}\b/g, '[redacted-payment-ref]'],
   // Coordinate pairs with high precision ("24.71355, 46.67529")
   [/-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}/g, '[redacted-coords]'],

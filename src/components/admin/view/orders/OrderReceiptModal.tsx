@@ -31,7 +31,7 @@ import { getVATBreakdown } from '../../../../utils/calculations';
 import { Price } from '../../../Price';
 import { ModalShell } from '../shared/ModalShell';
 import { DetailRow } from './DetailRow';
-import { TapPaymentDetails } from './TapPaymentDetails';
+import { PaymentDetails } from './PaymentDetails';
 import { paymentTone, syncStateOf, syncTone } from './ordersView';
 
 // Cancellation is deliberately NOT one of the normal select choices. It has
@@ -327,7 +327,7 @@ export function OrderReceiptModal({
             </DetailRow>
           </div>
 
-          <TapPaymentDetails order={order} isAccountant={isAccountant} isRTL={isRTL} />
+          <PaymentDetails order={order} isAccountant={isAccountant} isRTL={isRTL} />
 
           <div className="space-y-2 rounded-[var(--radius-ds-md)] bg-con-surface-2 p-3">
             <DetailRow label="POS sync status">

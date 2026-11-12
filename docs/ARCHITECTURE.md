@@ -31,7 +31,7 @@
           Lazywait POS       Meta / WhatsApp       Other integrations
                                                     (email, maps, etc.)
 
-          Payment/Tap code remains present but is PROVISIONAL + FROZEN.
+          Payments: Moyasar (decided 2026-11-11) — online payment is OFF; see §9.
           Push notifications (Expo) are LIVE — see §10.
 ```
 
@@ -459,20 +459,35 @@ These are operational visibility controls, not a substitute for external paging 
 
 Sentry is wired across native mobile, Expo web and admin web. Release/source-map handling is controlled by the documented Sentry gates and EAS/Vite configuration.
 
-## 9. Payment/refund boundary — frozen
+## 9. Payments — Moyasar
 
-Payment/Tap source, database objects and Edge Functions remain in the repository, but the provider is **not treated as the final product decision**.
+**Decided by the owner on 2026-11-11** (CLAUDE.md §6). On the branch `feat/moyasar-only-20261111` Moyasar is the only provider; the Tap and Geidea code is removed. Online payment was **off** on 2026-11-11 (read-only), and every payment function deployed in Production was still a July Tap-era bundle. The steps that change that, each a separate owner approval, are [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §47. Runbook: [`PAYMENTS.md`](PAYMENTS.md).
 
-The owner decision recorded in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) freezes payment/refund changes while the final gateway is unresolved.
+The shape, as the code on that branch has it:
 
-Important consequences:
+- the signed-in app calls `payment-initiate`, which opens one payment attempt per order or checkout session and a Moyasar **invoice** for the server-computed total;
+- the app opens Moyasar's hosted page **only inside its own payment screen** (a WebView). Card details and Apple Pay are entered there, never in our code;
+- Moyasar sends the customer to our return address (`payment-return`). The payment screen recognises it and closes, and the app asks `payment-verify`;
+- `payment-webhook` receives Moyasar's events and **re-fetches the payment from Moyasar** before confirming anything;
+- a payment confirms an order only if its invoice, amount, currency and **live** mode match the attempt. Customer checkout is refused in TEST mode; the sandbox is the console's admin test (`payment-test-config`);
+- refunds go through `payment-refund`, driven by the `payment-refund-worker` cron job, which is off.
+
+The web build (`/app`) never offers online payment.
+
+**History — the freeze, until 2026-11-11.** Kept as written; do not act on it.
+
+> Payment/Tap source, database objects and Edge Functions remain in the repository, but the provider is **not treated as the final product decision**.
+>
+> The owner decision recorded in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) freezes payment/refund changes while the final gateway is unresolved.
+
+Consequences that applied then:
 
 - Do not use the payment code as a foundation for new work.
 - Do not change/deploy/test payment/refund behavior during ordinary development.
 - Automated refund processing remains disabled.
 - Reopening the area requires a separate provider decision and explicit approval.
 
-Architecture diagrams or README text must not describe the provisional Tap stack as the final gateway.
+Architecture diagrams or README text must not describe Tap or Geidea as a current provider.
 
 ## 10. Push notifications — LIVE
 
@@ -542,7 +557,7 @@ Rules:
 - [`../PROJECT_STATUS.md`](../PROJECT_STATUS.md) — current release/engineering state.
 - [`MIGRATIONS.md`](MIGRATIONS.md) — migration workflow/history ledger.
 - [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) — current owner/live reconciliation gaps.
-- [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) — payment freeze.
+- [`PAYMENTS.md`](PAYMENTS.md) — payments with Moyasar; [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) — the payment freeze, history to 2026-11-11.
 - [`ORDER_CONFIRMATION_FLOW.md`](ORDER_CONFIRMATION_FLOW.md) — customer order confirmation lifecycle.
 - [`OPERATIONS_ALERTS_DIGEST.md`](OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
 - [`SENTRY_OBSERVABILITY.md`](SENTRY_OBSERVABILITY.md) / [`SENTRY_WEB_OBSERVABILITY.md`](SENTRY_WEB_OBSERVABILITY.md) — observability.

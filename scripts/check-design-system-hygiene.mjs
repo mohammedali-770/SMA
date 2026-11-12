@@ -151,7 +151,10 @@ for (const gone of ['theme.ts', join('components', 'Button.tsx'), join('componen
  * one would be legitimate, so an allowlist would only describe where we happen
  * to have looked.
  *
- * Add files as each surface lands. Do not remove entries.
+ * Add files as each surface lands. Do not remove an entry for a file that still
+ * exists. A file that is deleted outright comes off the list with it, as the
+ * other payment gateway's readiness panel did on 2026-11-11, when Moyasar became
+ * the only provider.
  */
 const ADMIN_MIGRATED = [
   // Console shell
@@ -183,7 +186,7 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/orders/OrderReceiptModal.tsx',
   'src/components/admin/view/orders/OrdersRequiringVerificationCard.tsx',
   'src/components/admin/view/orders/OrdersTable.tsx',
-  'src/components/admin/view/orders/TapPaymentDetails.tsx',
+  'src/components/admin/view/orders/PaymentDetails.tsx',
   'src/components/admin/view/orders/ordersView.ts',
   // Catalog + Branch Operations
   'src/components/admin/BannerManagementPanel.tsx',
@@ -215,7 +218,7 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/stats/statsCopy.ts',
   'src/components/admin/IntegrationsPanel.tsx',
   'src/components/admin/IntegrationCard.tsx',
-  'src/components/admin/TapPaymentPanel.tsx',
+  'src/components/admin/MoyasarPaymentPanel.tsx',
   'src/components/admin/WhatsAppOtpPanel.tsx',
   'src/components/admin/EmailServerPanel.tsx',
   'src/components/admin/PushToolsPanel.tsx',

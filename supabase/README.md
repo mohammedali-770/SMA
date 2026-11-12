@@ -35,7 +35,7 @@ Supabase currently provides:
 - Audited staff role administration and AAL2/TOTP staff authorization.
 - Edge Function provider/server boundaries.
 
-Payment/refund source is still the Tap-era code until the Moyasar-only change (#446) merges. Moyasar is the provider (owner decision, 2026-11-11, `CLAUDE.md` §6); every live payment step is its own owner approval. Push is **live** — see `CLAUDE.md` §7.
+Payments go through **Moyasar**, the provider the owner chose on 2026-11-11 (`CLAUDE.md` §6); the Tap and Geidea code is removed. Applying a payment migration and deploying the payment functions are each owner actions, in the order in `../docs/OWNER_ACTIONS.md` §47. Push is **live** — see `CLAUDE.md` §7.
 
 ## Security model
 
@@ -157,7 +157,7 @@ Important principles:
 - `verify_jwt=false` functions must authenticate through their own external/service contract.
 - provider secrets remain server-side;
 - deployment is an explicit owner-approved production action;
-- deploying a payment function is its own owner approval (`CLAUDE.md` §5, §6), even though the workflow can deploy it;
+- the seven payment functions deploy only together, after `20260824100000` and then `20261003120000` are applied, and each deploy is its own approval (`../docs/DEPLOY.md` §12);
 - push sending is **live** — the `integration_settings` master flag is enabled and `push-dispatch` delivers to real customer devices; turning that row off is the kill switch.
 
 ## Lazywait
@@ -199,6 +199,6 @@ Restore/rebuild work must also respect this lifecycle and its database objects.
 - `../docs/MIGRATION_RECONCILIATION_20260812.md` — latest live migration snapshot.
 - `../docs/MIGRATIONS.md` — migration workflow/history ledger.
 - `../docs/OWNER_ACTIONS.md` — current owner/live-dashboard decisions.
-- `../docs/PAYMENT_POSTPONEMENT.md` — the payment/refund freeze, superseded 2026-11-11 (`CLAUDE.md` §6).
+- `../docs/PAYMENTS.md` — payments with Moyasar; `../docs/PAYMENT_POSTPONEMENT.md` — the payment freeze, history to 2026-11-11.
 - `../docs/BACKUP_RECOVERY.md` — backup/restore state.
 - `functions/README.md` — Edge Functions.

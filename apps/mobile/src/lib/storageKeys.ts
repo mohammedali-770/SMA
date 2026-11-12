@@ -5,9 +5,10 @@
  * values: a changed key silently discards every existing cart / language
  * preference in the field.
  *
- * Not listed here (still local to the frozen payment/checkout flow, to be
- * consolidated once that code is unfrozen): the pending checkout-session and
- * WebView hand-off keys, and the GoTrue session keys managed by supabase-js.
+ * Not listed here: the pending checkout-session key, which lives beside its
+ * pure recovery logic in features/checkout/pendingSession.ts, and the GoTrue
+ * session keys managed by supabase-js. (The payment WebView hand-off is held in
+ * memory only and has no key.)
  */
 export const CART_STORAGE_KEY = 'spicymeal.cart';
 export const LANGUAGE_STORAGE_KEY = 'spicymeal.lang';

@@ -99,11 +99,11 @@ For build commands and native configuration, use [`README_MOBILE.md`](README_MOB
 
 ## 5. Deliberately inactive/frozen areas
 
-### Payment and refunds — Moyasar chosen, still off
+### Payment and refunds — Moyasar decided, not live
 
-*Superseded 2026-11-11: Moyasar is the payment provider (`CLAUDE.md` §6). Repository work that keeps Moyasar the only provider is no longer frozen; every live payment step is still its own owner approval. The Moyasar-only change is pull request #446.*
+**Changed 2026-11-12.** On 2026-11-11 the owner chose **Moyasar** (CLAUDE.md §6). The branch `feat/moyasar-only-20261111` removes the Tap and Geidea code and makes every payment path Moyasar-only. Read-only on 2026-11-11: online payment was off, every deployed payment function was still a July Tap-era bundle, and the refund job was off. Every step that changes that is its own owner approval, in the order in [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §47. Runbook: [`docs/PAYMENTS.md`](docs/PAYMENTS.md).
 
-The payment source in the repository is still the Tap-era code until #446 merges. Online payment is off and automated refund processing remains disabled; turning either on is an owner action. The freeze that applied until 2026-11-11 is recorded in [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md), kept as history.
+*History, until 2026-11-11:* The final payment provider has not been selected. Existing Tap/payment/refund source remains for continuity/history, but ordinary work must not modify, deploy, schedule or test that area. Automated refund processing remains disabled. The authoritative decision is [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 
 ### Push notifications — LIVE
 
@@ -270,7 +270,7 @@ Starting EAS/store builds requires explicit owner approval.
 | Latest migration status | `docs/MIGRATION_RECONCILIATION_20260812.md` |
 | Migration workflow/history | `docs/MIGRATIONS.md` |
 | Current owner/live-dashboard actions | `docs/OWNER_ACTIONS.md` |
-| Payments (Moyasar, owner decision 2026-11-11) | `CLAUDE.md` §6; the superseded freeze: `docs/PAYMENT_POSTPONEMENT.md` |
+| Payments (Moyasar) | `docs/PAYMENTS.md`; go-live steps `docs/OWNER_ACTIONS.md` §47; the freeze, history to 2026-11-11, `docs/PAYMENT_POSTPONEMENT.md` |
 | Git branch state | `docs/GIT_BRANCHES.md` |
 | Feature-retention evidence | `docs/BRANCH_FEATURE_RETENTION_AUDIT.md` |
 

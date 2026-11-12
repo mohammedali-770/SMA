@@ -62,17 +62,24 @@ Approval for one action is not blanket approval for later actions.
 - sandbox first, then live;
 - Moyasar's live Allowed IPs are met through a static-IP proxy service.
 
-**What it lifts.** The freeze recorded below no longer applies to repository work that keeps Moyasar the only provider: code, tests and documents, on a purpose branch, through a pull request, merged on the owner's word. The implementation (Tap and Geidea removed, every payment path Moyasar-only, and the runbook `docs/PAYMENTS.md`) is pull request #446, judged against this section once it is on the base branch. API contract: `docs/integrations/Moyasar_API_Reference.md`.
+**What it lifts.** The freeze recorded below no longer applies to repository work that keeps Moyasar the only provider: code, tests and documents, on a purpose branch, through a pull request, merged on the owner's word. The change that removed Tap and Geidea and made every payment path Moyasar-only landed with pull request #446. Runbook: `docs/PAYMENTS.md`. API contract: `docs/integrations/Moyasar_API_Reference.md`.
 
 **What it does not lift. Nothing live follows from a merge.** Each of these is its own §5 approval, named when due:
-- applying `20260824100000_moyasar_payment_provider`, then `20261003120000_moyasar_only_payments`, then (after the deploy below) `20261004120000_drop_tap_payment_rpcs`, each by version. The last two arrive with #446. The second refuses to apply before the first, and the third before the second;
-- deploying the seven payment functions as one set (`payment-initiate`, `-verify`, `-webhook`, `-return`, `-refund`, `-test-config`, and `-admin-test-return`, which #446 renames from `tap-admin-test-return`), and later deleting the retired `tap-admin-test-return` function;
-- payment keys, webhook tokens, the `MOYASAR_PROXY_URL` secret (read by #446's code), and any Moyasar dashboard change (Allowed IPs, webhook registration and its one-time verification code);
+- applying `20260824100000_moyasar_payment_provider`, then `20261003120000_moyasar_only_payments`, then (after the deploy below) `20261004120000_drop_tap_payment_rpcs`, each by version. The second refuses to apply before the first, and the third before the second;
+- deploying the seven payment functions as one set (`payment-initiate`, `-verify`, `-webhook`, `-return`, `-refund`, `-test-config`, `-admin-test-return`), and later deleting the retired `tap-admin-test-return` function;
+- payment keys, webhook tokens, the `MOYASAR_PROXY_URL` secret, and any Moyasar dashboard change (Allowed IPs, webhook registration and its one-time verification code);
 - switching the payment row to live, enabling it, and turning on `app_settings.online_payment_enabled`;
 - generating `refund_trigger_secret` (read from the payment row's secret config by both the refund driver and `payment-refund`; no migration creates it) and re-enabling the `payment-refund-worker` cron job;
 - the EAS build that ships the app half;
 - any live payment or refund, including the planned small live payment with its automatic refund;
 - the customer documents and store answers that must change before customers can pay by card: naming Moyasar in the live privacy policy, updating the payment and cancellation/refund policies (both still say payment is cash only), the App Store and Play payment answers, the cash-only listing claim, and the App Review notes.
+
+**What keeps it safe while it is off.** Each is code in this repository, with tests:
+- customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
+- an attempt opened in TEST mode never confirms an order or a checkout session;
+- the console's Online Payment switch opens only for an enabled, live Moyasar row. **It guards the console, not the setting:** `set_payment_settings` checks `is_admin()` alone;
+- the web build (`/app`) never offers online payment;
+- payment history is data: the `tap` rows stay and are shown read-only.
 
 **Live state, read-only, 2026-11-11:**
 - online payment is OFF since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode, which customers could not have completed; the owner switched it off;
@@ -104,7 +111,7 @@ Automated refund processing is intended to remain disabled while the freeze is a
 
 **Exception granted 2026-08-24 — `payment-test-config`'s admin gate, and nothing else.** That function authorized callers on `profile.role = 'admin'` alone, the same defect fixed in the four non-frozen admin Edge Functions on 2026-08-23. It is not a read-only diagnostics endpoint: its `verify_order` action reaches `validateAndConfirmTapCharge`, which can mark a real order paid — it cannot invent a payment, since it confirms only on a genuine CAPTURED charge retrieved from Tap, but an AAL1 caller could drive payment-state writes on real orders through the service-role client, which bypasses RLS. The gate now calls `public.is_admin()` (role **and** AAL2). **No provider behaviour, charge construction, verification logic or configuration was touched**, and `adminAuthWiring.test.ts` pins that surface — the four actions, the forced TEST key, the TEST-mode guard on charge creation, and the confirm call — so a payment change cannot ride in under an auth fix. Deploying it is still a separate §5 action and is NOT covered by this exception.
 
-Authoritative product decision while the freeze stood: `docs/PAYMENT_POSTPONEMENT.md`, superseded on 2026-11-11 by the decision above.
+Authoritative product decision while the freeze stood: `docs/PAYMENT_POSTPONEMENT.md`, superseded on 2026-11-11 by the decision above and `docs/PAYMENTS.md`.
 
 ## 7. Push notifications — LIVE
 
@@ -265,6 +272,25 @@ The superseded statement was **112 repository files / 117 live rows / exactly ON
 Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
+
+**AMENDED 2026-11-11, the Moyasar decision (§6) — `20260824100000` is no
+longer frozen.** It is step 1 of the Moyasar apply order, not a file kept
+unapplied on purpose:
+1. `20260824100000_moyasar_payment_provider`;
+2. `20261003120000_moyasar_only_payments` (`docs/MIGRATIONS.md` §55);
+3. the payment function deploy;
+4. `20261004120000_drop_tap_payment_rpcs` (§56).
+
+Each is its own approval, named by version. The second refuses to apply before
+the first, and the fourth before the second. No SQL can tell whether step 3
+happened, so holding 3 before 4 is the approver's job. Paragraphs below that
+call `20260824100000` "frozen on purpose" describe the freeze as it stood when
+they were written. **On merge of the Moyasar-only change the outstanding set is
+SIX:** `20260824100000`, `20260929120000`, `20261002120000` (#436, merged
+2026-11-12), `20261005120000` (#445, merged 2026-11-12) and the two
+Moyasar-only files. **Name the target by version.** A bulk
+apply would now take all three Moyasar files in filename order, the drop file
+before the deploy it must follow.
 
 **AMENDED 2026-11-12 — `20261005120000_server_input_bounds` is written,
 validated and awaiting approval. On merge it joins the unapplied set.** On the base
@@ -1769,7 +1795,7 @@ Do not leave old screenshots/README text describing:
 - the prototype/localStorage emulator as current;
 - the mobile app as a WebView wrapper;
 - a retired branch as production;
-- Tap, Moyasar or Geidea as the final payment provider;
+- Tap or Geidea as a current payment provider, or payment as frozen (Moyasar is the provider since 2026-11-11, §6);
 - direct SQL staff-role promotion as routine onboarding;
 - direct Production CLI deploy/db-push shortcuts;
 - dated dashboard counts/settings as current without re-verification.

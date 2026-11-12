@@ -1,8 +1,7 @@
 /**
  * Moyasar helpers (pure, web-standard only — no Deno APIs — so vitest can import
- * them, mirroring _shared/tap.ts and _shared/whatsapp.ts). Nothing here logs or
- * returns a secret; the secret key is only ever used as the HTTP Basic username
- * by the caller.
+ * them, mirroring _shared/whatsapp.ts). Nothing here logs or returns a secret;
+ * the secret key is only ever used as the HTTP Basic username by the caller.
  *
  * WHY THE INVOICE, NOT A CHARGE
  * Moyasar's authentication page states, without qualification: "Sending
@@ -12,26 +11,26 @@
  * (https://docs.moyasar.com/api/authentication)
  *
  * So `POST /v1/payments` with `source[type]=creditcard` — which carries the PAN,
- * CVC and expiry — is NOT a server-side option for us. The server-side flow that
- * corresponds to Tap's hosted checkout is the INVOICE: we create an invoice, the
- * customer is redirected to Moyasar's own checkout page, and the card never
- * touches our infrastructure. That is what this module builds.
+ * CVC and expiry — is NOT a server-side option for us. The server-side hosted
+ * checkout is the INVOICE: we create an invoice, the customer is redirected to
+ * Moyasar's own checkout page, and the card never touches our infrastructure.
+ * That is what this module builds.
  *
- * TWO IDS, NOT ONE — the shape difference from Tap
- * Tap gives one id (the charge) that is created up front and refunded later.
+ * TWO IDS, NOT ONE
  * Moyasar gives two:
  *   - the INVOICE id, known when we open the attempt, which owns the hosted URL;
  *   - the PAYMENT id, which only exists once the customer actually pays, and
  *     which is the thing `POST /v1/payments/:id/refund` takes.
  * We store the invoice id in `payment_records.provider_checkout_ref` and the
  * payment id in `provider_ref`, so the refund path and the (provider,
- * provider_ref) confirmation idempotency both key off the payment — exactly as
- * they already do for a Tap charge — with no change to any shared RPC.
+ * provider_ref) confirmation idempotency both key off the payment, with no
+ * change to any shared RPC.
  *
  * AMOUNTS ARE MINOR UNITS. Moyasar takes "a positive integer representing the
- * payment amount in the smallest currency unit" — 1.00 SAR is `100`, not `1`.
- * Tap takes major units. Getting this wrong is a 100x charge, so the conversion
- * lives here behind unit tests and is never done inline at a call site.
+ * payment amount in the smallest currency unit" — 1.00 SAR is `100`, not `1`,
+ * while `orders.total` holds major units. Getting this wrong is a 100x charge,
+ * so the conversion lives here behind unit tests and is never done inline at a
+ * call site.
  */
 
 const encoder = new TextEncoder();
@@ -112,6 +111,27 @@ export function amountsMatch(majorUnits: number, minorUnits: number, currency = 
   return Number.isInteger(actual) && expected === actual && expected > 0;
 }
 
+/**
+ * The smallest invoice Moyasar accepts: 100 minor units, 1.00 SAR
+ * (docs/integrations/Moyasar_API_Reference.md §2 and §3.1, "Minimum `100`").
+ *
+ * The ONE place this number lives on the server. payment-initiate refuses a
+ * smaller total before it opens an attempt, and the admin sandbox invoice is
+ * exactly this floor. The database refuses it too, in begin_session_attempt and
+ * begin_payment_attempt (20261003120000), as `total < 1.00`: SQL cannot import
+ * this constant, so paymentWiring.test.ts holds the two together.
+ */
+export const MOYASAR_MIN_INVOICE_MINOR_UNITS = 100;
+
+/**
+ * True when an amount in MAJOR units is below what Moyasar will put on an
+ * invoice. Such a total can never be paid online: the invoice create is
+ * refused, so an attempt opened for it ends with no invoice at all.
+ */
+export function isBelowMoyasarMinimum(majorUnits: number, currency = 'SAR'): boolean {
+  return toMinorUnits(majorUnits, currency) < MOYASAR_MIN_INVOICE_MINOR_UNITS;
+}
+
 // ---------------------------------------------------------------------------
 // Authentication — HTTP Basic, key as username, EMPTY password.
 // ---------------------------------------------------------------------------
@@ -186,9 +206,8 @@ export function keyMatchesMode(key: string, mode: MoyasarMode, kind: 'secret' | 
  *     authenticating an inbound webhook (see verifyWebhookSecretToken);
  *   - the key must carry the prefix for the mode it is filed under.
  *
- * That last check has no Tap equivalent and is deliberate. Tap's key slots are
- * opaque strings, so a live key pasted into the test slot is undetectable and
- * would charge real cards from an interface labelled TEST. Moyasar's keys are
+ * That last check is deliberate. A live key pasted into the test slot would
+ * charge real cards from an interface labelled TEST. Moyasar's keys are
  * self-describing (`sk_test_` / `sk_live_`), so we can refuse that outright
  * rather than discovering it from a customer's statement.
  *
@@ -209,16 +228,13 @@ export function resolveMoyasarConfig(
   //
   // `integration_settings` holds ONE row per provider_type, and
   // upsert_integration_settings MERGES secret_config (`old || new`) rather than
-  // replacing it — so keys the new payload does not mention survive a save.
-  // That merge only helps if the two gateways use DIFFERENT names: had Moyasar
-  // reused Tap's `test_secret_key` / `live_secret_key`, saving Moyasar
-  // credentials would overwrite Tap's by collision, and every refund still
-  // queued for Tap would become impossible to execute.
+  // replacing it — so keys the new payload does not mention survive a save,
+  // Tap's old `test_secret_key` / `live_secret_key` included wherever they were
+  // ever saved. Distinct names are what guarantee a leftover Tap credential is
+  // never read as a Moyasar one.
   //
-  // With these names both gateways' credentials coexist in the one row, so
-  // switching the provider is reversible and in-flight work at the old gateway
-  // stays serviceable. Nothing is stored under the old names — no Moyasar
-  // credential exists anywhere — so this costs nothing to adopt.
+  // Do not rename these. They are live data: the admin card writes them, and
+  // Production already stores `moyasar_test_publishable_key` under this name.
   const secretKey = String(
     (mode === 'live' ? secretConfig.moyasar_live_secret_key : secretConfig.moyasar_test_secret_key) ?? '',
   ).trim();
@@ -264,7 +280,7 @@ export interface BuildInvoiceParams {
    * Customer-safe text only — Moyasar renders `description` on the hosted
    * checkout page the customer sees. NEVER embed the internal SM-… order number
    * here; the verification binding lives in metadata + invoice_id, not this
-   * field. (Same rule as the Tap charge description — Issue #94.)
+   * field (Issue #94).
    */
   description: string;
   /** Our unique per-attempt reference (sm_<uuid>). */
@@ -296,9 +312,10 @@ export interface BuildInvoiceParams {
  * `payment.invoice_id === the invoice id we stored`, which Moyasar sets itself
  * and a client cannot influence. See moyasarVerify.ts.
  *
- * `amount` is emitted in MINOR units. Moyasar rejects an invoice under 100
- * minor units (1.00 SAR); the caller checks the total is positive and the
- * server-side amount check in validateAndConfirm re-compares independently.
+ * `amount` is emitted in MINOR units. Moyasar rejects an invoice under
+ * MOYASAR_MIN_INVOICE_MINOR_UNITS (1.00 SAR); payment-initiate refuses such a
+ * total before it opens an attempt, and the server-side amount check in
+ * validateAndConfirm re-compares independently.
  *
  * `callback_url` IS DELIBERATELY NOT SENT, and the omission is the considered
  * choice rather than an oversight. Moyasar documents it as "an endpoint on your
@@ -336,10 +353,91 @@ export function buildInvoicePayload(p: BuildInvoiceParams): Record<string, unkno
   return body;
 }
 
+export type CheckoutLanguage = 'ar' | 'en';
+
+/**
+ * The invoice's hosted-checkout URL as it may be handed to the app, or null.
+ *
+ * The app opens whatever payment-initiate returns, so only Moyasar's own
+ * domain may come back: https on moyasar.com or a subdomain of it. Moyasar's
+ * documented example is `http://checkout.moyasar.com/invoices/<id>?lang=en`
+ * (https://docs.moyasar.com/api/invoices/01-create-invoice), so http on that
+ * domain is upgraded rather than refused. Anything else is refused: another
+ * host or a look-alike such as moyasar.com.evil.example, credentials, a port,
+ * another scheme.
+ *
+ * `lang` is set to the customer's language. It is not a documented request
+ * field, but it appears in every invoice URL Moyasar's documentation shows;
+ * a page that ignores it is unharmed.
+ */
+export function customerCheckoutUrl(raw: unknown, lang: CheckoutLanguage): string | null {
+  let url: URL;
+  try {
+    url = new URL(String(raw ?? ''));
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host !== 'moyasar.com' && !host.endsWith('.moyasar.com')) return null;
+  if (url.protocol === 'http:') url.protocol = 'https:';
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null;
+  url.searchParams.set('lang', lang);
+  return url.toString();
+}
+
 /** Clamp an expiry to Moyasar-safe bounds and render the ISO instant. */
 export function invoiceExpiryIso(nowMs: number, expiryMinutes: number): string {
   const minutes = Math.min(60, Math.max(5, Math.round(Number(expiryMinutes) || 30)));
   return new Date(nowMs + minutes * 60_000).toISOString();
+}
+
+/**
+ * How far short of its attempt's `expires_at` an invoice stops being payable.
+ * The attempt's instant is the DATABASE's clock and Moyasar applies the
+ * invoice's by its own, so the margin absorbs skew between the two.
+ */
+export const INVOICE_EXPIRY_MARGIN_MS = 60_000;
+
+/**
+ * The shortest invoice worth handing a customer. A card payment with a 3-D
+ * Secure challenge does not fit in less, and an attempt this close to its end
+ * is better closed, so the next start gets a full window of its own.
+ */
+export const MIN_INVOICE_LIFETIME_MS = 2 * 60_000;
+
+/**
+ * The `expired_at` for an invoice opened on an attempt, or null when the
+ * attempt has too little time left to be worth one.
+ *
+ * AN INVOICE MUST NEVER OUTLIVE ITS ATTEMPT. begin_payment_attempt and
+ * begin_session_attempt close an expired attempt and open a new one, whose
+ * invoice is new too. If the old invoice were still payable then, one checkout
+ * would hold two payable invoices, and a customer who paid both would be
+ * charged twice for one order. The attempt's own `expires_at` is set once, by
+ * the database, from the same clamped `invoice_expiry_minutes`; computing the
+ * invoice's from `Date.now()` instead let it run past that, by request latency
+ * on a fresh attempt and by the attempt's whole age on a reused one whose first
+ * create failed.
+ *
+ * So the invoice ends INVOICE_EXPIRY_MARGIN_MS before the attempt does, and
+ * never later than a fresh window from now. An attempt with no `expires_at`
+ * (none the RPCs write) is never closed for age, so the fresh window cannot
+ * outlive it. An `expires_at` that is not a date fails closed, as no time left.
+ */
+export function invoiceExpiryForAttempt(
+  nowMs: number,
+  attemptExpiresAt: unknown,
+  expiryMinutes: number,
+): string | null {
+  const fresh = Date.parse(invoiceExpiryIso(nowMs, expiryMinutes));
+  let ends = fresh;
+  if (attemptExpiresAt != null && attemptExpiresAt !== '') {
+    const attemptEnds = Date.parse(String(attemptExpiresAt));
+    if (!Number.isFinite(attemptEnds)) return null;
+    ends = Math.min(fresh, attemptEnds - INVOICE_EXPIRY_MARGIN_MS);
+  }
+  if (ends - nowMs < MIN_INVOICE_LIFETIME_MS) return null;
+  return new Date(ends).toISOString();
 }
 
 /**
@@ -387,10 +485,28 @@ export function mapMoyasarPaymentStatus(status: unknown): { outcome: MoyasarOutc
     case 'voided':
       return { outcome: 'cancelled', messageKey: 'payCancelled' };
     case 'refunded':
-      return { outcome: 'refunded', messageKey: 'payRefunded' };
+      // The money came back, so there is nothing to confirm. The key is
+      // payUnknown because the shipped app has no refund-specific string, and
+      // its t() prints a missing key's own name on screen. payUnknown's copy is
+      // true of a refunded payment too: "We could not confirm the payment.
+      // Please contact support if an amount was deducted."
+      // (apps/mobile/src/i18n/strings.ts, en and ar).
+      return { outcome: 'refunded', messageKey: 'payUnknown' };
     default: // anything unrecognised — NEVER paid.
       return { outcome: 'unknown', messageKey: 'payUnknown' };
   }
+}
+
+/**
+ * The message key for a confirmation result. A payment Moyasar reports as paid
+ * that we did NOT confirm (a binding mismatch, a TEST-mode attempt) must not
+ * tell the customer "Payment successful": the app shows the server's key as it
+ * is, beside a failed state. payUnknown says what is true: "We could not
+ * confirm the payment" (apps/mobile/src/i18n/strings.ts, en and ar).
+ */
+export function confirmMessageKey(paymentStatus: unknown, paid: boolean): string {
+  const mapped = mapMoyasarPaymentStatus(paymentStatus);
+  return mapped.outcome === 'paid' && !paid ? 'payUnknown' : mapped.messageKey;
 }
 
 /**
@@ -415,9 +531,48 @@ export function mapMoyasarInvoiceStatus(status: unknown): { outcome: MoyasarOutc
     case 'expired':
       return { outcome: 'expired', messageKey: 'payExpired' };
     case 'refunded':
-      return { outcome: 'refunded', messageKey: 'payRefunded' };
+      // payUnknown, not a refund-specific key — see mapMoyasarPaymentStatus.
+      return { outcome: 'refunded', messageKey: 'payUnknown' };
     default:
       return { outcome: 'unknown', messageKey: 'payUnknown' };
+  }
+}
+
+export interface ClosedInvoiceOutcome {
+  outcome: 'expired' | 'cancelled';
+  messageKey: string;
+  failureCode: string;
+}
+
+/**
+ * The terminal outcome of an invoice Moyasar has CLOSED without a settled
+ * payment, or null while it is open or once it is paid.
+ *
+ * An invoice with no paid payment used to read 'pending' whatever its own
+ * status said. Neither of these can ever be paid: "User will be prevented from
+ * paying the invoice once expired" (api/invoices/01-create-invoice), and
+ * cancelling one means "it can no longer be paid by the customer"
+ * (api/invoices/06-cancel-invoice). 'pending' kept the app resuming a page
+ * nobody could pay, and, while it did, refusing every new order, cash
+ * included. The outcomes and keys are ones the shipped app already treats as
+ * terminal and can show: 'expired' / payExpired and 'cancelled' / payCancelled
+ * (apps/mobile/src/features/checkout/pendingSession.ts TERMINAL_STATUSES;
+ * apps/mobile/src/i18n/strings.ts, en and ar).
+ *
+ * A settled payment always wins: money Moyasar holds is confirmed or refunded,
+ * never written off. `on_hold` (a SADAD bill not yet paid) is still open.
+ */
+export function closedInvoiceOutcome(invoice: Record<string, unknown>): ClosedInvoiceOutcome | null {
+  const payments = Array.isArray(invoice?.payments) ? (invoice.payments as Record<string, unknown>[]) : [];
+  if (payments.some((p) => mapMoyasarPaymentStatus(p?.status).outcome === 'paid')) return null;
+  switch (String(invoice?.status ?? '').toLowerCase()) {
+    case 'expired':
+      return { outcome: 'expired', messageKey: 'payExpired', failureCode: 'invoice_expired' };
+    case 'canceled':
+    case 'cancelled':
+      return { outcome: 'cancelled', messageKey: 'payCancelled', failureCode: 'invoice_canceled' };
+    default:
+      return null;
   }
 }
 
@@ -433,14 +588,14 @@ export function mapMoyasarInvoiceStatus(status: unknown): { outcome: MoyasarOutc
  * HMAC and NO signature header; the webhook reference documents `secret_token`
  * as a field of the event object and nothing else.
  *
- * THIS IS WEAKER THAN TAP'S HASHSTRING AND THE DIFFERENCE MATTERS.
+ * A BEARER SECRET IS NOT A SIGNATURE, AND THE DIFFERENCE MATTERS.
  * A bearer secret in a request body proves only that the sender knows the
  * secret. It does not bind the secret to the payload, so it cannot detect a
- * tampered body the way an HMAC over the charge fields does — anyone who ever
+ * tampered body the way an HMAC over the payment fields would — anyone who ever
  * obtains the token (a log, a proxy, a misrouted request) can post an arbitrary
- * "paid" event. The mitigation is architectural, not cryptographic, and it is
- * the same one the Tap path already uses: this check only decides whether we
- * BOTHER to look, and the webhook body is never trusted as evidence of payment.
+ * "paid" event. The mitigation is architectural, not cryptographic: this check
+ * only decides whether we BOTHER to look, and the webhook body is never trusted
+ * as evidence of payment.
  * Confirmation always comes from a server-to-server fetch of the payment with
  * our own secret key (moyasarVerify.ts), so a forged webhook achieves nothing
  * beyond making us perform a lookup that will not confirm.
@@ -511,6 +666,59 @@ export const HANDLED_WEBHOOK_TYPES = new Set([
 ]);
 
 // ---------------------------------------------------------------------------
+// Webhook verification — a one-time code for the dashboard, not a payment event.
+// ---------------------------------------------------------------------------
+
+/**
+ * Moyasar may require a new webhook to be verified before it delivers
+ * anything. It then sends ONE `webhook_verification` event, with
+ * `data.webhook_id` and a 6-digit `data.verification_code`, never retried; the
+ * code must be entered in the dashboard within 30 minutes, and "Until it's
+ * verified, the webhook receives no events, and they aren't delivered later
+ * either" (https://docs.moyasar.com/api/other/webhooks/verify-webhook,
+ * published 2026-11-11). Deliberately absent from HANDLED_WEBHOOK_TYPES: it
+ * carries no payment, so nothing is re-fetched or confirmed on it.
+ */
+export const WEBHOOK_VERIFICATION_TYPE = 'webhook_verification';
+
+/** Every slot resolveMoyasarConfig reads a webhook token from. */
+const WEBHOOK_SECRET_SLOTS = [
+  'moyasar_test_webhook_secret_token',
+  'moyasar_live_webhook_secret_token',
+  'moyasar_webhook_secret_token',
+] as const;
+
+/**
+ * True when `provided` matches the token in ANY configured slot: test, live or
+ * the shared fallback. A verification event is the step that sets the webhook
+ * up, so it is checked against every slot rather than the one its `live` flag
+ * would pick. Each slot is compared, whatever matched first.
+ */
+export function matchesAnyWebhookSecret(provided: unknown, secretConfig: Record<string, unknown>): boolean {
+  let matched = false;
+  for (const slot of WEBHOOK_SECRET_SLOTS) {
+    if (verifyWebhookSecretToken(provided, String(secretConfig[slot] ?? '').trim())) matched = true;
+  }
+  return matched;
+}
+
+/**
+ * The integration_sync_logs row a verified event becomes. The console reads
+ * the code from `response.verification_code` (staff-only through RLS,
+ * 20260707121300); nothing else may carry it, the console log included.
+ */
+export function webhookVerificationLogRow(evt: MoyasarWebhookEnvelope): Record<string, unknown> {
+  return {
+    provider: 'moyasar',
+    direction: 'webhook',
+    status: 'success',
+    request: { type: WEBHOOK_VERIFICATION_TYPE, webhook_id: String(evt.data.webhook_id ?? '').slice(0, 64) },
+    response: { verification_code: String(evt.data.verification_code ?? '').slice(0, 16) },
+    error: null,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Response sanitization + error extraction.
 // ---------------------------------------------------------------------------
 
@@ -519,8 +727,7 @@ export const HANDLED_WEBHOOK_TYPES = new Set([
  *
  * Moyasar returns `source.number` masked as first-six + last-four. The first six
  * are the BIN: they identify the issuing bank and card product, which is more
- * about the customer than we need to keep, and the Tap sanitizer already drops
- * the equivalent `first_six` deliberately. So we store only the last four.
+ * about the customer than we need to keep. So we store only the last four.
  */
 export function lastFourOf(maskedNumber: unknown): string | null {
   const s = String(maskedNumber ?? '').replace(/\D/g, '');
@@ -616,6 +823,37 @@ export function paymentFailureMessage(payment: unknown): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Allowed IPs — Moyasar LIVE refuses a secret-key call from an unlisted address.
+// ---------------------------------------------------------------------------
+
+/** The reason code for that refusal, wherever it is logged or recorded. */
+export const MOYASAR_IP_NOT_ALLOWED = 'moyasar_ip_not_allowed';
+
+/** What fixes it, in the words every log line uses. */
+export const MOYASAR_IP_NOT_ALLOWED_REMEDY =
+  'configure MOYASAR_PROXY_URL and list the proxy IPs in Moyasar Allowed IPs';
+
+/**
+ * True when Moyasar refused a request because of the account's Allowed IPs
+ * list, not because of the key or the request.
+ *
+ * Dashboard → Settings → API Keys → Allowed IPs restricts secret-key calls by
+ * source address; in LIVE at least one address must be listed, and any other
+ * gets 401 `authentication_error` "This IP Address is not whitelisted to do
+ * this operation" (https://docs.moyasar.com/guides/dashboard/setting-up-your-ip-whitelist).
+ * A wrong or revoked key gets the same status and the same type, so only the
+ * message tells the two apart: it must name the IP and the allow-list.
+ *
+ * The difference matters. A bad key is a credential to fix; a refused address
+ * is a network route to fix (moyasarHttp.ts), and the request itself was fine.
+ */
+export function isMoyasarIpNotAllowed(httpStatus: number, body: unknown): boolean {
+  if (httpStatus !== 401) return false;
+  const message = extractMoyasarError(body).message ?? '';
+  return /\bip\b/i.test(message) && /whitelist|allow/i.test(message);
+}
+
+// ---------------------------------------------------------------------------
 // Verification binding — the security-critical decision, kept pure and tested.
 // ---------------------------------------------------------------------------
 
@@ -688,14 +926,28 @@ export function checkPaymentBinding(
  * by a successful one leaves both on the invoice. We take a `paid`/`captured`
  * one if it exists, and otherwise return the most recent attempt so the caller
  * can report a real failure reason rather than a bare "pending".
+ *
+ * `preferredPaymentId` is the payment the attempt already carries in
+ * provider_ref. When that one is settled it is chosen over any other, so a
+ * second settled payment on the same invoice, which is recorded as a duplicate,
+ * can never stand in front of the payment that owns the attempt and keep it
+ * from being confirmed.
  */
-export function selectInvoicePayment(invoice: Record<string, unknown>): Record<string, unknown> | null {
+export function selectInvoicePayment(
+  invoice: Record<string, unknown>,
+  preferredPaymentId?: string | null,
+): Record<string, unknown> | null {
   const payments = Array.isArray(invoice?.payments) ? (invoice.payments as Record<string, unknown>[]) : [];
   if (!payments.length) return null;
-  const settled = payments.find((p) => {
+  const isSettled = (p: Record<string, unknown>) => {
     const st = String(p?.status ?? '').toLowerCase();
     return st === 'paid' || st === 'captured';
-  });
+  };
+  const preferred = preferredPaymentId
+    ? payments.find((p) => isSettled(p) && String(p?.id ?? '') === preferredPaymentId)
+    : undefined;
+  if (preferred) return preferred;
+  const settled = payments.find(isSettled);
   if (settled) return settled;
   // Most recent by created_at, falling back to array order.
   const sorted = [...payments].sort((a, b) =>
@@ -703,105 +955,191 @@ export function selectInvoicePayment(invoice: Record<string, unknown>): Record<s
   return sorted[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Duplicate payments — a second settled payment for something already paid.
+// ---------------------------------------------------------------------------
+
 /**
- * Does this webhook body look like a Moyasar event rather than another
- * gateway's?
+ * The failure_code, sync-log error and result reason for a DUPLICATE: a
+ * payment that Moyasar holds, that binds to its attempt, and that did not pay
+ * the order, because another payment already had.
  *
- * WHY SHAPE AND NOT CONFIGURATION. payment-webhook used to pick its handler
- * from `integration_settings.provider_name` — whatever an administrator
- * selected most recently. That is the wrong question when a customer is
- * mid-checkout during a provider switch: the event that arrives belongs to the
- * gateway that took the money, not to the one now configured. Routing a Tap
- * charge into the Moyasar handler makes it fail the secret-token check and
- * return 401, so a paid order silently never confirms.
- *
- * The test is deliberately structural and cheap: Moyasar's envelope is
- * `{ id, type, created_at, secret_token, account_name, live, data }`
- * (https://docs.moyasar.com/api/other/webhooks/webhook-reference), and a Tap
- * charge body has no `type`/`data` pair. This only chooses which handler looks
- * at the body — each one still authenticates independently and fails closed, so
- * a wrong guess cannot confirm anything.
+ * It is recorded the way a binding mismatch is, on a `failed` row, and never
+ * as `paid`: every reader of payment_records, the refund worker and the order
+ * integrity watchdog included, expects at most one paid row per order. Staff
+ * refund it by hand from that row; nothing refunds it automatically.
  */
-export function looksLikeMoyasarWebhook(body: unknown): boolean {
-  const b = (body ?? {}) as Record<string, unknown>;
-  return typeof b.type === 'string'
-    && b.type.length > 0
-    && typeof b.data === 'object'
-    && b.data !== null;
+export const DUPLICATE_PAYMENT = 'duplicate_payment';
+
+/** The failure_message_safe on that row. Staff read it in the console. */
+export const DUPLICATE_PAYMENT_MESSAGE = 'Duplicate payment: the order was already paid. Refund this payment.';
+
+/**
+ * The message confirm_order_payment raises (P0001) when the order is already
+ * paid by a DIFFERENT payment (20261003120000). It is decided under the order's
+ * row lock, so two payments confirmed at the same moment cannot both pass it,
+ * which the read before the stamp in moyasarVerify.ts cannot promise.
+ */
+export const ORDER_ALREADY_PAID_BY_ANOTHER = 'order_already_paid_by_another_payment';
+
+/** Is this RPC error confirm_order_payment's "already paid by another payment"? */
+export function isOrderAlreadyPaidByAnother(error: { message?: unknown; code?: unknown } | null | undefined): boolean {
+  if (!error) return false;
+  return String(error.code ?? '') === 'P0001'
+    && String(error.message ?? '').includes(ORDER_ALREADY_PAID_BY_ANOTHER);
+}
+
+/**
+ * PostgREST filter that leaves recorded duplicates out of an "attempts" lookup.
+ * A duplicate row is a record of money to give back, not an attempt: a lookup
+ * that took the newest row as THE attempt would otherwise read a duplicate,
+ * which carries no invoice, in place of the attempt whose payment is still
+ * being confirmed. `neq` alone would drop the NULL failure_code of every open
+ * attempt as well, hence the explicit `is.null`.
+ */
+export const NOT_A_DUPLICATE_FILTER = `failure_code.is.null,failure_code.neq.${DUPLICATE_PAYMENT}`;
+
+/**
+ * Did confirmation attach THIS payment to the order it returned?
+ *
+ * finalize_checkout_session returns the session's existing order for any
+ * payment id once the session is consumed, so its answer alone cannot tell the
+ * payment that paid it from a second one. The row carrying this payment id
+ * can: the genuine payment's row is `paid` and linked to that order. A second
+ * payment's row is still the attempt it was stamped on, unpaid.
+ */
+export function isGenuineConfirmation(
+  row: { status?: unknown; order_id?: unknown } | null | undefined,
+  orderId: unknown,
+): boolean {
+  const order = String(orderId ?? '');
+  return Boolean(row) && String(row?.status ?? '') === 'paid' && order !== ''
+    && String(row?.order_id ?? '') === order;
 }
 
 // ---------------------------------------------------------------------------
-// Cross-provider attempt guard.
+// payment-verify for a checkout session whose newest attempt has no invoice.
 // ---------------------------------------------------------------------------
 
-export interface LiveAttempt {
-  id: string;
-  provider: string | null;
-  provider_ref: string | null;
-  provider_checkout_ref: string | null;
-  /** ISO instant the attempt stops being payable; null means no expiry was set. */
-  expires_at: string | null;
-}
-
-export type CrossProviderDecision =
-  | { action: 'proceed' }
-  | { action: 'close_stale'; attemptId: string }
-  | { action: 'refuse'; attemptId: string; provider: string };
+export type SessionVerifyVerdict =
+  | { kind: 'ask_moyasar' }
+  | { kind: 'pending' }
+  | { kind: 'terminal'; status: 'expired' | 'cancelled'; messageKey: 'payExpired' | 'payCancelled' };
 
 /**
- * Decide what to do when an order (or checkout session) already has a LIVE
- * payment attempt belonging to a DIFFERENT provider than the one about to be
- * used.
+ * What payment-verify answers for an unconsumed checkout session, decided
+ * before it needs the payment configuration or a key.
  *
- * WHY THIS IS NEEDED AT ALL. The database's double-charge guard is two partial
- * unique indexes keyed on (order_id, provider) and
- * (checkout_session_id, provider) — they are provider-SCOPED. That was correct
- * when one gateway existed. With two, a Tap attempt does not block a Moyasar
- * attempt on the same order: switch the configured provider while a customer has
- * a hosted checkout page open, let them tap Pay again, and they end up holding
- * TWO payable pages for one order. If both are paid, `confirm_order_payment`
- * de-duplicates on (provider, provider_ref) — which differ — so both settle, and
- * `open_order_refund_record` can only ever enrol ONE of the two charges for
- * refund. The second charge is money we took and cannot automatically give back.
+ * WHY IT EXISTS. Every build of the app saves the session id before it calls
+ * payment-initiate, and before EVERY order, cash included, resolves that saved
+ * session through payment-verify. Only an answer it treats as terminal
+ * ('failed', 'cancelled', 'expired') or 'paid' lets it go; anything else
+ * resumes the dead session and places nothing. A session that never got a
+ * usable invoice used to be answered 'pending' for ever — a refusal before any
+ * attempt (TEST mode, a disabled gateway, a total under the minimum), or a
+ * failed invoice create — and that locked the device out of every order. The
+ * answer has to come from the server, because that is the only fix that
+ * reaches the builds already installed.
  *
- * The check cannot live in the SQL RPCs without touching the frozen Tap ones, so
- * it lives at the one place that knows about both gateways: payment-initiate.
+ *   - the newest MOYASAR attempt carries an invoice: Moyasar decides
+ *     (verifyMoyasarAttempt), exactly as before;
+ *   - there is no Moyasar attempt at all (old provider rows do not count), or
+ *     the newest one is closed and never got an invoice: terminal. Nothing
+ *     can be paid: the customer is handed a checkout URL only after its
+ *     invoice id is stored;
+ *   - the newest one is 'initiated' with no invoice yet: 'pending' while the
+ *     session can still be paid, because an initiate may be in flight or its
+ *     invoice reconcilable; terminal once the session is over, because
+ *     begin_session_attempt refuses an expired or unpayable session, so no
+ *     invoice can ever be opened for it.
  *
- * The two outcomes are deliberately different:
- *  - The other attempt has NO provider-side object yet (no charge, no invoice) —
- *    nothing is payable anywhere, so it is safe to close it and move on.
- *  - The other attempt already has one. That page IS payable and we cannot close
- *    it from here, so opening a second one is refused outright. The customer
- *    waits for it to expire; that is a worse checkout and a far better outcome
- *    than being charged twice.
+ * Terminal is 'expired' / payExpired once the session's expires_at has passed
+ * or it is no longer 'pending_payment', else 'cancelled' / payCancelled: both
+ * are statuses every shipped build treats as terminal, with keys every build
+ * has copy for. NEVER a new key: an old build would print its name.
+ *
+ * Read-only by design. payment-verify never writes the session: marking it
+ * cancelled could race an initiate in flight and refuse a payment the customer
+ * then makes, because finalize_checkout_session rejects a cancelled session.
  */
-export function decideCrossProviderAttempt(
-  existing: LiveAttempt | null | undefined,
-  wantedProvider: string,
-  nowMs: number,
-): CrossProviderDecision {
-  if (!existing) return { action: 'proceed' };
-  const other = String(existing.provider ?? '').toLowerCase();
-  if (!other || other === String(wantedProvider ?? '').toLowerCase()) return { action: 'proceed' };
+export function decideSessionVerify(input: {
+  sessionStatus: unknown;
+  sessionExpiresAt: unknown;
+  attempt: { status?: unknown; provider_checkout_ref?: unknown } | null | undefined;
+  nowMs: number;
+}): SessionVerifyVerdict {
+  const { attempt } = input;
+  if (attempt && String(attempt.provider_checkout_ref ?? '') !== '') return { kind: 'ask_moyasar' };
 
-  // EXPIRY IS CHECKED FIRST, and leaving it out was a live lock-out.
-  //
-  // `status = 'initiated'` does NOT mean "still payable". An attempt is only
-  // moved off 'initiated' by its own provider's begin_*_attempt RPC, and there
-  // is no sweeper that closes stale rows. So an abandoned attempt at the other
-  // gateway keeps `status='initiated'` forever — and refusing on it would 409
-  // that order's online payment permanently, while telling the customer to wait
-  // for an expiry that is never going to be processed.
-  //
-  // An expired attempt is not payable, so it cannot be double-charged against:
-  // close it and move on, exactly as if it had never reached its gateway.
-  const expiresAt = existing.expires_at ? Date.parse(existing.expires_at) : NaN;
-  const expired = Number.isFinite(expiresAt) && expiresAt <= nowMs;
-  if (expired) return { action: 'close_stale', attemptId: existing.id };
+  const expiresAt = Date.parse(String(input.sessionExpiresAt ?? ''));
+  const sessionOver = String(input.sessionStatus ?? '') !== 'pending_payment'
+    || (Number.isFinite(expiresAt) && expiresAt <= input.nowMs);
 
-  const hasProviderSideCheckout =
-    Boolean(existing.provider_ref) || Boolean(existing.provider_checkout_ref);
-  return hasProviderSideCheckout
-    ? { action: 'refuse', attemptId: existing.id, provider: other }
-    : { action: 'close_stale', attemptId: existing.id };
+  if (attempt && String(attempt.status ?? '') === 'initiated' && !sessionOver) return { kind: 'pending' };
+  return sessionOver
+    ? { kind: 'terminal', status: 'expired', messageKey: 'payExpired' }
+    : { kind: 'terminal', status: 'cancelled', messageKey: 'payCancelled' };
+}
+
+/**
+ * The status payment-verify answers for a confirmation result.
+ *
+ * 'refunded' IS NEVER SENT. Every shipped build before the Moyasar change
+ * treats only 'failed', 'cancelled' and 'expired' as terminal for a saved
+ * checkout session (the Tap server never produced 'refunded'), so an answer of
+ * 'refunded' kept that build resuming the session, and once it expired,
+ * refusing every order on the device, cash included. A refunded payment paid
+ * for nothing, which is what 'failed' says; its key stays payUnknown, whose
+ * copy is true of it ("contact support if an amount was deducted"). A binding
+ * mismatch is 'failed' too, as it always was.
+ */
+export function verifyAnswerStatus(outcome: MoyasarOutcome | 'mismatch', paid: boolean): string {
+  if (paid) return 'paid';
+  if (outcome === 'mismatch' || outcome === 'refunded') return 'failed';
+  return outcome;
+}
+
+/** The answers every shipped build treats as terminal for a saved session. */
+export const SESSION_TERMINAL_STATUSES: ReadonlySet<string> = new Set(['failed', 'cancelled', 'expired']);
+
+/**
+ * What an OLDER invoice of a session says, when the newest attempt's answer
+ * would let the app drop the session (terminal) or has no invoice to ask.
+ *
+ * A session can hold several attempts: one expires, the next opens. A payment
+ * made in time on the first invoice can settle after that invoice expired
+ * (a slow 3-D Secure), and the webhook then finalizes the session from it. Read
+ * only the newest attempt, and a session whose newest attempt never got an
+ * invoice was answered 'cancelled' while the older invoice held the captured
+ * payment: the app dropped it, placed a cash order, and the late webhook made a
+ * second, paid order (review of 2026-11-12).
+ *
+ *   - 'paid': confirmed from the older invoice;
+ *   - 'pending': a payment on it is still in flight, or Moyasar could not be
+ *     asked. Only while the session can still be paid: an abandoned 3-D Secure
+ *     payment can stay 'initiated' at Moyasar indefinitely, and 'pending' for
+ *     ever is the lock-out this file exists to prevent. Past the session's
+ *     life the newest attempt's answer stands;
+ *   - 'ignore': nothing on it can still pay (no payment ever made, a decline,
+ *     a closed invoice, a refund, a mismatch).
+ */
+export function olderInvoiceVerdict(
+  result: { outcome: MoyasarOutcome | 'mismatch'; paid: boolean; reason?: string },
+  sessionLive: boolean,
+): 'paid' | 'pending' | 'ignore' {
+  if (result.paid) return 'paid';
+  if (result.reason === 'no_payment') return 'ignore';
+  // Moyasar reported this payment captured and bound to the invoice; only OUR
+  // read failed (the stamp read-back, or the post-finalize "did it pay" read,
+  // which runs after finalize may already have created the order). That is
+  // never a reason to let the app drop the session, live or not.
+  if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') return 'pending';
+  if ((result.outcome === 'pending' || result.outcome === 'unknown') && sessionLive) return 'pending';
+  return 'ignore';
+}
+
+/** Is a checkout session still payable: pending_payment and not past its expires_at. */
+export function isSessionLive(status: unknown, expiresAt: unknown, nowMs: number): boolean {
+  const at = Date.parse(String(expiresAt ?? ''));
+  return String(status ?? '') === 'pending_payment' && !(Number.isFinite(at) && at <= nowMs);
 }

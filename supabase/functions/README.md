@@ -1,6 +1,6 @@
 # Spicy Meal — Supabase Edge Functions
 
-> **Updated 2026-08-12.** Edge Functions are the server-side boundary for provider calls, service-role work and externally authenticated callbacks. The older Geidea-only documentation is obsolete.
+> **Updated 2026-11-11.** Edge Functions are the server-side boundary for provider calls, service-role work and externally authenticated callbacks.
 
 The Expo customer app and the staff/admin web app use the Supabase anon/publishable key plus the signed-in user's JWT. They must never receive the service-role key or provider secrets.
 
@@ -60,31 +60,23 @@ Push went live on 2026-08-17. `push-dispatch` still reads the `integration_setti
 
 Because this function now messages real customers, changes to its status copy, targeting or dispatch behaviour are customer-facing changes. Its `order_status` and `pos_sync` paths are idempotent per `(order_id, status)` under a claim/fencing lifecycle; `broadcast` is immediate, non-recallable, and restricted to devices with `promos_enabled = true`.
 
-## Payment/refund functions — PROVISIONAL
+## Payment/refund functions — Moyasar
 
-*Superseded 2026-11-11: Moyasar is the payment provider (`CLAUDE.md` §6). Repository work that keeps Moyasar the only provider is no longer frozen; every live payment step is still its own owner approval. The Moyasar-only change is pull request #446.* The table below describes the Tap-era functions as they stand on this branch.
+Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-11). The Tap and Geidea code paths were removed; their July history stays in `payment_records` as data.
 
-The repository still contains the existing payment implementation and historical provider scaffolding:
-
-| Function | `verify_jwt` | Current treatment |
+| Function | `verify_jwt` | Responsibility |
 | --- | --- | --- |
-| `payment-initiate` | true | Tap-era: provisional payment initiation; source contains Tap path plus older Geidea scaffold |
-| `payment-verify` | true | Tap-era: Tap verification path |
-| `payment-webhook` | false | Tap-era: provider webhook path |
-| `payment-return` | false | Tap-era: public return/redirect path |
-| `payment-refund` | false | Tap-era: refund processor; automated scheduling remains disabled |
-| `payment-test-config` | true | Tap-era: admin payment diagnostics/test tooling |
-| `tap-admin-test-return` | false | Tap-era: isolated Tap test return page |
+| `payment-initiate` | true | Opens (or reuses) a Moyasar invoice for the customer's own checkout session or order. Refuses customer checkout while the gateway is in TEST mode (`{status:'disabled', reason:'test_mode'}`), so a test card can never pay for a real order. A missing or disabled row, or one naming another provider, answers `{status:'disabled'}`; a total under 1.00 SAR answers `{status:'disabled', reason:'amount_below_minimum'}`; an unusable key or webhook token answers an error |
+| `payment-verify` | true | The verification the app trusts: fetches the invoice and its payment from Moyasar and confirms only a clean `paid` |
+| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed. A `webhook_verification` event's one-time code is stored in `integration_sync_logs` for the console, never logged |
+| `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
+| `payment-refund` | false | Refund worker, Moyasar refunds only. Fails closed without `refund_trigger_secret` in the payment row's `secret_config` (sent as `x-refund-secret`); automated scheduling (the `payment-refund-worker` cron job) is off |
+| `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
+| `payment-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to (renamed from `tap-admin-test-return` on 2026-11-11) |
 
-**Do not treat Tap or the old Geidea scaffold as the final payment architecture.** The owner chose Moyasar on 2026-11-11 (`CLAUDE.md` §6); #446 removes Tap and Geidea.
+These functions need two migrations, applied in this order and each named by version, before any of them is deployed: `20260824100000_moyasar_payment_provider` (`begin_payment_attempt`, `begin_session_attempt`, `payment_records.provider_checkout_ref`), then `20261003120000_moyasar_only_payments` (the loyalty multi-spend guard on `begin_session_attempt`, the 1.00 SAR minimum on both attempt RPCs, the 50-per-line cap on `begin_session_attempt`, and the refund driver's Moyasar gate). `20261004120000_drop_tap_payment_rpcs` is applied only after the deploy. They then deploy as one set: an older bundle beside a new one can open an invoice that nothing confirms.
 
-Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`:
-
-- no ordinary payment/refund code changes;
-- no provider configuration changes;
-- no payment/refund deployment/testing;
-- no automated refund re-enablement;
-- reopening requires a separate provider decision and explicit approval.
+The runbook is [`../../docs/PAYMENTS.md`](../../docs/PAYMENTS.md), with the binding rules in `CLAUDE.md` §5 and §6. Each of these is a separate owner approval: applying a payment migration, deploying a payment function, entering keys or the webhook secret, setting `MOYASAR_PROXY_URL`, changing the Moyasar dashboard, enabling online payment, and re-enabling automated refunds.
 
 ## Shared server helpers — `_shared/`
 
@@ -95,8 +87,8 @@ The `_shared` directory contains reusable server-only contracts, including:
 - integration-secret readers;
 - WhatsApp send/logging helpers;
 - Lazywait client/contracts;
-- Tap helpers and refund classification;
-- legacy Geidea helper code retained by the existing provisional payment path.
+- Moyasar helpers: invoice construction, verification binding, webhook authentication and refund classification;
+- `moyasarHttp.ts`, the only transport for Moyasar calls. Moyasar LIVE accepts secret-key calls only from its Allowed IPs list and Edge Functions have no static outbound IP, so when the `MOYASAR_PROXY_URL` secret is set every call goes through that proxy, and a value it cannot use refuses the call instead of sending it.
 
 A helper being present does not imply its provider is active or approved.
 
@@ -107,6 +99,8 @@ A helper being present does not imply its provider is active or approved.
 The Edge runtime provides the Supabase runtime credentials needed by server functions. The service-role key is server-only.
 
 ### Provider configuration
+
+`MOYASAR_PROXY_URL` is the one payment value held as an Edge Function secret rather than in the payment row. It is an `http://` or `https://` proxy URL and usually carries the proxy's credentials, so it is treated as a secret: never logged, never returned. Setting it is an owner action.
 
 Provider secrets are read server-side from the approved integration/secret storage paths and must never be returned to a client.
 
@@ -136,12 +130,13 @@ Do **not** copy old README commands that directly deploy a set of functions to p
 
 Production Edge Function deployment is an explicit owner-approved action governed by `CLAUDE.md` and the controlled GitHub workflow. The deployment workflow is manual, production-branch constrained and requires named functions/confirmation.
 
-Deploying a payment function is its own owner approval (`CLAUDE.md` §5, §6), even though the workflow can technically deploy it.
+Deploying a payment function needs the same explicit approval as any other deploy, plus the migration and one-set ordering described above.
 
 ## Related docs
 
 - [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) — system/trust architecture.
-- [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) — the payment/refund freeze, superseded 2026-11-11 (`CLAUDE.md` §6).
+- [`../../docs/PAYMENTS.md`](../../docs/PAYMENTS.md) — payment runbook (Moyasar): how it works, owner steps, go-live checks.
+- [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) — history: the payment freeze, 2026-07-29 to 2026-11-11.
 - [`../../docs/ORDER_CONFIRMATION_FLOW.md`](../../docs/ORDER_CONFIRMATION_FLOW.md) — order/POS confirmation lifecycle.
 - [`../../docs/OPERATIONS_ALERTS_DIGEST.md`](../../docs/OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
 - [`../../docs/MIGRATIONS.md`](../../docs/MIGRATIONS.md) — database migration authority.

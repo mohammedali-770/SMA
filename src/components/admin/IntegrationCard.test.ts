@@ -20,6 +20,9 @@
  *
  * So the negative assertion below is the point of the file, not decoration.
  */
+import { readFileSync } from 'node:fs';
+
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { PROVIDER_SPECS } from './IntegrationCard';
@@ -53,5 +56,65 @@ describe('Lazywait base_url placeholder', () => {
     expect(publicKeys).not.toContain('api_token');
     expect(publicKeys).not.toContain('webhook_secret');
     expect(publicKeys).not.toContain('sync_trigger_secret');
+  });
+});
+
+/**
+ * The payment card writes Moyasar's credentials and nothing else.
+ *
+ * Moyasar is the only payment provider (owner decision, 2026-11-11). The card
+ * used to offer a provider dropdown and swap between two field sets, so an
+ * administrator could still be shown another gateway's merchant id and key
+ * slots — boxes that configure nothing the server reads.
+ *
+ * The field NAMES are live data, not labels. The payment row already stores
+ * `moyasar_test_publishable_key` under this exact name, and `secret_config` is
+ * merged on save, so a renamed field would write a new key beside the old one
+ * and leave the server reading the old one. The last test therefore checks the
+ * card against what `resolveMoyasarConfig` actually reads, rather than against
+ * a list copied into this file.
+ */
+describe('payment card — Moyasar only', () => {
+  const payment = PROVIDER_SPECS.payment;
+  const publicKeys = payment.publicFields.map((f) => f.key);
+  const secretKeys = payment.secretFields.map((f) => f.key);
+
+  it('offers Moyasar and nothing else', () => {
+    expect(payment.providerOptions).toEqual(['moyasar']);
+  });
+
+  it("asks for none of the other gateway's inputs", () => {
+    for (const key of ['merchant_id', 'source_id', 'test_secret_key', 'live_secret_key']) {
+      expect(publicKeys).not.toContain(key);
+      expect(secretKeys).not.toContain(key);
+    }
+  });
+
+  it('asks for both webhook secret tokens, as secrets', () => {
+    // Moyasar signs nothing: this token is the only thing authenticating a
+    // webhook, and the server refuses to act on one without it.
+    expect(secretKeys).toContain('moyasar_test_webhook_secret_token');
+    expect(secretKeys).toContain('moyasar_live_webhook_secret_token');
+  });
+
+  it('keeps every secret key and token out of the public fields', () => {
+    // Public fields are rendered and round-tripped through the browser.
+    for (const f of payment.publicFields) {
+      expect(f.key).not.toMatch(/secret|token/i);
+      expect(`${f.label} ${f.placeholder ?? ''}`).not.toMatch(/sk_/);
+    }
+  });
+
+  it('writes only names the server reads, under the same kind of config', () => {
+    const src = readFileSync(new URL('../../../supabase/functions/_shared/moyasar.ts', import.meta.url), 'utf8');
+    const file = ts.createSourceFile('moyasar.ts', src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const code = ts.createPrinter({ removeComments: true }).printFile(file);
+    const read = (obj: string) => new Set([...code.matchAll(new RegExp(`${obj}\\.(\\w+)`, 'g'))].map((m) => m[1]));
+    const serverPublic = read('publicConfig');
+    const serverSecret = read('secretConfig');
+
+    expect(serverSecret.size).toBeGreaterThan(0);
+    for (const key of publicKeys) expect(serverPublic).toContain(key);
+    for (const key of secretKeys) expect(serverSecret).toContain(key);
   });
 });

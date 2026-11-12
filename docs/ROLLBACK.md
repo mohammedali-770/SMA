@@ -52,7 +52,13 @@ Safe approach:
 
 ### Payment functions
 
-Payment/refund functions remain frozen. An incident does **not** automatically authorize changing or redeploying them. Any payment/refund rollback needs a separate explicit exception/decision.
+*Changed 2026-11-12: this said the payment functions were frozen. The owner chose Moyasar on 2026-11-11 (CLAUDE.md §6).*
+
+An incident does **not** automatically authorize changing or redeploying a payment function. Every payment deploy is its own owner approval.
+
+- **The fast mitigation is not a redeploy.** Switch online payment off: console → Settings → Payment Methods → Online Payment off. Switching off is always allowed, and cash continues. It stops new checkout sessions only: a session opened before the switch can still be resumed and paid until it expires.
+- **Redeploy the seven payment functions together**, from one known reviewed commit (`DEPLOY.md` §12). Never one alone: a new bundle beside an older one can open a Moyasar invoice that nothing confirms.
+- **The July Tap-era bundles are not a rollback target** once the Moyasar-only set is live. They do not speak Moyasar, and after `20261004120000` the Tap functions they call no longer exist.
 
 ## 4. Native mobile rollback
 
@@ -162,10 +168,10 @@ Do not use a direct SQL mutation as a generic “fast rollback” when a support
 
 ## 7. Payment/refund safety
 
-While payment work is frozen:
+*Changed 2026-11-12: this list applied "while payment work is frozen". It still applies; only the reason changed.*
 
 - do not use a payment/refund transaction as a rollback smoke test;
-- keep `payment-refund-worker` disabled;
+- keep `payment-refund-worker` in its expected state: off until the owner re-enables it (`OWNER_ACTIONS.md` §47.16);
 - after any environment restore/rebuild, re-verify its cron state before traffic;
 - financial/provider correction is an explicit owner action.
 

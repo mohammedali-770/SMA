@@ -50,7 +50,7 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | `account` | 2 |
 | `auth` | 5 |
 | `cart` | 7 |
-| `checkout` | 23 |
+| `checkout` | 22 |
 | `legal` | 2 |
 | `menu` | 4 |
 | `notifications` | 11 |
@@ -88,5 +88,4 @@ The admin console is panel-based rather than routed: one component per operation
 | SettingsPanel | — |
 | StaffAccessPanel | — |
 | StatsPanel | The dashboard's four headline figures and the branch sales section |
-| TapPaymentPanel | Admin Tap Payments readiness + connection test. Reads config-presence booleans from the `payment-test-config` Edge Function (never any secret key)… |
 | WhatsAppOtpPanel | Admin WhatsApp OTP status + test-send panel. Reads config presence booleans from the `whatsapp-test-config` Edge Function (never any secret values)… |

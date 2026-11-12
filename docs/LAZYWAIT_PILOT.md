@@ -218,8 +218,8 @@ safe because only the mapped test branch/products can be sent.
 
 > The test order is intentionally **unpaid** (no gateway, no cash). The order is
 > still transmitted to the POS at creation; the online-payment update call is
-> **not** triggered (it only fires after a verified Geidea payment, which the
-> pilot doesn't use).
+> **not** triggered (it only fires after a verified online payment — Moyasar
+> since 2026-11-11, Geidea when this was written — which the pilot doesn't use).
 
 ---
 
@@ -339,7 +339,7 @@ controlled pickup orders, then plan widening) or **halt** (flip Enabled OFF).
 
 **Still intentionally NOT sent in Create Order (unchanged):** delivery, addons/
 modifiers, `price_id`, `customer_id`/`customer_cell`, online-payment update
-(unless a real Geidea payment is verified server-side, which the pilot excludes).
+(unless a real online payment — Moyasar since 2026-11-11 — is verified server-side, which the pilot excludes).
 
 ---
 

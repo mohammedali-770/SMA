@@ -150,9 +150,11 @@ Before disabling any integration:
 
 The Lazywait lifecycle deliberately prevents ambiguous automatic resends because they can duplicate POS tickets.
 
-## 7. Payment/refund incidents while payment work is frozen
+## 7. Payment/refund incidents
 
-The final payment provider has not been selected and payment/refund work remains frozen.
+The payment provider is **Moyasar** (owner decision, 2026-11-11, CLAUDE.md §6). Online payment was **off** on 2026-11-11 (read-only), so until the owner turns it on, any reported card payment is unexpected. *Changed 2026-11-12: this section used to say no provider was selected and payment work was frozen.*
+
+**First, if online payments are misbehaving, switch online payment off:** console → Settings → Payment Methods → Online Payment off. Switching off is always allowed. The app then stops offering online payment at checkout; cash continues. The switch stops new checkout sessions only (`begin_checkout_session` is the one thing that reads it). A session opened before the switch can still be resumed, get a new invoice and be paid until it expires, and a payment already under way on Moyasar's page can still complete; the webhook still confirms both. Turning it back on is an owner action.
 
 If a customer reports a money movement:
 
@@ -163,7 +165,11 @@ If a customer reports a money movement:
 5. Escalate any “provider movement with no internal record,” duplicate charge, or unexpected refund as SEV-1.
 6. Any manual provider refund/financial correction is an explicit owner action and must be recorded.
 
-The refund worker is intended to remain disabled while the freeze is active. After a restore/rebuild, re-verify `payment-refund-worker` before traffic resumes (`BACKUP_RECOVERY.md`).
+**A second payment for an already-paid order** is recorded, not reported paid: a `failed` `payment_records` row with `failure_code = 'duplicate_payment'`, plus an `integration_sync_logs` row. **Nothing alerts on it.** How to find and refund one: `PAYMENTS.md` §10.
+
+**A cancelled paid online order is not refunded automatically** (`OWNER_ACTIONS.md` §47.20). Refund it by hand in the Moyasar dashboard, as an owner action.
+
+The refund worker (`payment-refund-worker`) stays off until the owner re-enables it as `OWNER_ACTIONS.md` §47.16. After a restore/rebuild, re-verify it before traffic resumes (`BACKUP_RECOVERY.md`).
 
 ## 8. Authentication / staff access incidents
 
@@ -321,6 +327,6 @@ Keep it concise and evidence-based.
 - `docs/RELEASE_CHECKLIST.md` — pre-release gates.
 - `docs/OPERATIONS_ALERTS_DIGEST.md` — internal alert behavior.
 - `docs/ORDER_CONFIRMATION_FLOW.md` — customer/POS lifecycle.
-- `docs/PAYMENT_POSTPONEMENT.md` — payment/refund freeze.
+- `docs/PAYMENTS.md` — payments with Moyasar; `docs/PAYMENT_POSTPONEMENT.md` — the payment freeze, history to 2026-11-11.
 - `docs/SENTRY_OBSERVABILITY.md` — mobile observability.
 - `docs/SENTRY_WEB_OBSERVABILITY.md` — web observability.

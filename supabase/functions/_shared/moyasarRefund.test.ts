@@ -77,6 +77,32 @@ describe('classifyMoyasarRefundResponse', () => {
     expect(classifyMoyasarRefundResponse(false, 404, {}).outcome).toBe('failed');
   });
 
+  /**
+   * Moyasar LIVE refuses a secret-key call from an address not on the
+   * account's Allowed IPs list. Nothing was refunded and the same request
+   * succeeds once the proxy's IPs are listed, so writing it off as failed
+   * would leave a customer unrefunded over a network setting. It is released
+   * like a 429, with the reason kept on the row.
+   */
+  it('releases a refusal by the Allowed IPs list instead of failing the refund', () => {
+    const r = classifyMoyasarRefundResponse(false, 401, {
+      type: 'authentication_error', message: 'This IP Address is not whitelisted to do this operation',
+    });
+    expect(r.outcome).toBe('pending');
+    expect(r.failureCode).toBe('moyasar_ip_not_allowed');
+    expect(r.errorSafe).toContain('MOYASAR_PROXY_URL');
+    expect(refundFinalStatus(r)).toBe('pending');
+    expect(needsHumanReview(r)).toBe(false);
+  });
+
+  it('still fails a refund whose key Moyasar rejected', () => {
+    const r = classifyMoyasarRefundResponse(false, 401, {
+      type: 'authentication_error', message: 'Invalid authorization credentials',
+    });
+    expect(r.outcome).toBe('failed');
+    expect(r.failureCode).toBe('http_401');
+  });
+
   it('treats failed and voided payments as terminal rejections', () => {
     expect(classifyMoyasarRefundResponse(true, 200, { status: 'failed' }).outcome).toBe('failed');
     expect(classifyMoyasarRefundResponse(true, 200, { status: 'voided' }).outcome).toBe('failed');
@@ -255,7 +281,7 @@ describe('refundFinalStatus', () => {
     expect(refundFinalStatus(mk('pending', 'refund_ambiguous_needs_review'))).toBe('failed');
   });
 
-  it('never parks a Tap-shaped pending verdict, which carries no such code', () => {
+  it('never parks an ordinary pending verdict, which carries no such code', () => {
     expect(refundFinalStatus(mk('pending', null))).toBe('pending');
   });
 });

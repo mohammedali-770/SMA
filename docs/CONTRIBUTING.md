@@ -12,7 +12,7 @@ Four kinds, distinguished by what the reader is doing when they open it. The dis
 | --- | --- | --- | --- |
 | **Reference** | Looking something up | `docs/reference/` — **generated** | Edge Function inventory, database objects |
 | **How-to** | Doing a specific task, often under pressure | `docs/` | [Incident response](INCIDENT_RESPONSE.md), [Rollback](ROLLBACK.md), [Branch onboarding](BRANCH_ONBOARDING.md) |
-| **Explanation** | Trying to understand why | `docs/`, `docs/decisions/` | [Architecture](ARCHITECTURE.md), [Payment postponement](PAYMENT_POSTPONEMENT.md) |
+| **Explanation** | Trying to understand why | `docs/`, `docs/decisions/` | [Architecture](ARCHITECTURE.md), [Payment postponement](PAYMENT_POSTPONEMENT.md) (history to 2026-11-11) |
 | **Manual** | Operating the product, not the code | `docs/` | [Staff manual](STAFF_MANUAL.md) |
 
 If you are about to add a "Background" section to a runbook, or a "How to run it" section to an architecture page, you have two documents. Split them and link.
@@ -69,7 +69,7 @@ A customer manages *notifications*, not `push_devices` rows. An operator looks a
 
 ### Do not carry retired facts forward
 
-When something changes, delete the old description rather than layering a correction on top. Specifically, never leave text describing the prototype emulator as current, the mobile app as a WebView wrapper, a retired branch as production, Tap or Geidea as the chosen payment provider, or push as dormant. All of those have been true at some point and none of them are now.
+When something changes, delete the old description rather than layering a correction on top. Specifically, never leave text describing the prototype emulator as current, the mobile app as a WebView wrapper, a retired branch as production, Tap or Geidea as a current payment provider, payment as frozen, or push as dormant. All of those have been true at some point and none of them are now. Moyasar has been the payment provider since the owner's decision of 2026-11-11 (CLAUDE.md §6); describe it as chosen, and do not describe anything live — a key, a deploy, online payment being on — that has not been read live and dated.
 
 ### Secrets
 

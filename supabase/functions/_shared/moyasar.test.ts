@@ -1,12 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
-  amountsMatch, basicAuthHeader, buildInvoicePayload, currencyExponent, extractMoyasarError,
-  fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, keyMatchesMode,
-  lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
+  amountsMatch, basicAuthHeader, buildInvoicePayload, currencyExponent, customerCheckoutUrl, extractMoyasarError,
+  fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, isMoyasarIpNotAllowed,
+  keyMatchesMode, lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
-  selectInvoicePayment, checkPaymentBinding, looksLikeMoyasarWebhook, decideCrossProviderAttempt,
-  timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
+  selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
+  matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow, confirmMessageKey,
+  closedInvoiceOutcome, MOYASAR_MIN_INVOICE_MINOR_UNITS, isBelowMoyasarMinimum, invoiceExpiryForAttempt,
+  INVOICE_EXPIRY_MARGIN_MS, MIN_INVOICE_LIFETIME_MS, decideSessionVerify, isGenuineConfirmation,
+  DUPLICATE_PAYMENT, DUPLICATE_PAYMENT_MESSAGE, NOT_A_DUPLICATE_FILTER,
 } from './moyasar.ts';
+import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
+import { decidePendingAction } from '../../../apps/mobile/src/features/checkout/pendingSession.ts';
 
 describe('minor units (halalas)', () => {
   it('converts SAR major units to integer halalas', () => {
@@ -245,6 +250,46 @@ describe('buildInvoicePayload', () => {
   });
 });
 
+describe('customerCheckoutUrl', () => {
+  const ID = 'efebc231-7795-4cfd-b69c-980fe4c02c49';
+
+  /** Moyasar's own documented example uses http, so it is upgraded, not refused. */
+  it("upgrades Moyasar's documented http example and sets the customer's language", () => {
+    expect(customerCheckoutUrl(`http://checkout.moyasar.com/invoices/${ID}?lang=en`, 'ar')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?lang=ar`,
+    );
+  });
+  it('keeps an https URL on the domain or a subdomain, adding lang and keeping the rest', () => {
+    expect(customerCheckoutUrl(`https://checkout.moyasar.com/invoices/${ID}`, 'en')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?lang=en`,
+    );
+    expect(customerCheckoutUrl(`https://CHECKOUT.Moyasar.com/invoices/${ID}?x=1`, 'ar')).toBe(
+      `https://checkout.moyasar.com/invoices/${ID}?x=1&lang=ar`,
+    );
+    expect(customerCheckoutUrl('https://moyasar.com/i/1', 'en')).toBe('https://moyasar.com/i/1?lang=en');
+    expect(customerCheckoutUrl('https://a.b.moyasar.com/i', 'en')).toBe('https://a.b.moyasar.com/i?lang=en');
+  });
+  it("refuses anything that is not https on Moyasar's own domain", () => {
+    for (const raw of [
+      'https://evil.example/invoices/1',
+      'https://moyasar.com.evil.example/invoices/1',
+      'https://evilmoyasar.com/invoices/1',
+      'https://checkout.moyasar.com.evil.example/invoices/1',
+      'https://checkout.moyasar.com./invoices/1',
+      'https://user:pass@checkout.moyasar.com/invoices/1',
+      'https://checkout.moyasar.com:8443/invoices/1',
+      'ftp://checkout.moyasar.com/invoices/1',
+      'javascript:alert(1)//checkout.moyasar.com',
+      'checkout.moyasar.com/invoices/1',
+      '',
+      null,
+      undefined,
+    ]) {
+      expect(customerCheckoutUrl(raw, 'en'), String(raw)).toBeNull();
+    }
+  });
+});
+
 describe('invoiceExpiryIso', () => {
   const now = Date.parse('2026-08-24T10:00:00.000Z');
   it('adds the clamped expiry and renders ISO-8601', () => {
@@ -252,6 +297,52 @@ describe('invoiceExpiryIso', () => {
     expect(invoiceExpiryIso(now, 1)).toBe('2026-08-24T10:05:00.000Z');
     expect(invoiceExpiryIso(now, 900)).toBe('2026-08-24T11:00:00.000Z');
     expect(invoiceExpiryIso(now, NaN)).toBe('2026-08-24T10:30:00.000Z');
+  });
+});
+
+describe("Moyasar's invoice minimum", () => {
+  it('is 100 minor units, 1.00 SAR', () => {
+    expect(MOYASAR_MIN_INVOICE_MINOR_UNITS).toBe(100);
+  });
+  it('refuses a total under it, one halala below included, and accepts it exactly', () => {
+    for (const t of [0, 0.01, 0.5, 0.99]) expect(isBelowMoyasarMinimum(t), String(t)).toBe(true);
+    for (const t of [1, 1.01, 64]) expect(isBelowMoyasarMinimum(t), String(t)).toBe(false);
+  });
+  it('counts in the currency the attempt is in', () => {
+    expect(isBelowMoyasarMinimum(0.1, 'KWD')).toBe(false); // 100 fils
+    expect(isBelowMoyasarMinimum(0.099, 'KWD')).toBe(true);
+  });
+  it('treats junk as below it, so it can never open an invoice', () => {
+    expect(isBelowMoyasarMinimum(NaN)).toBe(true);
+    expect(isBelowMoyasarMinimum(-5)).toBe(true);
+  });
+});
+
+describe('invoiceExpiryForAttempt', () => {
+  const now = Date.parse('2026-11-12T10:00:00.000Z');
+  const at = (ms: number) => new Date(now + ms).toISOString();
+
+  it("ends a margin before the attempt's own expiry", () => {
+    expect(invoiceExpiryForAttempt(now, at(30 * 60_000), 30)).toBe(at(30 * 60_000 - INVOICE_EXPIRY_MARGIN_MS));
+  });
+  // The reconcile path's defect: a reused attempt with five minutes left was
+  // given a fresh thirty-minute invoice.
+  it('never runs to a fresh window from now when the attempt ends sooner', () => {
+    expect(invoiceExpiryForAttempt(now, at(5 * 60_000), 30)).toBe(at(5 * 60_000 - INVOICE_EXPIRY_MARGIN_MS));
+  });
+  it('never runs past a fresh window either, whatever the attempt says', () => {
+    expect(invoiceExpiryForAttempt(now, at(90 * 60_000), 30)).toBe(at(30 * 60_000));
+    expect(invoiceExpiryForAttempt(now, at(90 * 60_000), 900)).toBe(at(60 * 60_000));
+  });
+  it('an attempt with no expiry is never closed for age, so a fresh window is safe', () => {
+    expect(invoiceExpiryForAttempt(now, null, 30)).toBe(at(30 * 60_000));
+  });
+  it('is null when too little is left, and fails closed on a value that is not a date', () => {
+    const left = MIN_INVOICE_LIFETIME_MS + INVOICE_EXPIRY_MARGIN_MS;
+    expect(invoiceExpiryForAttempt(now, at(left), 30)).toBe(at(MIN_INVOICE_LIFETIME_MS));
+    expect(invoiceExpiryForAttempt(now, at(left - 1), 30)).toBeNull();
+    expect(invoiceExpiryForAttempt(now, at(-60_000), 30)).toBeNull();
+    expect(invoiceExpiryForAttempt(now, 'soon', 30)).toBeNull();
   });
 });
 
@@ -309,6 +400,106 @@ describe('mapMoyasarInvoiceStatus', () => {
   });
   it('sends anything unrecognised to unknown', () => {
     expect(mapMoyasarInvoiceStatus('something_new').outcome).toBe('unknown');
+  });
+});
+
+/**
+ * payment-verify forwards `messageKey` to the app, which renders it with
+ * `t(messageKey)` — and `t()` falls back to the key's own NAME when a string is
+ * missing (I18nProvider.tsx). A key the shipped app lacks is therefore printed
+ * on the customer's screen verbatim. The app reaches customers only through an
+ * EAS build, so the server must stay inside the strings the app already has.
+ *
+ * The repository's strings are the proxy checked here. A key added to
+ * strings.ts after the last EAS build would pass this test and still be missing
+ * on installed phones, which is why `refunded` maps to a key that has been in
+ * the app since the first online-payment build rather than to a new one.
+ */
+describe('closedInvoiceOutcome', () => {
+  const paid = { id: 'pay_1', status: 'paid' };
+
+  it('closes an expired or cancelled invoice that nobody paid', () => {
+    expect(closedInvoiceOutcome({ status: 'expired', payments: [] })).toEqual({
+      outcome: 'expired', messageKey: 'payExpired', failureCode: 'invoice_expired',
+    });
+    for (const status of ['canceled', 'cancelled', 'CANCELED']) {
+      expect(closedInvoiceOutcome({ status }), status).toEqual({
+        outcome: 'cancelled', messageKey: 'payCancelled', failureCode: 'invoice_canceled',
+      });
+    }
+  });
+
+  /** A declined card, or a 3-D Secure page abandoned half way, is not money held. */
+  it('closes it whatever unsettled attempts it carries', () => {
+    for (const status of ['failed', 'initiated', 'authorized', 'voided']) {
+      expect(closedInvoiceOutcome({ status: 'expired', payments: [{ status }] })?.outcome, status).toBe('expired');
+    }
+  });
+
+  /** Money Moyasar holds is confirmed or refunded, never written off. */
+  it('never closes an invoice carrying a settled payment', () => {
+    expect(closedInvoiceOutcome({ status: 'expired', payments: [{ status: 'failed' }, paid] })).toBeNull();
+    expect(closedInvoiceOutcome({ status: 'canceled', payments: [{ status: 'captured' }] })).toBeNull();
+  });
+
+  it('leaves an open invoice open, SADAD on_hold included', () => {
+    for (const status of ['initiated', 'on_hold', 'paid', 'refunded', 'something_new', '']) {
+      expect(closedInvoiceOutcome({ status, payments: [] }), status).toBeNull();
+    }
+    expect(closedInvoiceOutcome({})).toBeNull();
+    expect(closedInvoiceOutcome({ status: 'expired', payments: 'junk' })?.outcome).toBe('expired');
+  });
+
+  /** The contract with every installed copy of the app, read from the app itself. */
+  it('answers in outcomes the shipped app treats as terminal and keys it can show', () => {
+    for (const invoice of [{ status: 'expired' }, { status: 'canceled' }]) {
+      const closed = closedInvoiceOutcome(invoice)!;
+      expect(decidePendingAction({ status: closed.outcome })).toEqual({ kind: 'clear' });
+      expect(Object.keys(STRINGS.en)).toContain(closed.messageKey);
+      expect(Object.keys(STRINGS.ar)).toContain(closed.messageKey);
+    }
+    expect(decidePendingAction({ status: 'pending' })).toEqual({ kind: 'keep' });
+  });
+});
+
+describe('message keys the app can show', () => {
+  const PAYMENT_STATUSES = [
+    'initiated', 'paid', 'captured', 'authorized', 'verified', 'failed', 'voided', 'refunded', 'something_new',
+  ];
+  const INVOICE_STATUSES = [
+    'initiated', 'paid', 'failed', 'canceled', 'cancelled', 'voided', 'expired', 'on_hold', 'refunded',
+    'something_new',
+  ];
+
+  it('maps a refunded payment or invoice to payUnknown, keeping the refunded outcome', () => {
+    expect(mapMoyasarPaymentStatus('refunded')).toEqual({ outcome: 'refunded', messageKey: 'payUnknown' });
+    expect(mapMoyasarInvoiceStatus('refunded')).toEqual({ outcome: 'refunded', messageKey: 'payUnknown' });
+  });
+
+  /**
+   * The app shows the server's key beside the state it was given, so a paid
+   * payment that was not confirmed (a binding mismatch, a TEST-mode attempt)
+   * must not arrive as "Payment successful" on a failed dialog.
+   */
+  it('never says the payment succeeded unless it was confirmed', () => {
+    expect(confirmMessageKey('paid', true)).toBe('paySuccess');
+    expect(confirmMessageKey('captured', true)).toBe('paySuccess');
+    expect(confirmMessageKey('paid', false)).toBe('payUnknown');
+    expect(confirmMessageKey('captured', false)).toBe('payUnknown');
+    expect(confirmMessageKey('failed', false)).toBe('payDeclined');
+    expect(confirmMessageKey('initiated', false)).toBe('payPending');
+  });
+
+  it('never emits a key the app strings lack, in either language', () => {
+    const emitted = [
+      ...PAYMENT_STATUSES.map((s) => mapMoyasarPaymentStatus(s).messageKey),
+      ...INVOICE_STATUSES.map((s) => mapMoyasarInvoiceStatus(s).messageKey),
+      ...PAYMENT_STATUSES.flatMap((s) => [confirmMessageKey(s, true), confirmMessageKey(s, false)]),
+    ];
+    for (const key of emitted) {
+      expect(Object.keys(STRINGS.en), `en.${key}`).toContain(key);
+      expect(Object.keys(STRINGS.ar), `ar.${key}`).toContain(key);
+    }
   });
 });
 
@@ -383,6 +574,65 @@ describe('HANDLED_WEBHOOK_TYPES', () => {
   it('excludes the card-authentication events', () => {
     expect(HANDLED_WEBHOOK_TYPES.has('card_auth_authenticated')).toBe(false);
     expect(HANDLED_WEBHOOK_TYPES.has('card_auth_failed')).toBe(false);
+  });
+  /** It carries a code for the dashboard, not a payment: nothing to re-fetch or confirm. */
+  it('excludes the webhook verification event', () => {
+    expect(WEBHOOK_VERIFICATION_TYPE).toBe('webhook_verification');
+    expect(HANDLED_WEBHOOK_TYPES.has(WEBHOOK_VERIFICATION_TYPE)).toBe(false);
+  });
+});
+
+describe('webhook verification', () => {
+  // The shape Moyasar documents (https://docs.moyasar.com/api/other/webhooks/verify-webhook).
+  const event = parseWebhookEnvelope({
+    id: 'evt_1', type: 'webhook_verification', created_at: '2026-11-11T10:00:00Z',
+    secret_token: 'whsec_shared', account_name: 'Spicy Meal', live: false,
+    data: { webhook_id: 'b8c4f0a2-6d2e-4f7a-9d61-3b5a3c2e1f00', verification_code: '482913' },
+  });
+
+  it('accepts the token from any configured slot: test, live or shared', () => {
+    for (const slot of [
+      'moyasar_test_webhook_secret_token', 'moyasar_live_webhook_secret_token', 'moyasar_webhook_secret_token',
+    ]) {
+      expect(matchesAnyWebhookSecret('whsec_shared', { [slot]: ' whsec_shared ' }), slot).toBe(true);
+    }
+    expect(matchesAnyWebhookSecret('whsec_live', {
+      moyasar_test_webhook_secret_token: 'whsec_test', moyasar_live_webhook_secret_token: 'whsec_live',
+    })).toBe(true);
+  });
+
+  it('refuses a wrong or missing token, and an unconfigured gateway', () => {
+    const configured = { moyasar_test_webhook_secret_token: 'whsec_test' };
+    expect(matchesAnyWebhookSecret('whsec_wrong', configured)).toBe(false);
+    expect(matchesAnyWebhookSecret('', configured)).toBe(false);
+    expect(matchesAnyWebhookSecret(undefined, configured)).toBe(false);
+    expect(matchesAnyWebhookSecret('anything', {})).toBe(false);
+    expect(matchesAnyWebhookSecret('', { moyasar_webhook_secret_token: '' })).toBe(false);
+    // Only Moyasar's own slots count, not some other gateway's leftover.
+    expect(matchesAnyWebhookSecret('whsec_tap', { webhook_secret: 'whsec_tap' })).toBe(false);
+  });
+
+  it('becomes exactly the row the console reads, with the code in the response only', () => {
+    const row = webhookVerificationLogRow(event);
+    expect(row).toEqual({
+      provider: 'moyasar',
+      direction: 'webhook',
+      status: 'success',
+      request: { type: 'webhook_verification', webhook_id: 'b8c4f0a2-6d2e-4f7a-9d61-3b5a3c2e1f00' },
+      response: { verification_code: '482913' },
+      error: null,
+    });
+    expect(JSON.stringify(row.request)).not.toContain('482913');
+    expect(JSON.stringify(row)).not.toContain('whsec_shared');
+  });
+
+  it('bounds what it stores', () => {
+    const big = parseWebhookEnvelope({
+      type: 'webhook_verification', data: { webhook_id: 'w'.repeat(500), verification_code: 9.9e99 },
+    });
+    const row = webhookVerificationLogRow(big) as { request: { webhook_id: string }; response: { verification_code: string } };
+    expect(row.request.webhook_id).toHaveLength(64);
+    expect(row.response.verification_code.length).toBeLessThanOrEqual(16);
   });
 });
 
@@ -469,6 +719,35 @@ describe('paymentFailureMessage', () => {
   });
 });
 
+describe('isMoyasarIpNotAllowed', () => {
+  // The documented refusal, word for word
+  // (https://docs.moyasar.com/guides/dashboard/setting-up-your-ip-whitelist).
+  const refusal = {
+    type: 'authentication_error', message: 'This IP Address is not whitelisted to do this operation', errors: null,
+  };
+
+  it('recognises the documented Allowed IPs refusal', () => {
+    expect(isMoyasarIpNotAllowed(401, refusal)).toBe(true);
+    expect(isMoyasarIpNotAllowed(401, { message: 'IP address not allowed' })).toBe(true);
+  });
+  /** Same status, same type: only the message separates a bad key from a refused address. */
+  it('does not mistake a rejected key for a refused address', () => {
+    expect(isMoyasarIpNotAllowed(401, {
+      type: 'authentication_error', message: 'Invalid authorization credentials',
+    })).toBe(false);
+    // Naming the allow-list without the IP is not enough, nor the IP alone.
+    expect(isMoyasarIpNotAllowed(401, { message: 'This key is not allowed to do this operation' })).toBe(false);
+    expect(isMoyasarIpNotAllowed(401, { message: 'Unknown IP' })).toBe(false);
+  });
+  it('is only ever a 401', () => {
+    for (const status of [200, 400, 403, 404, 429, 500]) expect(isMoyasarIpNotAllowed(status, refusal)).toBe(false);
+  });
+  it('survives a body that is missing or junk', () => {
+    expect(isMoyasarIpNotAllowed(401, null)).toBe(false);
+    expect(isMoyasarIpNotAllowed(401, 'nope')).toBe(false);
+  });
+});
+
 describe('checkPaymentBinding', () => {
   const attempt = {
     provider_checkout_ref: 'inv_1',
@@ -551,43 +830,95 @@ describe('selectInvoicePayment', () => {
     expect(selectInvoicePayment({})).toBeNull();
     expect(selectInvoicePayment({ payments: 'nope' } as unknown as Record<string, unknown>)).toBeNull();
   });
+  // A second settled payment on the same invoice is a duplicate; it must not
+  // stand in front of the payment the attempt already carries.
+  it("prefers the attempt's own settled payment over another settled one", () => {
+    const other = { id: 'p9', status: 'paid', created_at: '2026-08-24T10:01:00Z' };
+    expect(selectInvoicePayment({ payments: [other, paid] }, 'p2')?.id).toBe('p2');
+    expect(selectInvoicePayment({ payments: [other, paid] }, null)?.id).toBe('p9');
+    // Not settled, or not on this invoice: the usual choice.
+    expect(selectInvoicePayment({ payments: [failed, other] }, 'p1')?.id).toBe('p9');
+    expect(selectInvoicePayment({ payments: [other, paid] }, 'nope')?.id).toBe('p9');
+  });
 });
 
-describe('looksLikeMoyasarWebhook', () => {
-  it('recognises the documented Moyasar envelope', () => {
-    expect(looksLikeMoyasarWebhook({
-      id: 'evt_1', type: 'payment_paid', secret_token: 'wh', live: true, data: { id: 'pay_1' },
-    })).toBe(true);
+describe('duplicate payments', () => {
+  it('are recorded under one code, with a message that says to refund', () => {
+    expect(DUPLICATE_PAYMENT).toBe('duplicate_payment');
+    expect(DUPLICATE_PAYMENT_MESSAGE).toMatch(/refund/i);
+    expect(DUPLICATE_PAYMENT_MESSAGE.length).toBeLessThanOrEqual(200);
   });
-
-  /**
-   * The case this exists for: during a provider switch a Tap charge body must
-   * not be routed into the Moyasar handler, where it would fail the
-   * secret-token check and leave a paid order unconfirmed.
-   */
-  it('does not mistake a Tap charge body for a Moyasar event', () => {
-    expect(looksLikeMoyasarWebhook({
-      id: 'chg_123', status: 'CAPTURED', amount: 45.5, currency: 'SAR', live_mode: false,
-      reference: { transaction: 'sm_x', order: 'ORD-x' },
-    })).toBe(false);
+  it('are left out of an attempt lookup without dropping open attempts', () => {
+    expect(NOT_A_DUPLICATE_FILTER).toBe('failure_code.is.null,failure_code.neq.duplicate_payment');
   });
+  it('a confirmation is genuine only when this payment row is paid AND linked to the returned order', () => {
+    expect(isGenuineConfirmation({ status: 'paid', order_id: 'o1' }, 'o1')).toBe(true);
+    expect(isGenuineConfirmation({ status: 'initiated', order_id: null }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'paid', order_id: 'o2' }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'failed', order_id: 'o1' }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation(null, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'paid', order_id: '' }, '')).toBe(false);
+  });
+});
 
-  it('rejects junk and partial shapes rather than guessing', () => {
-    expect(looksLikeMoyasarWebhook({})).toBe(false);
-    expect(looksLikeMoyasarWebhook(null)).toBe(false);
-    expect(looksLikeMoyasarWebhook({ type: 'payment_paid' })).toBe(false);      // no data
-    expect(looksLikeMoyasarWebhook({ data: { id: 'x' } })).toBe(false);          // no type
-    expect(looksLikeMoyasarWebhook({ type: '', data: {} })).toBe(false);         // empty type
-    expect(looksLikeMoyasarWebhook({ type: 'x', data: null })).toBe(false);
+describe('decideSessionVerify', () => {
+  const now = Date.parse('2026-11-12T10:00:00.000Z');
+  const open = { sessionStatus: 'pending_payment', sessionExpiresAt: new Date(now + 60_000).toISOString(), nowMs: now };
+  const over = { ...open, sessionExpiresAt: new Date(now - 1).toISOString() };
+  const CANCELLED = { kind: 'terminal', status: 'cancelled', messageKey: 'payCancelled' };
+  const EXPIRED = { kind: 'terminal', status: 'expired', messageKey: 'payExpired' };
+
+  it('asks Moyasar whenever the newest attempt carries an invoice, whatever else is true', () => {
+    for (const status of ['initiated', 'failed', 'paid']) {
+      expect(decideSessionVerify({ ...over, attempt: { status, provider_checkout_ref: 'inv_1' } })).toEqual({
+        kind: 'ask_moyasar',
+      });
+    }
+  });
+  it('is terminal with no attempt at all', () => {
+    expect(decideSessionVerify({ ...open, attempt: null })).toEqual(CANCELLED);
+    expect(decideSessionVerify({ ...over, attempt: null })).toEqual(EXPIRED);
+  });
+  it('is terminal for a closed attempt that never got an invoice', () => {
+    expect(decideSessionVerify({ ...open, attempt: { status: 'failed', provider_checkout_ref: null } })).toEqual(
+      CANCELLED,
+    );
+    expect(decideSessionVerify({ ...open, attempt: { status: 'failed', provider_checkout_ref: '' } })).toEqual(
+      CANCELLED,
+    );
+  });
+  it('is pending for an open attempt with no invoice yet, until the session is over', () => {
+    const attempt = { status: 'initiated', provider_checkout_ref: null };
+    expect(decideSessionVerify({ ...open, attempt })).toEqual({ kind: 'pending' });
+    expect(decideSessionVerify({ ...over, attempt })).toEqual(EXPIRED);
+    expect(decideSessionVerify({ ...open, sessionStatus: 'expired', attempt })).toEqual(EXPIRED);
+  });
+  it('reads the session as over once it is no longer pending_payment, whatever its clock says', () => {
+    for (const sessionStatus of ['expired', 'cancelled', 'consumed']) {
+      expect(decideSessionVerify({ ...open, sessionStatus, attempt: null })).toEqual(EXPIRED);
+    }
+  });
+  it('treats an unreadable expires_at as not passed', () => {
+    expect(decideSessionVerify({ ...open, sessionExpiresAt: null, attempt: null })).toEqual(CANCELLED);
+    expect(decideSessionVerify({ ...open, sessionExpiresAt: 'x', attempt: { status: 'initiated' } })).toEqual({
+      kind: 'pending',
+    });
+  });
+  it('answers only in statuses every shipped build treats as terminal, with keys every build has', () => {
+    for (const verdict of [CANCELLED, EXPIRED]) {
+      expect(decidePendingAction({ status: verdict.status })).toEqual({ kind: 'clear' });
+      expect(Object.keys(STRINGS.en)).toContain(verdict.messageKey);
+      expect(Object.keys(STRINGS.ar)).toContain(verdict.messageKey);
+    }
   });
 });
 
 describe('resolveMoyasarConfig key namespacing', () => {
   /**
-   * secret_config is MERGED on save, so distinct field names let Tap and
-   * Moyasar credentials coexist in the one integration_settings row. Reading
-   * Tap's names would defeat that: saving Moyasar keys would overwrite Tap's by
-   * collision and strand every refund still queued for Tap.
+   * secret_config is MERGED on save, so Tap's old `test_secret_key` survives in
+   * the payment row wherever it was ever saved — and a Tap test key is also
+   * `sk_test_`-prefixed. Reading that name would treat a different gateway's
+   * credential as a ready Moyasar key.
    */
   it('does not read Tap-shaped key names', () => {
     const c = resolveMoyasarConfig(true, 'moyasar',
@@ -607,70 +938,50 @@ describe('resolveMoyasarConfig key namespacing', () => {
   });
 });
 
-describe('decideCrossProviderAttempt', () => {
-  const NOW = Date.parse('2026-08-24T12:00:00.000Z');
-  const FUTURE = '2026-08-24T12:30:00.000Z';
-  const PAST = '2026-08-24T11:30:00.000Z';
-  const live = (over = {}) => ({
-    id: 'att_1', provider: 'tap', provider_ref: null, provider_checkout_ref: null,
-    expires_at: FUTURE, ...over,
+describe('payment-verify answer helpers (second-round review, 2026-11-12)', () => {
+  it('verifyAnswerStatus never answers refunded, and keeps every other outcome', async () => {
+    const { verifyAnswerStatus, SESSION_TERMINAL_STATUSES } = await import('./moyasar.ts');
+    expect(verifyAnswerStatus('refunded', false)).toBe('failed');
+    expect(verifyAnswerStatus('mismatch', false)).toBe('failed');
+    expect(verifyAnswerStatus('paid', true)).toBe('paid');
+    expect(verifyAnswerStatus('failed', true)).toBe('paid');
+    for (const o of ['pending', 'failed', 'cancelled', 'expired', 'unknown'] as const) {
+      expect(verifyAnswerStatus(o, false)).toBe(o);
+    }
+    // Every answer it can give is one the shipped builds understand.
+    expect([...SESSION_TERMINAL_STATUSES].sort()).toEqual(['cancelled', 'expired', 'failed']);
   });
 
-  it('proceeds when there is no live attempt at all', () => {
-    expect(decideCrossProviderAttempt(null, 'moyasar', NOW)).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(undefined, 'moyasar', NOW)).toEqual({ action: 'proceed' });
+  it('olderInvoiceVerdict: paid always; in flight only while the session can be paid; nothing otherwise', async () => {
+    const { olderInvoiceVerdict } = await import('./moyasar.ts');
+    expect(olderInvoiceVerdict({ outcome: 'paid', paid: true }, false)).toBe('paid');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false }, true)).toBe('pending');
+    expect(olderInvoiceVerdict({ outcome: 'unknown', paid: false }, true)).toBe('pending');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false }, false)).toBe('ignore');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false, reason: 'no_payment' }, true)).toBe('ignore');
+    for (const o of ['failed', 'cancelled', 'expired', 'refunded', 'mismatch'] as const) {
+      expect(olderInvoiceVerdict({ outcome: o, paid: false }, true)).toBe('ignore');
+    }
   });
 
-  it('proceeds when the live attempt is the SAME provider (normal reuse)', () => {
-    expect(decideCrossProviderAttempt(live({ provider: 'moyasar' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(live({ provider: 'MOYASAR' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
+  it('olderInvoiceVerdict: a captured payment whose only failure was OUR read stays pending, even past the session', async () => {
+    // Re-verification of 2026-11-12: these mapped to 'ignore' once the session
+    // expired, so verify answered terminal 'expired' and the app dropped a
+    // session whose order the same call may just have created.
+    const { olderInvoiceVerdict } = await import('./moyasar.ts');
+    for (const reason of ['stamp_failed', 'readback_failed']) {
+      for (const live of [true, false]) {
+        expect(olderInvoiceVerdict({ outcome: 'pending', paid: false, reason }, live)).toBe('pending');
+      }
+    }
   });
 
-  /**
-   * THE double-charge case. A Tap hosted page is open and payable; opening a
-   * Moyasar invoice too would give the customer two payable pages for one order,
-   * and only one of the two charges could ever be enrolled for refund.
-   */
-  it('refuses a second checkout when the other provider already has a payable one', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1' }), 'moyasar', NOW))
-      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
-    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1' }), 'moyasar', NOW))
-      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
-  });
-
-  /** Nothing exists at the other gateway, so nothing is payable — safe to close. */
-  it('closes a stale other-provider attempt that never reached its gateway', () => {
-    expect(decideCrossProviderAttempt(live(), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-  });
-
-  it('treats a blank provider on the row as nothing to guard against', () => {
-    expect(decideCrossProviderAttempt(live({ provider: null }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
-  });
-
-  /**
-   * THE LOCK-OUT. `status='initiated'` does not mean payable: nothing sweeps
-   * stale attempts, and only the owning provider's RPC ever closes one. Refusing
-   * on an EXPIRED other-provider attempt would 409 that order's online payment
-   * permanently — while the error text tells the customer to wait for an expiry
-   * that is never processed.
-   */
-  it('closes an EXPIRED other-provider attempt instead of refusing forever', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: PAST }), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1', expires_at: PAST }), 'moyasar', NOW))
-      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
-  });
-
-  it('still refuses while the other page is genuinely live', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: FUTURE }), 'moyasar', NOW).action)
-      .toBe('refuse');
-  });
-
-  it('refuses on a null expiry rather than assuming it lapsed', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: null }), 'moyasar', NOW).action)
-      .toBe('refuse');
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: 'not-a-date' }), 'moyasar', NOW).action)
-      .toBe('refuse');
+  it('isSessionLive: pending_payment and not past expires_at', async () => {
+    const { isSessionLive } = await import('./moyasar.ts');
+    const now = Date.parse('2026-11-12T10:00:00Z');
+    expect(isSessionLive('pending_payment', '2026-11-12T10:30:00Z', now)).toBe(true);
+    expect(isSessionLive('pending_payment', '2026-11-12T10:00:00Z', now)).toBe(false);
+    expect(isSessionLive('expired', '2026-11-12T10:30:00Z', now)).toBe(false);
+    expect(isSessionLive('pending_payment', null, now)).toBe(true);
   });
 });

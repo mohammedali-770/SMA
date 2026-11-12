@@ -94,6 +94,12 @@ handler and guard — mount recovery, `placeOrder`, `runTapPaymentSession`,
 `recalcRef` double-tap guard, `changeQuantity`, coupon validation, the
 address-resolution branch and every `router` call.
 
+*Changed 2026-11-11, in the Moyasar-only change:* `runTapPaymentSession` is now
+`runOnlinePayment`, and `placeOrder` now returns at once while `payRunningRef` is
+set. The payment screen's WebView props changed too (Apple Pay on, any `https`
+page allowed, only our return address completes); the byte-identical claim above
+describes the earlier migration, not the current file.
+
 Fixes found by the fixture pass, not by reading:
 
 * the below-minimum message printed **"31.00 SAR"** — the letters, which the

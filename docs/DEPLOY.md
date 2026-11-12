@@ -178,7 +178,7 @@ After an approved web release:
 - Operations Health does not show a new release-caused failure;
 - Sentry receives expected environment/release metadata under the approved observability test.
 
-Do not perform online-payment/refund tests while the payment freeze is active unless separately approved.
+Do not perform online-payment/refund tests as part of an ordinary release. A live payment or refund is its own owner approval (CLAUDE.md §5). The payment freeze was lifted for repository work on 2026-11-11; the planned live payment test is `OWNER_ACTIONS.md` §47.18.
 
 ## 9. Auto-deploy versus gated deploy
 
@@ -218,7 +218,78 @@ Use `docs/ROLLBACK.md`. The goal is to return to a known reviewed deployment, no
 
 Database/Edge Function rollback is a separate problem from web artifact rollback; follow the owning runbook and approval boundary.
 
-## 12. Related docs
+## 12. Supabase Edge Functions — the payment set
+
+**Added 2026-11-12.** This runbook is about Vercel, but one Edge Function rule
+belongs beside it, because the workflow that deploys functions changed with the
+Moyasar-only work (CLAUDE.md §6).
+
+**Every deploy of an Edge Function is its own owner approval** (CLAUDE.md §5).
+Nothing below grants one.
+
+### The seven payment functions deploy as one set
+
+| Function | `verify_jwt` | Who calls it |
+| --- | --- | --- |
+| `payment-initiate` | true | the signed-in customer's app |
+| `payment-verify` | true | the signed-in customer's app |
+| `payment-webhook` | **false** | Moyasar; authenticated by the webhook secret token |
+| `payment-return` | **false** | the customer's browser, after Moyasar's page |
+| `payment-refund` | **false** | the `payment-refund-worker` cron job, with `refund_trigger_secret` |
+| `payment-test-config` | true | an administrator at AAL2, from the console |
+| `payment-admin-test-return` | **false** | the browser, after the console's sandbox test |
+
+The values are those in `supabase/config.toml` on 2026-11-12.
+
+**Deploy all seven in one run.** A new payment bundle beside an older one can
+open a Moyasar invoice that nothing confirms. `payment-admin-test-return` is new:
+it replaces `tap-admin-test-return`, and `payment-test-config` points its sandbox
+return at it.
+
+**Order.** Apply `20260824100000_moyasar_payment_provider`, then
+`20261003120000_moyasar_only_payments`, each named by version, before this
+deploy. Apply `20261004120000_drop_tap_payment_rpcs` only after it. The full
+order, with what "done" looks like at each step, is `OWNER_ACTIONS.md` §47.
+
+### `verify_jwt` comes from `supabase/config.toml`
+
+`.github/workflows/deploy-functions.yml` reads each function's
+`[functions.<name>] verify_jwt` from `supabase/config.toml` when the job runs:
+
+- `false` deploys with `--no-verify-jwt`;
+- `true` deploys with verification on;
+- a function with no table, or no `true`/`false` value, stops the run with an
+  error.
+
+No list in the workflow can drift from the config. Until 2026-11-11 the workflow
+carried its own hard-coded list, which named only `payment-webhook` and
+`payment-return`; `payment-refund` would have deployed with verification on and
+refused the refund cron job. `deployFunctionsWiring.test.ts` runs the workflow's
+own function against the real `config.toml`.
+
+The `all` input deploys exactly the seven above and prints the required
+migration order. Any other function must be named.
+
+**As far as the record shows, the workflow has never deployed anything.** It
+needs the repository secret `SUPABASE_ACCESS_TOKEN`, which `OWNER_ACTIONS.md` §15
+records as never created, and recommends against creating. A deploy by hand (Supabase dashboard or CLI)
+must use the same `verify_jwt` values as the table above.
+
+### The old slug is deleted separately, later
+
+`tap-admin-test-return` is still deployed in Production (2026-11-11). Deleting it
+is a separate, destructive owner action, done only after the seven-function
+deploy (`OWNER_ACTIONS.md` §47.6). Until then a function-name drift report lists
+it as extra and `payment-admin-test-return` as missing.
+
+### A secret the payment functions read
+
+`MOYASAR_PROXY_URL` is an Edge Function secret, set in the Supabase dashboard,
+never in a `VITE_*` or `EXPO_PUBLIC_*` variable and never in a chat. Every Moyasar
+call goes through the proxy when it is set. An unusable value refuses every
+Moyasar call, TEST included (`OWNER_ACTIONS.md` §47.11).
+
+## 13. Related docs
 
 - `README.md` — current platform overview.
 - `PROJECT_STATUS.md` — current source/release state.
@@ -227,3 +298,4 @@ Database/Edge Function rollback is a separate problem from web artifact rollback
 - `docs/MAPS.md` — map provider configuration.
 - `docs/SENTRY_WEB_OBSERVABILITY.md` — web observability.
 - `docs/ROLLBACK.md` — mitigation/rollback.
+- `docs/OWNER_ACTIONS.md` §47 — the Moyasar go-live steps, in order.

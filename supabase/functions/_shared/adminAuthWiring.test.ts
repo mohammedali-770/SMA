@@ -195,8 +195,8 @@ describe('push-dispatch admin gate wiring', () => {
 // failed the moment the code changed, which is exactly when someone should have
 // to check whether the change was approved. It was: the owner approved a §6
 // exception for the gate on 2026-08-24. So the assertion is inverted rather than
-// deleted, and the freeze is now pinned where it still applies — the Tap
-// behaviour this function wraps.
+// deleted, and the payment surface this function wraps is pinned below — now
+// Moyasar's, since the owner chose Moyasar as the only provider on 2026-11-11.
 describe('payment-test-config admin gate wiring (§6 exception, 2026-08-24)', () => {
   const src = source('payment-test-config');
 
@@ -224,11 +224,13 @@ describe('payment-test-config admin gate wiring (§6 exception, 2026-08-24)', ()
       .not.toMatch(/if \(!profile \|\| profile\.role !== 'admin'\) return json/);
   });
 
-  // THE FREEZE, PINNED WHERE IT STILL APPLIES. The exception covered the gate
-  // and nothing else, so the Tap surface must be exactly as it was: same
-  // actions, same charge construction, same verification path. If one of these
-  // changes, a payment behaviour changed under cover of an auth fix.
-  it('leaves the Tap behaviour untouched (CLAUDE.md §6 still applies to it)', () => {
+  // THE PAYMENT SURFACE, PINNED. Tap's calls were pinned here while the §6
+  // freeze covered them; with Tap removed, the same tripwire now holds the
+  // Moyasar calls that replaced them — same four actions, the forced TEST key,
+  // the key-prefix refusal, the admin-test-only readback and the confirm path.
+  // If one of these changes, a payment behaviour changed, and this file is
+  // where that has to be noticed.
+  it('pins the Moyasar admin payment surface (owner decision, 2026-11-11)', () => {
     for (const marker of [
       "payload.action === 'test_connection'",
       "payload.action === 'verify_order'",
@@ -237,15 +239,19 @@ describe('payment-test-config admin gate wiring (§6 exception, 2026-08-24)', ()
       // CALLS, not imports. A first version of this listed the bare identifiers
       // and a mutant that replaced the confirm call with a stub survived — the
       // marker matched the import line. Pin the invocation.
-      'await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId)',
-      'buildTapChargePayload({',
-      'isAdminTestCharge(c)',
-      "resolveTapConfig(true, 'tap', pub, sec, 'test')", // the forced TEST key
+      'await verifyMoyasarAttempt(admin, rec, m.secretKey)',
+      'buildInvoicePayload({',
+      'isAdminTestInvoice(invoice)',
+      "resolveMoyasarConfig(true, 'moyasar', pub, sec, 'test')", // the forced TEST key
+      "keyMatchesMode(m.secretKey, 'test', 'secret')", // refuses a live key in the test slot
     ]) {
       expect(src).toContain(marker);
     }
-    // And no live-mode charge creation was introduced: test_checkout still
+    // And no live-mode invoice creation was introduced: test_checkout still
     // refuses outside TEST mode.
     expect(src).toContain("if (mode !== 'test') return json({ ok: false, message: 'Admin test checkout is only available in TEST mode.' }, 200);");
+    // Nothing of Tap is left to drive: no key resolver, no API host.
+    expect(code('payment-test-config')).not.toContain('resolveTapConfig');
+    expect(code('payment-test-config')).not.toContain('api.tap.company');
   });
 });

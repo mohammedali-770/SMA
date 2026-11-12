@@ -4,6 +4,11 @@
 > checkout-session / Lazywait-submission / retry / refund areas (CLAUDE.md §6),
 > granted 2026-07-24 for repository work only. **No Production apply, no function
 > deployment, and no live payment operation is authorized by that approval.**
+>
+> **Updated 2026-11-11: Moyasar is the payment provider** (owner decision; see
+> [`PAYMENTS.md`](PAYMENTS.md)). The online-payment path the app takes is §6a
+> below. Passages that described Tap as the provider are corrected where they
+> read as current, with a dated note. Nothing live changed with the decision.
 
 ## 1. The defect this replaces
 
@@ -20,7 +25,7 @@ database identifier for a row the restaurant may never have accepted.
 
 | Fact | Authority |
 |---|---|
-| The customer paid | The payment provider's own Retrieve-Charge response (`CAPTURED`, every bound field matching the stored attempt) |
+| The customer paid | Moyasar's own payment, fetched server-to-server (`paid` or `captured`, every bound field matching the stored attempt; [`PAYMENTS.md`](PAYMENTS.md) §2). *Until 2026-11-11 this row named Tap's Retrieve-Charge `CAPTURED`.* |
 | The order was placed | Lazywait returned a **usable** order reference |
 
 The customer is never told their order was placed on the strength of the first
@@ -136,12 +141,16 @@ cannot resurface it:
 `orderSelect.test.ts` asserts the select contains no internal column and that a
 deliberately hostile full row still maps to an object carrying none of them.
 
-**Knowingly retained:** `payment-initiate` still uses `order_number` as the Tap
-charge *description* and as the `reference.order` merchant reference
-(`supabase/functions/payment-initiate/index.ts`). Those go server→provider for
-reconciliation, and `reference.order` is a bound field that `payment-verify`
-validates, so changing it would weaken payment verification. The description is
-visible on Tap's hosted page; see §10.
+**Corrected 2026-11-11.** `payment-initiate` no longer reads `order_number` at
+all. The Moyasar invoice's `description` is the constant `'Spicy Meal order'`,
+because Moyasar shows it on the hosted page, and its metadata carries only the
+attempt's opaque references (`reference_transaction`, and an `ORD-…` or `CS-…`
+`reference_order`). The verification binding is the payment's `invoice_id`, not
+any reference.
+
+*History:* this paragraph used to say that `payment-initiate` still used
+`order_number` as the Tap charge description and as the bound
+`reference.order`; §10b records how the Tap description was closed.
 
 ### When the number appears — and why it once took 45 seconds
 
@@ -1218,13 +1227,21 @@ refunded twice.
 
 1. `claim_order_refund()` leases one refund (`FOR UPDATE SKIP LOCKED`) and moves
    the order to `refund_state = 'processing'` in the same transaction.
-2. The Tap refund request is sent, carrying our idempotency key as the merchant
-   reference.
-3. `classifyRefundResponse()` returns **three** outcomes, never two:
-   - `succeeded` — the provider confirmed a terminal `REFUNDED`
-   - `failed` — a definitive terminal rejection or a non-429 4xx
-   - `pending` — anything else: in-flight, undocumented status, 429, 5xx,
-     timeout, network error
+2. The Moyasar refund request is sent: `POST /v1/payments/{payment id}/refund`
+   with the amount in halalas. Moyasar documents no refund idempotency key, so
+   any re-attempt first reads the payment (`status`, `refunded`, `refunded_at`)
+   and posts only if nothing was refunded. *(Until 2026-11-11 this step was
+   Tap's refund request, carrying our idempotency key as the merchant
+   reference.)*
+3. `classifyMoyasarRefundResponse()` returns **three** outcomes, never two:
+   - `succeeded` — Moyasar's response carries a terminal refunded status
+   - `failed` — a definitive rejection, or a 4xx other than 429 and other than
+     an Allowed-IPs 401
+   - `pending` — anything else: an undocumented status, 429, 5xx, timeout,
+     network error, and a 401
+     from Moyasar's Allowed IPs list (`moyasar_ip_not_allowed`, no attempt cap)
+   A refund whose timestamp is set but whose amount does not reconcile is parked
+   `failed` with `refund_ambiguous_needs_review`.
 4. `finalize_order_refund()` is token-fenced. A `pending` outcome **releases** the
    lease for a later attempt rather than resolving it.
 
@@ -1232,6 +1249,96 @@ refunded twice.
 covers `pending`/`processing`. A `failed` refund surfaces in
 `list_failed_order_refunds()` for manual review, with the charge reference
 reduced to an md5 fingerprint and no provider payload stored anywhere.
+
+**What this does not cover (measured 2026-11-12, on a local chain, during review).**
+A paid online order that the branch **accepted** and staff then cancelled is
+not enrolled: `refund_state` stays `none` and no `order_refunds` row is opened.
+That predates the Moyasar change. Refunding it today is a manual refund in
+Moyasar's dashboard, an owner-approved live action. A **duplicate** payment
+(§6a) is not refunded automatically either. Both are recorded in
+[`PAYMENTS.md`](PAYMENTS.md) §6 and §10.
+
+## 6a. The online-payment path (Moyasar, 2026-11-11)
+
+This is what the app does when the customer chooses online payment. The server
+side, the owner steps and the go-live checks are in [`PAYMENTS.md`](PAYMENTS.md).
+None of this reaches a customer until the payment functions are deployed and the
+next EAS build ships; on 2026-11-11 online payment was off.
+
+**The order is created after the payment, never before.** The app opens a
+checkout session, saves its id on the phone, and calls `payment-initiate`. The
+customer pays on Moyasar's hosted invoice. `payment-verify` (or the webhook)
+fetches the payment from Moyasar and, only on a clean success, creates the paid
+order with `finalize_checkout_session`. The order then enters the POS
+confirmation lifecycle described above, like any paid order.
+
+**One transport: the in-app WebView.** The hosted page always opens in the
+app's payment WebView (`/payment/checkout`), whatever mode the server reports.
+The system auth browser path, `paymentFlow.ts` and `expo-web-browser` were
+removed. The WebView is where the app sees the page reach our return URL, and
+where Apple Pay can work (`enableApplePay`). Builds already in the field use the
+system browser in LIVE mode; they keep working, without Apple Pay.
+
+**The WebView policy** (`features/checkout/webviewPolicy.ts`), for every
+navigation in any frame:
+
+| Decision | When |
+| --- | --- |
+| complete | our `payment-return` URL (the exact Supabase host and `/functions/v1/payment-return`), or `spicymeal://payment/return` followed by nothing, `?` or `#` |
+| allow | any other `https` page: Moyasar's page, 3-D Secure, the issuer's challenge page |
+| block | everything else, including `http:`, `javascript:` and other app schemes; `about:blank` and `about:srcdoc` are allowed |
+
+There is no host allow-list, because an issuer's challenge page cannot be named
+in advance. "Complete" only hands control back: the app then asks the server.
+
+**Outcomes.** The app shows what `payment-verify` answers:
+
+- `paid` with an order id opens the receipt;
+- `pending` keeps the session ("Payment is still pending.", or "Payment was not
+  completed. You can continue or try again." after the customer closed the page);
+- `failed`, `cancelled` and `expired` are **terminal**: the saved session is
+  cleared and "Try again" opens a fresh one. An expired or cancelled Moyasar
+  invoice answers `expired` / `cancelled`;
+- `refunded` is terminal in the new build too, shown as failed with
+  `payUnknown`. The server never sends it: it answers `failed` for a refunded
+  payment, because older builds do not treat `refunded` as terminal.
+
+**`payUnknown`, not `paySuccess`.** A payment Moyasar reports paid that the
+server did **not** confirm (a binding mismatch, or a TEST-mode attempt) now
+carries `payUnknown`: "We could not confirm the payment. Please contact support
+if an amount was deducted." It used to carry `paySuccess`, so a failed dialog
+said "Payment successful".
+
+**A saved session is resolved before every order, cash included.** Only a
+terminal answer or `paid` lets the app drop it. A session that never got a
+usable invoice is now answered terminal by the server instead of `pending` for
+ever, which used to lock the device out of every order. Before a terminal
+answer the server also asks the session's older invoices, so a late payment on
+one is not lost.
+
+**No order while a payment run is in flight.** In the new build, Place order
+does nothing while an online run (for example "Try again" from the status
+dialog) is in progress. Older builds keep a short window where a cash order
+could be placed beside a payable invoice.
+
+**One paying payment per order.** A second settled payment for an order or
+session already paid is recorded as a `duplicate_payment` row, never as paid.
+On the order-first path this is decided under the order's row lock
+(`confirm_order_payment`, `20261003120000`).
+
+**A total under 1.00 SAR is refused before payment.** Moyasar will not invoice
+it. The new build says "Online payment needs a total of at least 1.00 SAR. Use
+fewer points, or pay in cash."
+
+**The web build never offers online payment.** `/app` hides the online option
+(`apps/mobile/src/lib/payment.ts`, platform `web`). If online were the only
+method switched on, `/app` checkout would show that no payment method is
+available. This takes effect when the branch is merged, because the web build
+deploys with every merge (CLAUDE.md §13).
+
+**TEST mode.** Customer checkout is refused while Moyasar is in TEST mode
+(`{status:'disabled', reason:'test_mode'}`), shown as "Online payment is
+unavailable right now." A TEST-mode attempt can never confirm an order.
 
 ## 7. Channels without a branch step
 
@@ -1270,6 +1377,15 @@ Without a configured secret the function returns `503` and processes nothing.
 **No cron job is scheduled by this change** — scheduling the refund worker is a
 separate owner-approved step, deliberately left out so that merging this work
 cannot start moving money on its own.
+
+> **Updated 2026-11-11.** The `payment-refund-worker` cron job was later created
+> (`20260729090000`) and has been **disabled since 2026-07-29**. Its driver,
+> `invoke_payment_refund_processor()`, reads the same `refund_trigger_secret`
+> from the payment row and, once `20261003120000` is applied, runs only for
+> provider `moyasar`. It is not in Vault. A names-only read on 2026-11-11
+> listed the key on the payment row (`BACKUP_RECOVERY.md` §4.3); its value was
+> not read, so whether it is non-blank is unknown. Check it by length
+> (`OWNER_ACTIONS.md` §47.16). See [`PAYMENTS.md`](PAYMENTS.md) §6.
 
 ## 9. Testing
 
@@ -1421,6 +1537,10 @@ last value while refreshing" is only safe when the refresh was triggered by
 time, not by the input changing.**
 
 ## 10b. Tap `description` (closed)
+
+> **History, 2026-11-11.** The Tap code is gone. The Moyasar invoice's
+> `description` is likewise the constant `'Spicy Meal order'`, and its binding
+> is the payment's `invoice_id` (§4).
 
 Tap documents `description` only as *"an arbitrary string which you can attach to
 a Charge request with more details, if needed"* and **never states that it stays
@@ -1964,6 +2084,12 @@ Coupon-validation and order-placement failures are classified through
 for developers, may name internal systems, and is not translated. The customer
 sees classified, translated copy; the detail goes to the failure report.
 
+> **Updated 2026-11-11.** Still true: the catches in `runOnlinePayment` and
+> `verifyPaymentSession` (as they are now named) show `e.message` as it is, and
+> `payment-initiate` writes that text in English only. The freeze that made
+> this payment work no longer applies, but converting them is still its own
+> change.
+
 **The two payment catches are deliberately NOT converted.** `open_checkout` and
 `verify_payment` still show `e.message` directly. Improving them is payment work
 under CLAUDE.md §6, and the branch that changed them asserted a "scoped
@@ -2244,5 +2370,6 @@ will not submit until a method is chosen.
   are forwarded by `lazywait-sync`. The assumed `delivery_notes` name this bullet
   worried about turned out not to exist at all.
 - **Refund worker scheduling is manual.** See §8.
-- **`payment-refund` has no integration test against a Tap sandbox.** The pure
+- **`payment-refund` has no integration test against a Moyasar sandbox** (until
+  2026-11-11 this said Tap). The pure
   classifier is unit-tested; the transport path is not exercised.

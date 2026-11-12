@@ -27,9 +27,15 @@ name: Deploy Supabase Functions
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Deploying an Edge Function requires explicit owner approval every time
-# (CLAUDE.md §5), and the payment functions are frozen on top of that (§6).
-# Nothing here grants that approval; the guards below only make it hard to
-# deploy by accident.
+# (CLAUDE.md §5). The payment functions deploy as ONE set ('all' below): a new
+# payment bundle beside an older one can open a Moyasar invoice that nothing
+# confirms. They deploy only after BOTH prerequisite migrations are applied, in
+# this order, each named by version: 20260824100000_moyasar_payment_provider,
+# then 20261003120000_moyasar_only_payments. Without the second, the session
+# flow opens payments with no loyalty multi-spend guard and no 1.00 SAR minimum.
+# 20261004120000_drop_tap_payment_rpcs is applied only AFTER this deploy
+# (supabase/functions/README.md). Nothing here grants any approval; the guards
+# below only make it hard to deploy by accident.
 #
 # Migrations are NOT run here — this only deploys functions, so it can never
 # touch the database schema.
@@ -38,7 +44,7 @@ on:
   workflow_dispatch:
     inputs:
       functions:
-        description: "Space-separated function names. 'all' = the four FROZEN payment functions (CLAUDE.md §6)."
+        description: "Space-separated function names. 'all' = the seven payment functions, which deploy as one set."
         type: string
         required: true
         # Deliberately EMPTY. It used to default to the payment set, so opening
@@ -86,11 +92,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${CONFIRM}" != "DEPLOY" ]; then
-            echo "::error::Confirmation not given. Re-run and type DEPLOY in the confirm field. Deploying an Edge Function needs explicit owner approval (CLAUDE.md §5); the payment functions are additionally frozen (§6)."
+            echo "::error::Confirmation not given. Re-run and type DEPLOY in the confirm field. Deploying an Edge Function needs explicit owner approval (CLAUDE.md §5)."
             exit 1
           fi
           if [ -z "${FNS// /}" ]; then
-            echo "::error::No functions named. Pass a space-separated list, or 'all' for the four frozen payment functions. There is deliberately no default."
+            echo "::error::No functions named. Pass a space-separated list, or 'all' for the payment set. There is deliberately no default."
             exit 1
           fi
           echo "Confirmed. Requested: ${FNS}"
@@ -125,10 +131,34 @@ jobs:
             exit 1
           fi
 
+          # The JWT flag for one function, read from supabase/config.toml when
+          # the job runs, so no list here can drift from it: `verify_jwt =
+          # false` prints --no-verify-jwt, `true` prints nothing, and anything
+          # else (no [functions.<name>] table, no verify_jwt line, any other
+          # value) fails. deployFunctionsWiring.test.ts runs this function
+          # against the real config.toml for every function.
+          jwt_flag() {
+            local value
+            value="$(awk -v table="[functions.$1]" '
+              { line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]*(#.*)?$/, "", line) }
+              line == table { inside = 1; next }
+              line ~ /^\[/ { inside = 0; next }
+              inside && line ~ /^verify_jwt[[:space:]]*=/ {
+                sub(/^verify_jwt[[:space:]]*=[[:space:]]*/, "", line); print line; exit
+              }
+            ' supabase/config.toml)"
+            case "$value" in
+              false) echo "--no-verify-jwt" ;;
+              true) echo "" ;;
+              *) return 1 ;;
+            esac
+          }
+
           FNS="$FNS_INPUT"
           if [ "$FNS" = "all" ]; then
-            FNS="payment-initiate payment-verify payment-webhook payment-return"
-            echo "::warning::Deploying the FROZEN payment set (CLAUDE.md §6). This needs its own explicit owner approval."
+            # Every payment function, the admin sandbox return page included.
+            FNS="payment-initiate payment-verify payment-webhook payment-return payment-refund payment-test-config payment-admin-test-return"
+            echo "::warning::Deploying the whole payment set. It needs its own explicit owner approval (CLAUDE.md §5). Migrations 20260824100000_moyasar_payment_provider and then 20261003120000_moyasar_only_payments must already be applied, in that order. 20261004120000_drop_tap_payment_rpcs is applied only after this deploy."
           fi
 
           for fn in $FNS; do
@@ -138,14 +168,17 @@ jobs:
               echo "::error::No such function in this checkout: supabase/functions/${fn}/index.ts"
               exit 1
             fi
-            # payment-webhook (called by Tap) and payment-return (browser GET)
-            # have no Supabase JWT, so they must deploy with --no-verify-jwt. All
-            # others keep JWT verification ON. supabase/config.toml is the source
-            # of truth for each function's setting.
-            case "$fn" in
-              payment-webhook|payment-return) FLAGS="--no-verify-jwt" ;;
-              *) FLAGS="" ;;
-            esac
+            # A function whose callers carry no Supabase JWT (a provider
+            # webhook, a browser GET, a scheduler or the service role) is
+            # marked verify_jwt = false in config.toml and deploys with
+            # --no-verify-jwt; every other keeps JWT verification ON. This used
+            # to be a hard-coded list, which drifted: until 2026-11-11 it named
+            # only payment-webhook and payment-return, so payment-refund would
+            # have deployed with verification on and refused the refund cron.
+            if ! FLAGS="$(jwt_flag "$fn")"; then
+              echo "::error::supabase/config.toml has no [functions.${fn}] table with verify_jwt = true or false, so its JWT setting is unknown. Add one before deploying it."
+              exit 1
+            fi
             echo "::group::Deploy $fn ($FLAGS)"
             supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $FLAGS
             echo "::endgroup::"

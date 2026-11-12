@@ -26,13 +26,13 @@
  *
  * Moyasar does not supply the first. `given_id` is documented for PAYMENT
  * CREATION only (https://docs.moyasar.com/api/idempotency); no idempotency
- * parameter is documented on `POST /v1/payments/:id/refund`. Taken alone that is
- * WORSE than Tap, which at least has a 24-hour `reference.idempotent`.
+ * parameter is documented on `POST /v1/payments/:id/refund`. Taken alone, that
+ * would make an automated retry unsafe.
  *
  * It does supply the second, and supplies it well. `GET /v1/payments/:id`
  * returns `status`, `refunded` (the cumulative amount refunded so far, in minor
  * units) and `refunded_at`. Those three fields answer "did my ambiguous attempt
- * actually land?" exactly — which a Tap refund retrieve was only assumed to do.
+ * actually land?" exactly.
  * `resolveRefundFromPayment()` below is that resolution step, and the worker
  * must run it before any retry rather than re-POSTing blind.
  *
@@ -41,7 +41,7 @@
  * of this code rather than an open question about the API.
  * ────────────────────────────────────────────────────────────────────────────
  */
-import { MOYASAR_API_BASE, toMinorUnits } from './moyasar.ts';
+import { MOYASAR_API_BASE, MOYASAR_IP_NOT_ALLOWED, isMoyasarIpNotAllowed, toMinorUnits } from './moyasar.ts';
 
 /** Only these payment statuses mean money has provably gone back. */
 const TERMINAL_SUCCESS = new Set(['refunded']);
@@ -92,6 +92,22 @@ export function classifyMoyasarRefundResponse(
   const status = String(body?.status ?? '').toLowerCase();
 
   if (!ok) {
+    // Refused by the account's Allowed IPs list: Moyasar turned the request
+    // away at authentication, so nothing was refunded, and the same request
+    // succeeds once the route is fixed. That is configuration, not a verdict on
+    // this refund, so it is NOT definitive. It stays 'pending', which
+    // refundFinalStatus() writes as a release, the same non-definitive path a
+    // 429 or a 5xx takes; the next run then reconciles before it posts again.
+    if (isMoyasarIpNotAllowed(httpStatus, body)) {
+      return {
+        outcome: 'pending',
+        providerRef,
+        failureCode: MOYASAR_IP_NOT_ALLOWED,
+        errorSafe:
+          'Moyasar refused the request: this server is not on the account\'s Allowed IPs list. '
+          + 'Configure MOYASAR_PROXY_URL and list the proxy IPs in Moyasar Allowed IPs.',
+      };
+    }
     // A 4xx that is NOT a rate limit is a definitive request-level rejection —
     // the same request will keep being rejected, so mark it failed for manual
     // review. Everything else (429, 5xx, network) stays retryable.
@@ -345,8 +361,6 @@ export function decideAfterReconcile(prior: RefundClassification | null): RetryD
  * `expire_stale_order_refund_claims()` already treats a lease it cannot resolve,
  * and for the same stated reason — "we cannot know whether the dead worker
  * already sent the refund … an automatic re-send could double-refund".
- *
- * A Tap verdict never carries this failure code, so this is a no-op there.
  */
 export function refundFinalStatus(v: RefundClassification): 'succeeded' | 'failed' | 'pending' {
   if (v.outcome === 'succeeded') return 'succeeded';

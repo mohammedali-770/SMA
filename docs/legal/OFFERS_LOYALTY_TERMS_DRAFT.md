@@ -185,8 +185,11 @@ current terms would not expect a reversal to be necessary at all.
 
 **"refunded" is false, and that was measured rather than inferred.** All nine
 live functions matching `%refund%` were checked against their source: not one
-mentions loyalty. Refund processing is disabled under the payment freeze, so the
-clause promised behaviour that has never run.
+mentions loyalty. Refund processing was disabled under the payment freeze, so the
+clause promised behaviour that has never run. (Since 2026-11-11 Moyasar is the
+provider and automatic refunds are planned, still disabled until the owner
+re-enables the refund job: `docs/PAYMENTS.md` §6. They still do not touch
+loyalty.)
 
 ### "You choose how many points to use on an order." — CORRECTED
 

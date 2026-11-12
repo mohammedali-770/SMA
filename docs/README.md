@@ -50,6 +50,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Understand an alert I have been paged about | [Operations alerts digest](OPERATIONS_ALERTS_DIGEST.md) · [Health center](OPERATIONS_HEALTH_CENTER.md) |
 | Investigate a stranded or missing order | [Order integrity watchdog](ORDER_INTEGRITY_WATCHDOG.md) · [Order confirmation flow](ORDER_CONFIRMATION_FLOW.md) |
 | Run or change the loyalty programme | [Loyalty](LOYALTY.md) |
+| Handle an online payment, a duplicate payment or a refund | [Payments](PAYMENTS.md) |
 | Bring a new restaurant branch online | [Branch onboarding](BRANCH_ONBOARDING.md) |
 | Remove a restaurant branch | [Branch deletion](BRANCH_DELETION.md) |
 | Restore data | [Backup and recovery](BACKUP_RECOVERY.md) |
@@ -78,7 +79,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
 | WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
 | Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
-| Payments | [CLAUDE.md §6](../CLAUDE.md): Moyasar is the provider (2026-11-11), read this first · [Payment postponement](PAYMENT_POSTPONEMENT.md): history, superseded |
+| Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) |
 | Maps | [Maps](MAPS.md) |
 | Sentry | [Mobile](SENTRY_OBSERVABILITY.md) · [Web and admin](SENTRY_WEB_OBSERVABILITY.md) |
 | Account deletion | [Deletion scheduler](account-deletion-scheduler.md) |
@@ -89,7 +90,6 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | | |
 | --- | --- |
 | [Decision records](decisions/README.md) | Why a choice was made, what was rejected, and what it costs |
-| [Payment postponement](PAYMENT_POSTPONEMENT.md) | Why payments were frozen until 2026-11-11 and what the freeze covered (superseded by CLAUDE.md §6) |
 | [Discounts and campaigns](DISCOUNTS_CAMPAIGNS.md) | The schema, and the business questions still open |
 | [Loyalty](LOYALTY.md) | How points are earned and spent, the four rules that shape it, and the corrected customer terms |
 | [Legal documents audit](LEGAL_DOCUMENTS_AUDIT.md) | Every live legal document read against the code: what was false, what was corrected, and what was verified accurate |
@@ -115,6 +115,7 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 | Document | What it is |
 | --- | --- |
 | [Migration reconciliation, 12 Aug 2026](MIGRATION_RECONCILIATION_20260812.md) | Latest dated read-only production migration snapshot |
+| [Payment postponement](PAYMENT_POSTPONEMENT.md) | The payment freeze, 2026-07-29 to 2026-11-11, and why the code looked as it did. Superseded by [Payments](PAYMENTS.md) |
 | [Migrations ledger](MIGRATIONS.md) | Historical workflow and provenance record; its classification counts are a dated Aug 7 snapshot |
 | [Address delete runbook](MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md) | A specific migration, start to finish |
 | [Branch feature retention audit](BRANCH_FEATURE_RETENTION_AUDIT.md) | Evidence gathered before historical Git branches were deleted |
