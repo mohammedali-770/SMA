@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**218 TypeScript test files declaring 3352 test blocks, plus 85 SQL suites.**
+**222 TypeScript test files declaring 3395 test blocks, plus 85 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -131,7 +131,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-81 files, 1119 declared test blocks.
+82 files, 1123 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -210,6 +210,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/services/rpcContractParity.test.ts` | 23 | the SQL reader |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
+| `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
@@ -333,29 +334,32 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-28 files, 718 declared test blocks.
+31 files, 757 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
-| `supabase/functions/_shared/adminPush.test.ts` | 44 | scopeFor |
+| `supabase/functions/_shared/adminPush.test.ts` | 50 | scopeFor |
 | `supabase/functions/_shared/adminPushWiring.test.ts` | 29 | the admin channel is separate from the customer channel |
-| `supabase/functions/_shared/alertDispatchWiring.test.ts` | 17 | operations-alert-dispatch is inert until deliberately enabled |
+| `supabase/functions/_shared/alertDispatchWiring.test.ts` | 18 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/apiKeys.test.ts` | 16 | key selection |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
+| `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 7 | email-test-config validates the SMTP endpoint before connecting |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
+| `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
+| `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
-| `supabase/functions/_shared/smtpTarget.test.ts` | 12 | parseSmtpTarget |
+| `supabase/functions/_shared/smtpTarget.test.ts` | 24 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |
 | `supabase/functions/_shared/tapRefund.test.ts` | 18 | classifyRefundResponse — confirmed success |

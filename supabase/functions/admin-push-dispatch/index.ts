@@ -80,10 +80,13 @@ const SEND_TIMEOUT_MS = 10_000;
 const SEND_CONCURRENCY = 6;
 
 /**
- * OPTIONAL pin for the push endpoints this deployment will POST to,
- * comma-separated. Unset — which is how every deployment stands today — means
- * "any public hostname", so setting it narrows the guard in
- * `refusePushEndpoint` and never widens it. Same shape as `SMTP_ALLOWED_HOSTS`.
+ * OPTIONAL replacement for the push services this deployment will POST to,
+ * comma-separated, matched by suffix. Unset or blank means the four browser
+ * push services in `DEFAULT_PUSH_SERVICE_HOSTS`; set, it REPLACES that list
+ * rather than adding to it. Until 2026-11-11 unset meant "any public hostname",
+ * which admitted a wildcard-DNS name pointing into private space. No value can
+ * re-admit an IP literal, an internal name or an explicit port:
+ * `refusePushEndpoint` refuses those before it reads the list.
  */
 const ADMIN_PUSH_ALLOWED_HOSTS = Deno.env.get('ADMIN_PUSH_ALLOWED_HOSTS') ?? null;
 /** Bounded work per invocation. The driver ticks every minute. */
