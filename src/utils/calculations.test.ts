@@ -4,6 +4,7 @@ import {
   formatSAR,
   calculateDistance,
   generateId,
+  getCSVTemplateData,
   parseCSVMenu,
   isCalendarDate,
   riyadhDateOnly,
@@ -178,6 +179,62 @@ describe('parseCSVMenu', () => {
     const { products, errors } = parseCSVMenu(csv, []);
     expect(products).toHaveLength(0);
     expect(errors.some(e => /missing required fields/i.test(e))).toBe(true);
+  });
+});
+
+describe('getCSVTemplateData — the file the download link saves', () => {
+  const HEADER =
+    'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url';
+  const PREFIX = 'data:text/csv;charset=utf-8,';
+
+  /** The bytes a browser saves for the link: the data URL, percent-decoded. */
+  function templateBytes(): Uint8Array {
+    const url = getCSVTemplateData();
+    expect(url.startsWith(PREFIX)).toBe(true);
+    const body = url.slice(PREFIX.length);
+    const out: number[] = [];
+    for (let i = 0; i < body.length; i++) {
+      if (body[i] === '%') {
+        out.push(parseInt(body.slice(i + 1, i + 3), 16));
+        i += 2;
+      } else {
+        out.push(body.charCodeAt(i));
+      }
+    }
+    return Uint8Array.from(out);
+  }
+
+  it('starts with the UTF-8 byte-order mark, so Excel reads the Arabic rows', () => {
+    expect(Array.from(templateBytes().slice(0, 3))).toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('keeps the nine-column header byte-for-byte after the mark', () => {
+    const afterMark = templateBytes().slice(3);
+    expect(new TextDecoder().decode(afterMark).split('\n')[0]).toBe(HEADER);
+    expect(Array.from(afterMark.slice(0, 3))).not.toEqual([0xef, 0xbb, 0xbf]);
+  });
+
+  it('round-trips: the downloaded template imports as its three sample products', () => {
+    // Export, then import the same bytes the way the file picker does —
+    // FileReader.readAsText(file) drops the mark and decodes UTF-8.
+    const r = parseCSVMenu(new TextDecoder().decode(templateBytes()), []);
+    expect(r.errors).toEqual([]);
+    expect(r.products.map(p => [p.nameEn, p.nameAr, p.price, p.calories])).toEqual([
+      ['Spicy Volcano Chicken', 'فولكانو دجاج مقرمش', 29, 710],
+      ['Crispy French Fries', 'بطاطس مقلية مقرمشة', 12, 310],
+      ['Ice Cold Orange Juice', 'عصير برتقال مثلج', 10, 120],
+    ]);
+    expect(r.categories.map(c => [c.nameEn, c.nameAr])).toEqual([
+      ['Burgers', 'برجر'], ['Sides', 'المقبلات'], ['Drinks', 'المشروبات'],
+    ]);
+  });
+
+  it('also imports when the text still carries the mark, as a paste can', () => {
+    const withMark = decodeURIComponent(getCSVTemplateData().slice(PREFIX.length));
+    expect(withMark.startsWith('\uFEFF')).toBe(true);
+    const r = parseCSVMenu(withMark, []);
+    expect(r.errors).toEqual([]);
+    expect(r.products).toHaveLength(3);
   });
 });
 

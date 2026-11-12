@@ -189,6 +189,12 @@ export function riyadhRangeToUtc(start: string, end: string): { fromIso: string;
 
 /**
  * Creates a sample CSV data URL for menu import.
+ *
+ * `%EF%BB%BF` is the UTF-8 byte-order mark. Without it Excel opens the file in
+ * the computer's legacy code page and the Arabic sample rows are unreadable —
+ * and an administrator who then saves it gets a file the import refuses. The
+ * text after the mark is the nine-column template, unchanged; the import strips
+ * the mark again (`readCsv`, and `FileReader.readAsText` for a chosen file).
  */
 export function getCSVTemplateData(): string {
   const headers = 'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url\n';
@@ -196,7 +202,7 @@ export function getCSVTemplateData(): string {
   const row2 = 'Sides,المقبلات,Crispy French Fries,بطاطس مقلية مقرمشة,Classic golden fries,بطاطس ذهبية كلاسيكية,12.00,310,https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&h=400&q=80\n';
   const row3 = 'Drinks,المشروبات,Ice Cold Orange Juice,عصير برتقال مثلج,Fresh squeezed orange juice,عصير برتقال طازج معصور,10.00,120,\n';
   
-  return 'data:text/csv;charset=utf-8,' + encodeURIComponent(headers + row1 + row2 + row3);
+  return 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(headers + row1 + row2 + row3);
 }
 
 /**
