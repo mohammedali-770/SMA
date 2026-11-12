@@ -87,4 +87,25 @@ describe('StaffAccessPanel', () => {
     expect(api.searchCandidates.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(await screen.findByText('Role change saved and written to the audit trail.')).toBeTruthy();
   });
+
+  it('times each audit row in Riyadh, in Latin digits, whatever the device zone', async () => {
+    // It used toLocaleString('ar-SA') in the DEVICE zone: an Arabic console in
+    // London read this 00:30 Riyadh change as 9:30 PM the evening before, in
+    // Arabic-Indic digits.
+    const zoneBefore = process.env.TZ;
+    process.env.TZ = 'Europe/London';
+    try {
+      api.listAudit.mockResolvedValue([{
+        id: 7, target_user_id: candidate.id, target_name: 'Candidate User', target_email: null,
+        target_phone: null, old_role: 'customer', new_role: 'accountant', reason: 'Finance access',
+        changed_by: admin.id, changed_by_name: 'Owner Admin', changed_by_email: null,
+        changed_at: '2026-11-11T21:30:00Z',
+      }]);
+      render(<StaffAccessPanel lang="ar" currentUserId="admin-1" />);
+      expect(await screen.findByText('2026-11-12 00:30:00')).toBeTruthy();
+    } finally {
+      if (zoneBefore === undefined) delete process.env.TZ;
+      else process.env.TZ = zoneBefore;
+    }
+  });
 });

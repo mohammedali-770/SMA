@@ -86,6 +86,57 @@ export function formatRiyadhDateTime(iso: string): string {
 }
 
 /**
+ * The console's clock: Riyadh wall time, Latin digits, 24-hour, whatever the
+ * device's zone and whatever language the console is showing.
+ *
+ * Audit trails and hover times used `toLocaleString()` in the DEVICE zone with
+ * no label, while reports and receipts were already Riyadh — so an owner
+ * abroad read 21:30 for a 00:30 Riyadh event. In Arabic, `ar-SA` also rendered
+ * Arabic-Indic digits and a 12-hour clock beside Latin-digit prices, which is
+ * what `design-system/money.ts` rules out for numbers.
+ *
+ * Assembled from `formatToParts`, so the shape is fixed here rather than
+ * borrowed from a locale's punctuation, which differs between ICU builds.
+ */
+const RIYADH_CLOCK = new Intl.DateTimeFormat('en-GB', {
+  timeZone: RIYADH_TZ,
+  numberingSystem: 'latn',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+type ClockInput = string | number | Date | null | undefined;
+
+function riyadhClock(input: ClockInput): { date: string; time: string } | null {
+  if (input === null || input === undefined || input === '') return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  const part: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const { type, value } of RIYADH_CLOCK.formatToParts(d)) part[type] = value;
+  return {
+    date: `${part.year}-${part.month}-${part.day}`,
+    time: `${part.hour}:${part.minute}:${part.second}`,
+  };
+}
+
+/** "YYYY-MM-DD HH:mm:ss" in Riyadh time; "—" when there is no usable instant. */
+export function formatRiyadhDateTimeSeconds(input: ClockInput): string {
+  const clock = riyadhClock(input);
+  return clock ? `${clock.date} ${clock.time}` : '—';
+}
+
+/** "HH:mm:ss" in Riyadh time; "—" when there is no usable instant. */
+export function formatRiyadhTimeSeconds(input: ClockInput): string {
+  const clock = riyadhClock(input);
+  return clock ? clock.time : '—';
+}
+
+/**
  * Returns the "YYYY-MM-DD" calendar date of an ISO timestamp in Riyadh local
  * time, for date-range filtering that must agree with the branch's local day
  * (slicing the UTC string put late-evening orders on the wrong day).

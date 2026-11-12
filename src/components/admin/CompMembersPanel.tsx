@@ -35,6 +35,7 @@ import { Text } from '../../design-system/ui/Text';
 import {
   compMembers, type CompAuditEntry, type CompCandidate, type CompMember,
 } from '../../lib/compMembersApi';
+import { exactTime } from './view/adminTime';
 
 const INPUT = [
   'min-h-10 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3',
@@ -399,7 +400,7 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
                   <td className="px-3 py-2"><Text variant="caption" as="span">{a.reason}</Text></td>
                   <td className="px-3 py-2">
                     <Text variant="caption" numeric as="span">
-                      {new Date(a.changed_at).toLocaleString(isRTL ? 'ar-SA' : 'en-GB')}
+                      {exactTime(a.changed_at, lang)}
                     </Text>
                   </td>
                 </tr>

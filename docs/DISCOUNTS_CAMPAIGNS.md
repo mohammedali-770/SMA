@@ -630,6 +630,10 @@ trap is closed too.
 - `comp_member_audit` is permanent. It deliberately does **not** use
   `ops_change_events`, which self-prunes after one day: fine for operational
   noise, useless as a money trail.
+- The audit list's **Time** column is Riyadh time, `YYYY-MM-DD HH:mm:ss`, with
+  Latin digits in both languages (since 2026-11-12). It used the device's zone
+  and, in Arabic, Arabic-Indic digits and a 12-hour clock, so an owner abroad
+  read a different time from the one recorded in Riyadh.
 
 Every write goes through `admin_set_comp_member`, which is SECURITY DEFINER and
 gated on `public.is_admin()` — role **and** AAL2. There is **no client write

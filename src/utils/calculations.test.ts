@@ -7,6 +7,9 @@ import {
   getCSVTemplateData,
   parseCSVMenu,
   isCalendarDate,
+  formatRiyadhDateTime,
+  formatRiyadhDateTimeSeconds,
+  formatRiyadhTimeSeconds,
   riyadhDateOnly,
   riyadhDayStartIso,
   riyadhMonthRange,
@@ -14,6 +17,23 @@ import {
   riyadhRangeToUtc,
 } from './calculations';
 import { Category } from '../types';
+
+/**
+ * Run `fn` with the process in `zone`, then put the zone back. Node re-reads
+ * TZ when it is assigned, so this changes what `Date` and `Intl` treat as
+ * local. CI runs in UTC, which is exactly the zone that hides a device-zone
+ * bug, so the zone-sensitive cases below never rely on the default.
+ */
+function inZone<T>(zone: string, fn: () => T): T {
+  const before = process.env.TZ;
+  process.env.TZ = zone;
+  try {
+    return fn();
+  } finally {
+    if (before === undefined) delete process.env.TZ;
+    else process.env.TZ = before;
+  }
+}
 
 describe('getVATBreakdown', () => {
   it('splits a VAT-inclusive total into pre-VAT subtotal + VAT at 15% (default)', () => {
@@ -444,6 +464,47 @@ describe('getCSVTemplateData — the file the download link saves', () => {
     const r = parseCSVMenu(withMark, []);
     expect(r.errors).toEqual([]);
     expect(r.products).toHaveLength(3);
+  });
+});
+
+describe('the console clock — Riyadh time, Latin digits, any device zone', () => {
+  // 2026-11-11T21:30Z is 00:30 on 12 November in Riyadh (UTC+3, no DST).
+  const INSTANT = '2026-11-11T21:30:05Z';
+  const ZONES = ['Europe/London', 'America/Los_Angeles', 'Asia/Riyadh', 'UTC'];
+
+  it('formats the Riyadh wall clock with seconds, whatever the process zone', () => {
+    for (const zone of ZONES) {
+      inZone(zone, () => {
+        expect(formatRiyadhDateTimeSeconds(INSTANT)).toBe('2026-11-12 00:30:05');
+        expect(formatRiyadhTimeSeconds(INSTANT)).toBe('00:30:05');
+        // The existing minute-precision sibling agrees with it.
+        expect(formatRiyadhDateTime(INSTANT)).toBe('2026-11-12 00:30');
+      });
+    }
+  });
+
+  it('takes an epoch number or a Date as well as a string', () => {
+    const ms = Date.parse(INSTANT);
+    expect(formatRiyadhDateTimeSeconds(ms)).toBe('2026-11-12 00:30:05');
+    expect(formatRiyadhTimeSeconds(new Date(ms))).toBe('00:30:05');
+  });
+
+  it('uses a 24-hour clock: midnight is 00, not 24 or 12', () => {
+    expect(formatRiyadhDateTimeSeconds('2026-12-31T21:00:00Z')).toBe('2027-01-01 00:00:00');
+    expect(formatRiyadhTimeSeconds('2026-06-15T09:00:00Z')).toBe('12:00:00');
+  });
+
+  it('renders only ASCII digits and punctuation', () => {
+    inZone('Europe/London', () => {
+      expect(formatRiyadhDateTimeSeconds(INSTANT)).toMatch(/^[0-9: -]+$/);
+    });
+  });
+
+  it('renders an em dash for a missing or unparseable instant', () => {
+    for (const bad of [null, undefined, '', 'not-a-date']) {
+      expect(formatRiyadhDateTimeSeconds(bad)).toBe('—');
+      expect(formatRiyadhTimeSeconds(bad)).toBe('—');
+    }
   });
 });
 

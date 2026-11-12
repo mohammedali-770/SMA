@@ -19,6 +19,7 @@ import { Eye, ShieldAlert } from 'lucide-react';
 import { orders as ordersApi, type PosConfirmationRequired } from '../../../../lib/api';
 import { Card } from '../../../../design-system/ui/Card';
 import { Text } from '../../../../design-system/ui/Text';
+import { formatRiyadhDateTime } from '../../../../utils/calculations';
 import { Price } from '../../../Price';
 import { ADMIN_LOCALES } from '../../adminLocales';
 import { POS_VERIFY_LIMIT, POS_VERIFY_REFRESH_MS, verifyReasonKey } from './ordersView';
@@ -46,8 +47,10 @@ export function OrdersRequiringVerificationCard({
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  const whenText = (iso: string | null): string =>
-    iso ? new Date(iso).toLocaleString(adminLang === 'ar' ? 'ar' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  // Riyadh time with Latin digits in both languages, like the receipts and
+  // reports: the device's own zone and an Arabic-Indic clock were what this
+  // showed before 2026-11-12.
+  const whenText = (iso: string | null): string => (iso ? formatRiyadhDateTime(iso) : '—');
 
   const total = data?.total ?? 0;
   // Hidden entirely once nothing needs verification.
