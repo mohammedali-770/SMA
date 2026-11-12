@@ -26,6 +26,9 @@ const LABEL = 'text-start text-[13px] font-semibold text-con-text-2';
 const TH = 'px-4 py-2.5 text-start';
 const TD = 'px-4 py-2.5 align-middle';
 
+/** U+FEFF, which UTF-8 encodes as the three bytes EF BB BF. */
+const UTF8_BOM = '\uFEFF';
+
 const SYNC_TONE: Record<string, PillTone> = {
   synced: 'success',
   sync_failed: 'danger',
@@ -215,7 +218,12 @@ export const ReportsPanel: React.FC = () => {
         lazywaitReport.map(r => `${csvCell(r.orderNumber)},${csvCell(r.date)},${csvCell(r.branch)},${r.total.toFixed(2)},${csvCell(r.status)},${csvCell(r.ref || 'N/A')},${csvCell(r.error || '')}`).join("\n");
     }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // A UTF-8 byte-order mark, as its OWN part ahead of the CSV text. Excel
+    // opens a CSV without one in the computer's legacy code page, which turns
+    // every Arabic branch, product and category name into mojibake — on the
+    // export the Arabic console labels "Excel/CSV". The text after the mark is
+    // untouched: the header row is a machine interface (ReportsPanel.test.tsx).
+    const blob = new Blob([UTF8_BOM, csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

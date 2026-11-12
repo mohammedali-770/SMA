@@ -17,6 +17,7 @@ import React from 'react';
 
 import { StatusPill } from '../../../design-system/ui/StatusPill';
 import { Text } from '../../../design-system/ui/Text';
+import { formatRiyadhTimeSeconds } from '../../../utils/calculations';
 
 export type LiveMode = 'realtime' | 'polling' | 'off' | string;
 
@@ -37,15 +38,12 @@ export function LiveModeBadge({
     ? (lang === 'ar' ? 'مباشر' : 'Live')
     : (lang === 'ar' ? 'تحديث تلقائي' : 'Auto-refreshing');
 
-  const stamp = lastUpdated
-    ? new Date(lastUpdated).toLocaleTimeString('en-GB', {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-      })
-    : null;
+  // Riyadh time, like every other console clock. The stamp used the device's
+  // zone, and the hover title the device's locale too, so the two could even
+  // disagree with each other.
+  const stamp = lastUpdated ? formatRiyadhTimeSeconds(lastUpdated) : null;
 
-  const title = lastUpdated
-    ? `${lang === 'ar' ? 'آخر تحديث' : 'Last updated'} ${new Date(lastUpdated).toLocaleTimeString()}`
-    : undefined;
+  const title = stamp ? `${lang === 'ar' ? 'آخر تحديث' : 'Last updated'} ${stamp}` : undefined;
 
   return (
     <span className="inline-flex items-center gap-2" title={title}>

@@ -214,4 +214,24 @@ describe('CompMembersPanel', () => {
     await waitFor(() => expect(screen.getByText(/at least 2 characters/)).toBeTruthy());
     expect(api.search).not.toHaveBeenCalled();
   });
+
+  it('times each audit row in Riyadh, in Latin digits, whatever the device zone', async () => {
+    // It used toLocaleString('ar-SA') in the DEVICE zone: an Arabic console in
+    // London read this 00:30 Riyadh change as 9:30 PM the evening before, in
+    // Arabic-Indic digits.
+    const zoneBefore = process.env.TZ;
+    process.env.TZ = 'Europe/London';
+    try {
+      api.listAudit.mockResolvedValue([{
+        id: 9, target_user_id: member.profile_id, target_phone: null, target_name: 'Free Eater',
+        was_active: false, now_active: true, reason: 'founding staff member',
+        changed_by: null, changed_at: '2026-11-11T21:30:00Z',
+      }]);
+      render(<CompMembersPanel lang="ar" />);
+      expect(await screen.findByText('2026-11-12 00:30:00')).toBeTruthy();
+    } finally {
+      if (zoneBefore === undefined) delete process.env.TZ;
+      else process.env.TZ = zoneBefore;
+    }
+  });
 });

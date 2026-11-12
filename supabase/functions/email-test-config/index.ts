@@ -2,20 +2,32 @@
 //   action 'status'    → readiness booleans for the SMTP config (no secret values).
 //   action 'test_send' → send a test email via the stored SMTP settings.
 // The SMTP password is read server-side from integration_settings.secret_config
-// and never returned to the browser; errors are sanitized before returning.
+// and never returned to the browser.
+//
+// THE ENDPOINT IS VALIDATED BEFORE ANYTHING CONNECTS, by the guard the alert
+// dispatcher uses (_shared/smtpTarget.ts). Until 2026-11-11 this function
+// handed the stored host and port straight to SMTPClient and returned up to 300
+// characters of the connection error, so the button could reach the cloud
+// metadata address or loopback, on any port, and report what answered there.
+// A failure now comes back as a reason code and a fixed sentence, never as the
+// error's text, because denomailer builds that text out of whatever the far end
+// said. Detail: docs/OPERATIONS_ALERTS_DIGEST.md.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
+import { classifySmtpFailure, describeSmtpRefusal, parseSmtpTarget } from '../_shared/smtpTarget.ts';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 
 function has(v: unknown): boolean { return typeof v === 'string' && v.trim().length > 0; }
 function str(v: unknown): string { return typeof v === 'string' ? v : ''; }
-function sanitize(msg: string): string {
-  // Never echo anything secret-shaped back to the browser.
-  return String(msg).replace(/(password|pass|auth)\s*[:=]?\s*\S+/gi, '$1 ***').slice(0, 300);
-}
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Pin for the SMTP relay, comma-separated, matched by suffix. Edge Function
+// secrets are project-wide, so this is the same value operations-alert-dispatch
+// reads. Unset means "any public hostname on a mail port", which still admits a
+// public NAME that resolves into private space; only this pin refuses that.
+const SMTP_ALLOWED_HOSTS = Deno.env.get('SMTP_ALLOWED_HOSTS') ?? null;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -48,32 +60,36 @@ Deno.serve(async (req: Request) => {
   const sec = (cfg?.secretConfig ?? {}) as Record<string, unknown>;
 
   if (payload.action === 'test_send') {
-    const host = str(pub.host).trim();
-    const port = Number(str(pub.port) || '587');
-    const secure = pub.secure === true;
-    const username = str(pub.username).trim();
-    const password = str(sec.password);
-    const fromEmail = str(pub.from_email).trim();
-    const fromName = str(pub.from_name).trim() || 'Spicy Meal';
-    const replyTo = str(pub.reply_to).trim();
-    const to = str(payload.to).trim();
+    // Host, port, TLS, username and sender all come from the guard, which
+    // refuses an IP literal, an internal name, a malformed host, a port that is
+    // not a mail port, and a host outside SMTP_ALLOWED_HOSTS when that is set.
+    const target = parseSmtpTarget(pub, SMTP_ALLOWED_HOSTS);
+    if (target.reason !== null) {
+      console.error('email test: smtp endpoint refused', { reason: target.reason });
+      return json({
+        ok: false,
+        reason: target.reason,
+        message: `${describeSmtpRefusal(target.reason)} (${target.reason})`,
+      }, 200);
+    }
 
-    if (!host || !fromEmail) return json({ ok: false, message: 'Email server is not fully configured (host + from email required).' }, 200);
+    const to = str(payload.to).trim();
     if (!EMAIL_RE.test(to)) return json({ ok: false, message: 'Enter a valid recipient email address.' }, 200);
-    if (!Number.isFinite(port) || port <= 0) return json({ ok: false, message: 'Invalid SMTP port.' }, 200);
+    const password = str(sec.password);
+    const replyTo = str(pub.reply_to).trim();
 
     let client: SMTPClient | null = null;
     try {
       client = new SMTPClient({
         connection: {
-          hostname: host,
-          port,
-          tls: secure,
-          auth: username ? { username, password } : undefined,
+          hostname: target.host,
+          port: target.port,
+          tls: target.tls,
+          auth: target.username ? { username: target.username, password } : undefined,
         },
       });
       await client.send({
-        from: `${fromName} <${fromEmail}>`,
+        from: `${target.fromName} <${target.fromEmail}>`,
         to,
         replyTo: replyTo || undefined,
         subject: 'Spicy Meal — SMTP test email',
@@ -84,7 +100,17 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, message: 'Test email sent.' }, 200);
     } catch (e) {
       try { await client?.close(); } catch { /* ignore */ }
-      return json({ ok: false, message: `Send failed — ${sanitize(e instanceof Error ? e.message : String(e))}` }, 200);
+      const failure = classifySmtpFailure(e, target.port);
+      // The error's NAME only. Its message is built from what the far end said.
+      console.error('email test: send failed', {
+        reason: failure.reason,
+        error: e instanceof Error ? e.name : 'unknown',
+      });
+      return json({
+        ok: false,
+        reason: failure.reason,
+        message: `Send failed. ${failure.message} (${failure.reason})`,
+      }, 200);
     }
   }
 

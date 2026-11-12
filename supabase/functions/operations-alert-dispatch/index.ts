@@ -93,9 +93,12 @@ interface ClaimedRow {
 }
 
 /**
- * OPTIONAL pin for the SMTP endpoint, comma-separated. Unset — which is how
- * every deployment stands today — means "any public hostname", so setting it
- * narrows the guard in `smtpTarget.ts` and never widens it.
+ * Pin for the SMTP relay, comma-separated, matched by suffix. Setting it only
+ * ever narrows the guard in `smtpTarget.ts`. Unset means "any public hostname
+ * on a mail port", and that is NOT enough to turn dispatch on: the host rules
+ * are lexical, so a public name that resolves into private space passes them.
+ * Set it before `external_dispatch_enabled` — docs/OPERATIONS_ALERTS_DIGEST.md,
+ * "What the SMTP guard cannot see".
  */
 const SMTP_ALLOWED_HOSTS = Deno.env.get('SMTP_ALLOWED_HOSTS') ?? null;
 
