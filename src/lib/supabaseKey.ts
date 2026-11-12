@@ -31,6 +31,58 @@ export function publicSupabaseKey(env: PublicKeyEnv): string | undefined {
   return anon || undefined;
 }
 
+/** What a console build needs to reach Supabase at all. */
+export interface SupabaseBuildEnv extends PublicKeyEnv {
+  VITE_SUPABASE_URL?: string;
+}
+
+/**
+ * The variable names a console build is missing, empty when it has what it
+ * needs. A key is satisfied by EITHER public key, exactly as at run time, so the
+ * two missing keys are reported as one entry naming both.
+ *
+ * Read by `vite.config.ts`, which fails a Vercel PRODUCTION build on a
+ * non-empty answer. Without that, a production build with no Supabase settings
+ * succeeded, and the console it produced sent every request to
+ * `http://localhost`.
+ */
+export function missingSupabaseBuildEnv(env: SupabaseBuildEnv): string[] {
+  const missing: string[] = [];
+  if (!env.VITE_SUPABASE_URL?.trim()) missing.push('VITE_SUPABASE_URL');
+  if (!publicSupabaseKey(env)) missing.push(PUBLIC_KEY_ENV_NAMES);
+  return missing;
+}
+
+/**
+ * Refuses a Vercel PRODUCTION build that has no Supabase settings.
+ *
+ * Without them the console still built, and every request it made went to a
+ * placeholder host: a console nobody could sign in to, which a successful
+ * build would put in place of the one that worked. A failed build is the
+ * better outcome, because Vercel then keeps serving the previous deployment. Previews only warn — a preview without the
+ * settings is a misconfiguration worth seeing, not one worth blocking — and a
+ * build outside Vercel (CI, local) sets no VERCEL_ENV and is unaffected.
+ *
+ * `vite.config.ts` passes `loadEnv(mode, cwd, 'VITE_')`, the same source Vite
+ * inlines into the bundle, so a value from an `.env.*` file counts as well as
+ * one in the process env.
+ */
+export function supabaseBuildGuard(
+  vercelEnv: string | undefined,
+  env: Record<string, string | undefined>,
+): { action: 'ok' } | { action: 'warn' | 'fail'; message: string } {
+  const missing = missingSupabaseBuildEnv({
+    VITE_SUPABASE_URL: env.VITE_SUPABASE_URL,
+    VITE_SUPABASE_PUBLISHABLE_KEY: env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY,
+  });
+  if (missing.length === 0 || (vercelEnv !== 'production' && vercelEnv !== 'preview')) return { action: 'ok' };
+  const message =
+    `[supabase-env] ${vercelEnv} build is missing ${missing.join(' and ')}. ` +
+    'The console would send every request to a placeholder host.';
+  return vercelEnv === 'production' ? { action: 'fail', message } : { action: 'warn', message };
+}
+
 /**
  * Headers for a raw PostgREST `fetch` made with the public key.
  *

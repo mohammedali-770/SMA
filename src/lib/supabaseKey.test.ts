@@ -3,7 +3,13 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { PUBLIC_KEY_ENV_NAMES, publicRestHeaders, publicSupabaseKey } from './supabaseKey';
+import {
+  PUBLIC_KEY_ENV_NAMES,
+  missingSupabaseBuildEnv,
+  publicRestHeaders,
+  publicSupabaseKey,
+  supabaseBuildGuard,
+} from './supabaseKey';
 
 const LEGACY = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig';
 const PUBLISHABLE = 'sb_publishable_abc123def456';
@@ -71,4 +77,86 @@ describe('every console key reader goes through the helper', () => {
       expect(src).not.toMatch(/Authorization:\s*`Bearer/);
     });
   }
+});
+
+describe('missingSupabaseBuildEnv', () => {
+  const URL = 'https://example.supabase.co';
+
+  it('is empty when the URL and either public key are present', () => {
+    expect(missingSupabaseBuildEnv({ VITE_SUPABASE_URL: URL, VITE_SUPABASE_ANON_KEY: LEGACY })).toEqual([]);
+    expect(
+      missingSupabaseBuildEnv({ VITE_SUPABASE_URL: URL, VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE }),
+    ).toEqual([]);
+  });
+
+  it('names the URL, and the two keys as one entry, when they are absent or blank', () => {
+    expect(missingSupabaseBuildEnv({})).toEqual(['VITE_SUPABASE_URL', PUBLIC_KEY_ENV_NAMES]);
+    expect(missingSupabaseBuildEnv({ VITE_SUPABASE_URL: '  ', VITE_SUPABASE_ANON_KEY: LEGACY })).toEqual([
+      'VITE_SUPABASE_URL',
+    ]);
+    expect(
+      missingSupabaseBuildEnv({
+        VITE_SUPABASE_URL: URL,
+        VITE_SUPABASE_PUBLISHABLE_KEY: '',
+        VITE_SUPABASE_ANON_KEY: ' ',
+      }),
+    ).toEqual([PUBLIC_KEY_ENV_NAMES]);
+  });
+});
+
+describe('supabaseBuildGuard', () => {
+  const URL = 'https://example.supabase.co';
+
+  it('FAILS a Vercel production build with no Supabase settings', () => {
+    const g = supabaseBuildGuard('production', {});
+    expect(g.action).toBe('fail');
+    expect(g.action !== 'ok' && g.message).toContain('VITE_SUPABASE_URL');
+  });
+
+  it('fails a production build missing only the keys', () => {
+    expect(supabaseBuildGuard('production', { VITE_SUPABASE_URL: URL }).action).toBe('fail');
+  });
+
+  it('only WARNS on a preview build', () => {
+    expect(supabaseBuildGuard('preview', {}).action).toBe('warn');
+  });
+
+  it('leaves CI and local builds alone (no VERCEL_ENV), and a development deploy', () => {
+    expect(supabaseBuildGuard(undefined, {}).action).toBe('ok');
+    expect(supabaseBuildGuard('', {}).action).toBe('ok');
+    expect(supabaseBuildGuard('development', {}).action).toBe('ok');
+  });
+
+  it('passes a production build that has the URL and either key', () => {
+    expect(supabaseBuildGuard('production', { VITE_SUPABASE_URL: URL, VITE_SUPABASE_ANON_KEY: LEGACY }).action).toBe(
+      'ok',
+    );
+    expect(
+      supabaseBuildGuard('production', { VITE_SUPABASE_URL: URL, VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE })
+        .action,
+    ).toBe('ok');
+  });
+});
+
+describe('vite.config.ts wires the guard into the build', () => {
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  const src = strip(readFileSync(resolve(__dirname, '../..', 'vite.config.ts'), 'utf8'));
+
+  it('runs it for builds, with VERCEL_ENV and the env Vite inlines, and throws on fail', () => {
+    expect(src).toMatch(/if \(command === 'build'\)/);
+    expect(src).toMatch(
+      /supabaseBuildGuard\(process\.env\.VERCEL_ENV, loadEnv\(mode, process\.cwd\(\), 'VITE_'\)\)/,
+    );
+    expect(src).toMatch(/guard\.action === 'fail'\) throw new Error\(guard\.message\)/);
+  });
+});
+
+describe('the runtime warning', () => {
+  it('no longer claims a demo-data fallback, and says requests will fail', () => {
+    const src = readFileSync(resolve(__dirname, 'supabase.ts'), 'utf8');
+    const start = src.indexOf('console.warn(');
+    const warn = src.slice(start, src.indexOf(');', start));
+    expect(warn).not.toMatch(/demo data/i);
+    expect(warn).toMatch(/will fail/);
+  });
 });

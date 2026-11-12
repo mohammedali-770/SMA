@@ -1,11 +1,16 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 
 import type { PublicLegalDoc } from './src/legal/legalPage';
 import { injectPrerender, renderStaticLegal } from './src/legal/prerender';
-import { PUBLIC_KEY_ENV_NAMES, publicRestHeaders, publicSupabaseKey } from './src/lib/supabaseKey';
+import {
+  PUBLIC_KEY_ENV_NAMES,
+  publicRestHeaders,
+  publicSupabaseKey,
+  supabaseBuildGuard,
+} from './src/lib/supabaseKey';
 
 const LEGAL_SELECT = 'document_type,title_en,title_ar,content_en,content_ar,version,effective_date';
 
@@ -84,7 +89,15 @@ function prerenderLegal(): Plugin {
   };
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ command, mode }) => {
+  // A Vercel PRODUCTION build without Supabase settings fails here, so Vercel
+  // keeps serving the previous deployment; a preview warns. See
+  // `supabaseBuildGuard` in src/lib/supabaseKey.ts.
+  if (command === 'build') {
+    const guard = supabaseBuildGuard(process.env.VERCEL_ENV, loadEnv(mode, process.cwd(), 'VITE_'));
+    if (guard.action === 'fail') throw new Error(guard.message);
+    if (guard.action === 'warn') console.warn(`\n!!! ${guard.message}\n`);
+  }
   // Source-map upload is OPT-IN and secret-gated: it activates only when the
   // SENTRY_AUTH_TOKEN secret exists in the (CI/Vercel) build environment —
   // see Issue #81. Without the token (local dev, previews, current CI) the
