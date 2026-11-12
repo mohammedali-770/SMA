@@ -499,7 +499,13 @@ Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. 
 
 - **EAS (native).** The August 11 iOS release-readiness work added `SENTRY_AUTH_TOKEN` to the EAS production environment and aligned the Sentry React Native compatibility line. Do not reintroduce the old documentation claim that the EAS token is simply missing. For each production release, verify source-map upload through the current Sentry release gates rather than assuming a historical secret still exists/works.
 - **Vercel (admin web): the token was not in the production build, measured 2026-11-11.** The production console bundle for commit `622a133` carries no Sentry debug ID. The upload plugin injects one into every chunk whenever it runs, so it did not run (`docs/SENTRY_WEB_OBSERVABILITY.md`). **Action:** add `SENTRY_AUTH_TOKEN` to the Vercel project's Production environment as a sensitive variable, never as a `VITE_*` one. A Vercel Production settings change is an owner action (CLAUDE.md §5). The next production `main-*.js` containing `sentry-dbid` shows it worked; an approved admin-web test event with a readable stack confirms it.
-- **`/app` (customer web): a token alone does not help.** The export produces no source maps at all, so there is nothing to upload. That needs a change to `apps/mobile/scripts/export-web.js`, not a setting.
+- **`/app` (customer web): the same token now covers it, changed 2026-11-12.** Until then the export produced no source maps, so a token alone would not have helped. `apps/mobile/scripts/export-web.js` now produces maps when `SENTRY_AUTH_TOKEN` is present, uploads them, deletes them from `dist/app`, and fails the build if any is left (`docs/SENTRY_WEB_OBSERVABILITY.md`). Both surfaces are built by the same `npm run build`, so **adding the token for the console also starts the `/app` upload, in the same production build**. There is no separate `/app` setting to make. What to expect:
+  - every production build uploads about 15 MB more and takes a little longer;
+  - a failed upload prints `WARNING: /app source maps were NOT uploaded to Sentry` and the build still succeeds, as the console's does;
+  - the build log should show `[export-web] /app source maps uploaded to Sentry.`, and an approved `/app` test event with readable frames confirms it;
+  - if the token is added to Preview as well as Production, preview builds upload too.
+
+  The token needs the same Sentry scopes the console upload uses. `/app` uploads into the same `react-native` project.
 
 ## 12. Migration ledger reconciliation — resolved 2026-08-12
 
@@ -2856,6 +2862,20 @@ menu no longer offers at all. Engineering-drafted; ships with the next EAS build
 It is deliberately not the "sold out" wording beside it (`soldOutNow`): a sold-out
 item comes back by itself, and this one has been withdrawn. Check that «ضمن
 القائمة» reads as "on the menu" rather than "in the list".
+
+**Widened 2026-11-12 — the accessibility pass (R07).** One new visible string and
+one new spoken composition, both engineering-drafted:
+
+- **Console sign-in footer**, `authSecuredBy` in `src/components/ops/opsStrings.ts`
+  (staff-facing, live on merge): «محمي عبر Supabase Auth · صلاحيات حسب الدور» —
+  English: *"Secured by Supabase Auth · role-based access"*. Until now the footer
+  was English in both languages.
+- **The menu card's spoken name**, heard only with VoiceOver or TalkBack on, for an
+  item that opens its options: the product name, a comma, then the price as
+  `priceAccessibilityLabel` already speaks it — for example «وجبة برجر, من 14.00
+  ريال سعودي». Nothing new is translated; what to check is whether the Latin comma
+  and the order read naturally, or whether «،» belongs there
+  (`apps/mobile/src/design-system/ui/productCardA11y.ts`).
 
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 

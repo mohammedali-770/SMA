@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandMark } from '../design-system/ui/BrandMark';
@@ -25,6 +25,8 @@ import { useOpsLang } from './ops/useOpsLang';
  */
 export const AuthScreen: React.FC = () => {
   const { t, dir, toggle } = useOpsLang('en');
+  const emailId = useId();
+  const passwordId = useId();
   const { signIn } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,9 @@ export const AuthScreen: React.FC = () => {
     try {
       await signIn(email.trim(), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      // Kept raw: GoTrue's message is the only detail there is. The sentence
+      // around it is translated where it renders.
+      setError(err instanceof Error && err.message ? err.message : '');
     } finally {
       setBusy(false);
     }
@@ -68,21 +72,25 @@ export const AuthScreen: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authEmail')}</label>
+            {/* The VISIBLE label names the field, so the name is Arabic when the
+                screen is (R07#6). A hard-coded English aria-label used to
+                override it. */}
+            <label htmlFor={emailId} className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authEmail')}</label>
             <input
+              id={emailId}
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
-              aria-label="Email"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authPassword')}</label>
+            <label htmlFor={passwordId} className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authPassword')}</label>
             <input
+              id={passwordId}
               type="password"
               required
               minLength={6}
@@ -90,12 +98,13 @@ export const AuthScreen: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
-              aria-label="Password"
             />
           </div>
 
-          {error && (
-            <p className="text-[11px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2">{error}</p>
+          {error !== null && (
+            <p role="alert" className="text-[11px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2">
+              {error ? `${t('authFailed')} — ${error}` : t('authFailed')}
+            </p>
           )}
 
           <button
@@ -110,7 +119,7 @@ export const AuthScreen: React.FC = () => {
 
         <div className="mt-5 pt-4 border-t border-con-line flex items-center gap-1.5 text-[9.5px] text-con-text-3 font-semibold justify-center">
           <ShieldCheck className="w-3.5 h-3.5 text-mint" />
-          <span>Secured by Supabase Auth · role-based access</span>
+          <span>{t('authSecuredBy')}</span>
         </div>
       </div>
     </div>

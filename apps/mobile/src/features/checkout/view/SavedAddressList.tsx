@@ -3,9 +3,10 @@
  * coordinates — the screen owns that; this is the list and its selected state.
  */
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { color, radius, space } from '../../../design-system/generated/tokens';
+import { selectedRadioState } from '../../../design-system/ui/a11yState';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { SavedAddress } from '../../../types/models';
@@ -37,7 +38,7 @@ export function SavedAddressList({
           <Pressable
             key={a.id}
             accessibilityRole="radio"
-            accessibilityState={{ selected: active, checked: active }}
+            {...selectedRadioState(active, Platform.OS)}
             accessibilityLabel={a.label || fallbackLabel}
             style={({ pressed }) => [
               styles.row, rtlRow,

@@ -63,6 +63,45 @@ describe('AuthScreen', () => {
     await vi.waitFor(() => expect(signIn).toHaveBeenCalledWith('staff@example.test', 'correct horse'));
   });
 
+  // R07#6 (2026-11-12): with Arabic on, the inputs were visibly labelled in
+  // Arabic and named "Email" / "Password" by hard-coded aria-labels, the labels
+  // were not associated, the footer stayed English and a failed sign-in was a
+  // plain paragraph nobody heard.
+  it('names each field by its VISIBLE label, in both languages', () => {
+    const { container } = render(<AuthScreen />);
+    expect(screen.getByLabelText('Email').getAttribute('type')).toBe('email');
+    expect(screen.getByLabelText('Password').getAttribute('type')).toBe('password');
+    fireEvent.click(screen.getByRole('button', { name: /العربية|arabic|English/i }));
+    expect(screen.getByLabelText('البريد الإلكتروني').getAttribute('type')).toBe('email');
+    expect(screen.getByLabelText('كلمة المرور').getAttribute('type')).toBe('password');
+    expect(container.querySelectorAll('input[aria-label]')).toHaveLength(0);
+    for (const label of container.querySelectorAll('label')) {
+      expect(label.getAttribute('for')).toBeTruthy();
+    }
+  });
+
+  it('translates the submit button and the footer', () => {
+    render(<AuthScreen />);
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeTruthy();
+    expect(screen.getByText(/Secured by Supabase Auth/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /العربية|arabic|English/i }));
+    expect(screen.getByRole('button', { name: 'تسجيل الدخول' })).toBeTruthy();
+    expect(screen.queryByText(/Secured by Supabase Auth · role-based access/)).toBeNull();
+    expect(screen.getByText(/صلاحيات حسب الدور/)).toBeTruthy();
+  });
+
+  it('announces a failed sign-in as an alert, in the language on screen', async () => {
+    signIn.mockRejectedValue(new Error('Invalid login credentials'));
+    render(<AuthScreen />);
+    fireEvent.click(screen.getByRole('button', { name: /العربية|arabic|English/i }));
+    fireEvent.change(screen.getByLabelText('البريد الإلكتروني'), { target: { value: 'staff@example.test' } });
+    fireEvent.change(screen.getByLabelText('كلمة المرور'), { target: { value: 'wrong horse' } });
+    fireEvent.submit(screen.getByLabelText('البريد الإلكتروني').closest('form')!);
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('تعذّر تسجيل الدخول');
+    expect(alert.textContent).toContain('Invalid login credentials');
+  });
+
   it('leaves no sign-up path behind in the context or the API', () => {
     const root = join(__dirname, '..', '..');
     const ctx = readFileSync(join(root, 'src/context/AppContext.tsx'), 'utf8');

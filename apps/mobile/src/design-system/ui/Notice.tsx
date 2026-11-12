@@ -26,10 +26,12 @@ export function Notice({ title, action, amount, amountLabel, tone = 'blocking', 
   const colors = useThemeColors();
   const { lang, rtlRow } = useI18n();
   const c =
+    // The bar keeps the hue; the title is an ink. A 17px title is not "large
+    // text", and the hues measure 3.01-4.23:1 on their own tints (R07#2).
     tone === 'warning' ? { bg: colors.warnTint, bar: colors.warn, title: colors.amberInk }
-    : tone === 'info' ? { bg: colors.infoTint, bar: colors.sky, title: colors.sky }
-    : tone === 'success' ? { bg: colors.mintTint, bar: colors.mint, title: colors.mint }
-    : { bg: colors.dangerTint, bar: colors.danger, title: colors.danger };
+    : tone === 'info' ? { bg: colors.infoTint, bar: colors.sky, title: colors.skyInk }
+    : tone === 'success' ? { bg: colors.mintTint, bar: colors.mint, title: colors.mintInk }
+    : { bg: colors.dangerTint, bar: colors.danger, title: colors.dangerInk };
   const showAmount = amount != null && amountLabel;
 
   return (

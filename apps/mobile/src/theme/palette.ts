@@ -46,6 +46,12 @@ export const darkPalette: AppPalette = {
   warn: '#D9AD4A',
   danger: '#E57B86',
   amberInk: '#E4B957',
+  // Status inks. The dark hues already clear AA on the dark tints (7.32 / 6.36
+  // / 5.39:1), so the inks keep those values. Separate keys so a future change
+  // to a hue cannot silently move the text drawn in it.
+  mintInk: '#79C99E',
+  skyInk: '#7FAFD8',
+  dangerInk: '#E57B86',
   heatOff: '#625B64',
 
   warnTint: '#30291B',

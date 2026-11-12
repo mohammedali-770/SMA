@@ -96,6 +96,23 @@ export const color = {
   warn: '#DE7C00',
   danger: '#D92D20',
   amberInk: '#8A5600',
+  /**
+   * Status INKS — the colour of the words on a status tint, and of status text
+   * at normal size. `mint`, `sky` and `danger` are hues for bars, dots and
+   * icons; as 11.5px pill labels on their own tints they measured 3.01, 3.63
+   * and 4.23:1 (R07#2, 2026-11-12), all under WCAG AA. `amberInk` was already
+   * the warning pill's ink and passes at 5.74:1; these three complete the set.
+   *
+   * Light: mintInk 4.85 / skyInk 5.02 / dangerInk 5.52 on their tints, and
+   * higher on every cream and white ground. Dark keeps the existing hue values,
+   * which already clear AA on the dark tints. Not aliases of the hues, for the
+   * same reason `emberText` is not an alias of `emberDeep`: an ink and a fill
+   * answer to different constraints. Pinned by `contrastContract.test.ts` and
+   * `darkContrastContract.test.ts`.
+   */
+  mintInk: '#0E7A3E',
+  skyInk: '#1767BF',
+  dangerInk: '#B8261B',
   heatOff: '#DCCDBB',
 
   /**
