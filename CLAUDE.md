@@ -237,11 +237,10 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
 **AMENDED 2026-11-12 — `20261005120000_server_input_bounds` is written,
-validated and awaiting approval. On merge it joins the unapplied set.** As this
-file stood on the base branch that set was Moyasar (frozen, §6),
-`20260929120000_db_advisor_hardening` and `20261001120000_prune_operational_run_history`;
-an open record PR says the prune file was applied on 2026-11-11, so read the
-live count rather than adding one here. The new file bounds order-line
+validated and awaiting approval. On merge it joins the unapplied set.** On the base
+branch at `9a90253` that set is Moyasar (frozen, §6),
+`20260929120000_db_advisor_hardening` and `20261002120000_staff_actor_fk_set_null`
+(#436), so on merge it is FOUR. The new file bounds order-line
 quantity at 50, bounds customer-editable names, emails, address labels and
 coordinates, fixes the landmark trim that treated the letter v as whitespace,
 lets an administrator's image delete actually delete, and makes
@@ -251,6 +250,18 @@ three numbers are owner decisions (`docs/OWNER_ACTIONS.md` §48). The money path
 is self-asserted unchanged. `20260824100000` still sorts ahead of it, so a bulk
 apply would take the frozen payment file first. **Name the target by version.**
 Detail: `docs/MIGRATIONS.md` §57.
+
+**AMENDED 2026-11-11 (later) — `20261002120000_staff_actor_fk_set_null` is
+written, validated and awaiting approval, so on merge the outstanding set is
+THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
+file. `20261001120000_prune_operational_run_history` is not among them: it was
+applied at 12:30:50 UTC the same day, live version `20261111123050`. This file
+makes four actor keys `ON DELETE SET NULL`, so a staff account that filed,
+resolved or revealed something can be deleted; before it, the console's staff
+Delete failed with 23503. It redefines nothing; the money path is
+self-asserted. The two unfrozen files are independent, each on its own
+approval, and `20260824100000` still sorts first. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §54.
 
 **AMENDED 2026-11-11 — `20261001120000_prune_operational_run_history` is
 written, validated and awaiting approval, so on merge the outstanding set is

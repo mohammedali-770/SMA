@@ -404,6 +404,13 @@ since it was written, reporting the same green as a passing suite.
 `.github/sql-ci/run.sh` now hands each suite a conninfo for its own clone. All
 five run; none skip.
 
+**The handler's half was tested by nothing until 2026-11-11.** The suite above
+proves the budget in SQL. Nothing pinned that `auth-send-sms-whatsapp` actually
+uses it: reserve before the send, 503 on a limiter error, 429 on a refusal,
+release on a failed send. Deleting or reordering that block passed every test and
+`deno check`. `_shared/whatsappLoginSendWiring.test.ts` now pins all four at source
+level; see [the 2026-11-11 section](#the-meta-send-now-has-a-3-second-deadline-2026-11-11).
+
 ### Ordering, when this is applied and deployed
 
 Apply the migration **first**. It defines the RPCs `auth-send-sms-whatsapp`
@@ -443,6 +450,12 @@ caller which limit it hit reveals how much traffic a given number has already ha
 reached, the send proceeds. A limiter that is unreachable must not become an
 outage of the entire login system — the trade is a temporary loss of limiting, not
 a loss of login.
+
+> **Superseded in source 2026-09-14: the limiter now fails CLOSED** (see the
+> section of that name near the end). That change shipped as source only, and this
+> document records no deploy of `auth-send-sms-whatsapp` after v2, so whether
+> Production fails open or closed is not established here. The 2026-11-11 section
+> says what a redeploy now carries.
 
 | | |
 | --- | --- |
@@ -572,7 +585,7 @@ and calls `claim_comp_membership`. A customer who can sign in is already verifie
 
 | Function | Deployed | Callers now |
 | --- | --- | --- |
-| `whatsapp-send-otp` | yes (v2) | the admin console's test-send (`src/lib/api.ts`) |
+| `whatsapp-send-otp` | yes (v2) | ~~the admin console's test-send (`src/lib/api.ts`)~~ **none in this repository** (corrected 2026-11-11: that test send calls `whatsapp-test-config`, which sends through `sendOtpViaWhatsApp` itself) |
 | `whatsapp-verify-otp` | yes (v2) | **none** |
 
 `whatsapp-verify-otp` is now a deployed function with no caller anywhere. It was
@@ -719,3 +732,159 @@ broken" apart from "WhatsApp login is switched off".
 **The verification path was already correct.** `_shared/whatsappSend.ts` does
 `if (beginErr) return 'error'` and sends nothing. Only the login hook was the
 outlier, which is why this went unnoticed.
+
+## The Meta send now has a 3-second deadline (2026-11-11)
+
+`deliverOtpTemplate` in `_shared/whatsappSend.ts` sent to the Meta Graph API with
+no timeout. It now gives up after **3 s** (`WHATSAPP_SEND_TIMEOUT_MS`). **This is
+source only.** It takes effect in a function only when that function is
+redeployed; the list is at the end of this section.
+
+### What was wrong, measured
+
+Supabase Auth gives the Send SMS hook **5 s** for the whole invocation: *"We have
+a time budget of 5s for the entire webhook invocation, including retry requests"*
+(Auth Hooks guide, read through the Supabase documentation search on
+2026-11-11). Nothing in the hook was bounded to fit inside it.
+
+The real `auth-send-sms-whatsapp` handler was run locally against a stub Graph
+API, with a stub PostgREST serving synthetic rows and a correctly signed hook
+request. Nothing left the machine and no message was sent.
+
+| Graph API behaviour | before | after |
+| --- | --- | --- |
+| answers at once (control) | `200 {}` in 14 ms | `200 {}` in 17 ms |
+| accepts the connection, never answers | **still waiting at 20 001 ms**: reservation taken, no log row, nothing released | hook error 502 at **3 005 ms**: `failed` / `network_error` logged, reservation released |
+| sends `200` headers, then never the body | **still waiting at 20 001 ms** | hook error 502 at **3 005 ms**: `failed` with no error code logged, reservation released |
+
+Before the fix, the hung requests finished only because the stub closed its
+socket at 20 s. In Production nothing closes it, so the function waits for the
+platform's own limit. Meanwhile:
+
+- Auth has already failed the customer's request at 5 s, so the answer the hook
+  eventually computes reaches nobody;
+- no `whatsapp_message_logs` row exists, so the failure is invisible;
+- the reservation is held. It is released only after the send returns, so a
+  customer who retries meets the 60 s cooldown and the hourly and daily caps
+  although nothing was delivered. If the platform ends the function first, it is
+  never released. This is read from the code, not observed in Production.
+
+### The change
+
+One line on the Graph fetch, `signal: AbortSignal.timeout(WHATSAPP_SEND_TIMEOUT_MS)`,
+with the constant exported at 3 000. It is the only `fetch` in the module. The
+hook itself did not change: the existing `catch` records the abort as
+`network_error`, `deliverOtpTemplate` returns `'error'`, and the hook releases the
+reservation and answers with its 502 hook error.
+
+**What it does not bound:** the five database calls around the send go through
+the service-role client and have no transport timeout of their own. A database
+that stalls can still overrun Auth's budget, as before.
+
+### Why 3 s
+
+On the failure path the hook makes five database round trips around the send:
+three before it (two reads of `integration_settings`, then `otp_reserve_send`)
+and two after it (`record_whatsapp_message`, then `otp_release_send`). 3 s leaves
+about 2 s for them. No retry competes for the budget. The hook answers HTTP 200
+on every path it returns from, with any error in the body, and Auth retries only
+a `429` or `503` status that carries a `retry-after` header.
+
+**What those five cost in Production is not known.** Where the hook executes is
+not recorded in this repository. Supabase Auth runs beside the database in
+eu-central-1 (Frankfurt), which suggests the hook runs there too. From Frankfurt,
+one read of `integration_settings` cost 35 ms on 2026-08-30 (the timing comment
+in `order-intake`). From Mumbai the same read cost 934 ms, and five of those would
+not fit in 2 s. The first real login after the redeploy, still owed (§10a),
+settles it: the function's execution time is in the Supabase logs.
+
+**How long Meta normally takes is not known either.** `whatsapp_message_logs`
+records no latency. A healthy send slower than 3 s is now reported as failed and
+may still be delivered (next section). The test allows at most 4 s, which already
+leaves the database calls about a second.
+
+### A timed-out send is ambiguous
+
+Abandoning the request does not recall it. Meta may already have accepted the
+message and may still deliver it. On the login path:
+
+- the customer is told the code could not be sent, and may receive it anyway;
+- the reservation is released, so they can ask again at once, and Supabase Auth
+  then sends a second code. Whether Auth still accepts the first code after the
+  hook reported failure has not been verified;
+- the log row says `network_error`, the same code as a refused connection, so it
+  cannot distinguish "never reached Meta" from "may still deliver".
+
+A dropped connection always carried this ambiguity. The timeout bounds it; it
+does not create it. On the verification paths (`sendOtpViaWhatsApp`, used by
+`account-delete-request`, `whatsapp-send-otp` and `whatsapp-test-config`), the
+challenge row is written before the send, so a late code still verifies and, as
+before, the budget slot is not returned.
+
+### What pins it
+
+`supabase/functions/_shared/whatsappLoginSendWiring.test.ts`: 10 source-level
+tests in the style of `adminAuthWiring.test.ts`.
+
+| | asserts | on the code before this change |
+| --- | --- | --- |
+| (a) | the Graph fetch in `deliverOtpTemplate` carries `AbortSignal.timeout(<constant>)`; the constant is a literal between 1 000 and 4 000 ms; every `fetch` in the module carries a signal | **fails** (3 tests) |
+| (b) | `otp_reserve_send` is called before the only `deliverOtpTemplate` call, for the same normalized number | passes |
+| (c) | a limiter error returns `hookError(503` | passes |
+| (d) | `allowed === false` returns `hookError(429`, with the gate read from the RPC's own answer | passes |
+| (e) | `otp_release_send` is called when the outcome is not `'sent'`, and nowhere else | passes |
+
+(b) to (e) pin behaviour that already existed and was tested by nothing. Fifteen
+scratch mutants were run against the suite and **all fifteen were killed**. They
+include fail-open (the pre-2026-09-14 behaviour), a hardcoded gate, a release on
+every outcome, and a reservation keyed on the raw payload phone.
+
+The suite strips comments more strictly than `adminAuthWiring.test.ts`, which
+drops only whole-line `//` comments. One mutant kept the signal only in a
+trailing comment; it is killed here, and it survives the whole-line stripper.
+
+The hook demonstration in the table above is not in CI: it needs Deno, sockets
+and a stub server.
+
+### Redeploy list
+
+Supabase bundles a function's imports when it is deployed, so the fix is live
+only in a function redeployed after the merge. Each redeploy is a separate
+owner-approved deploy (CLAUDE.md §5). Keep `verify_jwt` exactly as
+`supabase/config.toml` sets it.
+
+| function | `verify_jwt` | reaches the Meta send | redeploy for this fix | callers in this repository |
+| --- | --- | --- | --- | --- |
+| `auth-send-sms-whatsapp` | `false` | yes, directly | **yes, first** | every customer login, through Supabase Auth |
+| `account-delete-request` | `true` | yes (`send_otp`) | yes | the app's account-deletion flow |
+| `whatsapp-test-config` | `true` | yes (`test_send`) | yes | the admin console's WhatsApp test send |
+| `whatsapp-send-otp` | `true` | yes | optional | none (§9; a comment in `apps/mobile/src/services/api.ts` still says otherwise) |
+| `whatsapp-verify-otp` | `true` | **no**: it imports `getOtpPepper` only | **no** | none |
+
+`auth-send-sms-whatsapp` must keep `verify_jwt = false`. Auth calls it with a
+Standard Webhooks signature, not a JWT, so turning verification on would break
+every login. `whatsapp-verify-otp` bundles the file but never reaches the send, so
+redeploying it would change nothing this fix is about.
+
+**A redeploy ships the whole current bundle, not only this line.** What each one
+carries, as far as this repository records:
+
+- `auth-send-sms-whatsapp`: last recorded deploy v2, 2026-09-02. Since then, the
+  limiter's fail-closed change (2026-09-14, #371, which shipped as source only)
+  and the API-key preparation in `_shared/apiKeys.ts` and `_shared/supabaseClient.ts`
+  (2026-11-10, #419, inert until the new keys exist). **Unless a deploy this
+  document does not record has already happened, this redeploy also switches the
+  limiter from fail-open to fail-closed.** Read the live version before deploying.
+- `account-delete-request`: #419's sender change for its kick to
+  `account-delete-process` (`docs/SUPABASE_API_KEYS.md` §3, step 4). It is inert
+  until the new keys exist. If they are created before `account-delete-process`
+  is redeployed, that best-effort kick is refused and the scheduled processor
+  picks the request up instead: a delay, not a lost request.
+- `whatsapp-test-config` (last recorded v3, 2026-08-23) and `whatsapp-send-otp`
+  (v2): every shared file changed since their last deploys, #419 included.
+
+**What a check after the deploy can and cannot show.** As on 2026-09-02, a `GET`
+returning the hook-shaped 405 and an unsigned `POST` returning 401 prove that the
+function boots and the signature gate holds, without sending anybody a code.
+Neither exercises the timeout, which would need Meta to be slow. The first real
+login proves the success path.
