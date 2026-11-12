@@ -26,6 +26,7 @@ import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { loyaltyCampaigns, type LoyaltyCampaign } from '../../lib/loyaltyCampaignsApi';
+import { riyadhDateOnly } from '../../utils/calculations';
 
 const INPUT = [
   'ds-motion min-h-10 w-full rounded-[var(--radius-ds-md)] border border-con-line',
@@ -372,8 +373,12 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
                       </Text>
                     </td>
                     <td className={TD}>
+                      {/* The RIYADH calendar date, not a slice of the UTC
+                          string: a campaign starting at midnight Riyadh is
+                          21:00 UTC the day before, and read as that day. */}
                       <Text variant="caption" tone="secondary" as="span">
-                        {(c.starts_at ?? '—').slice(0, 10)} → {(c.ends_at ?? '—').slice(0, 10)}
+                        {c.starts_at ? riyadhDateOnly(c.starts_at) : '—'} →{' '}
+                        {c.ends_at ? riyadhDateOnly(c.ends_at) : '—'}
                       </Text>
                     </td>
                     {/* WHAT IT APPLIES TO. Added with the scope controls: a list

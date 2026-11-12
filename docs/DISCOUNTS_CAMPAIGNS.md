@@ -71,6 +71,22 @@ would have rendered those two codes perfectly and told the operator nothing:
   beside a connectivity error, which on a screen whose purpose is reassurance
   about discount exposure is the exact failure it exists to prevent.
 
+- **Saving the bounds no longer moves the expiry (fixed 2026-11-12).** PostgREST
+  returns a `timestamptz` in the database session zone, which is UTC in
+  Production. The editor put that UTC wall clock into its `datetime-local`
+  field, and the save read the field back as the browser's own time. In Riyadh
+  every save moved the expiry **three hours earlier**, a save that changed only
+  the usage limit included, and the shift added up with each save. The field
+  now shows the stored instant on the browser's clock (`toLocalInputValue`, the
+  exact inverse of `toIso`). An expiry left as it was loaded is written back as
+  the stored value itself (`boundsEndsAt`), so it cannot move even in the one
+  hour a year that a daylight-saving zone repeats.
+- **The list's dates are Riyadh calendar dates.** It sliced the UTC string, so a
+  code starting or ending between 00:00 and 02:59 Riyadh, midnight included,
+  was listed on the day before.
+- Neither defect had touched a real code. The 2026-11-11 assessment read
+  Production read-only and found 2 coupons, neither with an expiry.
+
 Writes are ordinary RLS-gated table operations rather than an RPC:
 `coupons_admin_all` is an `ALL` policy for `authenticated` with `is_admin()` on
 both `USING` and `WITH CHECK`, so role AND AAL2 already gate every one.

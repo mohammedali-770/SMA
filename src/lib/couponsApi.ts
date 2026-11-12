@@ -104,6 +104,53 @@ export function toIso(v: string): string | null {
   return v ? new Date(v).toISOString() : null;
 }
 
+/**
+ * The exact inverse of `toIso`: a stored instant as the `datetime-local` value
+ * that names it in the operator's browser zone.
+ *
+ * The Bounds editor used to load `ends_at.slice(0, 16)`. PostgREST returns a
+ * timestamptz in the DATABASE session zone, which is UTC in Production, so the
+ * field showed the UTC wall clock and `toIso` then read it back as browser-zone
+ * time. In Riyadh every save moved the expiry three hours EARLIER — including a
+ * save that only changed the usage limit — and the shift compounded.
+ *
+ * Built from the local getters for exactly that reason. Seconds and
+ * milliseconds are appended only when present: a value the console wrote is
+ * always minute-aligned and renders as `YYYY-MM-DDTHH:mm`, which is also the
+ * shape a browser normalises such a value to.
+ */
+export function toLocalInputValue(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const two = (n: number) => String(n).padStart(2, '0');
+  const date = `${String(d.getFullYear()).padStart(4, '0')}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+  let value = `${date}T${two(d.getHours())}:${two(d.getMinutes())}`;
+  const seconds = d.getSeconds();
+  const millis = d.getMilliseconds();
+  if (seconds !== 0 || millis !== 0) value += `:${two(seconds)}`;
+  if (millis !== 0) value += `.${String(millis).padStart(3, '0')}`;
+  return value;
+}
+
+/**
+ * What a Bounds save writes to `ends_at`.
+ *
+ * An expiry the operator left exactly as it was loaded is written back as the
+ * stored instant itself, not re-parsed from the wall clock the field showed.
+ * The two are the same instant everywhere except in the hour a daylight-saving
+ * zone repeats each autumn: there one wall-clock string names two instants and
+ * `new Date()` picks the earlier, so the round trip alone would move the
+ * second one back an hour. Riyadh has no daylight saving, so only an operator
+ * abroad could reach that — but "a save that changed only the usage limit moved
+ * the expiry" is the defect `toLocalInputValue` replaced, and it should not
+ * survive in any zone.
+ */
+export function boundsEndsAt(input: string, stored: string | null): string | null {
+  if (stored && input === toLocalInputValue(stored)) return stored;
+  return toIso(input);
+}
+
 /** Optional numeric field: blank means "no bound", not zero. */
 function optionalNumber(v: string): number | null {
   const t = v.trim();
@@ -320,13 +367,17 @@ export const couponsApi = {
    * trigger refuses) and could not be bounded (nothing wrote these columns), so
    * the operator was still left with the direct database write the panel is
    * supposed to replace. Review caught that on #358.
+   *
+   * `storedEndsAt` is the `ends_at` the editor was opened with. When the
+   * Expires field still shows it, that instant is written back unchanged —
+   * see `boundsEndsAt`. A caller that omits it gets the plain conversion.
    */
-  async updateBounds(id: string, bounds: CouponBounds): Promise<void> {
+  async updateBounds(id: string, bounds: CouponBounds, storedEndsAt: string | null = null): Promise<void> {
     const patch = {
       min_order_amount: optionalNumber(bounds.minOrderAmount) ?? 0,
       max_discount_amount: optionalNumber(bounds.maxDiscountAmount),
       usage_limit: optionalNumber(bounds.usageLimit),
-      ends_at: toIso(bounds.endsAt),
+      ends_at: boundsEndsAt(bounds.endsAt, storedEndsAt),
     };
     const { error } = await supabase.from('coupons').update(patch).eq('id', id);
     if (error) throw new Error(error.message);
