@@ -54,6 +54,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 | `npm run play-screenshots:check` | `node scripts/check-play-screenshots.mjs` |
 | `npm run preview` | `vite preview` |
 | `npm run test` | `vitest run` |
+| `npm run test:e2e` | `playwright test -c e2e/playwright.config.ts` |
 | `npm run test:watch` | `vitest` |
 
 ## Repository scripts

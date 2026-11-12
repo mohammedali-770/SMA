@@ -2,7 +2,7 @@
      GENERATED FILE — DO NOT EDIT.
      Regenerate with: npm run docs:generate
      CI fails if this file drifts from its source (npm run docs:check).
-     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`
+     Derived from: `vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `e2e/*.spec.ts`
      Describes the REPOSITORY, not live Production.
      ------------------------------------------------------------------ -->
 
@@ -23,6 +23,7 @@ What is tested, where those tests live, and how to run them. Use it to find whet
 | `npm run lint` | TypeScript, no emit |
 | `npm run design-system:check` | Design-system mirrors and hygiene |
 | `npm run docs:check` | Documentation drift and ownership |
+| `npm run test:e2e` | The Playwright specs in `e2e/`, against a built `dist/` (run `npm run build` first) |
 
 Vitest runs under the **Node** environment, not jsdom or a device; suites that need a DOM opt in per file with a `@vitest-environment jsdom` docblock. A mobile test file therefore cannot import `react-native`. This is why feature modules keep their rules in pure, framework-free files — those are the parts under test.
 
@@ -116,6 +117,14 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/staff_account_deletion_test.sql`
 - `supabase/tests/staff_mfa_aal2_test.sql`
 - `supabase/tests/staff_role_administration_test.sql`
+
+## End-to-end specs
+
+Playwright, against the **built** web app: `npm run build` produces `dist/`, `e2e/serve-dist.mjs` serves it with `vercel.json`'s headers and rewrites, and every Supabase and Sentry request is answered or refused inside the browser, so nothing reaches Production. The `Production build` CI job runs them straight after the build.
+
+| File | Tests |
+| --- | --- |
+| `e2e/guest-journey.spec.ts` | 2 |
 
 ## TypeScript suites
 

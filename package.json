@@ -28,6 +28,7 @@
     "docs:check": "node scripts/docs-generate.mjs --check && node scripts/docs-check-ownership.mjs && node scripts/check-recorded-hashes.mjs && node scripts/check-test-phone-numbers.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "phones:check": "node scripts/check-test-phone-numbers.mjs"
   },
   "dependencies": {
@@ -48,6 +49,7 @@
     "react-dom": "^19.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@sentry/vite-plugin": "^5.4.0",
     "@testing-library/react": "^16.3.2",
     "@types/google.maps": "^3.65.2",

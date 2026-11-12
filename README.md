@@ -128,6 +128,8 @@ npm run docs:check                      # generated reference, ownership rules, 
 # Production build (Vite + Expo web export)
 npm run build                           # reinstalls apps/mobile dependencies first, then builds dist/
 find dist -name '*.map'                 # must print nothing: source maps never ship
+npx playwright install --only-shell chromium  # once per Playwright version; the lockfile fixes which build
+npm run test:e2e                        # a guest's journey through dist/, hermetic (e2e/guest-journey.spec.ts)
 
 # Edge Function typecheck (Deno), with Deno 2.9.4 as CI pins it
 deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts

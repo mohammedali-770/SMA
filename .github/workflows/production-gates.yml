@@ -72,6 +72,28 @@ jobs:
           fi
           echo "no .map files in dist/"
 
+      # The browser the end-to-end spec runs. `npx playwright` is the exact
+      # @playwright/test version in package.json and the lockfile, and that
+      # version names the one browser build it downloads, so nothing here floats.
+      # Headless shell only: the spec never runs headed.
+      #
+      # No `--with-deps`: it runs `apt-get update`, which hung for a whole job
+      # budget in sql-suites.yml (see the note there), and the runner image
+      # already carries Chrome's libraries. A missing library fails the next
+      # step loudly; it cannot pass it.
+      - name: Install the end-to-end browser
+        timeout-minutes: 5
+        run: npx --no-install playwright install --only-shell chromium
+
+      # A signed-out customer's journey through the build above, served with
+      # vercel.json's headers and rewrites. Hermetic: every Supabase read comes
+      # from a fixture of seed rows, and any write, function call, guest read of
+      # orders, Sentry error event or page error fails it. A few seconds.
+      # e2e/guest-journey.spec.ts says what it covers and why.
+      - name: End-to-end guest journey (built /app)
+        timeout-minutes: 5
+        run: npm run test:e2e
+
   edge-functions:
     name: Edge Function typecheck (Deno)
     runs-on: ubuntu-latest

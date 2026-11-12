@@ -453,13 +453,20 @@ function generateTesting() {
   const sqlDir = join(ROOT, 'supabase', 'tests');
   const sqlFiles = existsSync(sqlDir) ? readdirSync(sqlDir).filter((f) => f.endsWith('.sql')).sort() : [];
 
+  // Playwright specs under e2e/ — not collected by vitest, run by `npm run test:e2e`.
+  const e2eSpecs = walk(join(ROOT, 'e2e'), (f) => /\.spec\.ts$/.test(f) && !f.includes('test-results'));
+  const e2eRows = e2eSpecs.map((f) => {
+    const blocks = (read(f).match(/^test(?:\.\w+)?\s*\(/gm) ?? []).length;
+    return `| \`${cell(posix(relative(ROOT, f)))}\` | ${blocks} |`;
+  });
+
   const fileTotal = sections.reduce((n, s) => n + s.count, 0);
   const blockTotal = sections.reduce((n, s) => n + s.blocks, 0);
 
   return (
     banner(
       'Test inventory',
-      '`vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`',
+      '`vitest.config.ts`, the test files it collects, `supabase/tests/*.sql`, `e2e/*.spec.ts`',
       'What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.',
     ) +
     [
@@ -476,6 +483,7 @@ function generateTesting() {
       '| `npm run lint` | TypeScript, no emit |',
       '| `npm run design-system:check` | Design-system mirrors and hygiene |',
       '| `npm run docs:check` | Documentation drift and ownership |',
+      '| `npm run test:e2e` | The Playwright specs in `e2e/`, against a built `dist/` (run `npm run build` first) |',
       '',
       'Vitest runs under the **Node** environment, not jsdom or a device; suites that need a DOM opt in per file with a `@vitest-environment jsdom` docblock. A mobile test file therefore cannot import `react-native`. This is why feature modules keep their rules in pure, framework-free files — those are the parts under test.',
       '',
@@ -484,6 +492,14 @@ function generateTesting() {
       'SQL suites run against a **disposable** database, never Production (CLAUDE.md §10). `.github/workflows/sql-suites.yml` gates them, and the heavier migration-chain job is path-gated so it only runs when SQL changes.',
       '',
       ...sqlFiles.map((f) => `- \`supabase/tests/${f}\``),
+      '',
+      '## End-to-end specs',
+      '',
+      'Playwright, against the **built** web app: `npm run build` produces `dist/`, `e2e/serve-dist.mjs` serves it with `vercel.json`\'s headers and rewrites, and every Supabase and Sentry request is answered or refused inside the browser, so nothing reaches Production. The `Production build` CI job runs them straight after the build.',
+      '',
+      '| File | Tests |',
+      '| --- | --- |',
+      ...e2eRows,
       '',
       '## TypeScript suites',
       '',
