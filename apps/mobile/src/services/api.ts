@@ -14,6 +14,10 @@
  * payment / SMS / Lazywait call. Those stay server-side behind Edge Functions.
  */
 import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
+import {
+  APP_SETTINGS_SELECT, BRANCH_SELECT, CATEGORY_SELECT, MODIFIER_GROUP_SELECT, MODIFIER_SELECT,
+  PRODUCT_SELECT, PRODUCT_VARIANT_SELECT,
+} from '../lib/catalogSelect';
 import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
 import {
@@ -107,9 +111,15 @@ export const auth = {
 // ---------------------------------------------------------------------------
 // Catalog (public reads under RLS)
 // ---------------------------------------------------------------------------
+// The six menu tables and `app_settings` are read with EXPLICIT column lists
+// (lib/catalogSelect.ts), not `select('*')`. PostgREST refuses the whole select
+// when one listed column is missing, so a column goes into a list only once the
+// migration adding it is applied in Production; catalogSelect.test.ts pins the
+// lists to what the mappers read.
 export const catalog = {
-  branches: async () => ok<DbBranch[]>(await supabase.from('branches').select('*').order('name_en')),
-  categories: async () => ok<DbCategory[]>(await supabase.from('categories').select('*').order('sort_order')),
+  branches: async () => ok<DbBranch[]>(await supabase.from('branches').select(BRANCH_SELECT).order('name_en')),
+  categories: async () =>
+    ok<DbCategory[]>(await supabase.from('categories').select(CATEGORY_SELECT).order('sort_order')),
   // Homepage banners: RLS returns only ACTIVE, in-window rows to anon/customers.
   // Ordered here (sort_order asc, then newest) so the carousel needs no client filtering.
   banners: async () => ok<DbHomepageBanner[]>(await supabase
@@ -117,14 +127,17 @@ export const catalog = {
     .select('id, title_en, title_ar, image_url, is_active, sort_order, starts_at, ends_at, action_type, action_value, created_at')
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })),
-  products: async () => ok<DbProduct[]>(await supabase.from('products').select('*').order('sort_order')),
+  products: async () =>
+    ok<DbProduct[]>(await supabase.from('products').select(PRODUCT_SELECT).order('sort_order')),
   /** Price tiers. RLS returns only active rows to a customer. */
   productVariants: async () => ok<DbProductVariant[]>(await supabase
     .from('product_variants')
-    .select('id, product_id, name_en, name_ar, price, calories, sort_order, is_active')
+    .select(PRODUCT_VARIANT_SELECT)
     .order('sort_order')),
-  modifierGroups: async () => ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select('*')),
-  modifiers: async () => ok<DbModifier[]>(await supabase.from('modifiers').select('*').order('sort_order')),
+  modifierGroups: async () =>
+    ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select(MODIFIER_GROUP_SELECT)),
+  modifiers: async () =>
+    ok<DbModifier[]>(await supabase.from('modifiers').select(MODIFIER_SELECT).order('sort_order')),
   productModifierGroups: async () =>
     ok<DbProductModifierGroup[]>(await supabase.from('product_modifier_groups').select('*')),
   availability: async () =>
@@ -170,7 +183,7 @@ export const catalog = {
     return (data ?? []) as DbBranchVariantAvailability[];
   },
   settings: async () =>
-    ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
+    ok<DbAppSettings>(await supabase.from('app_settings').select(APP_SETTINGS_SELECT).eq('id', true).single()),
   /**
    * Is loyalty pickup-only right now? `boolean | null`, `null` when the answer
    * could not be read.
