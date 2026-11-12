@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **147**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261004120000_drop_tap_payment_rpcs.sql`.
+Migration files in the repository: **148**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261004120000_drop_tap_payment_rpcs.sql`.
 
 ## Tables
 
@@ -30,12 +30,12 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 4 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branch_delivery_events` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
-| `branch_delivery_requests` | `20260916120000_branch_delivery_requests.sql` | 0 | 1 |
+| `branch_delivery_requests` | `20260916120000_branch_delivery_requests.sql` | 1 | 1 |
 | `branch_delivery_zones` | `20260710120000_delivery_zones.sql` | 0 | 3 |
 | `branch_modifier_availability` | `20260820140000_branch_modifier_availability.sql` | 0 | 2 |
 | `branch_product_availability` | `20260707120200_catalog.sql` | 1 | 1 |
-| `branch_reference_entries` | `20260917120000_branch_reference_entries.sql` | 0 | 1 |
-| `branch_reference_reveals` | `20260917120000_branch_reference_entries.sql` | 0 | 1 |
+| `branch_reference_entries` | `20260917120000_branch_reference_entries.sql` | 1 | 1 |
+| `branch_reference_reveals` | `20260917120000_branch_reference_entries.sql` | 1 | 1 |
 | `branch_variant_availability` | `20260923120000_branch_variant_availability.sql` | 0 | 2 |
 | `branch_working_hours` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branches` | `20260707120200_catalog.sql` | 3 | 3 |

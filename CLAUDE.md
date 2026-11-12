@@ -286,10 +286,22 @@ the first, and the fourth before the second. No SQL can tell whether step 3
 happened, so holding 3 before 4 is the approver's job. Paragraphs below that
 call `20260824100000` "frozen on purpose" describe the freeze as it stood when
 they were written. **On merge of the Moyasar-only change the outstanding set is
-FOUR:** `20260824100000`, `20260929120000` and the two Moyasar-only files, plus
-`20261002120000` if #436 merges first. **Name the target by version.** A bulk
+FIVE:** `20260824100000`, `20260929120000`, `20261002120000` (#436, merged
+2026-11-12) and the two Moyasar-only files. **Name the target by version.** A bulk
 apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
+
+**AMENDED 2026-11-11 (later) — `20261002120000_staff_actor_fk_set_null` is
+written, validated and awaiting approval, so on merge the outstanding set is
+THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
+file. `20261001120000_prune_operational_run_history` is not among them: it was
+applied at 12:30:50 UTC the same day, live version `20261111123050`. This file
+makes four actor keys `ON DELETE SET NULL`, so a staff account that filed,
+resolved or revealed something can be deleted; before it, the console's staff
+Delete failed with 23503. It redefines nothing; the money path is
+self-asserted. The two unfrozen files are independent, each on its own
+approval, and `20260824100000` still sorts first. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §54.
 
 **AMENDED 2026-11-11 — `20261001120000_prune_operational_run_history` is
 written, validated and awaiting approval, so on merge the outstanding set is

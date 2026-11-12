@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**223 TypeScript test files declaring 3521 test blocks, plus 84 SQL suites.**
+**225 TypeScript test files declaring 3554 test blocks, plus 85 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -112,6 +112,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
 - `supabase/tests/staff_access_directory_test.sql`
+- `supabase/tests/staff_account_deletion_test.sql`
 - `supabase/tests/staff_mfa_aal2_test.sql`
 - `supabase/tests/staff_role_administration_test.sql`
 
@@ -129,7 +130,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-79 files, 1117 declared test blocks.
+80 files, 1140 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -204,6 +205,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
+| `apps/mobile/src/services/rpcContractParity.test.ts` | 23 | the SQL reader |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
@@ -334,7 +336,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-31 files, 844 declared test blocks.
+32 files, 854 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -367,5 +369,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/webhookReliabilityWiring.test.ts` | 11 | lazywait-webhook |
 | `supabase/functions/_shared/webPush.test.ts` | 29 | base64url |
 | `supabase/functions/_shared/whatsapp.test.ts` | 18 | normalizePhoneE164 |
+| `supabase/functions/_shared/whatsappLoginSendWiring.test.ts` | 10 | whatsappSend.ts — the Meta send has a deadline |
 | `supabase/functions/payment-return/returnLink.test.ts` | 11 | sanitizeUuid |
 | `supabase/functions/staff-accounts/guards.test.ts` | 9 | staff-accounts manageable-role allow-list |
