@@ -192,6 +192,9 @@ export const STRINGS = {
     payPending: 'Payment is still pending.',
     payUnknown: 'We could not confirm the payment. Please contact support if an amount was deducted.',
     payUnavailable: 'Online payment is unavailable right now.',
+    // Moyasar will not take an online payment under 1.00 SAR, which redeeming
+    // points can leave. Shown in place of payUnavailable for that refusal.
+    payBelowMinimum: 'Online payment needs a total of at least 1.00 SAR. Use fewer points, or pay in cash.',
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
     // One-word state for the payment status pill. The sentence underneath
@@ -547,6 +550,7 @@ export const STRINGS = {
     payPending: 'الدفع قيد المعالجة.',
     payUnknown: 'تعذّر تأكيد الدفع. يرجى التواصل مع الدعم إذا تم خصم مبلغ.',
     payUnavailable: 'الدفع الإلكتروني غير متاح حالياً.',
+    payBelowMinimum: 'يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. استخدم نقاطاً أقل، أو ادفع نقداً.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
     payStatusPending: 'قيد المعالجة',

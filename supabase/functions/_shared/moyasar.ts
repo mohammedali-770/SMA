@@ -111,6 +111,27 @@ export function amountsMatch(majorUnits: number, minorUnits: number, currency = 
   return Number.isInteger(actual) && expected === actual && expected > 0;
 }
 
+/**
+ * The smallest invoice Moyasar accepts: 100 minor units, 1.00 SAR
+ * (docs/integrations/Moyasar_API_Reference.md §2 and §3.1, "Minimum `100`").
+ *
+ * The ONE place this number lives on the server. payment-initiate refuses a
+ * smaller total before it opens an attempt, and the admin sandbox invoice is
+ * exactly this floor. The database refuses it too, in begin_session_attempt and
+ * begin_payment_attempt (20261003120000), as `total < 1.00`: SQL cannot import
+ * this constant, so paymentWiring.test.ts holds the two together.
+ */
+export const MOYASAR_MIN_INVOICE_MINOR_UNITS = 100;
+
+/**
+ * True when an amount in MAJOR units is below what Moyasar will put on an
+ * invoice. Such a total can never be paid online: the invoice create is
+ * refused, so an attempt opened for it ends with no invoice at all.
+ */
+export function isBelowMoyasarMinimum(majorUnits: number, currency = 'SAR'): boolean {
+  return toMinorUnits(majorUnits, currency) < MOYASAR_MIN_INVOICE_MINOR_UNITS;
+}
+
 // ---------------------------------------------------------------------------
 // Authentication — HTTP Basic, key as username, EMPTY password.
 // ---------------------------------------------------------------------------
@@ -291,9 +312,10 @@ export interface BuildInvoiceParams {
  * `payment.invoice_id === the invoice id we stored`, which Moyasar sets itself
  * and a client cannot influence. See moyasarVerify.ts.
  *
- * `amount` is emitted in MINOR units. Moyasar rejects an invoice under 100
- * minor units (1.00 SAR); the caller checks the total is positive and the
- * server-side amount check in validateAndConfirm re-compares independently.
+ * `amount` is emitted in MINOR units. Moyasar rejects an invoice under
+ * MOYASAR_MIN_INVOICE_MINOR_UNITS (1.00 SAR); payment-initiate refuses such a
+ * total before it opens an attempt, and the server-side amount check in
+ * validateAndConfirm re-compares independently.
  *
  * `callback_url` IS DELIBERATELY NOT SENT, and the omission is the considered
  * choice rather than an oversight. Moyasar documents it as "an endpoint on your
@@ -367,6 +389,55 @@ export function customerCheckoutUrl(raw: unknown, lang: CheckoutLanguage): strin
 export function invoiceExpiryIso(nowMs: number, expiryMinutes: number): string {
   const minutes = Math.min(60, Math.max(5, Math.round(Number(expiryMinutes) || 30)));
   return new Date(nowMs + minutes * 60_000).toISOString();
+}
+
+/**
+ * How far short of its attempt's `expires_at` an invoice stops being payable.
+ * The attempt's instant is the DATABASE's clock and Moyasar applies the
+ * invoice's by its own, so the margin absorbs skew between the two.
+ */
+export const INVOICE_EXPIRY_MARGIN_MS = 60_000;
+
+/**
+ * The shortest invoice worth handing a customer. A card payment with a 3-D
+ * Secure challenge does not fit in less, and an attempt this close to its end
+ * is better closed, so the next start gets a full window of its own.
+ */
+export const MIN_INVOICE_LIFETIME_MS = 2 * 60_000;
+
+/**
+ * The `expired_at` for an invoice opened on an attempt, or null when the
+ * attempt has too little time left to be worth one.
+ *
+ * AN INVOICE MUST NEVER OUTLIVE ITS ATTEMPT. begin_payment_attempt and
+ * begin_session_attempt close an expired attempt and open a new one, whose
+ * invoice is new too. If the old invoice were still payable then, one checkout
+ * would hold two payable invoices, and a customer who paid both would be
+ * charged twice for one order. The attempt's own `expires_at` is set once, by
+ * the database, from the same clamped `invoice_expiry_minutes`; computing the
+ * invoice's from `Date.now()` instead let it run past that, by request latency
+ * on a fresh attempt and by the attempt's whole age on a reused one whose first
+ * create failed.
+ *
+ * So the invoice ends INVOICE_EXPIRY_MARGIN_MS before the attempt does, and
+ * never later than a fresh window from now. An attempt with no `expires_at`
+ * (none the RPCs write) is never closed for age, so the fresh window cannot
+ * outlive it. An `expires_at` that is not a date fails closed, as no time left.
+ */
+export function invoiceExpiryForAttempt(
+  nowMs: number,
+  attemptExpiresAt: unknown,
+  expiryMinutes: number,
+): string | null {
+  const fresh = Date.parse(invoiceExpiryIso(nowMs, expiryMinutes));
+  let ends = fresh;
+  if (attemptExpiresAt != null && attemptExpiresAt !== '') {
+    const attemptEnds = Date.parse(String(attemptExpiresAt));
+    if (!Number.isFinite(attemptEnds)) return null;
+    ends = Math.min(fresh, attemptEnds - INVOICE_EXPIRY_MARGIN_MS);
+  }
+  if (ends - nowMs < MIN_INVOICE_LIFETIME_MS) return null;
+  return new Date(ends).toISOString();
 }
 
 /**
@@ -855,17 +926,142 @@ export function checkPaymentBinding(
  * by a successful one leaves both on the invoice. We take a `paid`/`captured`
  * one if it exists, and otherwise return the most recent attempt so the caller
  * can report a real failure reason rather than a bare "pending".
+ *
+ * `preferredPaymentId` is the payment the attempt already carries in
+ * provider_ref. When that one is settled it is chosen over any other, so a
+ * second settled payment on the same invoice, which is recorded as a duplicate,
+ * can never stand in front of the payment that owns the attempt and keep it
+ * from being confirmed.
  */
-export function selectInvoicePayment(invoice: Record<string, unknown>): Record<string, unknown> | null {
+export function selectInvoicePayment(
+  invoice: Record<string, unknown>,
+  preferredPaymentId?: string | null,
+): Record<string, unknown> | null {
   const payments = Array.isArray(invoice?.payments) ? (invoice.payments as Record<string, unknown>[]) : [];
   if (!payments.length) return null;
-  const settled = payments.find((p) => {
+  const isSettled = (p: Record<string, unknown>) => {
     const st = String(p?.status ?? '').toLowerCase();
     return st === 'paid' || st === 'captured';
-  });
+  };
+  const preferred = preferredPaymentId
+    ? payments.find((p) => isSettled(p) && String(p?.id ?? '') === preferredPaymentId)
+    : undefined;
+  if (preferred) return preferred;
+  const settled = payments.find(isSettled);
   if (settled) return settled;
   // Most recent by created_at, falling back to array order.
   const sorted = [...payments].sort((a, b) =>
     String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')));
   return sorted[0] ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate payments — a second settled payment for something already paid.
+// ---------------------------------------------------------------------------
+
+/**
+ * The failure_code, sync-log error and result reason for a DUPLICATE: a
+ * payment that Moyasar holds, that binds to its attempt, and that did not pay
+ * the order, because another payment already had.
+ *
+ * It is recorded the way a binding mismatch is, on a `failed` row, and never
+ * as `paid`: every reader of payment_records, the refund worker and the order
+ * integrity watchdog included, expects at most one paid row per order. Staff
+ * refund it by hand from that row; nothing refunds it automatically.
+ */
+export const DUPLICATE_PAYMENT = 'duplicate_payment';
+
+/** The failure_message_safe on that row. Staff read it in the console. */
+export const DUPLICATE_PAYMENT_MESSAGE = 'Duplicate payment: the order was already paid. Refund this payment.';
+
+/**
+ * PostgREST filter that leaves recorded duplicates out of an "attempts" lookup.
+ * A duplicate row is a record of money to give back, not an attempt: a lookup
+ * that took the newest row as THE attempt would otherwise read a duplicate,
+ * which carries no invoice, in place of the attempt whose payment is still
+ * being confirmed. `neq` alone would drop the NULL failure_code of every open
+ * attempt as well, hence the explicit `is.null`.
+ */
+export const NOT_A_DUPLICATE_FILTER = `failure_code.is.null,failure_code.neq.${DUPLICATE_PAYMENT}`;
+
+/**
+ * Did confirmation attach THIS payment to the order it returned?
+ *
+ * finalize_checkout_session returns the session's existing order for any
+ * payment id once the session is consumed, so its answer alone cannot tell the
+ * payment that paid it from a second one. The row carrying this payment id
+ * can: the genuine payment's row is `paid` and linked to that order. A second
+ * payment's row is still the attempt it was stamped on, unpaid.
+ */
+export function isGenuineConfirmation(
+  row: { status?: unknown; order_id?: unknown } | null | undefined,
+  orderId: unknown,
+): boolean {
+  const order = String(orderId ?? '');
+  return Boolean(row) && String(row?.status ?? '') === 'paid' && order !== ''
+    && String(row?.order_id ?? '') === order;
+}
+
+// ---------------------------------------------------------------------------
+// payment-verify for a checkout session whose newest attempt has no invoice.
+// ---------------------------------------------------------------------------
+
+export type SessionVerifyVerdict =
+  | { kind: 'ask_moyasar' }
+  | { kind: 'pending' }
+  | { kind: 'terminal'; status: 'expired' | 'cancelled'; messageKey: 'payExpired' | 'payCancelled' };
+
+/**
+ * What payment-verify answers for an unconsumed checkout session, decided
+ * before it needs the payment configuration or a key.
+ *
+ * WHY IT EXISTS. Every build of the app saves the session id before it calls
+ * payment-initiate, and before EVERY order, cash included, resolves that saved
+ * session through payment-verify. Only an answer it treats as terminal
+ * ('failed', 'cancelled', 'expired') or 'paid' lets it go; anything else
+ * resumes the dead session and places nothing. A session that never got a
+ * usable invoice used to be answered 'pending' for ever — a refusal before any
+ * attempt (TEST mode, a disabled gateway, a total under the minimum), or a
+ * failed invoice create — and that locked the device out of every order. The
+ * answer has to come from the server, because that is the only fix that
+ * reaches the builds already installed.
+ *
+ *   - the newest MOYASAR attempt carries an invoice: Moyasar decides
+ *     (verifyMoyasarAttempt), exactly as before;
+ *   - there is no Moyasar attempt at all (old provider rows do not count), or
+ *     the newest one is closed and never got an invoice: terminal. Nothing
+ *     can be paid: the customer is handed a checkout URL only after its
+ *     invoice id is stored;
+ *   - the newest one is 'initiated' with no invoice yet: 'pending' while the
+ *     session can still be paid, because an initiate may be in flight or its
+ *     invoice reconcilable; terminal once the session is over, because
+ *     begin_session_attempt refuses an expired or unpayable session, so no
+ *     invoice can ever be opened for it.
+ *
+ * Terminal is 'expired' / payExpired once the session's expires_at has passed
+ * or it is no longer 'pending_payment', else 'cancelled' / payCancelled: both
+ * are statuses every shipped build treats as terminal, with keys every build
+ * has copy for. NEVER a new key: an old build would print its name.
+ *
+ * Read-only by design. payment-verify never writes the session: marking it
+ * cancelled could race an initiate in flight and refuse a payment the customer
+ * then makes, because finalize_checkout_session rejects a cancelled session.
+ */
+export function decideSessionVerify(input: {
+  sessionStatus: unknown;
+  sessionExpiresAt: unknown;
+  attempt: { status?: unknown; provider_checkout_ref?: unknown } | null | undefined;
+  nowMs: number;
+}): SessionVerifyVerdict {
+  const { attempt } = input;
+  if (attempt && String(attempt.provider_checkout_ref ?? '') !== '') return { kind: 'ask_moyasar' };
+
+  const expiresAt = Date.parse(String(input.sessionExpiresAt ?? ''));
+  const sessionOver = String(input.sessionStatus ?? '') !== 'pending_payment'
+    || (Number.isFinite(expiresAt) && expiresAt <= input.nowMs);
+
+  if (attempt && String(attempt.status ?? '') === 'initiated' && !sessionOver) return { kind: 'pending' };
+  return sessionOver
+    ? { kind: 'terminal', status: 'expired', messageKey: 'payExpired' }
+    : { kind: 'terminal', status: 'cancelled', messageKey: 'payCancelled' };
 }

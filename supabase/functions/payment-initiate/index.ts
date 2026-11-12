@@ -3,8 +3,8 @@ import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
   MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, customerCheckoutUrl, extractMoyasarError,
-  invoiceExpiryIso, mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
-  type CheckoutLanguage,
+  invoiceExpiryForAttempt, isBelowMoyasarMinimum, mapMoyasarInvoiceStatus, resolveMoyasarConfig,
+  sanitizeMoyasarInvoice, type CheckoutLanguage,
 } from '../_shared/moyasar.ts';
 import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
@@ -25,6 +25,9 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * Customer checkout is refused while the gateway is in TEST mode, so a test
  * card can never pay for a real order; see refuseTestModeCheckout(). Sandbox
  * testing is the console's admin test (payment-test-config `test_checkout`).
+ *
+ * A total under Moyasar's invoice minimum (1.00 SAR) is refused before any
+ * attempt is opened; see refuseBelowMinimum().
  *
  * The checkout URL handed to the app is always https on Moyasar's own domain;
  * anything else is refused (customerCheckoutUrl, refuseCheckoutUrl). The app
@@ -225,6 +228,33 @@ async function createMoyasarInvoice(
     // creating one now is safe.
   }
 
+  // NO INVOICE MAY OUTLIVE ITS ATTEMPT. Once the attempt expires,
+  // begin_*_attempt closes it and the next start opens a new attempt with a new
+  // invoice; an old invoice still payable then would be a second way to pay the
+  // same checkout. So the invoice ends with the attempt's own expires_at, which
+  // the database set from the same clamped expiry, never at a fresh
+  // `Date.now()` window: that ran past the attempt by request latency on a new
+  // attempt, and by the attempt's whole age when a reused one's first create had
+  // failed (invoiceExpiryForAttempt).
+  const { data: attemptRow, error: attemptErr } = await admin.from('payment_records')
+    .select('expires_at').eq('id', attemptId).maybeSingle();
+  if (attemptErr || !attemptRow) {
+    console.error('Moyasar attempt expiry unreadable', String(attemptErr?.message ?? 'no row').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+  const expiresAtIso = invoiceExpiryForAttempt(Date.now(), attemptRow.expires_at, m.expiryMinutes);
+  if (!expiresAtIso) {
+    // Too little of the attempt is left for anyone to pay inside it. No invoice
+    // exists for it (a reused attempt was reconciled just above and none was
+    // found), so it is closed, and the next start opens a fresh attempt with a
+    // full window of its own.
+    await admin.from('payment_records').update({
+      status: 'failed', failure_code: 'attempt_expiring', failure_message_safe: 'Payment session expired',
+      last_verified_at: new Date().toISOString(),
+    }).eq('id', attemptId).eq('status', 'initiated').is('provider_checkout_ref', null).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
   const payload = buildInvoicePayload({
     amount: params.amount,
     currency: attemptCurrency,
@@ -234,7 +264,7 @@ async function createMoyasarInvoice(
     expiryMinutes: m.expiryMinutes,
     successUrl: `${supabaseUrl}/functions/v1/payment-return?${params.returnQuery}`,
     backUrl: `${supabaseUrl}/functions/v1/payment-return?${params.returnQuery}`,
-    expiresAtIso: invoiceExpiryIso(Date.now(), m.expiryMinutes),
+    expiresAtIso,
   });
 
   let resp: Response;
@@ -326,6 +356,42 @@ function refuseTestModeCheckout(flow: 'order' | 'session', check: 'configured' |
   return json({ status: 'disabled', reason: 'test_mode' }, 200);
 }
 
+/**
+ * A total Moyasar will not invoice can never be paid online.
+ *
+ * Moyasar refuses an invoice under 1.00 SAR (MOYASAR_MIN_INVOICE_MINOR_UNITS),
+ * and redeeming points can leave a remainder of a few halalas. Unrefused, the
+ * attempt was opened, the create failed, and every "Try again" failed the same
+ * way. So it is refused BEFORE begin_*_attempt, and no attempt exists for it
+ * (the database refuses one as well, 20261003120000). It answers with the shape
+ * every shipped build already handles, {status:'disabled'}, which they show as
+ * "Online payment is unavailable right now."; the reason lets a newer build say
+ * what to change instead.
+ */
+function refuseBelowMinimum(flow: 'order' | 'session'): Response {
+  console.warn(JSON.stringify({ event: 'payment_initiate_refused', reason: 'amount_below_minimum', flow }));
+  return json({ status: 'disabled', reason: 'amount_below_minimum' }, 200);
+}
+
+/**
+ * Retire a checkout session whose total is under Moyasar's minimum.
+ *
+ * Nothing can ever pay it: its total is frozen, no invoice can be opened for
+ * it, and no attempt exists. Left 'pending_payment' for its 30 minutes, it is
+ * what begin_checkout_session hands back for the same cart's idempotency key,
+ * so a customer who takes fewer points is shown the same refused total again,
+ * and its points stay reserved against every other session they open
+ * (begin_session_attempt's loyalty guard). 'expired' rather than 'cancelled',
+ * because finalize_checkout_session accepts an expired session and a captured
+ * payment must never be refused, however impossible one is here. Best-effort:
+ * if it fails, payment-verify still answers the session terminal.
+ */
+async function retireUnpayableSession(admin: SupabaseClient, sessionId: string): Promise<void> {
+  await admin.from('checkout_sessions').update({ status: 'expired' })
+    .eq('id', sessionId).eq('status', 'pending_payment').is('order_id', null)
+    .then(() => {}, () => {});
+}
+
 async function initiateMoyasar(
   admin: SupabaseClient,
   order: Record<string, unknown>,
@@ -337,6 +403,7 @@ async function initiateMoyasar(
   }
   const total = Number(order.total ?? 0);
   if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+  if (isBelowMoyasarMinimum(total, 'SAR')) return refuseBelowMinimum('order');
 
   const m = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
   if (!m.ok) {
@@ -414,6 +481,10 @@ async function initiateMoyasarForSession(
 
   const total = Number(session.total ?? 0);
   if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+  if (isBelowMoyasarMinimum(total, String(session.currency ?? 'SAR'))) {
+    await retireUnpayableSession(admin, String(session.id));
+    return refuseBelowMinimum('session');
+  }
 
   const m = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
   if (!m.ok) {

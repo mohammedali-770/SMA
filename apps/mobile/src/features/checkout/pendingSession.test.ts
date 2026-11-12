@@ -5,6 +5,7 @@ import {
   describeVerifyResult,
   parsePendingSession,
   recoverPendingSession,
+  refusalDropsSession,
   serializePendingSession,
   type PendingSession,
   type VerifyOutcome,
@@ -182,4 +183,24 @@ describe('describeVerifyResult', () => {
       expect(describeVerifyResult({ status }).terminal).toBe(recovery.kind === 'clear');
     },
   );
+});
+
+describe('refusalDropsSession', () => {
+  // Nothing can be paid on a session under Moyasar's 1.00 SAR minimum, so the
+  // saved session goes at once.
+  it('drops the session only for a total under the minimum', () => {
+    expect(refusalDropsSession({ status: 'disabled', reason: 'amount_below_minimum' })).toBe(true);
+  });
+
+  // These refusals are made before THAT request opens an attempt, but an earlier
+  // attempt on the same session may hold a paid invoice; payment-verify decides.
+  it.each([
+    [{ status: 'disabled' }],
+    [{ status: 'disabled', reason: 'test_mode' }],
+    [{ status: 'disabled', reason: null }],
+    [{ status: 'already_paid', reason: 'amount_below_minimum' }],
+    [{}],
+  ])('keeps it for %j', (init) => {
+    expect(refusalDropsSession(init)).toBe(false);
+  });
 });

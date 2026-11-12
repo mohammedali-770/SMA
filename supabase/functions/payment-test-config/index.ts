@@ -3,7 +3,8 @@ import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
-  MOYASAR_API_BASE, MOYASAR_IP_NOT_ALLOWED, basicAuthHeader, buildInvoicePayload, extractMoyasarError,
+  DUPLICATE_PAYMENT, MOYASAR_API_BASE, MOYASAR_IP_NOT_ALLOWED, MOYASAR_MIN_INVOICE_MINOR_UNITS,
+  NOT_A_DUPLICATE_FILTER, basicAuthHeader, buildInvoicePayload, extractMoyasarError, fromMinorUnits,
   invoiceExpiryIso, isAdminTestInvoice, isMoyasarIpNotAllowed, keyMatchesMode, mapMoyasarInvoiceStatus,
   resolveMoyasarConfig, sanitizeMoyasarInvoice,
 } from '../_shared/moyasar.ts';
@@ -176,9 +177,11 @@ async function handleMoyasar(
     // paid payment, via the same shared, idempotent path the customer flow uses.
     const orderId = String(payload.orderId ?? '');
     if (!orderId) return json({ status: 'error', message: 'orderId is required' }, 200);
+    // The newest ATTEMPT: a row recorded for a duplicate payment is not one
+    // (NOT_A_DUPLICATE_FILTER), and would hide the attempt still to confirm.
     const { data: recs } = await admin.from('payment_records')
       .select('id, order_id, checkout_session_id, provider_ref, provider_checkout_ref, reference_transaction, reference_order, amount, currency, mode, status')
-      .eq('order_id', orderId).eq('provider', 'moyasar')
+      .eq('order_id', orderId).eq('provider', 'moyasar').or(NOT_A_DUPLICATE_FILTER)
       .order('created_at', { ascending: false }).limit(1);
     const rec = (Array.isArray(recs) ? recs[0] : null) as MoyasarAttempt | null;
     if (!rec || !rec.provider_checkout_ref) {
@@ -201,6 +204,9 @@ async function handleMoyasar(
     }
     if (result.reason === 'test_mode_attempt') {
       return json({ status: 'failed', message: 'This attempt was opened in TEST mode. A test payment never confirms a customer order.' }, 200);
+    }
+    if (result.reason === DUPLICATE_PAYMENT) {
+      return json({ status: 'failed', message: 'This payment duplicates one that already paid the order. It is recorded as duplicate_payment: refund it in the Moyasar dashboard.' }, 200);
     }
     const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
     return json({ status: outcome, message: result.messageKey }, 200);
@@ -228,7 +234,7 @@ async function handleMoyasar(
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
     const body = buildInvoicePayload({
       // Moyasar rejects an invoice below 100 minor units, so 1 SAR is the floor.
-      amount: 1,
+      amount: fromMinorUnits(MOYASAR_MIN_INVOICE_MINOR_UNITS, 'SAR'),
       currency: 'SAR',
       description: 'Spicy Meal admin Moyasar test checkout',
       referenceTransaction: ref,

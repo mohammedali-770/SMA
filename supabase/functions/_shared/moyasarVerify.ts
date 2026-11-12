@@ -22,6 +22,8 @@
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import {
+  DUPLICATE_PAYMENT,
+  DUPLICATE_PAYMENT_MESSAGE,
   MOYASAR_API_BASE,
   MOYASAR_IP_NOT_ALLOWED,
   basicAuthHeader,
@@ -29,10 +31,10 @@ import {
   closedInvoiceOutcome,
   confirmMessageKey,
   fromMinorUnits,
+  isGenuineConfirmation,
   isMoyasarIpNotAllowed,
   lastFourOf,
   mapMoyasarPaymentStatus,
-  paymentFailureMessage,
   sanitizeMoyasarInvoice,
   sanitizeMoyasarPayment,
   selectInvoicePayment,
@@ -104,6 +106,136 @@ export interface ConfirmResult {
   orderId?: string;
 }
 
+/** What the stamp read-back found on the attempt row. */
+type StampState =
+  | { kind: 'ours'; orderId: string | null; status: string }
+  | { kind: 'other'; orderId: string | null }
+  | { kind: 'unknown' };
+
+/**
+ * Stamp THIS payment's id onto the attempt, then READ BACK what the row holds.
+ *
+ * The `.is('provider_ref', null)` filter means a row already stamped by a
+ * concurrent run matches ZERO rows — and a zero-row PostgREST update is not an
+ * error. Keying a guard on the error therefore skipped it in exactly the case it
+ * existed for. Only the row's actual state settles it: this payment ('ours'),
+ * another payment already holding the attempt ('other'), or no stamp at all
+ * ('unknown': the write or the read failed).
+ */
+async function stampPaymentRef(
+  admin: SupabaseClient, attemptId: string, paymentId: string,
+): Promise<StampState> {
+  await admin.from('payment_records')
+    .update({ provider_ref: paymentId })
+    .eq('id', attemptId)
+    .is('provider_ref', null)
+    .then(() => {}, () => {});
+  const { data: current, error } = await admin.from('payment_records')
+    .select('provider_ref, order_id, status').eq('id', attemptId).maybeSingle();
+  const ref = String(current?.provider_ref ?? '');
+  if (error || !current || !ref) return { kind: 'unknown' };
+  const orderId = current.order_id ? String(current.order_id) : null;
+  if (ref === paymentId) return { kind: 'ours', orderId, status: String(current.status ?? '') };
+  return { kind: 'other', orderId };
+}
+
+/**
+ * Record a DUPLICATE: a settled, binding-valid payment that did not pay the
+ * order, because another payment already had. It must be refundable, so it is
+ * written down rather than reported paid.
+ *
+ *  - `stamped`: the attempt already carries this payment id (the session path
+ *    after finalize_checkout_session returned an order another payment
+ *    created), so THAT row becomes the record.
+ *  - `insert`: the attempt belongs to another payment, or the order was already
+ *    paid before this one was stamped, so a row of its own carries this
+ *    payment id. It carries no invoice id, so the webhook's invoice lookup
+ *    still finds the attempt, and every attempt lookup skips it
+ *    (NOT_A_DUPLICATE_FILTER). A unique violation on (provider, provider_ref)
+ *    means it is already recorded.
+ *
+ * Status 'failed' with failure_code DUPLICATE_PAYMENT, the precedent a binding
+ * mismatch set: never 'paid', because the refund worker and the watchdog expect
+ * one paid row per order. One integration_sync_logs row is written per new
+ * record, so a replayed webhook does not count the same duplicate twice; if the
+ * payment row itself could not be written, that log row is still written.
+ */
+async function recordDuplicatePayment(
+  admin: SupabaseClient,
+  how: 'stamped' | 'insert',
+  ctx: {
+    attempt: MoyasarAttempt;
+    paymentId: string;
+    orderId: string | null;
+    amount: number;
+    currency: string;
+    raw: Record<string, unknown>;
+    cardScheme: string | null;
+    cardLast4: string | null;
+    alreadyRecorded?: boolean;
+  },
+): Promise<ConfirmResult> {
+  const { attempt, paymentId } = ctx;
+  const orderId = ctx.orderId ?? attempt.order_id ?? null;
+  const record = {
+    status: 'failed',
+    failure_code: DUPLICATE_PAYMENT,
+    failure_message_safe: DUPLICATE_PAYMENT_MESSAGE,
+    order_id: orderId,
+    amount: ctx.amount,
+    currency: ctx.currency,
+    raw: ctx.raw,
+    card_scheme: ctx.cardScheme,
+    card_last_four: ctx.cardLast4,
+    last_verified_at: new Date().toISOString(),
+  };
+
+  let fresh = !ctx.alreadyRecorded;
+  if (how === 'stamped') {
+    await admin.from('payment_records').update(record)
+      .eq('id', attempt.id).neq('status', 'paid')
+      .then(() => {}, () => {});
+  } else {
+    const { error } = await admin.from('payment_records').insert({
+      ...record,
+      provider: 'moyasar',
+      provider_ref: paymentId,
+      mode: attempt.mode,
+      // A row must name an order or a session (payment_records' CHECK); the
+      // session is named even when the order is known, for whoever refunds it.
+      checkout_session_id: attempt.checkout_session_id ?? null,
+    });
+    if (error) {
+      // Only (provider, provider_ref) already taken means "already recorded".
+      // Any other failure leaves the sync-log row below as the only record, so
+      // it is still written.
+      if (String((error as { code?: unknown }).code ?? '') === '23505') {
+        fresh = false;
+      } else {
+        console.error(JSON.stringify({
+          event: 'moyasar_duplicate_not_recorded', attempt: String(attempt.id).slice(0, 36),
+        }));
+      }
+    }
+  }
+
+  if (fresh) {
+    await admin.from('integration_sync_logs').insert({
+      provider: 'moyasar', order_id: orderId, direction: 'webhook', status: 'failed',
+      request: {
+        payment_id: paymentId.slice(0, 64),
+        ...(attempt.checkout_session_id ? { session: String(attempt.checkout_session_id).slice(0, 64) } : {}),
+        ...(orderId ? { order: String(orderId).slice(0, 64) } : {}),
+      },
+      error: DUPLICATE_PAYMENT,
+    }).then(() => {}, () => {});
+    console.warn(JSON.stringify({
+      event: 'moyasar_duplicate_payment', attempt: String(attempt.id).slice(0, 36),
+    }));
+  }
+  return { outcome: 'failed', paid: false, reason: DUPLICATE_PAYMENT, ...(orderId ? { orderId: String(orderId) } : {}) };
+}
+
 /**
  * Validate a retrieved Moyasar payment against the stored attempt and, if it is
  * a clean `paid`/`captured`, confirm the order paid and hand it to the POS.
@@ -173,6 +305,11 @@ export async function validateAndConfirmMoyasarPayment(
     const paidMajor = fromMinorUnits(Number(payment.amount ?? 0), currency);
     const cardScheme = source.company != null ? String(source.company) : null;
     const cardLast4 = lastFourOf(source.number);
+    const duplicate = (how: 'stamped' | 'insert', dupOrderId: string | null, alreadyRecorded = false) =>
+      recordDuplicatePayment(admin, how, {
+        attempt, paymentId, orderId: dupOrderId, amount: paidMajor, currency, raw: sanitized,
+        cardScheme, cardLast4, alreadyRecorded,
+      });
     let orderId = '';
     let confirmedOrder: Record<string, unknown> | null = null;
 
@@ -181,8 +318,27 @@ export async function validateAndConfirmMoyasarPayment(
       // atomically creates the real, already-paid order from the frozen snapshot,
       // marks the attempt paid and links it, and consumes the session. Idempotent:
       // a webhook + a verify (or a duplicate webhook) converge on ONE order.
-      // It also fills in provider_ref on an attempt row that still has none,
-      // which is exactly the state a Moyasar session attempt is in until now.
+      //
+      // STAMP FIRST, so the payment lands on the attempt that owns its invoice.
+      // finalize's row picker prefers the row already carrying this payment id
+      // and otherwise takes the NEWEST ref-less 'initiated' attempt
+      // (20260712170000), which, once a session holds a second attempt, is the
+      // wrong one: the first payment was attached to the second invoice's row.
+      const stamp = await stampPaymentRef(admin, attempt.id, paymentId);
+      if (stamp.kind === 'other') {
+        // The attempt already belongs to another payment on this invoice, so
+        // this one paid nothing. Never finalize with it.
+        return await duplicate('insert', stamp.orderId);
+      }
+      if (stamp.kind === 'unknown') {
+        console.error('moyasar provider_ref stamp did not land', JSON.stringify({
+          attempt: String(attempt.id).slice(0, 36),
+        }));
+        // 'pending', not 'failed': the payment may be genuine, and the app clears
+        // its saved session on a terminal answer. A retry stamps again.
+        return { outcome: 'pending', paid: false, reason: 'stamp_failed' };
+      }
+
       const { data, error } = await admin.rpc('finalize_checkout_session', {
         p_session_id: attempt.checkout_session_id,
         p_provider: 'moyasar',
@@ -206,28 +362,47 @@ export async function validateAndConfirmMoyasarPayment(
       }
       confirmedOrder = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
       orderId = String(confirmedOrder?.id ?? '');
-    } else {
-      // Order-first flow. confirm_order_payment upserts on (provider,
-      // provider_ref); our attempt row was opened with provider_ref NULL because
-      // Moyasar only issues a payment id once the customer pays. Stamp it onto
-      // THIS attempt first, so the upsert updates the row we already own instead
-      // of inserting a second one beside it.
-      await admin.from('payment_records')
-        .update({ provider_ref: paymentId })
-        .eq('id', attempt.id)
-        .is('provider_ref', null)
-        .then(() => {}, () => {});
 
-      // READ BACK, ALWAYS. The `.is('provider_ref', null)` filter means a row
-      // already stamped by a concurrent run matches ZERO rows — and a zero-row
-      // PostgREST update is not an error. Keying the guard on the error therefore
-      // skipped it in exactly the case it existed for: an attempt already carrying
-      // a DIFFERENT payment id would fall through to confirm_order_payment, whose
-      // upsert is on (provider, provider_ref), and insert a SECOND paid row for
-      // the order. Only the row's actual state settles this.
-      const { data: current } = await admin.from('payment_records')
-        .select('provider_ref').eq('id', attempt.id).maybeSingle();
-      if (String(current?.provider_ref ?? '') !== paymentId) {
+      // DID THIS PAYMENT PAY IT? finalize returns the session's existing order
+      // for ANY payment id once the session is consumed (20260712170000), so a
+      // second payment used to come back 'paid' and be written nowhere. Only the
+      // row carrying this payment id can tell: the genuine payment's row is paid
+      // and linked to that order. The first payment, its replayed webhook, and a
+      // webhook racing payment-verify for it all read that back.
+      const { data: mine, error: mineErr } = await admin.from('payment_records')
+        .select('status, order_id, failure_code')
+        .eq('provider', 'moyasar').eq('provider_ref', paymentId).maybeSingle();
+      if (mineErr) {
+        // Unknown is not 'paid' and not 'failed': the order may be this payment's.
+        return { outcome: 'pending', paid: false, reason: 'readback_failed' };
+      }
+      if (!isGenuineConfirmation(mine, orderId)) {
+        return await duplicate('stamped', orderId || null, mine?.failure_code === DUPLICATE_PAYMENT);
+      }
+    } else {
+      // Order-first flow. ALREADY PAID BY ANOTHER PAYMENT? Then this one paid
+      // nothing: confirm_order_payment would mark a second paid row and rewrite
+      // paid_at. Decided before the stamp, so the attempt is left for the
+      // payment that is still its own.
+      const { data: paidRows, error: paidErr } = await admin.from('payment_records')
+        .select('provider, provider_ref')
+        .eq('order_id', attempt.order_id).eq('status', 'paid');
+      if (paidErr) return { outcome: 'pending', paid: false, reason: 'readback_failed' };
+      const paidByAnother = (Array.isArray(paidRows) ? paidRows : []).some(
+        (r: { provider?: unknown; provider_ref?: unknown }) =>
+          !(String(r.provider ?? '') === 'moyasar' && String(r.provider_ref ?? '') === paymentId),
+      );
+      if (paidByAnother) return await duplicate('insert', attempt.order_id);
+
+      // confirm_order_payment upserts on (provider, provider_ref); our attempt
+      // row was opened with provider_ref NULL because Moyasar only issues a
+      // payment id once the customer pays. Stamp it onto THIS attempt first, so
+      // the upsert updates the row we already own instead of inserting a second
+      // one beside it. An attempt already carrying a DIFFERENT payment id would
+      // otherwise fall through to that upsert and insert a SECOND paid row.
+      const stamp = await stampPaymentRef(admin, attempt.id, paymentId);
+      if (stamp.kind === 'other') return await duplicate('insert', attempt.order_id);
+      if (stamp.kind === 'unknown') {
         console.error('moyasar provider_ref stamp did not land', JSON.stringify({
           attempt: String(attempt.id).slice(0, 36),
         }));
@@ -288,19 +463,21 @@ export async function validateAndConfirmMoyasarPayment(
     return { outcome: 'mismatch', paid: false, reason: 'verification_mismatch' };
   }
 
-  // Terminal non-success -> mark the attempt failed so a fresh attempt is allowed.
-  if (outcome === 'failed' || outcome === 'cancelled' || outcome === 'expired') {
-    await touch({
-      status: 'failed',
-      failure_code: String(payment.status ?? outcome).slice(0, 40),
-      failure_message_safe: paymentFailureMessage(payment),
-    });
-    return { outcome, paid: false };
-  }
-
-  // initiated / authorized / verified / refunded / unknown -> keep the attempt
-  // open (never paid). `refunded` is deliberately not treated as a success: the
-  // money has come back, so there is nothing to confirm.
+  // EVERYTHING ELSE LEAVES THE ATTEMPT OPEN, a declined, voided or expired
+  // PAYMENT included, recording only when we looked and what we saw.
+  //
+  // A payment is one try at an invoice, and the invoice stays payable after it:
+  // a declined card can be followed by Apple Pay on the same hosted page
+  // (selectInvoicePayment). Closing the attempt on that decline let a resumed
+  // checkout open a SECOND attempt and a second invoice beside the first, still
+  // payable one, and a customer could then pay both. Only an INVOICE that
+  // Moyasar has closed ends an attempt (closedInvoiceOutcome, in
+  // verifyMoyasarAttempt), or the attempt's own expiry in begin_*_attempt.
+  //
+  // The outcome is still reported: a lone declined payment makes payment-verify
+  // answer 'failed', and the app starts again on the same session, which reuses
+  // this attempt and its invoice. `refunded` is never a success: the money has
+  // come back, so there is nothing to confirm.
   await touch({});
   return { outcome, paid: false };
 }
@@ -352,7 +529,9 @@ export async function verifyMoyasarAttempt(
     return { outcome: closed.outcome, paid: false, messageKey: closed.messageKey };
   }
 
-  const payment = selectInvoicePayment(invoice);
+  // The payment this attempt already carries comes first: a second settled one
+  // on the same invoice is a duplicate, and must not stand in front of it.
+  const payment = selectInvoicePayment(invoice, attempt.provider_ref);
   if (!payment) {
     // The invoice exists but nobody has attempted a payment on it yet.
     await admin.from('payment_records')

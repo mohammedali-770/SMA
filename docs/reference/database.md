@@ -127,7 +127,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
-| `begin_payment_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
+| `begin_payment_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `begin_session_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `branch_availability_sweep` | 5 | `20260923120000_branch_variant_availability.sql` |
 | `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |

@@ -130,6 +130,25 @@ export function describeVerifyResult(
   return { state, terminal, messageKey };
 }
 
+/**
+ * Is a payment-initiate refusal one that leaves NOTHING payable, so the saved
+ * session may be dropped at once?
+ *
+ * Only `amount_below_minimum`: Moyasar will not invoice a total under 1.00 SAR,
+ * so no invoice can exist for that session, and the server retires it.
+ *
+ * Every other {status:'disabled'} — a gateway switched off, missing or in TEST
+ * mode — is decided before that request opens an attempt, but the session may
+ * already hold an earlier one whose invoice the customer has paid. With the
+ * gateway off, the webhook ignores that payment, and dropping the session
+ * would leave nothing to confirm it. Those are resolved through payment-verify
+ * (recoverPendingSession), which drops a session only when the server answers
+ * it terminal.
+ */
+export function refusalDropsSession(init: { status?: string | null; reason?: string | null }): boolean {
+  return init.status === 'disabled' && init.reason === 'amount_below_minimum';
+}
+
 export type RecoverResult =
   | { kind: 'none' }                        // nothing pending → safe to begin a new checkout
   | { kind: 'receipt'; orderId: string }    // the pending payment succeeded → go to the receipt

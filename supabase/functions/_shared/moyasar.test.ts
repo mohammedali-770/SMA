@@ -6,7 +6,9 @@ import {
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
   selectInvoicePayment, checkPaymentBinding, timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
   matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow, confirmMessageKey,
-  closedInvoiceOutcome,
+  closedInvoiceOutcome, MOYASAR_MIN_INVOICE_MINOR_UNITS, isBelowMoyasarMinimum, invoiceExpiryForAttempt,
+  INVOICE_EXPIRY_MARGIN_MS, MIN_INVOICE_LIFETIME_MS, decideSessionVerify, isGenuineConfirmation,
+  DUPLICATE_PAYMENT, DUPLICATE_PAYMENT_MESSAGE, NOT_A_DUPLICATE_FILTER,
 } from './moyasar.ts';
 import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
 import { decidePendingAction } from '../../../apps/mobile/src/features/checkout/pendingSession.ts';
@@ -295,6 +297,52 @@ describe('invoiceExpiryIso', () => {
     expect(invoiceExpiryIso(now, 1)).toBe('2026-08-24T10:05:00.000Z');
     expect(invoiceExpiryIso(now, 900)).toBe('2026-08-24T11:00:00.000Z');
     expect(invoiceExpiryIso(now, NaN)).toBe('2026-08-24T10:30:00.000Z');
+  });
+});
+
+describe("Moyasar's invoice minimum", () => {
+  it('is 100 minor units, 1.00 SAR', () => {
+    expect(MOYASAR_MIN_INVOICE_MINOR_UNITS).toBe(100);
+  });
+  it('refuses a total under it, one halala below included, and accepts it exactly', () => {
+    for (const t of [0, 0.01, 0.5, 0.99]) expect(isBelowMoyasarMinimum(t), String(t)).toBe(true);
+    for (const t of [1, 1.01, 64]) expect(isBelowMoyasarMinimum(t), String(t)).toBe(false);
+  });
+  it('counts in the currency the attempt is in', () => {
+    expect(isBelowMoyasarMinimum(0.1, 'KWD')).toBe(false); // 100 fils
+    expect(isBelowMoyasarMinimum(0.099, 'KWD')).toBe(true);
+  });
+  it('treats junk as below it, so it can never open an invoice', () => {
+    expect(isBelowMoyasarMinimum(NaN)).toBe(true);
+    expect(isBelowMoyasarMinimum(-5)).toBe(true);
+  });
+});
+
+describe('invoiceExpiryForAttempt', () => {
+  const now = Date.parse('2026-11-12T10:00:00.000Z');
+  const at = (ms: number) => new Date(now + ms).toISOString();
+
+  it("ends a margin before the attempt's own expiry", () => {
+    expect(invoiceExpiryForAttempt(now, at(30 * 60_000), 30)).toBe(at(30 * 60_000 - INVOICE_EXPIRY_MARGIN_MS));
+  });
+  // The reconcile path's defect: a reused attempt with five minutes left was
+  // given a fresh thirty-minute invoice.
+  it('never runs to a fresh window from now when the attempt ends sooner', () => {
+    expect(invoiceExpiryForAttempt(now, at(5 * 60_000), 30)).toBe(at(5 * 60_000 - INVOICE_EXPIRY_MARGIN_MS));
+  });
+  it('never runs past a fresh window either, whatever the attempt says', () => {
+    expect(invoiceExpiryForAttempt(now, at(90 * 60_000), 30)).toBe(at(30 * 60_000));
+    expect(invoiceExpiryForAttempt(now, at(90 * 60_000), 900)).toBe(at(60 * 60_000));
+  });
+  it('an attempt with no expiry is never closed for age, so a fresh window is safe', () => {
+    expect(invoiceExpiryForAttempt(now, null, 30)).toBe(at(30 * 60_000));
+  });
+  it('is null when too little is left, and fails closed on a value that is not a date', () => {
+    const left = MIN_INVOICE_LIFETIME_MS + INVOICE_EXPIRY_MARGIN_MS;
+    expect(invoiceExpiryForAttempt(now, at(left), 30)).toBe(at(MIN_INVOICE_LIFETIME_MS));
+    expect(invoiceExpiryForAttempt(now, at(left - 1), 30)).toBeNull();
+    expect(invoiceExpiryForAttempt(now, at(-60_000), 30)).toBeNull();
+    expect(invoiceExpiryForAttempt(now, 'soon', 30)).toBeNull();
   });
 });
 
@@ -781,6 +829,87 @@ describe('selectInvoicePayment', () => {
     expect(selectInvoicePayment({ payments: [] })).toBeNull();
     expect(selectInvoicePayment({})).toBeNull();
     expect(selectInvoicePayment({ payments: 'nope' } as unknown as Record<string, unknown>)).toBeNull();
+  });
+  // A second settled payment on the same invoice is a duplicate; it must not
+  // stand in front of the payment the attempt already carries.
+  it("prefers the attempt's own settled payment over another settled one", () => {
+    const other = { id: 'p9', status: 'paid', created_at: '2026-08-24T10:01:00Z' };
+    expect(selectInvoicePayment({ payments: [other, paid] }, 'p2')?.id).toBe('p2');
+    expect(selectInvoicePayment({ payments: [other, paid] }, null)?.id).toBe('p9');
+    // Not settled, or not on this invoice: the usual choice.
+    expect(selectInvoicePayment({ payments: [failed, other] }, 'p1')?.id).toBe('p9');
+    expect(selectInvoicePayment({ payments: [other, paid] }, 'nope')?.id).toBe('p9');
+  });
+});
+
+describe('duplicate payments', () => {
+  it('are recorded under one code, with a message that says to refund', () => {
+    expect(DUPLICATE_PAYMENT).toBe('duplicate_payment');
+    expect(DUPLICATE_PAYMENT_MESSAGE).toMatch(/refund/i);
+    expect(DUPLICATE_PAYMENT_MESSAGE.length).toBeLessThanOrEqual(200);
+  });
+  it('are left out of an attempt lookup without dropping open attempts', () => {
+    expect(NOT_A_DUPLICATE_FILTER).toBe('failure_code.is.null,failure_code.neq.duplicate_payment');
+  });
+  it('a confirmation is genuine only when this payment row is paid AND linked to the returned order', () => {
+    expect(isGenuineConfirmation({ status: 'paid', order_id: 'o1' }, 'o1')).toBe(true);
+    expect(isGenuineConfirmation({ status: 'initiated', order_id: null }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'paid', order_id: 'o2' }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'failed', order_id: 'o1' }, 'o1')).toBe(false);
+    expect(isGenuineConfirmation(null, 'o1')).toBe(false);
+    expect(isGenuineConfirmation({ status: 'paid', order_id: '' }, '')).toBe(false);
+  });
+});
+
+describe('decideSessionVerify', () => {
+  const now = Date.parse('2026-11-12T10:00:00.000Z');
+  const open = { sessionStatus: 'pending_payment', sessionExpiresAt: new Date(now + 60_000).toISOString(), nowMs: now };
+  const over = { ...open, sessionExpiresAt: new Date(now - 1).toISOString() };
+  const CANCELLED = { kind: 'terminal', status: 'cancelled', messageKey: 'payCancelled' };
+  const EXPIRED = { kind: 'terminal', status: 'expired', messageKey: 'payExpired' };
+
+  it('asks Moyasar whenever the newest attempt carries an invoice, whatever else is true', () => {
+    for (const status of ['initiated', 'failed', 'paid']) {
+      expect(decideSessionVerify({ ...over, attempt: { status, provider_checkout_ref: 'inv_1' } })).toEqual({
+        kind: 'ask_moyasar',
+      });
+    }
+  });
+  it('is terminal with no attempt at all', () => {
+    expect(decideSessionVerify({ ...open, attempt: null })).toEqual(CANCELLED);
+    expect(decideSessionVerify({ ...over, attempt: null })).toEqual(EXPIRED);
+  });
+  it('is terminal for a closed attempt that never got an invoice', () => {
+    expect(decideSessionVerify({ ...open, attempt: { status: 'failed', provider_checkout_ref: null } })).toEqual(
+      CANCELLED,
+    );
+    expect(decideSessionVerify({ ...open, attempt: { status: 'failed', provider_checkout_ref: '' } })).toEqual(
+      CANCELLED,
+    );
+  });
+  it('is pending for an open attempt with no invoice yet, until the session is over', () => {
+    const attempt = { status: 'initiated', provider_checkout_ref: null };
+    expect(decideSessionVerify({ ...open, attempt })).toEqual({ kind: 'pending' });
+    expect(decideSessionVerify({ ...over, attempt })).toEqual(EXPIRED);
+    expect(decideSessionVerify({ ...open, sessionStatus: 'expired', attempt })).toEqual(EXPIRED);
+  });
+  it('reads the session as over once it is no longer pending_payment, whatever its clock says', () => {
+    for (const sessionStatus of ['expired', 'cancelled', 'consumed']) {
+      expect(decideSessionVerify({ ...open, sessionStatus, attempt: null })).toEqual(EXPIRED);
+    }
+  });
+  it('treats an unreadable expires_at as not passed', () => {
+    expect(decideSessionVerify({ ...open, sessionExpiresAt: null, attempt: null })).toEqual(CANCELLED);
+    expect(decideSessionVerify({ ...open, sessionExpiresAt: 'x', attempt: { status: 'initiated' } })).toEqual({
+      kind: 'pending',
+    });
+  });
+  it('answers only in statuses every shipped build treats as terminal, with keys every build has', () => {
+    for (const verdict of [CANCELLED, EXPIRED]) {
+      expect(decidePendingAction({ status: verdict.status })).toEqual({ kind: 'clear' });
+      expect(Object.keys(STRINGS.en)).toContain(verdict.messageKey);
+      expect(Object.keys(STRINGS.ar)).toContain(verdict.messageKey);
+    }
   });
 });
 

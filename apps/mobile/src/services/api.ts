@@ -420,7 +420,7 @@ export const checkout = {
 export interface PaymentInitiateResult {
   provider?: string;
   status?: string;            // 'disabled' | 'already_paid' | undefined
-  reason?: string;            // with 'disabled': 'test_mode' while the gateway is in TEST mode
+  reason?: string;            // with 'disabled': 'test_mode' (gateway in TEST mode) or 'amount_below_minimum' (total under 1.00 SAR)
   mode?: string;              // 'test' | 'live'
   invoiceId?: string;         // the Moyasar invoice id
   checkoutUrl?: string | null;

@@ -13,6 +13,8 @@
 -- is what makes the reuse and provider-scoping cases below load-bearing rather
 -- than decorative. Case 11 is the loyalty guard 20261003120000 ported: without
 -- it, two live checkout sessions could each be paid with the same points.
+-- Case 12 is Moyasar's 1.00 SAR invoice minimum, also 20261003120000: below it
+-- an attempt could only end with no invoice.
 --
 -- No provider is contacted: begin_payment_attempt / begin_session_attempt only
 -- write a payment_records row. Nothing here schedules or invokes the refund
@@ -496,6 +498,125 @@ begin
   end if;
 
   raise notice 'CASE 11 ok: the live balance must cover the points of every live session';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Case 12: MOYASAR'S INVOICE MINIMUM (20261003120000). Moyasar refuses an
+-- invoice under 100 minor units, 1.00 SAR, so a total under that can never be
+-- paid online, and an attempt opened for it could only end with no invoice:
+-- every retry failed the same way, and the saved session held the device. A
+-- points redemption leaves such remainders. Both RPCs refuse it with P0001 and
+-- write no row; exactly 1.00 is accepted. payment-initiate refuses it first.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_cust  uuid := 'c0000000-0000-0000-0000-0000000000fc';
+  v_total numeric;
+  v_id    uuid;
+  v_state text;
+  v_msg   text;
+  r       record;
+begin
+  begin
+    insert into auth.users (id, email) values (v_cust, 'moyasar-minimum-suite@example.com')
+      on conflict (id) do nothing;
+  exception when undefined_table then
+    null; -- harness seeds auth.users differently
+  end;
+  insert into public.profiles (id, role) values (v_cust, 'customer')
+    on conflict (id) do nothing;
+
+  -- Refused below the floor, one halala below it included.
+  foreach v_total in array array[0.50, 0.99]::numeric[] loop
+    insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+      values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', '{}'::jsonb, 50, v_total)
+      returning id into v_id;
+    v_state := null; v_msg := null;
+    begin
+      perform public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+    exception when others then
+      v_state := sqlstate; v_msg := sqlerrm;
+    end;
+    if v_state is distinct from 'P0001'
+       or v_msg is distinct from 'Order total is below the online payment minimum of 1.00 SAR' then
+      raise exception 'CASE 12 FAILED: a session of % SAR opened an attempt (sqlstate %, %)',
+        v_total, coalesce(v_state, 'none'), coalesce(v_msg, 'no error');
+    end if;
+    if exists (select 1 from public.payment_records where checkout_session_id = v_id) then
+      raise exception 'CASE 12 FAILED: a refused session of % SAR still wrote a payment row', v_total;
+    end if;
+
+    insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+      values ('b0000000-0000-0000-0000-0000000000fe', 'pickup', 50, v_total, 'online', 'pending')
+      returning id into v_id;
+    v_state := null; v_msg := null;
+    begin
+      perform public.begin_payment_attempt(v_id, 'moyasar', 'live', 30);
+    exception when others then
+      v_state := sqlstate; v_msg := sqlerrm;
+    end;
+    if v_state is distinct from 'P0001'
+       or v_msg is distinct from 'Order total is below the online payment minimum of 1.00 SAR' then
+      raise exception 'CASE 12 FAILED: an order of % SAR opened an attempt (sqlstate %, %)',
+        v_total, coalesce(v_state, 'none'), coalesce(v_msg, 'no error');
+    end if;
+    if exists (select 1 from public.payment_records where order_id = v_id) then
+      raise exception 'CASE 12 FAILED: a refused order of % SAR still wrote a payment row', v_total;
+    end if;
+  end loop;
+
+  -- Refused BEFORE an open attempt is reused: one written by an older build
+  -- for such a total is not handed back.
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', '{}'::jsonb, 50, 0.50)
+    returning id into v_id;
+  insert into public.payment_records
+    (checkout_session_id, provider, status, amount, currency, mode, reference_transaction, initiated_at, expires_at)
+  values (v_id, 'moyasar', 'initiated', 0.50, 'SAR', 'live', 'sm_minimum_suite', now(), now() + interval '30 minutes');
+  v_state := null;
+  begin
+    perform public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+  exception when others then
+    v_state := sqlstate;
+  end;
+  if v_state is distinct from 'P0001' then
+    raise exception 'CASE 12 FAILED: an open attempt for a 0.50 SAR session was reused';
+  end if;
+
+  insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+    values ('b0000000-0000-0000-0000-0000000000fe', 'pickup', 50, 0.50, 'online', 'pending')
+    returning id into v_id;
+  insert into public.payment_records
+    (order_id, provider, status, amount, currency, mode, reference_transaction, initiated_at, expires_at)
+  values (v_id, 'moyasar', 'initiated', 0.50, 'SAR', 'live', 'sm_minimum_suite_o', now(), now() + interval '30 minutes');
+  v_state := null;
+  begin
+    perform public.begin_payment_attempt(v_id, 'moyasar', 'live', 30);
+  exception when others then
+    v_state := sqlstate;
+  end;
+  if v_state is distinct from 'P0001' then
+    raise exception 'CASE 12 FAILED: an open attempt for a 0.50 SAR order was reused';
+  end if;
+
+  -- Exactly the floor is accepted, by both.
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', '{}'::jsonb, 50, 1.00)
+    returning id into v_id;
+  select * into r from public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+  if r.attempt_id is null or r.reused or r.amount <> 1.00 then
+    raise exception 'CASE 12 FAILED: a session of exactly 1.00 SAR could not open its attempt';
+  end if;
+
+  insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+    values ('b0000000-0000-0000-0000-0000000000fe', 'pickup', 50, 1.00, 'online', 'pending')
+    returning id into v_id;
+  select * into r from public.begin_payment_attempt(v_id, 'moyasar', 'live', 30);
+  if r.attempt_id is null or r.reused or r.amount <> 1.00 then
+    raise exception 'CASE 12 FAILED: an order of exactly 1.00 SAR could not open its attempt';
+  end if;
+
+  raise notice 'CASE 12 ok: a total under 1.00 SAR opens no attempt, and exactly 1.00 does';
 end $$;
 
 rollback;

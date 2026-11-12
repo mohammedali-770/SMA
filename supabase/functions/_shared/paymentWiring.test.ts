@@ -368,17 +368,24 @@ describe('a TEST-mode attempt never confirms an order', () => {
   );
   const paid = block(confirm, "if (outcome === 'paid' && allMatch) {");
 
+  // Updated deliberately with the C1 fix (2026-11-12): the stamp moved into
+  // stampPaymentRef, which BOTH flows now call, so the refusal is pinned ahead
+  // of each call to it rather than ahead of an inline update.
   it('refuses before the payment id is stamped and before either confirmation RPC', () => {
     const refusal = paid.indexOf("if (attempt.mode !== 'live') {");
     expect(refusal).toBeGreaterThan(-1);
     for (const step of [
+      'await stampPaymentRef(admin, attempt.id, paymentId)',
       "admin.rpc('finalize_checkout_session'",
-      '.update({ provider_ref: paymentId })',
       "admin.rpc('confirm_order_payment'",
       'triggerLazywaitSyncOnce(admin)',
     ]) {
       expect(paid.indexOf(step), step).toBeGreaterThan(refusal);
     }
+    expect(count(paid, 'await stampPaymentRef(admin, attempt.id, paymentId)')).toBe(2);
+    expect(block(verify, 'async function stampPaymentRef(')).toContain(
+      '.update({ provider_ref: paymentId })',
+    );
     const refused = block(paid, "if (attempt.mode !== 'live') {");
     expect(refused).toContain("return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };");
     expect(refused).toContain("status: 'failed', failure_code: 'test_mode_attempt',");
@@ -424,7 +431,9 @@ describe('verifyMoyasarAttempt closes an invoice Moyasar has closed', () => {
   it('decides it once the invoice is read, before the "not paid yet" answer and any confirmation', () => {
     const decided = fn.indexOf('const closed = closedInvoiceOutcome(invoice);');
     expect(decided).toBeGreaterThan(fn.indexOf('if (!retrieved.ok) {'));
-    expect(decided).toBeLessThan(fn.indexOf('const payment = selectInvoicePayment(invoice);'));
+    expect(decided).toBeLessThan(
+      fn.indexOf('const payment = selectInvoicePayment(invoice, attempt.provider_ref);'),
+    );
     expect(decided).toBeLessThan(
       fn.indexOf('await validateAndConfirmMoyasarPayment(admin, attempt, payment)'),
     );
@@ -444,13 +453,16 @@ describe('verifyMoyasarAttempt closes an invoice Moyasar has closed', () => {
 describe('payment-verify', () => {
   const src = code('payment-verify');
 
+  // Updated deliberately with the C3/C4 fix (2026-11-12): verifyMoyasarOrder
+  // now also takes the user's client, and the session flow passes the attempt
+  // it already read. The guard is still ahead of each call.
   it('guards a missing payment row explicitly instead of asserting it away', () => {
     expect(src).not.toContain('cfg!');
     const orderFlow = fnBody(src, 'Deno.serve(');
     const sessionFlow = fnBody(src, 'async function verifySession(');
     for (const [body, call] of [
-      [orderFlow, 'return await verifyMoyasarOrder(admin, cfg, orderId);'],
-      [sessionFlow, 'return await verifyMoyasarSession(supaUser, admin, cfg, sessionId);'],
+      [orderFlow, 'return await verifyMoyasarOrder(supaUser, admin, cfg, orderId);'],
+      [sessionFlow, 'return await verifyMoyasarSession(supaUser, admin, cfg, sessionId, latest.rec);'],
     ]) {
       const guard = body.indexOf("if (!cfg) return json({ status: 'pending' }, 200);");
       expect(guard, call).toBeGreaterThan(-1);
@@ -654,5 +666,210 @@ describe('payment-admin-test-return', () => {
     expect(html()).not.toMatch(/\btap\b|moyasar/i);
     expect(html()).toContain('Test checkout complete');
     expect(html()).toMatch(/lang="ar" dir="rtl"[\s\S]*[\u0600-\u06FF]/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The 2026-11-12 review fixes (C1-C4). Their behaviour is proven by
+// moyasarDuplicatePayment.test.ts, paymentInitiateGuards.test.ts and
+// paymentVerifyTerminal.test.ts, which run these handlers. What only the
+// source can show is pinned here.
+// ---------------------------------------------------------------------------
+
+describe("Moyasar's 1.00 SAR minimum is one number in two languages", () => {
+  const sql = readFileSync(
+    new URL('../../migrations/20261003120000_moyasar_only_payments.sql', import.meta.url),
+    'utf8',
+  );
+
+  it('the database refuses below MOYASAR_MIN_INVOICE_MINOR_UNITS, in both attempt RPCs', async () => {
+    const { MOYASAR_MIN_INVOICE_MINOR_UNITS, fromMinorUnits } = await import('./moyasar.ts');
+    const major = fromMinorUnits(MOYASAR_MIN_INVOICE_MINOR_UNITS, 'SAR').toFixed(2);
+    for (const v of ['v_session', 'v_order']) {
+      expect(sql).toContain(
+        `  if ${v}.total < ${major} then raise exception 'Order total is below the online payment minimum of ${major} SAR' using errcode = 'P0001'; end if;`,
+      );
+    }
+  });
+
+  it('payment-initiate refuses it before either attempt RPC, and never with a raw number', () => {
+    const src = code('payment-initiate');
+    for (const [fn, begin] of [
+      ['async function initiateMoyasar(', "admin.rpc('begin_payment_attempt'"],
+      ['async function initiateMoyasarForSession(', "admin.rpc('begin_session_attempt'"],
+    ]) {
+      const body = fnBody(src, fn);
+      const refusal = body.indexOf('isBelowMoyasarMinimum(total, ');
+      expect(refusal, fn).toBeGreaterThan(-1);
+      expect(refusal, fn).toBeLessThan(body.indexOf(begin));
+    }
+    expect(fnBody(src, 'function refuseBelowMinimum(')).toContain(
+      "return json({ status: 'disabled', reason: 'amount_below_minimum' }, 200);",
+    );
+    expect(src).not.toMatch(/total\s*<\s*1\b|<\s*100\b/);
+  });
+
+  it('only the unpayable SESSION is retired, and only while nothing could have paid it', () => {
+    const src = code('payment-initiate');
+    const retire = fnBody(src, 'async function retireUnpayableSession(');
+    expect(retire).toContain(".update({ status: 'expired' })");
+    expect(retire).toContain(".eq('status', 'pending_payment').is('order_id', null)");
+    expect(count(src, 'await retireUnpayableSession(')).toBe(1);
+    expect(fnBody(src, 'async function initiateMoyasar(')).not.toContain('retireUnpayableSession');
+  });
+});
+
+describe('payment-initiate: no invoice outlives its attempt', () => {
+  const create = fnBody(code('payment-initiate'), 'async function createMoyasarInvoice(');
+
+  it("builds the invoice's expiry from the attempt's own expires_at, never a fresh Date.now() window", () => {
+    expect(code('payment-initiate')).not.toContain('invoiceExpiryIso(');
+    const read = create.indexOf(".select('expires_at').eq('id', attemptId).maybeSingle();");
+    const derive = create.indexOf(
+      'const expiresAtIso = invoiceExpiryForAttempt(Date.now(), attemptRow.expires_at, m.expiryMinutes);',
+    );
+    expect(read).toBeGreaterThan(-1);
+    expect(derive).toBeGreaterThan(read);
+    expect(derive).toBeLessThan(create.indexOf('const payload = buildInvoicePayload({'));
+    expect(create).toContain('    expiresAtIso,\n  });');
+  });
+
+  it('closes only an attempt that has no invoice when too little of it is left', () => {
+    expect(block(create, 'if (!expiresAtIso) {')).toContain(
+      ".eq('id', attemptId).eq('status', 'initiated').is('provider_checkout_ref', null)",
+    );
+  });
+});
+
+describe('a payment failure no longer closes its attempt', () => {
+  const verify = stripComments(readFileSync(new URL('./moyasarVerify.ts', import.meta.url), 'utf8'));
+  const confirm = section(
+    verify,
+    'export async function validateAndConfirmMoyasarPayment(',
+    'export async function verifyMoyasarAttempt(',
+  );
+
+  it('ends with a touch that changes no status, after the two branches that refuse a settled payment', () => {
+    const tail = confirm.slice(confirm.indexOf("if (outcome === 'paid' && !allMatch) {"));
+    const afterMismatch = tail.slice(
+      tail.indexOf("return { outcome: 'mismatch', paid: false, reason: 'verification_mismatch' };"),
+    );
+    expect(afterMismatch).toContain('await touch({});');
+    expect(afterMismatch).not.toMatch(/status: 'failed'|outcome === 'failed'|paymentFailureMessage/);
+  });
+
+  it('only an invoice Moyasar closed, or begin_*_attempt, still closes one', () => {
+    expect(count(verify, "status: 'failed', failure_code: closed.failureCode,")).toBe(1);
+  });
+});
+
+describe('duplicates: detected on both flows, and never taken for an attempt', () => {
+  const verify = stripComments(readFileSync(new URL('./moyasarVerify.ts', import.meta.url), 'utf8'));
+  const paid = block(
+    section(
+      verify,
+      'export async function validateAndConfirmMoyasarPayment(',
+      'export async function verifyMoyasarAttempt(',
+    ),
+    "if (outcome === 'paid' && allMatch) {",
+  );
+
+  it('session flow: stamp, finalize, then read back THIS payment before reporting paid', () => {
+    const steps = [
+      'const stamp = await stampPaymentRef(admin, attempt.id, paymentId);',
+      "if (stamp.kind === 'other') {",
+      "admin.rpc('finalize_checkout_session'",
+      ".eq('provider', 'moyasar').eq('provider_ref', paymentId).maybeSingle();",
+      'if (!isGenuineConfirmation(mine, orderId)) {',
+      "return { outcome: 'paid', paid: true, orderId };",
+    ].map((step) => paid.indexOf(step));
+    for (const at of steps) expect(at).toBeGreaterThan(-1);
+    expect([...steps].sort((a, b) => a - b)).toEqual(steps);
+  });
+
+  it('order flow: an order paid by another payment is refused before the stamp and the confirm', () => {
+    const order = paid.slice(paid.indexOf('} else {'));
+    const check = order.indexOf("if (paidByAnother) return await duplicate('insert', attempt.order_id);");
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(order.indexOf('await stampPaymentRef(admin, attempt.id, paymentId)'));
+    expect(check).toBeLessThan(order.indexOf("admin.rpc('confirm_order_payment'"));
+  });
+
+  it('records a duplicate as failed, never as paid', () => {
+    const rec = section(
+      verify,
+      'async function recordDuplicatePayment(',
+      'export async function validateAndConfirmMoyasarPayment(',
+    );
+    expect(rec).toContain("status: 'failed',");
+    expect(rec).toContain('failure_code: DUPLICATE_PAYMENT,');
+    expect(rec).not.toContain("status: 'paid'");
+    expect(rec).toContain("return { outcome: 'failed', paid: false, reason: DUPLICATE_PAYMENT,");
+  });
+
+  it('every lookup of "the newest attempt" skips a recorded duplicate', () => {
+    expect(count(code('payment-verify'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(1);
+    expect(code('payment-verify')).toContain('latestMoyasarAttempt(admin, ');
+    expect(count(code('payment-test-config'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(1);
+    expect(code('payment-webhook')).toContain(
+      ".eq('provider', 'moyasar').eq('provider_ref', paymentId).or(NOT_A_DUPLICATE_FILTER).maybeSingle();",
+    );
+  });
+
+  it('payment-verify answers the session or order itself for a duplicate, never failed', () => {
+    const src = code('payment-verify');
+    expect(count(src, 'if (result.reason === DUPLICATE_PAYMENT) {')).toBe(2);
+  });
+
+  it('the webhook asks Moyasar to retry an outcome it could not establish', () => {
+    expect(fnBody(code('payment-webhook'), 'async function handleMoyasarWebhook(')).toContain(
+      "if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') {",
+    );
+  });
+});
+
+describe('payment-verify decides a dead session before it needs a key', () => {
+  const src = code('payment-verify');
+  const session = fnBody(src, 'async function verifySession(');
+
+  it('reads the session expiry and the attempt before the payment configuration', () => {
+    expect(session).toContain(".select('id, status, order_id, expires_at')");
+    const attempt = session.indexOf("await latestMoyasarAttempt(admin, 'checkout_session_id', sessionId);");
+    const verdict = session.indexOf('const verdict = decideSessionVerify({');
+    const config = session.indexOf("await getProviderConfig(admin, 'payment');");
+    expect(attempt).toBeGreaterThan(-1);
+    expect(verdict).toBeGreaterThan(attempt);
+    expect(config).toBeGreaterThan(session.indexOf("if (verdict.kind === 'terminal') {"));
+  });
+
+  it('a failed read is pending, and nothing here writes the session', () => {
+    expect(session).toContain("if (!latest.ok) return json({ status: 'pending' }, 200);");
+    expect(src).not.toMatch(/from\('checkout_sessions'\)[^;]*\.update\(/);
+  });
+});
+
+describe('the app drops a saved session only when nothing can be paid on it', () => {
+  const screen = readFileSync(
+    new URL('../../../apps/mobile/src/features/checkout/CheckoutScreen.tsx', import.meta.url),
+    'utf8',
+  );
+  const refused = block(
+    screen,
+    "if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {",
+  );
+
+  it('clears at once for a total under the minimum, and says what to change', () => {
+    const below = block(refused, 'if (refusalDropsSession(init)) {');
+    expect(below).toContain('await clearPendingSession();');
+    expect(below).toContain("setError(t('payBelowMinimum'));");
+  });
+
+  it('otherwise asks payment-verify instead of clearing blindly', () => {
+    const rest = refused.slice(
+      refused.indexOf("setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });"),
+    );
+    expect(rest).toContain('void settleRefusedSession();');
+    expect(rest).not.toContain('clearPendingSession');
+    expect(block(screen, 'const settleRefusedSession = async () => {')).toContain('recoverPendingSession({');
   });
 });

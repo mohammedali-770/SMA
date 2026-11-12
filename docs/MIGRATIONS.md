@@ -7054,10 +7054,14 @@ over about three days.
 awaiting owner approval.** It is the database half of the owner's decision of
 2026-11-11 that Moyasar is the payment provider (CLAUDE.md §6).
 
-sha256 `7199ab22f7173becebc630d1b62bfa59dd8d183f099744f6577ca70f285810ea`,
-1 916 lines / 91 746 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `6f70ae41b1ff332592643169055b70ae56b2b7e6ea100e12eac021a3c886a147`,
+2 072 lines / 100 150 bytes. **Re-hash the MERGED copy before applying**, per §15.
+**Amended 2026-11-12, still unapplied**, after the adversarial review of the
+Moyasar-only change (finding C2): both attempt RPCs now refuse a total under
+Moyasar's 1.00 SAR invoice minimum. The fingerprint, the counts and the
+expected hashes below are the amended file's.
 
-**It redefines five functions and rewrites three comments, and nothing else.**
+**It redefines six functions and rewrites three comments, and nothing else.**
 No row is written, no grant or cron job changes, and it does not create
 `refund_trigger_secret`. **MONEY PATH UNTOUCHED, and the file asserts it**
 before and after: `place_order` `12b6816d…` and `compute_order_snapshot`
@@ -7069,7 +7073,8 @@ Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
 
 | Object | Before | After |
 | --- | --- | --- |
-| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard | the guard from `20260712170000:253-267`, ported verbatim |
+| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard, and opens an attempt for any total above zero | the guard from `20260712170000:253-267`, ported verbatim; a total under 1.00 SAR refused with P0001 before any attempt is reused or opened |
+| `begin_payment_attempt` | opens an attempt for any total above zero | a total under 1.00 SAR refused with P0001 before any attempt is reused or opened |
 | `invoke_payment_refund_processor` | returns NULL unless the provider is `tap`, so the refund worker can never be invoked | gates on `moyasar`, case-insensitively |
 | `open_order_refund_record` | falls back to provider `tap` | falls back to `moyasar` |
 | `operations_health_snapshot_internal` | the payment card's `configured` flag is Tap's resolver, so a Moyasar row always reads `not_configured` | mirrors `resolveMoyasarConfig` |
@@ -7131,7 +7136,8 @@ when the file was generated:
 
 | Function | Source | Substitutions |
 | --- | --- | --- |
-| `begin_session_attempt` | `20260824100000:186-268` | 2: three declarations, and the guard block |
+| `begin_session_attempt` | `20260824100000:186-268` | 3: three declarations, the guard block, and the minimum after the zero-total check |
+| `begin_payment_attempt` | `20260824100000:94-177` | 1: the minimum after the zero-total check |
 | `invoke_payment_refund_processor` | `20260729090000:186-262` | 1: the gate and its comment |
 | `open_order_refund_record` | `20260724120000:519-556` | 1: the literal |
 | `operations_health_snapshot_internal` | `20260925120000:113-1206` | 1: the payment configuration read and its comment |
@@ -7154,14 +7160,16 @@ chain shows only those hunks.
 The last two are not byte-identical to their files. With `--` comments removed
 and whitespace collapsed, live and repository hash the same: `6925d1a4…` and
 `588fc392…`. So the statements are the ones in the files, and the guard being
-ported is the one running today. `begin_session_attempt` is not live at all.
+ported is the one running today. `begin_session_attempt` and
+`begin_payment_attempt` are not live at all.
 
 **Hashes to expect after the apply**, computed on the local chain from this
 file before anything is sent:
 
 | Function | `md5(prosrc)` | `md5(pg_get_functiondef)` |
 | --- | --- | --- |
-| `begin_session_attempt` | `235aedf3456beec445f76efaf9f443c7` (4 365 chars) | `ca27604a86180acedd60beea257cd9e8` |
+| `begin_payment_attempt` | `9add3686b376e30ec4795a4695230df5` (3 429 chars) | `5dd3e36fa8015648bdf15455262be1d7` |
+| `begin_session_attempt` | `c856cdd32c8dbf5937441a685c58dfe0` (4 509 chars) | `8093e83a1a6ac4129284177fe1a0d5f2` |
 | `invoke_payment_refund_processor` | `afad660670f6d46b5e9c75e9f4d12c71` (2 677) | `2920cd9b992a2a1c1e61e07cfdd9e287` |
 | `open_order_refund_record` | `140778650aaea14bd32d4e087ae68ad9` (1 139) | `81c0ff702d8f5adbec5ddc450896329b` |
 | `operations_health_snapshot_internal` | `1e300b3d61759729e523d7c74224ce78` (49 281) | `54c3f7b243ca0cb7628c99f2438b7447` |
@@ -7235,6 +7243,15 @@ Fixing those is a separate change.
   Three of them survived the block's first version, which matched statement
   fragments. The block now compares the whole guard and the whole predicate,
   comments removed and whitespace collapsed.
+- **The 2026-11-12 amendment, the 1.00 SAR minimum** (`moyasar_begin_attempt_test.sql`
+  Case 12): 0.50 and 0.99 refused by both RPCs with no row written, exactly
+  1.00 accepted, and an open attempt for a 0.50 total refused rather than
+  reused. Local chain with it: 147 migrations, 84 suites, all passing but the
+  two quarantined. **Six mutants**: each minimum removed, `<=` (refusing exactly
+  1.00), a 0.50 threshold, and each minimum moved after the reuse lookup. All
+  six are killed by the file's own block, and five by the suite; the sixth,
+  moving the session minimum after the guard but still before reuse, changes no
+  outcome the suite can see, and the block's position check kills it.
 
 ### What it proves at apply time, and what it cannot
 
@@ -7243,9 +7260,9 @@ as values. The payment card must be in a legitimate state, report `enabled` and
 `configured` as booleans consistent with that state, and carry no key material.
 
 It does **not** call `invoke_payment_refund_processor`, which can POST to the
-refund worker, or `begin_session_attempt`, which writes `payment_records`. A
-trigger function cannot be called directly. Those three are proven on the local
-chain only.
+refund worker, or `begin_session_attempt` and `begin_payment_attempt`, which
+write `payment_records`. A trigger function cannot be called directly. Those
+four are proven on the local chain only.
 
 **What the card reads after the apply depends on what the owner saved**, which
 no check reads. It is `not_monitored` if the selected mode's secret key and a
@@ -7257,9 +7274,9 @@ on, a `not_configured` card raises `payment:configuration`.
 1. Apply `20260824100000` by name. Verify that `begin_payment_attempt`,
    `begin_session_attempt` and `payment_records.provider_checkout_ref` exist.
 2. Apply `20261003120000` by name, after re-hashing the merged copy.
-3. Verify read-only: the five hashes above, one definition each, the money-path
+3. Verify read-only: the six hashes above, one definition each, the money-path
    pair unchanged, and `anon` and `authenticated` unable to execute any of the
-   five.
+   six.
 
 A timed-out apply is unknown until a read settles it (§52).
 

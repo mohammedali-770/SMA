@@ -49,9 +49,17 @@
 --      'Payment / Moyasar' and 'الدفع / Moyasar'. Staff-facing only. Rows
 --      already rendered keep their text; that is history.
 --
+--   6. begin_session_attempt and begin_payment_attempt refuse a total under
+--      Moyasar's minimum invoice, 100 minor units (1.00 SAR), with P0001,
+--      before any attempt is opened. Moyasar refuses such an invoice, so an
+--      attempt opened for it ended with no invoice, and every retry failed the
+--      same way. A points redemption can leave such a remainder.
+--      payment-initiate refuses it first; this is the second line.
+--
 -- It also rewrites three object COMMENTS that named Tap as current:
 -- begin_payment_attempt, begin_session_attempt, and the
--- payment_records.provider_checkout_ref column.
+-- payment_records.provider_checkout_ref column. The first two also name the
+-- minimum.
 --
 -- WHAT IT DELIBERATELY DOES NOT DO
 --   * no row is written, no cron job touched, no grant changed. The revoke and
@@ -82,7 +90,8 @@
 -- migration that last defined it, changed only by anchored substitutions, each
 -- asserted to match EXACTLY ONCE when this file was generated:
 --
---   begin_session_attempt                20260824100000:186-268   2 (declare; guard)
+--   begin_session_attempt                20260824100000:186-268   3 (declare; guard; minimum)
+--   begin_payment_attempt                20260824100000:94-177    1 (minimum)
 --   invoke_payment_refund_processor      20260729090000:186-262   1 (the gate)
 --   open_order_refund_record             20260724120000:519-556   1 (the literal)
 --   operations_health_snapshot_internal  20260925120000:113-1206  1 (the predicate)
@@ -97,7 +106,8 @@
 -- is live in a comment-trimmed form (1 021 chars against the file's 1 135).
 -- With comments removed and whitespace collapsed, both hash
 -- 6925d1a44939d91d0ea9ff773d247eac, so its statements are unchanged and only
--- its comments come back. begin_session_attempt is not live at all.
+-- its comments come back. begin_session_attempt and begin_payment_attempt are
+-- not live at all.
 --
 -- A TRIM-SET TRAP, worth knowing beyond this file. The Tap predicate trimmed
 -- with E' \t\n\r\f\v'. PostgreSQL has no \v escape, so that set holds the
@@ -143,6 +153,11 @@ begin
   if v_n <> 1 then
     raise exception 'expected exactly one begin_session_attempt, found %', v_n;
   end if;
+  select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'begin_payment_attempt';
+  if v_n <> 1 then
+    raise exception 'expected exactly one begin_payment_attempt, found %', v_n;
+  end if;
 
   -- The money-path baseline this file was written against. Cardinality first,
   -- looked up by name, compared with `is distinct from` so a NULL fails.
@@ -173,7 +188,7 @@ end
 $guard$;
 
 -- ---------------------------------------------------------------------------
--- 1. begin_session_attempt: the loyalty multi-spend guard
+-- 1. begin_session_attempt: the loyalty multi-spend guard, and the minimum
 -- ---------------------------------------------------------------------------
 -- Identical signature and RETURNS TABLE, which `create or replace` requires.
 -- The guard sits after the total check and before the reuse lookup, exactly
@@ -183,6 +198,9 @@ $guard$;
 -- A refusal is P0001 'Your loyalty points balance changed. Please rebuild your
 -- order.' payment-initiate logs it and answers with its generic "Could not
 -- start the payment", as it did on the Tap path.
+--
+-- The minimum is the statement straight after the zero-total check: a total
+-- under 1.00 SAR, Moyasar's smallest invoice, opens no attempt (see 1b).
 create or replace function public.begin_session_attempt(
   p_session_id     uuid,
   p_provider       text,
@@ -229,6 +247,7 @@ begin
     raise exception 'Checkout session expired' using errcode = 'P0001';
   end if;
   if coalesce(v_session.total, 0) <= 0 then raise exception 'Order total must be greater than zero' using errcode = 'P0001'; end if;
+  if v_session.total < 1.00 then raise exception 'Order total is below the online payment minimum of 1.00 SAR' using errcode = 'P0001'; end if;
 
   -- Loyalty multi-spend guard: the live balance must still cover the points this
   -- session redeems PLUS points reserved by the customer's other live sessions.
@@ -290,10 +309,109 @@ revoke all on function public.begin_session_attempt(uuid, text, text, integer) f
 grant execute on function public.begin_session_attempt(uuid, text, text, integer) to service_role;
 
 comment on function public.begin_session_attempt(uuid, text, text, integer) is
-  'Opens (or reuses) THE single active payment attempt for a checkout session, for any provider. Refuses with P0001 when the customer''s live loyalty balance no longer covers the points this session redeems plus those reserved by their other live sessions: the concurrent-session multi-spend guard, under a lock on the profile row (since 20261003120000).';
+  'Opens (or reuses) THE single active payment attempt for a checkout session, for any provider. Refuses with P0001 when the customer''s live loyalty balance no longer covers the points this session redeems plus those reserved by their other live sessions: the concurrent-session multi-spend guard, under a lock on the profile row (since 20261003120000). Refuses with P0001 a total under Moyasar''s 1.00 SAR invoice minimum (since 20261003120000).';
+
+-- ---------------------------------------------------------------------------
+-- 1b. begin_payment_attempt: Moyasar's invoice minimum
+-- ---------------------------------------------------------------------------
+-- The order-first twin, re-emitted for the one statement both now share: a
+-- total under Moyasar's minimum invoice, 100 minor units (1.00 SAR), is refused
+-- before any attempt is opened. Moyasar refuses such an invoice, so an attempt
+-- opened for it could only end with no invoice, and every retry the same way.
+-- payment-initiate refuses it first (isBelowMoyasarMinimum,
+-- MOYASAR_MIN_INVOICE_MINOR_UNITS); this is the second line. Identical
+-- signature and RETURNS TABLE.
+create or replace function public.begin_payment_attempt(
+  p_order_id       uuid,
+  p_provider       text,
+  p_mode           text,
+  p_expiry_minutes integer default 30
+)
+returns table (
+  attempt_id            uuid,
+  reference_transaction text,
+  reference_order       text,
+  provider_ref          text,
+  provider_checkout_ref text,
+  checkout_url          text,
+  amount                numeric,
+  currency              text,
+  mode                  text,
+  reused                boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order    public.orders;
+  v_existing public.payment_records;
+  v_new      public.payment_records;
+  v_ref      text;
+  v_ref_ord  text;
+  v_provider text := nullif(btrim(lower(coalesce(p_provider, ''))), '');
+  v_expires  timestamptz := now() + make_interval(mins => greatest(5, least(60, coalesce(p_expiry_minutes, 30))));
+begin
+  if v_provider is null then
+    raise exception 'A payment provider is required' using errcode = 'P0001';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then raise exception 'Order % not found', p_order_id; end if;
+  if v_order.payment_status = 'paid' then raise exception 'Order is already paid' using errcode = 'P0001'; end if;
+  if coalesce(v_order.payment_method, '') <> 'online' then raise exception 'Order is not an online-payment order' using errcode = 'P0001'; end if;
+  if coalesce(v_order.total, 0) <= 0 then raise exception 'Order total must be greater than zero' using errcode = 'P0001'; end if;
+  if v_order.total < 1.00 then raise exception 'Order total is below the online payment minimum of 1.00 SAR' using errcode = 'P0001'; end if;
+
+  -- Reuse a still-live attempt; expire a stale one.
+  select * into v_existing from public.payment_records
+    where order_id = p_order_id and provider = v_provider and status = 'initiated'
+    order by created_at desc limit 1;
+  if found then
+    if v_existing.expires_at is not null and v_existing.expires_at <= now() then
+      update public.payment_records
+        set status = 'failed', failure_code = 'expired', failure_message_safe = 'Payment session expired'
+        where id = v_existing.id;
+    else
+      return query select v_existing.id, v_existing.reference_transaction, v_existing.reference_order,
+                          v_existing.provider_ref, v_existing.provider_checkout_ref, v_existing.checkout_url,
+                          v_existing.amount, v_existing.currency, v_existing.mode, true;
+      return;
+    end if;
+  end if;
+
+  v_ref     := 'sm_' || replace(gen_random_uuid()::text, '-', '');
+  v_ref_ord := 'ORD-' || substr(replace(p_order_id::text, '-', ''), 1, 12);
+  begin
+    insert into public.payment_records
+      (order_id, provider, status, amount, currency, mode, reference_transaction, reference_order, initiated_at, expires_at)
+    values
+      (p_order_id, v_provider, 'initiated', v_order.total, 'SAR',
+       case when p_mode = 'live' then 'live' else 'test' end,
+       v_ref, v_ref_ord, now(), v_expires)
+    returning * into v_new;
+  exception when unique_violation then
+    -- A concurrent attempt won the one-active-attempt race; return it instead of
+    -- opening a second checkout.
+    select * into v_existing from public.payment_records
+      where order_id = p_order_id and provider = v_provider and status = 'initiated'
+      order by created_at desc limit 1;
+    return query select v_existing.id, v_existing.reference_transaction, v_existing.reference_order,
+                        v_existing.provider_ref, v_existing.provider_checkout_ref, v_existing.checkout_url,
+                        v_existing.amount, v_existing.currency, v_existing.mode, true;
+    return;
+  end;
+
+  return query select v_new.id, v_new.reference_transaction, v_new.reference_order,
+                      v_new.provider_ref, v_new.provider_checkout_ref, v_new.checkout_url,
+                      v_new.amount, v_new.currency, v_new.mode, false;
+end $$;
+
+revoke all on function public.begin_payment_attempt(uuid, text, text, integer) from public, anon, authenticated;
+grant execute on function public.begin_payment_attempt(uuid, text, text, integer) to service_role;
 
 comment on function public.begin_payment_attempt(uuid, text, text, integer) is
-  'Opens (or reuses) THE single active payment attempt for an order, for any provider. reference_order is an OPAQUE ORD-… value, never the internal SM-… order number.';
+  'Opens (or reuses) THE single active payment attempt for an order, for any provider. reference_order is an OPAQUE ORD-… value, never the internal SM-… order number. Refuses with P0001 a total under Moyasar''s 1.00 SAR invoice minimum (since 20261003120000).';
 
 comment on column public.payment_records.provider_checkout_ref is
   'Provider-side checkout object this attempt is being paid through, when it is a different id from the settled payment. Moyasar: the invoice id. provider_ref holds the payment id, which is what is confirmed and refunded.';
@@ -1672,10 +1790,10 @@ grant execute on function public.operations_alerts_render_event(text, text, text
 --
 -- WHAT IS CALLED AND WHAT IS NOT. The snapshot (`stable`) and the renderer
 -- (`immutable`) are called, and their results are read back as values. The
--- other three are NOT called here. invoke_payment_refund_processor can POST to
--- the refund worker. begin_session_attempt writes payment_records. A trigger
--- function cannot be called directly. Their behaviour is proven by
--- supabase/tests/moyasar_only_payments_test.sql and
+-- other four are NOT called here. invoke_payment_refund_processor can POST to
+-- the refund worker. begin_session_attempt and begin_payment_attempt write
+-- payment_records. A trigger function cannot be called directly. Their
+-- behaviour is proven by supabase/tests/moyasar_only_payments_test.sql and
 -- moyasar_begin_attempt_test.sql on the local chain.
 do $verify$
 declare
@@ -1688,9 +1806,11 @@ declare
   p_total  integer;
   p_guard  integer;
   p_reuse  integer;
+  p_min    integer;
 begin
   -- 6.1 ONE DEFINITION EACH.
-  foreach v_fn in array array['begin_session_attempt', 'invoke_payment_refund_processor',
+  foreach v_fn in array array['begin_session_attempt', 'begin_payment_attempt',
+                              'invoke_payment_refund_processor',
                               'open_order_refund_record', 'operations_health_snapshot_internal',
                               'operations_alerts_render_event'] loop
     select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -1702,6 +1822,7 @@ begin
 
   -- 6.2 CONTAINMENT UNCHANGED: service_role only, everywhere it was.
   foreach v_fn in array array['public.begin_session_attempt(uuid,text,text,integer)',
+                              'public.begin_payment_attempt(uuid,text,text,integer)',
                               'public.invoke_payment_refund_processor()',
                               'public.open_order_refund_record()',
                               'public.operations_health_snapshot_internal()',
@@ -1716,17 +1837,19 @@ begin
   end loop;
 
   -- 6.3 THE HEADERS WERE COPIED, NOT RETYPED: definer, volatility and
-  --     search_path exactly as before, for all five.
+  --     search_path exactly as before, for all six.
   select string_agg(p.proname || ':' || p.prosecdef::text || ':' || p.provolatile::text || ':'
                     || coalesce(array_to_string(p.proconfig, ';'), '-'), ' | ' order by p.proname)
     into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
-     and p.proname in ('begin_session_attempt', 'invoke_payment_refund_processor',
+     and p.proname in ('begin_session_attempt', 'begin_payment_attempt',
+                       'invoke_payment_refund_processor',
                        'open_order_refund_record', 'operations_health_snapshot_internal',
                        'operations_alerts_render_event');
   if v_txt is distinct from
-       'begin_session_attempt:true:v:search_path=public'
+       'begin_payment_attempt:true:v:search_path=public'
+    || ' | begin_session_attempt:true:v:search_path=public'
     || ' | invoke_payment_refund_processor:true:v:search_path=public, vault, extensions, net'
     || ' | open_order_refund_record:true:v:search_path=public'
     || ' | operations_alerts_render_event:false:i:search_path=public'
@@ -1734,12 +1857,13 @@ begin
     raise exception 'a function header changed: %', coalesce(v_txt, 'NULL');
   end if;
 
-  -- 6.4 NO TAP LEFT in the five bodies, comments included. A word-start match,
+  -- 6.4 NO TAP LEFT in the six bodies, comments included. A word-start match,
   --     so 'Tap', 'tap' and 'tap_begin_…' are all caught.
   select string_agg(p.proname, ', ') into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
-     and p.proname in ('begin_session_attempt', 'invoke_payment_refund_processor',
+     and p.proname in ('begin_session_attempt', 'begin_payment_attempt',
+                       'invoke_payment_refund_processor',
                        'open_order_refund_record', 'operations_health_snapshot_internal',
                        'operations_alerts_render_event')
      and p.prosrc ~* '\mtap';
@@ -1790,6 +1914,38 @@ begin
   if not (p_total > 0 and p_total < p_guard and p_guard < p_reuse) then
     raise exception 'the loyalty guard is out of place in begin_session_attempt (%, %, %)',
       p_total, p_guard, p_reuse;
+  end if;
+
+  -- 6.6b THE INVOICE MINIMUM, as a statement in both attempt RPCs, straight
+  --      after the zero-total check and before an attempt is reused or
+  --      opened, in the same normalised form. Its threshold is pinned with it:
+  --      1.00 SAR is MOYASAR_MIN_INVOICE_MINOR_UNITS (moyasar.ts), which a
+  --      wiring test holds this file to.
+  p_min := position(
+       'if v_session.total < 1.00 then raise exception ''Order total is below the '
+       || 'online payment minimum of 1.00 SAR'' using errcode = ''P0001''; end if;'
+       in v_src);
+  if p_min = 0 then
+    raise exception 'begin_session_attempt does not refuse a total under the 1.00 SAR invoice minimum';
+  end if;
+  if not (p_total < p_min and p_min < p_guard) then
+    raise exception 'the minimum is out of place in begin_session_attempt (%, %, %)', p_total, p_min, p_guard;
+  end if;
+
+  select regexp_replace(regexp_replace(p.prosrc, '--[^\n]*', '', 'g'), '\s+', ' ', 'g') into v_src
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'begin_payment_attempt';
+  p_total := position('''Order total must be greater than zero''' in v_src);
+  p_min := position(
+       'if v_order.total < 1.00 then raise exception ''Order total is below the '
+       || 'online payment minimum of 1.00 SAR'' using errcode = ''P0001''; end if;'
+       in v_src);
+  p_reuse := position('select * into v_existing from public.payment_records' in v_src);
+  if p_min = 0 then
+    raise exception 'begin_payment_attempt does not refuse a total under the 1.00 SAR invoice minimum';
+  end if;
+  if not (p_total > 0 and p_total < p_min and p_min < p_reuse) then
+    raise exception 'the minimum is out of place in begin_payment_attempt (%, %, %)', p_total, p_min, p_reuse;
   end if;
 
   -- 6.7 THE HEALTH PREDICATE, compared whole in the same normalised form, so

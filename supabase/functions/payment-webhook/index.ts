@@ -2,9 +2,9 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
-  HANDLED_WEBHOOK_TYPES, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice, matchesAnyWebhookSecret,
-  parseWebhookEnvelope, resolveMoyasarConfig, verifyWebhookSecretToken, webhookVerificationLogRow,
-  type MoyasarWebhookEnvelope,
+  HANDLED_WEBHOOK_TYPES, NOT_A_DUPLICATE_FILTER, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice,
+  matchesAnyWebhookSecret, parseWebhookEnvelope, resolveMoyasarConfig, verifyWebhookSecretToken,
+  webhookVerificationLogRow, type MoyasarWebhookEnvelope,
 } from '../_shared/moyasar.ts';
 import {
   retrieveMoyasarPayment, validateAndConfirmMoyasarPayment, type MoyasarAttempt,
@@ -154,7 +154,10 @@ async function handleMoyasarWebhook(
 
   // Locate the stored attempt. Normally by the invoice the attempt was opened
   // against; a repeat webhook arriving after confirmation matches on the payment
-  // id instead, because that is what confirmation stamps into provider_ref.
+  // id instead, because that is what confirmation stamps into provider_ref. A
+  // row recorded for a DUPLICATE payment carries that payment id but is not an
+  // attempt and has no invoice, so the second lookup skips it: binding against
+  // it could only fail, and would overwrite the record of money to give back.
   let rec: MoyasarAttempt | null = null;
   const select = 'id, order_id, checkout_session_id, provider_ref, provider_checkout_ref, reference_transaction, reference_order, amount, currency, mode, status';
   if (invoiceId) {
@@ -165,7 +168,7 @@ async function handleMoyasarWebhook(
   }
   if (!rec && paymentId) {
     const { data } = await admin.from('payment_records').select(select)
-      .eq('provider', 'moyasar').eq('provider_ref', paymentId).maybeSingle();
+      .eq('provider', 'moyasar').eq('provider_ref', paymentId).or(NOT_A_DUPLICATE_FILTER).maybeSingle();
     rec = (data ?? null) as MoyasarAttempt | null;
   }
   if (!rec) {
@@ -196,5 +199,12 @@ async function handleMoyasarWebhook(
   }
 
   const result = await validateAndConfirmMoyasarPayment(admin, rec, retrieved.body, { liveMode: evt.live });
+  // Our own write or read failed before the outcome was known. Ask Moyasar to
+  // send it again rather than acknowledge a payment nothing has confirmed.
+  if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') {
+    return json({ status: 'retry', reason: result.reason }, 503);
+  }
+  // A duplicate is acknowledged: it is recorded for a refund, and a retry would
+  // only record it again.
   return json({ status: result.paid ? 'paid' : 'acknowledged', outcome: result.outcome }, 200);
 }

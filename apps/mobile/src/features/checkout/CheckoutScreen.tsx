@@ -52,7 +52,7 @@ import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '.
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { cartLineLabel } from '../../utils/format';
-import { describeVerifyResult, recoverPendingSession } from './pendingSession';
+import { describeVerifyResult, recoverPendingSession, refusalDropsSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
 import { CheckoutFooter } from './view/CheckoutFooter';
@@ -812,7 +812,22 @@ export function CheckoutScreen() {
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
       if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
+        if (refusalDropsSession(init)) {
+          // Moyasar will not invoice a total under 1.00 SAR, so nothing can ever
+          // be paid on this session (payment-initiate retires it as well). Drop
+          // it, and say what to change: fewer points, or cash.
+          await clearPendingSession();
+          setPayFlow(null);
+          setError(t('payBelowMinimum'));
+          return;
+        }
         setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });
+        // NOT dropped blindly. This refusal is made before THIS call opens an
+        // attempt, but the session may already hold an earlier one whose invoice
+        // the customer paid, and with the gateway switched off the webhook
+        // ignores that payment. payment-verify decides instead: it answers a
+        // session with nothing payable terminal, and recovery then drops it.
+        void settleRefusedSession();
         return;
       }
       if (init.checkoutUrl) {
@@ -837,6 +852,23 @@ export function CheckoutScreen() {
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       payRunningRef.current = false;
+    }
+  };
+
+  // After payment-initiate refused to open a payment: resolve the saved session
+  // through payment-verify, the same way recovery does before every order. A
+  // payment that did settle opens its receipt; a dead session is dropped, so
+  // the next order, cash included, is not held behind it.
+  const settleRefusedSession = async () => {
+    try {
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (rec.kind === 'receipt') { cart.clear(); setPayFlow(null); router.replace(`/receipt/${rec.orderId}`); }
+    } catch {
+      // Recovery before the next order runs the same check again.
     }
   };
 
