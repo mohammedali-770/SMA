@@ -49,25 +49,42 @@ Authoritative decision: `docs/PAYMENT_POSTPONEMENT.md`.
 
 ## 3. Backup / PITR / restore capability
 
-**Status:** LIVE VERIFY + OWNER DECISION — still unverified in repository evidence.
+**Status:** OWNER DECISION. Read live 2026-11-11: **there is no backup.**
 
-The repository does not establish:
+The organisation is on the Supabase **Free** plan (`get_organization`,
+2026-11-11). Supabase takes no automatic backup of a Free project: daily backups
+are for Pro, Team and Enterprise, and PITR is an add-on on top of a paid plan. No
+off-platform dump is known, and nothing in the repository makes one. Losing the
+database today loses everything since the project was created on 2026-07-08. No
+restore has ever been rehearsed. Facts and sources: `docs/BACKUP_RECOVERY.md`
+§1-3.
 
-- whether Supabase PITR is enabled;
-- the actual retention window;
-- whether daily/off-platform backups exist;
-- who can execute a restore;
-- a measured RPO/RTO;
-- whether a restore drill has ever succeeded.
+Required owner actions, in this order:
 
-Required owner action:
+1. **Say whether any dump already exists**: where it is, when it was made, and how.
+   If one does, record it in `docs/BACKUP_RECOVERY.md` §1.
+2. **Decide the RPO and RTO targets** (`docs/BACKUP_RECOVERY.md` §2). The honest
+   values today are "everything since 2026-07-08" and "undefined".
+3. **Choose the capability that meets them, and set it up.** Either upgrade the
+   organisation to Pro (daily backups, 7 kept; PITR as a further add-on; it also
+   lifts the 500 MB cap), or schedule off-platform logical dumps with
+   `supabase db dump`, stored encrypted because they hold customer personal data and
+   provider credentials. The first is a spending decision; the second needs a
+   Production database credential.
+4. **Name who can start a restore, and who stands in for them.**
+5. **Run the drill** against a disposable project (`docs/BACKUP_RECOVERY.md` §6)
+   and record the measured result in §7.
 
-1. Open Supabase backup settings and record the actual current configuration in `docs/BACKUP_RECOVERY.md`.
-2. Decide acceptable RPO/RTO.
-3. Run the documented restore drill against a disposable project.
-4. Record the measured result.
+A nearer outage needs no data loss at all. At 500 MB a Free project goes
+read-only and no order can be placed; the database was 207 MB on 2026-11-11 and
+growing about 1.7 MB a day. The run-history prune from PR #435 stops that growth. It
+was merged on 2026-11-11 (`8df5408`) and applied the same day, and its first nightly
+run is 01:10 UTC on 2026-11-12 (`docs/BACKUP_RECOVERY.md` §3). Shrinking the file
+afterwards with a one-off `VACUUM FULL` is optional and a separate decision
+(`docs/MIGRATIONS.md` §53).
 
-Do not call backup/recovery "ready" until that file contains live evidence.
+Do not call backup/recovery "ready" until `docs/BACKUP_RECOVERY.md` §7 holds a
+drill with a measured RPO and RTO.
 
 ## 4. Payment-refund worker safety after any environment rebuild
 
@@ -452,11 +469,11 @@ Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. 
 
 ## 11. Sentry production source maps
 
-**Status:** SOURCE/RELEASE HISTORY updated.
+**Status:** OWNER ACTION for Vercel, measured 2026-11-11. RELEASE GATE for EAS.
 
-The August 11 iOS release-readiness work added `SENTRY_AUTH_TOKEN` to the EAS production environment and aligned the Sentry React Native compatibility line. Do not reintroduce the old documentation claim that the token is simply missing.
-
-For each production release, verify source-map upload through the current Sentry release gates rather than assuming a historical secret still exists/works.
+- **EAS (native).** The August 11 iOS release-readiness work added `SENTRY_AUTH_TOKEN` to the EAS production environment and aligned the Sentry React Native compatibility line. Do not reintroduce the old documentation claim that the EAS token is simply missing. For each production release, verify source-map upload through the current Sentry release gates rather than assuming a historical secret still exists/works.
+- **Vercel (admin web): the token was not in the production build, measured 2026-11-11.** The production console bundle for commit `622a133` carries no Sentry debug ID. The upload plugin injects one into every chunk whenever it runs, so it did not run (`docs/SENTRY_WEB_OBSERVABILITY.md`). **Action:** add `SENTRY_AUTH_TOKEN` to the Vercel project's Production environment as a sensitive variable, never as a `VITE_*` one. A Vercel Production settings change is an owner action (CLAUDE.md §5). The next production `main-*.js` containing `sentry-dbid` shows it worked; an approved admin-web test event with a readable stack confirms it.
+- **`/app` (customer web): a token alone does not help.** The export produces no source maps at all, so there is nothing to upload. That needs a change to `apps/mobile/scripts/export-web.js`, not a setting.
 
 ## 12. Migration ledger reconciliation — resolved 2026-08-12
 

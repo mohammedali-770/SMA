@@ -405,14 +405,23 @@ NO. Sensitive Info: NO. Contacts: NO.**
 
 ### Two answers that are argued rather than guessed
 
-**Crash Data is *Linked to You*, and Sentry's own manifest disagrees.**
+**Crash Data is declared *Linked to You*, and Sentry's own manifest disagrees.**
 `Sentry.bundle/PrivacyInfo.xcprivacy` inside the `.ipa` declares
 `NSPrivacyCollectedDataTypeCrashData` with `Linked: false`. That describes the
-SDK's defaults. **Our configuration is not the default**: `sanitize.ts:223-226`
-reduces `event.user` to `{ id }` and drops every other field, so a crash report
-carries the account id. **The developer's declaration governs, not the bundled
-SDK manifest** — declare Linked. This is the same fact that makes §6 mark Play's
-"User IDs" row as collected.
+SDK's defaults. **The developer's declaration governs, not the bundled SDK
+manifest.**
+
+**The reason this paragraph gave for Linked was wrong, corrected 2026-11-11.** It
+said `sanitize.ts` reduces `event.user` to `{ id }`, so a crash report carries the
+account id. That code (`sanitize.ts:228-233`) only trims a user object that
+something else supplied, and nothing supplies one: no code calls `Sentry.setUser`
+on any surface, and `sendDefaultPii` is false on native and web. So the app
+attaches no account id to a report. Whether the native SDKs add an
+installation-scoped id of their own was not checked on a device. **Linked stays the
+declared answer until the owner re-decides it**: while that question is open,
+declaring more than may be collected is the safe direction. Play's "User IDs" row
+(§6 of `PLAY_STORE_SUBMISSION.md`) is declared for the account itself,
+`profiles.id`, and does not depend on this.
 
 **Device ID carries no marketing purpose on Apple's form the way it does on
 Play's.** Play asks for a purpose list and the push token's opt-out promos make
