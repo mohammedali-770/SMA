@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**214 TypeScript test files declaring 3325 test blocks, plus 83 SQL suites.**
+**214 TypeScript test files declaring 3327 test blocks, plus 83 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -327,19 +327,19 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-28 files, 732 declared test blocks.
+28 files, 734 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
-| `supabase/functions/_shared/adminPush.test.ts` | 49 | scopeFor |
+| `supabase/functions/_shared/adminPush.test.ts` | 50 | scopeFor |
 | `supabase/functions/_shared/adminPushWiring.test.ts` | 29 | the admin channel is separate from the customer channel |
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 18 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/apiKeys.test.ts` | 16 | key selection |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
-| `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 6 | email-test-config validates the SMTP endpoint before connecting |
+| `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 7 | email-test-config validates the SMTP endpoint before connecting |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |

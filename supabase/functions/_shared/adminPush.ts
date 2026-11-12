@@ -242,19 +242,24 @@ export const ENDPOINT_NOT_ALLOWED = 'endpoint_not_allowed';
 
 /**
  * The push services a browser hands out endpoints on, matched by suffix.
- * Chrome and the other Chromium browsers use FCM, Firefox uses Mozilla's
- * autopush, Safari and a Home Screen web app on iOS use Apple's service, and
- * Edge on Windows uses WNS, whose hosts are per region under
- * `notify.windows.com`.
+ * Chrome and the other Chromium browsers use FCM. Chrome's Beta, Dev and Canary
+ * channels use Google's staging endpoint `jmt17.google.com` instead (Chromium
+ * `components/push_messaging`: `kPushMessagingStagingGcmEndpoint`, returned for
+ * every non-Stable channel). Firefox uses Mozilla's autopush, Safari and a Home
+ * Screen web app on iOS use Apple's service, and Edge on Windows uses WNS, whose
+ * hosts are per region under `notify.windows.com`.
  *
  * THIS IS THE DEFAULT, NOT A SUGGESTION (2026-11-11). Until then an unset
  * `ADMIN_PUSH_ALLOWED_HOSTS` meant "any public hostname", and a public hostname
  * is a weaker property than it sounds: `10.0.0.5.sslip.io` is one, and wildcard
- * DNS answers it with 10.0.0.5. A browser never hands out an endpoint anywhere
- * else, so naming the services costs a real subscription nothing.
+ * DNS answers it with 10.0.0.5. A browser hands out endpoints only on its
+ * vendor's push service, so naming the services costs a real subscription
+ * nothing, provided the list names every service a browser uses. The first
+ * version missed Chrome's pre-release channels; review caught it (2026-11-12).
  */
 export const DEFAULT_PUSH_SERVICE_HOSTS: readonly string[] = [
   'fcm.googleapis.com',
+  'jmt17.google.com',
   'updates.push.services.mozilla.com',
   'web.push.apple.com',
   'notify.windows.com',

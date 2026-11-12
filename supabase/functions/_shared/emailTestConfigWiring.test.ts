@@ -104,6 +104,22 @@ describe('email-test-config never echoes the raw connection error', () => {
     expect(code()).not.toContain('sanitize(');
   });
 
+  it('returns only the classified reason and sentence, never the error itself', () => {
+    // A blocklist of old spellings misses a new one (`${e}`, `(e as Error).message`),
+    // so pin the failure response itself: nothing from the error object, under
+    // any spelling, and exactly the two classified values.
+    const branch = testSendBranch();
+    const block = branch.slice(branch.indexOf('} catch (e) {'));
+    const start = block.indexOf('return json(');
+    const end = block.indexOf('}, 200)', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const response = block.slice(start, end);
+    expect(response).not.toMatch(/\be\b/);
+    expect(response.match(/\$\{[^}]*\}/g)).toEqual(['${failure.message}', '${failure.reason}']);
+    expect(response).toMatch(/reason:\s*failure\.reason,/);
+  });
+
   it('never disables denomailer’s refusal to authenticate in the clear', () => {
     // The same pin as the dispatcher's, for the same reason: switching it off is
     // what somebody would reach for to silence a "not secure" failure.

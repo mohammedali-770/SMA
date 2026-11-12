@@ -406,12 +406,23 @@ describe('refusePushEndpoint', () => {
   it('admits each browser push service by suffix, including Edge on Windows', () => {
     expect(DEFAULT_PUSH_SERVICE_HOSTS).toEqual([
       'fcm.googleapis.com',
+      'jmt17.google.com',
       'updates.push.services.mozilla.com',
       'web.push.apple.com',
       'notify.windows.com',
     ]);
     // WNS hands out per-region hosts under notify.windows.com.
     expect(refusePushEndpoint('https://wns2-par02p.notify.windows.com/w/?token=abc')).toBeNull();
+  });
+
+  it("admits Chrome's pre-release channels, and nothing that only looks like them", () => {
+    // Chrome Beta, Dev and Canary hand out endpoints on Google's staging host
+    // (Chromium components/push_messaging, kPushMessagingStagingGcmEndpoint).
+    expect(refusePushEndpoint('https://jmt17.google.com/fcm/send/dpH5lCsTSSM:APA91bF')).toBeNull();
+    expect(refusePushEndpoint('https://notjmt17.google.com/fcm/send/x')).toBe('endpoint_not_allowed');
+    expect(refusePushEndpoint('https://jmt17.google.com.attacker.example/fcm/send/x')).toBe('endpoint_not_allowed');
+    expect(refusePushEndpoint('https://google.com/fcm/send/x')).toBe('endpoint_not_allowed');
+    expect(refusePushEndpoint('https://jmt17.google.com:8443/fcm/send/x')).toBe('endpoint_has_port');
   });
 
   it('treats a blank allowlist as unset, so an empty secret does not open every host', () => {

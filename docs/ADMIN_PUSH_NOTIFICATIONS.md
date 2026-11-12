@@ -324,6 +324,7 @@ so the sender now admits only those services, matched by suffix:
 | Host | Who issues it |
 | --- | --- |
 | `fcm.googleapis.com` | Chrome and the other Chromium browsers |
+| `jmt17.google.com` | Chrome Beta, Dev and Canary: Chromium's staging endpoint for every non-Stable channel |
 | `updates.push.services.mozilla.com` | Firefox |
 | `web.push.apple.com` | Safari, and a Home Screen web app on iOS |
 | `notify.windows.com` | Edge on Windows (per-region hosts under it) |
@@ -344,9 +345,14 @@ redeploy changes nothing for the owner's phone.
 
 **If an admin's browser uses a service that is not on the list**, the sender
 refuses the endpoint before any request is made. The function log names the
-origin with reason `endpoint_not_allowed`, the failure count rises, and the row
-is pruned after 20 refusals. The remedy is to set `ADMIN_PUSH_ALLOWED_HOSTS` to
-the four hosts plus the new one, and then have that admin enable the bell again.
+origin with reason `endpoint_not_allowed`, and the failure count rises on every
+send. **A refusal never prunes the row:** it stays until the list admits the
+host or the admin turns the bell off. The remedy is to set
+`ADMIN_PUSH_ALLOWED_HOSTS` to the five hosts plus the new one, and then have that
+admin enable the bell again. That step matters: enabling the bell resets the
+count (`save_admin_push_subscription` sets `failure_count = 0`), and a count left
+above the prune threshold would delete the row at its first ordinary failure once
+the host is admitted.
 
 ### A subscription is deleted on 404 and 410, and on nothing else
 
