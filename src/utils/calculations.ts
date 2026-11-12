@@ -263,14 +263,21 @@ const MENU_CSV_COLUMNS = 9;
 /** A price cell: digits, then optionally a point and one or two more. No separators, no currency. */
 const MENU_CSV_PRICE = /^\d+(?:\.\d{1,2})?$/;
 
-/** A calories cell, when it is not blank: a whole number, digits only. */
-const MENU_CSV_CALORIES = /^\d+$/;
+/**
+ * A calories cell, when it is not blank: a whole number, digits only. A
+ * trailing point and zeros ("450.0") is still that whole number — Excel writes
+ * it so when the column is formatted with decimal places — and reads as 450.
+ */
+const MENU_CSV_CALORIES = /^\d+(?:\.0+)?$/;
 
 /** The template's Arabic columns: category_name_ar, product_name_ar, description_ar. */
 const MENU_CSV_ARABIC_COLUMNS = [1, 3, 5];
 
 /** A character of the Arabic script, in the blocks a menu is written in (U+FEFF excluded). */
 const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFC]/;
+
+/** A letter of any script. A cell of question marks, digits and spaces has none. */
+const ANY_LETTER = /\p{L}/u;
 
 /**
  * The import's refusals, in both console languages. The older row messages
@@ -353,11 +360,16 @@ export function parseCSVMenu(
 
   // The same mistake on a computer whose legacy code page has no Arabic at all
   // (English Windows, windows-1252): Excel writes "?" for every Arabic letter.
-  // That is valid UTF-8, so there is no U+FFFD to find. A sheet whose Arabic
-  // columns hold question marks and not one Arabic letter is that file. One
-  // stray "?" in a real Arabic sheet does not trip this.
+  // That is valid UTF-8, so there is no U+FFFD to find. The file is
+  // recognised by two things together: not one Arabic letter in the Arabic
+  // columns, and at least one Arabic cell with a "?" and no letter of any
+  // script ("????", "12 ???? ????"), which is what an Arabic name becomes.
+  // Neither alone is enough. One stray "?" in a real Arabic sheet has Arabic
+  // beside it, and English placeholder text such as "Thirsty?" has letters, so
+  // both import as before.
   const arabicCells = rows.slice(1).flatMap((r) => MENU_CSV_ARABIC_COLUMNS.map((c) => r[c] ?? ''));
-  if (arabicCells.some((c) => c.includes('?')) && !arabicCells.some((c) => ARABIC_SCRIPT.test(c))) {
+  const replacedCell = (c: string) => c.includes('?') && !ANY_LETTER.test(c);
+  if (arabicCells.some(replacedCell) && !arabicCells.some((c) => ARABIC_SCRIPT.test(c))) {
     return refuse(MENU_CSV_TEXT.notUtf8[lang]);
   }
 

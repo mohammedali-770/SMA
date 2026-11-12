@@ -340,6 +340,20 @@ describe('CSV import — what a chosen FILE really contains', () => {
     expect(bulkUploadMenu).not.toHaveBeenCalled();
   });
 
+  it('gives the Arabic refusals on the PASTE path too, in the Arabic console', () => {
+    // The paste box calls parseCSVMenu from a different handler than a chosen
+    // file. Review found that dropping the console language from that call
+    // passed every test, which would have shown an Arabic admin English refusals.
+    mockContext({ adminLang: 'ar' });
+    render(<MenuManagementPanel />);
+    fireEvent.click(tab('رفع منيو بملف Excel/CSV'));
+    const pasted = `${HEADER}\nPlatters,أطباق,Feast,وليمة,d,و,99.00,"1,200",`;
+    fireEvent.change(screen.getByPlaceholderText(/category_name_en/i), { target: { value: pasted } });
+    fireEvent.click(tab('فحص وتدقيق الجدول المرفوع'));
+    expect(screen.getByText(/^قيمة السعرات الحرارية في الصف 2 غير صالحة/)).toBeTruthy();
+    expect(screen.queryByText(/invalid calories value/)).toBeNull();
+  });
+
   it('reads a "CSV UTF-8" file with a quoted comma, previews it, and commits the right price', async () => {
     vi.spyOn(window, 'alert').mockImplementation(() => {});
     bulkUploadMenu.mockResolvedValue({ success: true, count: 1, skipped: 0 });

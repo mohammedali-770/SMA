@@ -318,6 +318,25 @@ describe('parseCSVMenu — what spreadsheets actually write', () => {
     expect(r.products.map(p => p.nameAr)).toEqual(['Why Not?', 'ب']);
   });
 
+  it('imports a UTF-8 sheet whose Arabic columns hold English placeholder text with a question mark', () => {
+    // Review found this refused, with a message saying the file was not UTF-8,
+    // which was untrue: the Arabic columns hold no Arabic, and "Thirsty?" has a
+    // "?". A replaced Arabic name has no letters at all, and this cell has some.
+    const csv = `${HEADER}\nDrinks,Drinks,Cola,Cola,Thirsty?,Thirsty?,5,0,`;
+    const r = parseCSVMenu(csv, []);
+    expect(r.errors).toEqual([]);
+    expect(r.products.map(p => [p.nameAr, p.descriptionAr, p.price])).toEqual([['Cola', 'Thirsty?', 5]]);
+  });
+
+  it('still refuses a replaced sheet when only one Arabic cell lost its letters', () => {
+    // English text in two Arabic columns, and a description that was
+    // "12 قطعة حارة": digits and spaces survive, every Arabic letter is "?".
+    const csv = `${HEADER}\nWings,Wings,Hot Wings,Hot Wings,Hot wings,12 ???? ????,29.00,450,`;
+    const r = parseCSVMenu(csv, []);
+    expect(r.products).toEqual([]);
+    expect(r.errors).toEqual([expect.stringMatching(/^This file is not saved as UTF-8/)]);
+  });
+
   it('refuses a quote that never closes, and imports nothing', () => {
     const csv = `${HEADER}\nBurgers,برجر,A,أ,d,و,10,100,\nBurgers,برجر,"Wings, 12 pcs,أجنحة,d,و,29.00,450,\nBurgers,برجر,C,ج,d,و,30,300,`;
     const r = parseCSVMenu(csv, []);
@@ -386,10 +405,14 @@ describe('parseCSVMenu — what spreadsheets actually write', () => {
     expect(calories('710')).toBe(710);
     expect(calories('0')).toBe(0);
     expect(calories('')).toBe(0);
+    // Excel writes a whole number this way when the column has decimal places.
+    // Review found "450.0" refused; it is 450.
+    expect(calories('450.0')).toBe(450);
+    expect(calories('450.00')).toBe(450);
     // A seven-column row has no calories cell at all, which also means 0.
     expect(parseCSVMenu(`${HEADER}\nX,س,A,أ,d,و,10`, []).products[0]?.calories).toBe(0);
     // parseInt took the leading digits of each of these, or wrote 0 silently.
-    for (const bad of ['1,200', '450 kcal', '450.5', 'abc', '-5', '١٢٠']) {
+    for (const bad of ['1,200', '450 kcal', '450.5', '450.05', '450.', '.0', 'abc', '-5', '١٢٠']) {
       expect(calories(`"${bad}"`)).toBeUndefined();
     }
   });

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**217 TypeScript test files declaring 3372 test blocks, plus 83 SQL suites.**
+**217 TypeScript test files declaring 3376 test blocks, plus 83 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -214,7 +214,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-110 files, 1566 declared test blocks.
+110 files, 1570 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -229,7 +229,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
-| `src/components/admin/MenuManagementPanel.test.tsx` | 19 | product price validation — the money contract |
+| `src/components/admin/MenuManagementPanel.test.tsx` | 20 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
@@ -243,7 +243,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/alerts/alertsView.test.ts` | 18 | load contract |
 | `src/components/admin/view/branches/DeliveryAreasEditor.test.tsx` | 10 | DeliveryAreasEditor |
 | `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
-| `src/components/admin/view/consoleClock.test.tsx` | 4 | a banner row shows its window as Riyadh calendar dates |
+| `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
 | `src/components/admin/view/health/HealthSystemCard.test.tsx` | 4 | branch_availability health card |
 | `src/components/admin/view/health/healthView.test.ts` | 22 | polling contract |
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 4 | admin rule filter ↔ watchdog rule set |
@@ -326,7 +326,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/tapAdminTest.test.ts` | 4 | canRunAdminTestCheckout |
-| `src/utils/calculations.test.ts` | 62 | getVATBreakdown |
+| `src/utils/calculations.test.ts` | 64 | getVATBreakdown |
 | `src/utils/csvReader.test.ts` | 15 | readCsv — fields and records |
 
 ### `supabase/functions/`
