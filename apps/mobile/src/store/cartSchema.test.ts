@@ -6,7 +6,7 @@
  * pinned directly rather than left to the component tests.
  */
 import { describe, it, expect } from 'vitest';
-import { CART_SCHEMA_VERSION, cheapestVariant, parsePersistedCart } from './CartProvider';
+import { CART_SCHEMA_VERSION, cheapestVariant, parsePersistedCart } from '../features/cart/cartSchema';
 import type { CartItem, ProductVariant } from '../types/models';
 
 const variant = (id: string, price: number): ProductVariant => ({
