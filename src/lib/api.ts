@@ -214,6 +214,12 @@ export interface AdminBranchStats {
  * in-memory order list. `total_amount` spans EVERY status, including cancelled,
  * because that is what the average-ticket tile has always divided by.
  */
+/** `admin_loyalty_stats()` — every row with `role = 'customer'`, as one figure each. */
+export interface AdminLoyaltyStats {
+  member_count: number;
+  points_total: number;
+}
+
 export interface AdminOrderStats {
   total_orders: number;
   total_amount: number;
@@ -239,6 +245,14 @@ export interface DbLazywaitCatalogItem {
   min_selection: number | null; max_selection: number | null; multi_max: number | null;
   pulled_at: string;
 }
+/**
+ * The columns `DbLazywaitCatalogItem` declares, and nothing else. Not `*`: the
+ * table also keeps `raw`, the full Lazywait snapshot of every record, which the
+ * mapping screen never reads and which is most of each row's size.
+ */
+export const LAZYWAIT_CATALOG_ITEM_COLUMNS =
+  'id, entity_type, lazywait_id, name_en, name_ar, name_other, parent_id, prices, branches_ids, '
+  + 'min_selection, max_selection, multi_max, pulled_at';
 export interface LazywaitMappingCount { mapped: number; total: number; }
 export interface LazywaitMappingStatus {
   branches: LazywaitMappingCount; categories: LazywaitMappingCount; products: LazywaitMappingCount;
@@ -353,9 +367,39 @@ export const auth = {
 // ---------------------------------------------------------------------------
 // Profiles (RLS: a customer reads only their own row; staff read all)
 // ---------------------------------------------------------------------------
+//
+// THERE IS DELIBERATELY NO `list()`. It used to read every profile, `select('*')`,
+// on every staff sign-in, so the Loyalty tiles could be summed in the browser.
+// PostgREST caps a response at 1 000 rows, so past that the tiles were silently
+// wrong, and every sign-in downloaded every customer's name, phone and email.
+// The tiles now come from `loyalty.stats()` and the ledger is read a page at a
+// time, only when the Loyalty section is open.
+/** Rows per page of the Settings → Loyalty customer ledger. */
+export const LOYALTY_LEDGER_PAGE_SIZE = 50;
+/** Exactly the columns the ledger renders, plus `role` so the row maps as a profile. */
+export const LOYALTY_LEDGER_COLUMNS = 'id, full_name, phone_number, email, role, loyalty_points';
+export interface LoyaltyLedgerPage {
+  rows: DbProfile[];
+  /** Customers in total, from `count: 'exact'`; null when the server did not say. */
+  total: number | null;
+}
 export const profiles = {
-  list: async () =>
-    ok<DbProfile[]>(await supabase.from('profiles').select('*').order('full_name')),
+  /**
+   * One page of customers for the loyalty ledger, starting at row `from`.
+   * Ordered by name and then id: `full_name` alone is not unique, and paging on
+   * a non-unique order repeats some rows and drops others between pages.
+   */
+  loyaltyLedgerPage: async (from: number, pageSize: number = LOYALTY_LEDGER_PAGE_SIZE): Promise<LoyaltyLedgerPage> => {
+    const res = await supabase
+      .from('profiles')
+      .select(LOYALTY_LEDGER_COLUMNS, { count: 'exact' })
+      .eq('role', 'customer')
+      .order('full_name')
+      .order('id')
+      .range(from, from + pageSize - 1);
+    if (res.error) throw new Error(res.error.message);
+    return { rows: (res.data ?? []) as unknown as DbProfile[], total: res.count ?? null };
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -372,6 +416,12 @@ export const loyalty = {
       p_customer_id: customerId, p_delta: delta, p_reason: reason ?? null,
     }));
   },
+  /**
+   * Loyalty programme totals for the Settings tiles (`admin_loyalty_stats`,
+   * `is_staff()` enforced inside). Constant-size, so the tiles no longer depend
+   * on how many customers the browser happens to have downloaded.
+   */
+  stats: async () => ok<AdminLoyaltyStats>(await supabase.rpc('admin_loyalty_stats')),
 };
 
 // ---------------------------------------------------------------------------
@@ -597,7 +647,9 @@ export const paymentGateway = {
 export const lazywaitCatalog = {
   /** Staff read of the pulled catalog cache (RLS: is_staff). */
   items: async () =>
-    ok<DbLazywaitCatalogItem[]>(await supabase.from('lazywait_catalog_items').select('*')),
+    ok<DbLazywaitCatalogItem[]>(
+      await supabase.from('lazywait_catalog_items').select(LAZYWAIT_CATALOG_ITEM_COLUMNS),
+    ),
   /** Staff readiness + mapped/total summary (never returns secrets). */
   status: async () => ok<LazywaitMappingStatus>(await supabase.rpc('lazywait_mapping_status')),
   /** Admin-only: trigger the server-side catalog pull (Edge Function). */
@@ -762,8 +814,13 @@ export const orders = {
    * the staff contract. It runs with the staff member's own JWT; no service-role
    * key is involved.
    */
-  list: async () =>
-    ok<DbOrder[]>(await supabase.rpc('admin_list_orders', { p_limit: null })),
+  /**
+   * Pass a limit. Without one the RPC returns EVERY order, with customer names,
+   * phones, notes and addresses: at 50 000 orders that was 63 MB and 2.7 s, to
+   * show the Lazywait monitor's 50 rows. With 200 it was 254 KB and 9 ms.
+   */
+  list: async (limit?: number) =>
+    ok<DbOrder[]>(await supabase.rpc('admin_list_orders', { p_limit: limit ?? null })),
   /**
    * CUSTOMER order feed with items. `public.orders` no longer grants table-wide
    * SELECT to `authenticated`; a customer holds column privileges for exactly the
@@ -1200,11 +1257,25 @@ async function invokePush(body: Record<string, unknown>): Promise<PushSendResult
   const { data, error } = await supabase.functions.invoke('push-dispatch', { body });
   if (error) {
     let msg = error.message;
-    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
-    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    const ctx = (error as { context?: { json?: () => Promise<unknown> } }).context;
+    try { msg = pushErrorMessage(ctx?.json ? await ctx.json() : null, msg); } catch { /* keep msg */ }
     throw new Error(msg);
   }
   return data as PushSendResult;
+}
+
+/**
+ * The sentence to show for a failed push-dispatch call. Its refusals put the
+ * text in `error`, but its dependency failures (a device lookup or a claim that
+ * failed, answered 500) put it in `reason`, so reading `error` alone showed the
+ * generic "non-2xx status code" for exactly the failures worth reading.
+ */
+export function pushErrorMessage(body: unknown, fallback: string): string {
+  if (!body || typeof body !== 'object') return fallback;
+  const b = body as { error?: unknown; reason?: unknown };
+  if (typeof b.error === 'string' && b.error.trim()) return b.error;
+  if (typeof b.reason === 'string' && b.reason.trim()) return b.reason;
+  return fallback;
 }
 
 export const pushAdmin = {

@@ -29,6 +29,18 @@ const STATE_TONE: Record<string, PillTone> = {
 };
 const RETRYABLE = new Set(['failed', 'blocked', 'dead_letter', 'skipped']);
 
+/**
+ * How many of the most recent orders the monitor reads. It shows at most 50
+ * after dropping the ones that never needed a POS sync; it used to fetch EVERY
+ * order (with customer names, phones and addresses) to do that, 63 MB at 50 000
+ * orders. A failed order older than this window is not listed here. The
+ * order-integrity watchdog still reads it, and the Live Orders board keeps
+ * every unsettled order however old.
+ */
+export const LAZYWAIT_MONITOR_FETCH = 200;
+/** Rows the monitor renders. */
+export const LAZYWAIT_MONITOR_ROWS = 50;
+
 const TH = 'py-1 pe-2 text-start';
 const TD = 'py-1.5 pe-2 align-top';
 
@@ -43,8 +55,10 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
     setLoading(true);
     setError(null);
     try {
-      const o = await ordersApi.list();
-      setOrderRows(o.filter((x) => x.lazywait_sync_state && x.lazywait_sync_state !== 'skipped').slice(0, 50));
+      const o = await ordersApi.list(LAZYWAIT_MONITOR_FETCH);
+      setOrderRows(
+        o.filter((x) => x.lazywait_sync_state && x.lazywait_sync_state !== 'skipped').slice(0, LAZYWAIT_MONITOR_ROWS),
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load Lazywait status');
     } finally {
