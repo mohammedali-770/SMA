@@ -964,6 +964,18 @@ describe('payment-verify answer helpers (second-round review, 2026-11-12)', () =
     }
   });
 
+  it('olderInvoiceVerdict: a captured payment whose only failure was OUR read stays pending, even past the session', async () => {
+    // Re-verification of 2026-11-12: these mapped to 'ignore' once the session
+    // expired, so verify answered terminal 'expired' and the app dropped a
+    // session whose order the same call may just have created.
+    const { olderInvoiceVerdict } = await import('./moyasar.ts');
+    for (const reason of ['stamp_failed', 'readback_failed']) {
+      for (const live of [true, false]) {
+        expect(olderInvoiceVerdict({ outcome: 'pending', paid: false, reason }, live)).toBe('pending');
+      }
+    }
+  });
+
   it('isSessionLive: pending_payment and not past expires_at', async () => {
     const { isSessionLive } = await import('./moyasar.ts');
     const now = Date.parse('2026-11-12T10:00:00Z');

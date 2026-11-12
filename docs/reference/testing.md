@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**223 TypeScript test files declaring 3519 test blocks, plus 84 SQL suites.**
+**223 TypeScript test files declaring 3521 test blocks, plus 84 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -129,7 +129,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-79 files, 1116 declared test blocks.
+79 files, 1117 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -151,7 +151,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
-| `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 13 | CheckoutScreen opens the hosted page only in the in-app WebView |
+| `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 26 | parsePendingSession |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 39 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
@@ -334,7 +334,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-31 files, 843 declared test blocks.
+31 files, 844 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -351,7 +351,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
-| `supabase/functions/_shared/moyasar.test.ts` | 117 | minor units (halalas) |
+| `supabase/functions/_shared/moyasar.test.ts` | 118 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 24 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 38 | moyasarRefundUrl / moyasarPaymentUrl |

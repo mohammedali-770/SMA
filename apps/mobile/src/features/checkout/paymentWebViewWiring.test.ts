@@ -47,6 +47,16 @@ describe('CheckoutScreen shows a verify result the way recovery reads it', () =>
     expect(screen).toContain('if (shown.terminal) void clearPendingSession();');
   });
 
+  it('places no order while an online run is in flight', () => {
+    // Re-verification of 2026-11-12: a 'Try again' run whose initiate had not
+    // opened its attempt yet let verify answer the saved session terminal, and
+    // a cash order went through under the invoice the run then opened.
+    const body = screen.slice(screen.indexOf('const placeOrder = async'));
+    const guard = body.indexOf('if (payRunningRef.current) return;');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(body.indexOf('setPlacing(true)'));
+  });
+
   it('keeps no second, inline list of terminal statuses', () => {
     // A second list is how 'refunded' came to clear nothing: recovery and the
     // screen each had their own, and neither knew it.

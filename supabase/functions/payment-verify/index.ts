@@ -181,6 +181,12 @@ async function askOlderInvoices(
     }
     if (v === 'pending') return { status: 'pending' };
   }
+  // Before the newest attempt's terminal answer stands, look once more: a pass
+  // above, or a webhook meanwhile, may have just created the paid order.
+  const { data: s3, error: s3Err } = await supaUser
+    .from('checkout_sessions').select('order_id').eq('id', sessionId).maybeSingle();
+  if (s3Err) return { status: 'pending' };
+  if (s3?.order_id) return { status: 'paid', orderId: s3.order_id };
   return null;
 }
 

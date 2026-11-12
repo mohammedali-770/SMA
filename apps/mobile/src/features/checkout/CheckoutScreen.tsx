@@ -636,6 +636,12 @@ export function CheckoutScreen() {
 
   const placeOrder = async () => {
     if (!canPlace || !selectedBranch || !orderType) return;
+    // An online run started from the status dialog ('Try again') is still in
+    // flight. Its initiate may not have opened its attempt yet, so
+    // payment-verify can answer the saved session terminal and recovery would
+    // clear it. A cash order placed now could then sit under a payable invoice
+    // the run is about to open: two orders, one paid (review of 2026-11-12).
+    if (payRunningRef.current) return;
     setError(null);
     setPlacing(true);
     try {

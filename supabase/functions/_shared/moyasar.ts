@@ -1129,6 +1129,11 @@ export function olderInvoiceVerdict(
 ): 'paid' | 'pending' | 'ignore' {
   if (result.paid) return 'paid';
   if (result.reason === 'no_payment') return 'ignore';
+  // Moyasar reported this payment captured and bound to the invoice; only OUR
+  // read failed (the stamp read-back, or the post-finalize "did it pay" read,
+  // which runs after finalize may already have created the order). That is
+  // never a reason to let the app drop the session, live or not.
+  if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') return 'pending';
   if ((result.outcome === 'pending' || result.outcome === 'unknown') && sessionLive) return 'pending';
   return 'ignore';
 }

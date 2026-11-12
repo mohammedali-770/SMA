@@ -477,6 +477,13 @@ describe('payment-verify', () => {
     const olderGuard = older.indexOf('if (!cfg) return null;');
     expect(olderGuard).toBeGreaterThan(-1);
     expect(older.indexOf('for (const rec of recs) {')).toBeGreaterThan(olderGuard);
+    // After the loop, and before a terminal answer is allowed to stand, the
+    // session is read once more: a pass above may have just created its order.
+    const loop = older.indexOf('for (const rec of recs) {');
+    const reread = older.indexOf("if (s3?.order_id) return { status: 'paid', orderId: s3.order_id };");
+    expect(reread).toBeGreaterThan(loop);
+    expect(older.indexOf("if (s3Err) return { status: 'pending' };")).toBeGreaterThan(loop);
+    expect(older.lastIndexOf('return null;')).toBeGreaterThan(reread);
   });
 
   it('verifies the newest MOYASAR attempt, with the key for its stored mode', () => {
