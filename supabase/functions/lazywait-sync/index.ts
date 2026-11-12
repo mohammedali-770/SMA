@@ -389,7 +389,16 @@ Deno.serve(async (req: Request) => {
         // -> safe requeue within the deadline; if the RPC actually committed but
         // the reply was lost, marker set -> confirmation_required). Never resend.
         summary.skipped++;
-        console.error('begin_lazywait_create_attempt failed (no send):', safeErr(gateErr.message));
+        // No row is written on this path or the not-ready one below, so this line
+        // is the attempt's only trace. It carries the order's UUID, and nothing
+        // about the customer, so a stuck order can be found in the logs by id.
+        console.error(JSON.stringify({
+          at: 'lazywait-sync.gate',
+          order_id: orderId,
+          outcome: 'rpc_error',
+          sent: false,
+          error: safeErr(gateErr.message),
+        }));
         continue;
       }
       const gateStatus = String(gate ?? '');
@@ -465,7 +474,13 @@ Deno.serve(async (req: Request) => {
         // 'invalid_state' / 'not_found' / anything unexpected -> DO NOT send.
         // Leave the row for the reaper/next tick; no blind resend, no state churn.
         summary.skipped++;
-        console.warn('begin_lazywait_create_attempt not ready (no send):', gateStatus);
+        console.warn(JSON.stringify({
+          at: 'lazywait-sync.gate',
+          order_id: orderId,
+          outcome: 'not_ready',
+          sent: false,
+          gate_status: gateStatus,
+        }));
         continue;
       }
 

@@ -1245,3 +1245,39 @@ Two calls in the POS path carry a Supabase key, and both now come from
   legacy keys exist, `apikey` alone once a secret key does.
 
 The POS bearer token, the webhook HMAC and the `x-sync-secret` are untouched.
+
+## Gate refusals that write no row now log the order id (2026-11-11)
+
+`begin_lazywait_create_attempt` is the fenced gate just before the Create Order
+POST. Two of its outcomes write nothing: the RPC itself failing, and a status
+the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
+send nothing, and leave it 'syncing' for the stale reaper. Neither calls
+`record_lazywait_sync`, so no `integration_sync_logs` row exists for that
+attempt. Until this change the log line was free text without the order id, so
+a responder chasing a stuck order could not find the attempt.
+
+Each branch now writes one JSON line, in the shape of `order-intake`'s timing
+line. These two were emitted by the real handler against a stub database
+(synthetic order ids):
+
+```json
+{"at":"lazywait-sync.gate","order_id":"33333333-3333-4333-8333-000000000001","outcome":"rpc_error","sent":false,"error":"canceling statement due to statement timeout"}
+{"at":"lazywait-sync.gate","order_id":"33333333-3333-4333-8333-000000000002","outcome":"not_ready","sent":false,"gate_status":"invalid_state"}
+```
+
+- `rpc_error` is logged with `console.error` and `not_ready` with
+  `console.warn`, the levels the free-text lines used.
+- `order_id` is the UUID on the claimed row, never a value from the request.
+  Nothing about the customer is logged. `error` is the existing `safeErr` text.
+- To find an order's attempt, search the function's logs for the order's UUID.
+
+Control flow is unchanged. Both branches still count a skip and move to the next
+order, and the same stub run showed it: identical RPC sequence before and after,
+no `record_lazywait_sync`, no outbound request.
+`_shared/lazywaitGateLogWiring.test.ts` pins the fields and the control flow.
+
+**Live only after `lazywait-sync` is redeployed**, a §5 action with its own
+approval. The bundle is the whole current source, so the deploy also ships the
+2026-11-09 key handling above, and the 2026-09-14 base-URL allowlist, whose
+deploy is not recorded here. If `push-dispatch` is deployed in the same session,
+deploy it first (`docs/OWNER_ACTIONS.md` §42: receivers before senders).
