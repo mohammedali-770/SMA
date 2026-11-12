@@ -12,6 +12,7 @@ import {
   canRunMoyasarAdminTestCheckout, isMoyasarShapedStatus, moyasarBlockingReason,
 } from '../../lib/moyasarAdminTest';
 import { webhookVerificationNotice, type WebhookVerificationNotice } from '../../lib/moyasarWebhookVerification';
+import { formatRiyadhTimeSeconds } from '../../utils/calculations';
 
 /**
  * Admin Moyasar readiness + connection test. Reads config-presence booleans from
@@ -102,8 +103,9 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
   const canRunTest = canRunMoyasarAdminTestCheckout(status, disabled);
   const blocking = moyasarBlockingReason(status);
   const keyPrefix = isLive ? 'sk_live_' : 'sk_test_';
-  const clock = (ms: number) =>
-    new Date(ms).toLocaleTimeString(isRTL ? 'ar-SA' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+  // The console's clock (Riyadh, Latin digits, 24-hour) in both languages, like
+  // every other console time (adminTime.test.ts).
+  const clock = (ms: number) => formatRiyadhTimeSeconds(ms);
 
   const blockingNotice = (): { title: string; action?: string; tone: NoticeTone } | null => {
     switch (blocking) {
