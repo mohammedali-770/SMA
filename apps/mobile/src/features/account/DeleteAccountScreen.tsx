@@ -175,7 +175,7 @@ export function DeleteAccountScreen() {
           accessible
           accessibilityRole="progressbar"
           accessibilityLabel={t('delSubmitting')}
-          accessibilityState={{ busy: true }}
+          aria-busy
           accessibilityLiveRegion="polite"
           style={styles.flex}
         >
@@ -206,7 +206,7 @@ export function DeleteAccountScreen() {
               <Pressable
                 onPress={() => setAcknowledged((v) => !v)}
                 accessibilityRole="checkbox"
-                accessibilityState={{ checked: acknowledged }}
+                aria-checked={acknowledged}
                 accessibilityLabel={t('delAck')}
                 hitSlop={8}
                 style={[styles.ackRow, rtlRow]}

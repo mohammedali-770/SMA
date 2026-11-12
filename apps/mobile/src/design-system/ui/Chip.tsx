@@ -1,9 +1,10 @@
 /** Design-system Chip (mobile). */
 import React from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { radius, space } from '../generated/tokens';
 import { useThemeColors } from '../../theme/ThemeProvider';
+import { selectedButtonState } from './a11yState';
 import { Text } from './Text';
 import { makeStyles } from '../../theme/makeStyles';
 
@@ -26,7 +27,7 @@ export function SelectableChip({ label, selected, onPress, onLayout, style }: Se
       onLayout={onLayout}
       hitSlop={6}
       accessibilityRole="button"
-      accessibilityState={{ selected }}
+      {...selectedButtonState(selected, Platform.OS)}
       style={[
         styles.base,
         {
