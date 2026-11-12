@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**217 TypeScript test files declaring 3347 test blocks, plus 84 SQL suites.**
+**218 TypeScript test files declaring 3351 test blocks, plus 84 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -130,7 +130,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-79 files, 1105 declared test blocks.
+80 files, 1109 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -207,6 +207,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/services/rpcContractParity.test.ts` | 23 | the SQL reader |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
+| `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
