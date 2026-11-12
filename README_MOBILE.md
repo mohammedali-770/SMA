@@ -51,7 +51,7 @@ The app is portrait-only, phone-focused on iOS (`supportsTablet: false`), and de
 
 Payment/provider code exists but is deliberately frozen while the final payment gateway decision is pending. Do not change or test payment/refund behavior as part of ordinary mobile work; see [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 
-Push notifications are live. The Profile → Notifications toggles register a real device, order-status pushes reach opted-in customers automatically, and marketing broadcasts are strictly opt-in. Changes to notification copy, targeting or dispatch behaviour are customer-facing — see `CLAUDE.md` §7.
+Push notifications are live. The Profile → Notifications toggles register a real device, order-status pushes reach customers who allowed notifications automatically, and marketing has been opt-out since 2026-08-20, so a broadcast reaches every one of them who has not switched offers off. Changes to notification copy, targeting or dispatch behaviour are customer-facing — see `CLAUDE.md` §7.
 
 ## Local setup
 
@@ -78,6 +78,8 @@ npm --prefix apps/mobile run ios
 npm --prefix apps/mobile run web
 ```
 
+> **Every one of these rewrites a tracked file.** Each runs `expo start`, which rewrites the `include` array of `apps/mobile/tsconfig.json` and drops `.expo/types/**/*.ts` and `expo-env.d.ts` (measured 2026-11-11 with `start` and `web`). Never commit that edit. Revert it with `git checkout -- apps/mobile/tsconfig.json`; `npm run design-system:check` fails while it is present. Detail: [`docs/DEV_VISUAL_REVIEW.md`](docs/DEV_VISUAL_REVIEW.md).
+
 The mobile dependency tree is intentionally separate from the root/admin dependency tree. For full repository development, install both:
 
 ```bash
@@ -95,7 +97,7 @@ EAS profile environment values live in `apps/mobile/eas.json` and/or the EAS env
 
 ## Quality checks
 
-From the repository root:
+The mobile-relevant checks, from the repository root. The full set CI runs, with local commands, is in [README → Quality gates](README.md#quality-gates).
 
 ```bash
 # Mobile TypeScript
