@@ -4317,6 +4317,57 @@ either.
 **Done looks like:** the three numbers confirmed in writing here, the apply
 recorded as a ledger row in `docs/MIGRATIONS.md`, and §57 marked APPLIED.
 
+## 49. Audit trail — one apply, then two deploys, in that order
+
+**Opened 2026-11-12.** `20261007120000_audit_trail.sql` is written, validated
+and NOT applied. Detail: `docs/MIGRATIONS.md` §58. (This number was the next
+free one on this branch's base; a parallel change may also claim §49, in which
+case one of them is renumbered at merge.)
+
+It closes checklist gaps S09#1-3. After it:
+
+- every real `orders.status` change writes a row to `order_status_audit`: old
+  and new status, who (`auth.uid()`), their role, and `manual` or `automatic`
+  (no signed-in caller). The POS webhook's `lazywait_status` updates write
+  nothing, because they do not change `status`;
+- every broadcast's `notification_log` row records `sent_by` and `content` (the
+  four strings sent);
+- staff password resets and deletions, and every insert, update and delete on
+  `products`, `product_variants`, `coupons`, `categories` and `app_settings`,
+  write a row to `admin_action_audit`. Column names are always recorded; values
+  only for prices, flags, limits and ordering. No password is ever recorded.
+
+Both tables are append-only (update, delete and truncate are refused for every
+role) and readable only by staff (`order_status_audit`) or admins
+(`admin_action_audit`). Nothing prunes them. No customer-visible behaviour
+changes, and the money path is asserted unchanged.
+
+### The steps, each its own approval (CLAUDE.md §5)
+
+1. **Merge** the pull request. Nothing reaches Production from the merge alone:
+   no web or app code reads the new tables yet.
+2. **Apply `20261007120000` by name.** Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. Re-hash the merged copy first
+   (§15). From this moment status changes and table edits are audited, even
+   before either deploy.
+3. **Then deploy `push-dispatch`.** Push is live (CLAUDE.md §7). The only change
+   is the broadcast's log row; targeting, copy, the admin gate and every
+   response are unchanged. Deployed before step 2, a broadcast still sends and
+   still answers `ok`: the log write sees PGRST204, writes the old row without
+   sender and content, and logs one line. It never turns a sent broadcast into
+   an error, because an admin told it failed may send it again, and a broadcast
+   cannot be recalled.
+4. **Then deploy `staff-accounts`.** Deployed before step 2, a reset or delete
+   still succeeds; the audit call gets PGRST202 and the function logs
+   `audit row not written`.
+5. **Check afterwards**, read-only: both tables exist with RLS on; the latest
+   status change in the console appears in `order_status_audit` with your id
+   and `manual`; `place_order` `12b6816d…` and `compute_order_snapshot`
+   `22e2d429…` unchanged.
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`
+and §58 marked APPLIED, then both deploys recorded with their versions.
+
 ## Owner-action closeout rule
 
 When an item is completed:
