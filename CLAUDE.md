@@ -248,9 +248,13 @@ and +1 row**: #435 merged the file, and this apply landed it. Two is still the
 shape that looks safe and is not: `20260824100000` sorts first. **Name the
 target by version.**
 
-**APPLIED IS NOT YET EFFECTIVE.** The apply added a function and a daily job
-and deleted nothing. The first prune is the 01:10 UTC run on 2026-11-12, and
-the run log's backlog takes three nights to clear. Until then it keeps growing.
+**THE FIRST RUN WORKED, measured 2026-11-12.** The apply itself added a
+function and a daily job and deleted nothing. The job's first run, 01:10 UTC on
+2026-11-12, succeeded in 14.55 s: the run log went 661 568 → 465 386 rows (its
+200 000-row nightly cap), both ledgers were cut to 30 days, and every job kept
+its newest run and newest success. The alerts evaluator fell from 12.45 s to
+7.98 s on average. Two more nights clear the run log's backlog. Detail:
+`docs/MIGRATIONS.md` §53.
 
 **HASH WHAT THE DATABASE STORED, NOT WHAT YOU SENT.**
 `supabase_migrations.schema_migrations.statements` keeps the full SQL each
