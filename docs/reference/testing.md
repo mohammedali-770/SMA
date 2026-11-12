@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**249 TypeScript test files declaring 3827 test blocks, plus 87 SQL suites.**
+**250 TypeScript test files declaring 3845 test blocks, plus 87 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -152,7 +152,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-90 files, 1224 declared test blocks.
+91 files, 1242 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -232,6 +232,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
+| `apps/mobile/src/lib/webExportSourceMaps.test.ts` | 18 | planWebExport without SENTRY_AUTH_TOKEN |
 | `apps/mobile/src/lib/webIndexTemplate.test.ts` | 5 | apps/mobile/public/index.html |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/services/catalogVariantAvailability.test.ts` | 5 | catalog.variantAvailability |
