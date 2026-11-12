@@ -297,9 +297,9 @@ written, validated and awaiting approval, so on merge it joins the unapplied
 set, making it EIGHT:** the seven named below and this file. It adds one
 read-only function, `admin_loyalty_stats()`, gated on `is_staff()` exactly as
 `profiles_select_own_or_staff` is, for the console's Loyalty tiles. It redefines
-nothing and the money path is self-asserted. The console half deploys on merge
-(§13) and shows "—" in the tiles until the file is applied, so apply it before
-or right after the merge. `20260824100000` still sorts first, so a bulk apply
+nothing and the money path is self-asserted. It merges ALONE: the console change
+that reads it (#456) merges only after this file is applied, because a merge
+deploys the console (§13). `20260824100000` still sorts first, so a bulk apply
 would take the Moyasar files first. **Name the target by version.** Detail:
 `docs/MIGRATIONS.md` §59, owner step `docs/OWNER_ACTIONS.md` §50.
 

@@ -41,9 +41,10 @@ to Production.**
 > written, validated and NOT applied, so on merge the outstanding set is
 > EIGHT:** the seven below and this file (§59). It adds one `is_staff()`-gated
 > read-only function for the console's Loyalty tiles and changes nothing else.
-> The money path is self-asserted unchanged. The console half deploys on merge
-> and shows "—" until the file is applied, so apply it before or right after
-> the merge. Moyasar's `20260824100000` still sorts first. **Name the target by
+> The money path is self-asserted unchanged. **This pull request carries the
+> migration alone**, so merging it changes nothing anyone sees. The console
+> change that reads it (#456) merges only AFTER this file is applied, because a
+> merge deploys the console (CLAUDE.md §13, AGENTS.md change control). Moyasar's `20260824100000` still sorts first. **Name the target by
 > version.**
 
 > **Updated 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`

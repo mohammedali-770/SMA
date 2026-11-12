@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**254 TypeScript test files declaring 3877 test blocks, plus 88 SQL suites.**
+**248 TypeScript test files declaring 3824 test blocks, plus 88 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -133,7 +133,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-91 files, 1229 declared test blocks.
+90 files, 1224 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -192,7 +192,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
-| `apps/mobile/src/lib/catalogSelect.test.ts` | 5 | catalog select lists |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
 | `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
@@ -231,7 +230,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-127 files, 1746 declared test blocks.
+122 files, 1698 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -248,7 +247,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
-| `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 20 | product price validation — the money contract |
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 13 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
@@ -294,8 +292,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
 | `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
-| `src/context/consoleLoadWiring.test.ts` | 8 | Lazywait monitor |
-| `src/context/staffInitialLoad.test.ts` | 5 | runStaffInitialLoad |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
 | `src/design-system/contrastContract.test.ts` | 9 | muted ink clears WCAG AA for normal text |
 | `src/design-system/fieldState.test.ts` | 15 | resolveFieldState — accessibility wiring |
@@ -315,7 +311,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
-| `src/lib/consoleLoadApi.test.ts` | 11 | orders.list |
 | `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
@@ -326,7 +321,6 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
 | `src/lib/loyaltyRulesSummary.test.ts` | 14 | loyaltyRulesSummary |
-| `src/lib/loyaltyStats.test.ts` | 8 | loyaltyTiles |
 | `src/lib/mappers.test.ts` | 31 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |
@@ -356,7 +350,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
 | `src/lib/staleAssetRecovery.test.ts` | 15 | failedAssetUrl |
-| `src/lib/supabaseKey.test.ts` | 17 | publicSupabaseKey |
+| `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/vercelConfig.test.ts` | 13 | vercel.json is expressible by this model |
 | `src/lib/webBudget.test.ts` | 8 | startupFontNames |
