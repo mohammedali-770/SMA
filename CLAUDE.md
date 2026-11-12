@@ -62,7 +62,7 @@ Approval for one action is not blanket approval for later actions.
 - sandbox first, then live;
 - Moyasar's live Allowed IPs are met through a static-IP proxy service.
 
-**What it lifts.** The freeze recorded below no longer applies to repository work that keeps Moyasar the only provider: code, tests and documents, on a purpose branch, through a pull request, merged on the owner's word. The change that removed Tap and Geidea and made every payment path Moyasar-only is the branch `feat/moyasar-only-20261111`. Runbook: `docs/PAYMENTS.md`. API contract: `docs/integrations/Moyasar_API_Reference.md`.
+**What it lifts.** The freeze recorded below no longer applies to repository work that keeps Moyasar the only provider: code, tests and documents, on a purpose branch, through a pull request, merged on the owner's word. The change that removed Tap and Geidea and made every payment path Moyasar-only landed with pull request #446. Runbook: `docs/PAYMENTS.md`. API contract: `docs/integrations/Moyasar_API_Reference.md`.
 
 **What it does not lift. Nothing live follows from a merge.** Each of these is its own §5 approval, named when due:
 - applying `20260824100000_moyasar_payment_provider`, then `20261003120000_moyasar_only_payments`, then (after the deploy below) `20261004120000_drop_tap_payment_rpcs`, each by version. The second refuses to apply before the first, and the third before the second;
@@ -72,9 +72,9 @@ Approval for one action is not blanket approval for later actions.
 - generating `refund_trigger_secret` (read from the payment row's secret config by both the refund driver and `payment-refund`; no migration creates it) and re-enabling the `payment-refund-worker` cron job;
 - the EAS build that ships the app half;
 - any live payment or refund, including the planned small live payment with its automatic refund;
-- naming Moyasar in the live privacy policy.
+- the customer documents and store answers that must change before customers can pay by card: naming Moyasar in the live privacy policy, updating the payment and cancellation/refund policies (both still say payment is cash only), the App Store and Play payment answers, the cash-only listing claim, and the App Review notes.
 
-**What keeps it safe while it is off.** Each is code on the branch, with tests:
+**What keeps it safe while it is off.** Each is code in this repository, with tests:
 - customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
 - an attempt opened in TEST mode never confirms an order or a checkout session;
 - the console's Online Payment switch opens only for an enabled, live Moyasar row. **It guards the console, not the setting:** `set_payment_settings` checks `is_admin()` alone;
