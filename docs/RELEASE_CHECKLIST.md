@@ -232,6 +232,30 @@ builds. Before that build reaches testers, also check:
       release builds are minified"). Turning the upload on later does not help
       builds already shipped.
 
+### Customer-app resilience — added 2026-11-12
+
+Four fixes that only a device, or the web build, can show working:
+
+- [ ] **A stalled read ends in Retry.** With the network throttled to nothing
+      (or `/rest/v1/products` held open), the order-type screen and the menu
+      show their error and a **Retry** button within about 20 seconds, instead
+      of a spinner for ever. Retry with the network back loads the menu. Order
+      placement and payment calls are not timed.
+- [ ] **Prices follow the menu.** Put an item in the cart, change its price in
+      the console, then background and foreground the app (or go back to the
+      menu): the cart line and subtotal show the new price. Relaunching with a
+      saved cart does the same. Deactivate the item instead and the cart line
+      says it is no longer on the menu; checkout refuses it by name. **Checkout
+      itself does not re-quote** a price that changes while it is open; that is
+      an open owner decision.
+- [ ] **A double press navigates once.** Double-tap (on the web build,
+      double-click) Sign in, then "Not now", the branch "Change" row, a
+      product's "Choose" and the cart bar. Each opens one screen, and one Back
+      returns to where it started. A one-tap "Add" still adds on every tap.
+- [ ] **The back chevron works on a direct load.** Open `/app/cart` (or a
+      product or legal page) directly in a browser, or refresh it, and press the
+      header's back chevron: it goes to the menu.
+
 ## 8. App Store and Play submission
 
 **Store *policy* readiness is a separate, one-time gate:

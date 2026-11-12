@@ -32,6 +32,7 @@ import { SelectableChip, StatusPill } from '../../design-system/ui/Chip';
 import { ProductCard } from '../../design-system/ui/ProductCard';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
+import { useNavigationLatch } from '../../lib/useNavigationLatch';
 import { shouldForceSelection } from '../order/orderContext';
 import { useCart, useCatalog, useOrderContext } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
@@ -81,6 +82,9 @@ export function HomeMenuScreen({
   } = useCatalog();
   const cart = useCart();
   const { addItem } = cart;
+  // Choose, Change and the cart bar each pushed a duplicate screen on a double
+  // press. Only the navigation is latched: a one-tap Add stays unthrottled.
+  const guardNavigation = useNavigationLatch();
   const orderCtx = useOrderContext();
   useEffect(() => {
     if (
@@ -301,10 +305,10 @@ export function HomeMenuScreen({
   // being asked. The detail screen already renders the tier picker.
   const handleAdd = useCallback(
     (product: Product, needsChoice: boolean) => {
-      if (needsChoice) router.push(`/product/${product.id}`);
+      if (needsChoice) guardNavigation(() => router.push(`/product/${product.id}`));
       else addItem(product, {}, 1);
     },
-    [addItem],
+    [addItem, guardNavigation],
   );
   const renderItem = useCallback(
     ({ item }: { item: MenuSectionItem }) => (
@@ -340,7 +344,7 @@ export function HomeMenuScreen({
       {orderCtx.context ? (
         <Pressable
           style={[styles.branchRow, rtlRow]}
-          onPress={() => router.push('/select')}
+          onPress={() => guardNavigation(() => router.push('/select'))}
           accessibilityRole="button"
         >
           <View style={styles.ctxAccent} />
@@ -509,7 +513,7 @@ export function HomeMenuScreen({
         <View style={[styles.cartBar, { paddingBottom: insets.bottom + space.s2 }]}>
           <Pressable
             style={[styles.cartBtn, rtlRow]}
-            onPress={() => router.push('/cart')}
+            onPress={() => guardNavigation(() => router.push('/cart'))}
             accessibilityRole="button"
           >
             <View style={styles.cartCount}>

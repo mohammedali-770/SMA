@@ -11,6 +11,11 @@
  *  - `react-native-url-polyfill/auto` is imported first so supabase-js's use of
  *    the WHATWG `URL` API works on Hermes.
  *  - Token auto-refresh is tied to app foreground/background via AppState.
+ *  - Database READS time out (`readTimeoutFetch`). Nothing underneath does:
+ *    React Native's Android networking sets no timeout and supabase-js adds
+ *    none, so a stalled catalogue read left the first screen on a spinner with
+ *    no Retry. Writes, RPCs, Edge Functions and auth calls pass through it
+ *    untouched; see that module for why each is excluded.
  *
  * The security model is identical to the web app: the app holds only the anon
  * key and every request is authorized by Postgres RLS. No service-role key and
@@ -21,6 +26,7 @@ import { AppState } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY, isSupabaseConfigured } from './env';
+import { readTimeoutFetch } from './readTimeoutFetch';
 import { sessionStorage } from './secureSessionStorage';
 
 if (!isSupabaseConfigured) {
@@ -42,6 +48,7 @@ export const supabase = createClient(
       persistSession: true,
       detectSessionInUrl: false,
     },
+    global: { fetch: readTimeoutFetch },
   },
 );
 
