@@ -76,6 +76,7 @@ export function CartScreen() {
         onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; evaluateStripVisible(); }}><View style={{ gap: space.s3 }}>
         {cart.items.map((it) => <CartLine key={it.cartItemId} item={it} name={cartLineLabel(it, pick)} modifierSummary={modifierSummary(it, pick)} lineAmount={it.unitPrice * it.quantity}
           removeLabel={t('remove')} editLabel={pick('Edit item', 'تعديل المنتج')}
+          unavailableLabel={it.unavailable ? t('cartLineUnavailable') : null}
           onEdit={() => router.push({ pathname: '/product/[id]', params: { id: it.product.id, cartItemId: it.cartItemId } })}
           onInc={() => cart.incrementLine(it.cartItemId)}
           // Suggesting back the item the customer just deleted reads as broken —
@@ -98,8 +99,11 @@ export function CartScreen() {
 }
 function modifierSummary(it: CartItem, pick: (en: string, ar: string) => string): string { return Object.values(it.selectedModifiers).flat().map((m) => pick(m.nameEn, m.nameAr)).join(' · '); }
 
-export function CartLine({ item, name, modifierSummary: summary, lineAmount, removeLabel, editLabel, onEdit, onInc, onDec, onRemove }: {
-  item: CartItem; name: string; modifierSummary: string; lineAmount: number; removeLabel: string; editLabel: string; onEdit: () => void; onInc: () => void; onDec: () => void; onRemove: () => void;
+export function CartLine({ item, name, modifierSummary: summary, lineAmount, removeLabel, editLabel, unavailableLabel, onEdit, onInc, onDec, onRemove }: {
+  item: CartItem; name: string; modifierSummary: string; lineAmount: number; removeLabel: string; editLabel: string;
+  /** Shown when repriceCart flagged the line; checkout refuses it by name. */
+  unavailableLabel?: string | null;
+  onEdit: () => void; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
   const colors = useThemeColors(); const { rtlRow } = useI18n(); const styles = useStyles(); const [imgFailed, setImgFailed] = useState(false); const showImage = !!item.product.imageUrl && !imgFailed;
   return <View style={styles.line}>
@@ -107,7 +111,8 @@ export function CartLine({ item, name, modifierSummary: summary, lineAmount, rem
       {showImage ? <Image source={{ uri: item.product.imageUrl }} style={styles.lineImg} contentFit="cover" transition={150} cachePolicy="memory-disk" recyclingKey={item.product.id} onError={() => setImgFailed(true)} /> : <View style={[styles.lineImg, styles.lineImgEmpty]}><DishIcon size={26} color={colors.heatOff} /></View>}
       <View style={styles.lineBody}><View style={[styles.lineTop, rtlRow]}><Text variant="heading" style={{ flex: 1 }} numberOfLines={2}>{name}</Text><Price amount={lineAmount} size={typeScale.body.size} weight="700" /></View>
         {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}
-        {item.note ? <Text variant="caption" tone="ember" numberOfLines={2}>{item.note}</Text> : null}</View>
+        {item.note ? <Text variant="caption" tone="ember" numberOfLines={2}>{item.note}</Text> : null}
+        {unavailableLabel ? <Text variant="caption" style={{ color: colors.danger }} numberOfLines={2}>{unavailableLabel}</Text> : null}</View>
     </Pressable>
     <View style={[styles.lineBottom, rtlRow]}><QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small /><Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}><Text variant="caption" align="center" style={{ color: colors.danger }}>{removeLabel}</Text></Pressable></View>
   </View>;

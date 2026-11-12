@@ -2846,6 +2846,17 @@ The lines in 1 to 12 are listed in the console sources
 (`src/components/admin/MoyasarPaymentPanel.tsx`, `view/orders/PaymentDetails.tsx`,
 `SettingsPanel.tsx`); a line wrapped above is one line there.
 
+**Widened 2026-11-12 — one cart line** (`apps/mobile/src/i18n/strings.ts`, key
+`cartLineUnavailable`), shown under a cart line whose product, size or option the
+menu no longer offers at all. Engineering-drafted; ships with the next EAS build:
+
+- `cartLineUnavailable` — «لم يعد ضمن القائمة. احذفه للمتابعة.» — English: *"No
+  longer on the menu. Remove it to continue."*
+
+It is deliberately not the "sold out" wording beside it (`soldOutNow`): a sold-out
+item comes back by itself, and this one has been withdrawn. Check that «ضمن
+القائمة» reads as "on the menu" rather than "in the list".
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

@@ -58,7 +58,11 @@ export function validateCartForBranch(
     // the line even though the product is still on sale.
     const sizeOk = !isVariantAvailable || !it.variant
       || isVariantAvailable(it.variant.id, branchId);
-    const ok = it.product.isActive && isAvailable(it.product.id, branchId) && optionsOk && sizeOk;
+    // A line repriceCart flagged names something the menu no longer offers at
+    // all. It is unorderable at every branch, so it fails here too, and both
+    // the branch switch and the checkout pre-check then name it.
+    const ok = !it.unavailable && it.product.isActive && isAvailable(it.product.id, branchId)
+      && optionsOk && sizeOk;
     (ok ? valid : invalid).push(it);
   }
   return { valid, invalid, allValid: invalid.length === 0 };

@@ -18,6 +18,7 @@ import { Card } from '../../design-system/ui/Card';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
+import { useNavigationLatch } from '../../lib/useNavigationLatch';
 import { makeStyles } from '../../theme/makeStyles';
 import { loginHref } from './returnPath';
 
@@ -30,6 +31,9 @@ interface PromptProps {
 export function SignInPrompt({ title, body, returnTo }: PromptProps) {
   const { pick } = useI18n();
   const s = useStyles();
+  // A double tap pushed login twice, so the first "Not now" left the customer
+  // on a second login screen.
+  const guardNavigation = useNavigationLatch();
   return (
     <Card>
       <View style={s.stack}>
@@ -37,7 +41,7 @@ export function SignInPrompt({ title, body, returnTo }: PromptProps) {
         <Text variant="body" tone="secondary">
           {body}
         </Text>
-        <Button label={pick('Sign in', 'تسجيل الدخول')} onPress={() => router.push(loginHref(returnTo))} />
+        <Button label={pick('Sign in', 'تسجيل الدخول')} onPress={() => guardNavigation(() => router.push(loginHref(returnTo)))} />
       </View>
     </Card>
   );
