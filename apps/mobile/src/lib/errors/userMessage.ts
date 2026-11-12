@@ -31,6 +31,15 @@ export type FailureKind =
   | 'rate_limited'
   /** The server answered, and it was a server-side fault. */
   | 'server'
+  /**
+   * The order was refused by a rule the customer can act on
+   * (place_customer_order, 20261005120000). The server's English sentence is
+   * matched here and replaced with copy in the customer's language.
+   */
+  | 'order_phone_unverified'
+  | 'order_open_limit'
+  | 'order_hourly_limit'
+  | 'order_quantity_limit'
   /** Anything we have not taught this module to recognise. */
   | 'unknown';
 
@@ -48,6 +57,10 @@ const MESSAGE_KEY: Record<FailureKind, StringKey> = {
   timeout: 'errTimeout',
   rate_limited: 'errRateLimited',
   server: 'errServer',
+  order_phone_unverified: 'errOrderPhoneUnverified',
+  order_open_limit: 'errOrderOpenLimit',
+  order_hourly_limit: 'errOrderHourlyLimit',
+  order_quantity_limit: 'errOrderQuantityLimit',
   unknown: 'somethingWentWrong',
 };
 
@@ -75,8 +88,19 @@ export function describeFailure(err: unknown): Failure {
   const technical = technicalText(err);
   const s = technical.toLowerCase();
 
+  // The order refusals come FIRST. They are the server's own sentences, passed
+  // through order-intake unchanged, and one of them carries a count that the
+  // generic classifiers below could misread.
   const kind: FailureKind =
-    /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
+    /verify your phone number before placing an order/.test(s)
+      ? 'order_phone_unverified'
+    : /orders in progress\. please wait/.test(s)
+      ? 'order_open_limit'
+    : /orders in the last hour\. please try again later/.test(s)
+      ? 'order_hourly_limit'
+    : /order_items_quantity_max/.test(s)
+      ? 'order_quantity_limit'
+    : /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
       ? 'network_blocked'
     : /rate.?limit|too many requests|\b429\b|too many attempts/.test(s)
       ? 'rate_limited'

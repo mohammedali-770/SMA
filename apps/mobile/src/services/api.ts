@@ -288,6 +288,16 @@ export const legal = {
 // customer device. See lib/orderSelect.ts and its contract test.
 const ORDER_WITH_ITEMS_SELECT = CUSTOMER_ORDER_SELECT;
 
+/** The `error` field of an Edge Function's error body, or the client's own message. */
+async function functionErrorText(error: { message: string }): Promise<string> {
+  const ctx = (error as { context?: { json?: () => Promise<{ error?: unknown }> } }).context;
+  try {
+    const body = ctx?.json ? await ctx.json() : null;
+    if (body && typeof body.error === 'string' && body.error) return body.error;
+  } catch { /* keep the client's message */ }
+  return error.message;
+}
+
 export const orders = {
   // REMOVED: `orders.place()`.
   //
@@ -323,7 +333,12 @@ export const orders = {
         paymentMethod: input.paymentMethod ?? null,
       },
     });
-    if (error) throw new Error(error.message);
+    // A refusal arrives as a non-2xx response, which supabase-js reports as
+    // "Edge Function returned a non-2xx status code" with the body left on
+    // `context`. Read the server's sentence out of it, so the checkout's
+    // failureMessage can recognise an order limit and show it in the
+    // customer's language instead of a generic apology.
+    if (error) throw new Error(await functionErrorText(error));
     const res = (data ?? {}) as { order?: DbCustomerOrderWithItems; error?: string };
     if (res.error) throw new Error(res.error);
     if (!res.order) throw new Error('Order was not created.');
