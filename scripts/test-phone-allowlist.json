@@ -10,7 +10,8 @@
       "used_in": [
         "apps/mobile/src/lib/orderSelect.test.ts",
         "src/components/admin/BranchEditModal.test.tsx",
-        "src/components/admin/view/orders/OrderReceiptModal.test.tsx"
+        "src/components/admin/view/orders/OrderReceiptModal.test.tsx",
+        "supabase/tests/server_input_bounds_test.sql"
       ]
     },
     {
@@ -118,7 +119,7 @@
     },
     {
       "number": "+966500000099",
-      "used_in": ["supabase/tests/otp_login_rate_limit_test.sql"]
+      "used_in": ["supabase/tests/otp_login_rate_limit_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000101",
@@ -129,31 +130,31 @@
     },
     {
       "number": "+966500000201",
-      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000202",
-      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_on_settlement_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000211",
-      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000212",
-      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000213",
-      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000214",
-      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql"]
+      "used_in": ["supabase/tests/loyalty_earn_snapshot_path_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000301",
-      "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql"]
+      "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000777",
@@ -161,23 +162,23 @@
     },
     {
       "number": "+966500000801",
-      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000802",
-      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000803",
-      "used_in": ["supabase/tests/loyalty_expiry_test.sql"]
+      "used_in": ["supabase/tests/loyalty_expiry_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000901",
-      "used_in": ["supabase/tests/export_my_data_test.sql", "supabase/tests/loyalty_multipliers_test.sql"]
+      "used_in": ["supabase/tests/export_my_data_test.sql", "supabase/tests/loyalty_multipliers_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500000902",
-      "used_in": ["supabase/tests/export_my_data_test.sql"]
+      "used_in": ["supabase/tests/export_my_data_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500002001",
@@ -209,7 +210,7 @@
     },
     {
       "number": "+966500009901",
-      "used_in": ["supabase/tests/order_cancellation_integrity_test.sql"]
+      "used_in": ["supabase/tests/order_cancellation_integrity_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
     {
       "number": "+966500009902",

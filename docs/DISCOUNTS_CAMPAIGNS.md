@@ -732,6 +732,35 @@ language for money nobody paid, and `order_refund_due` (which requires
 make it reachable. Flagged rather than fixed, because changing refund language
 is payment-adjacent and §6 is active.
 
+## Comped orders and the customer order limits (2026-11-12)
+
+`20261005120000_server_input_bounds` (written, **NOT applied**) adds three
+refusals to `place_customer_order`: no verified phone, too many open orders,
+too many orders in the hour. A comped customer's cash order goes through that
+wrapper like any other — `SM-2026-000055` and `-000056` did — so the rules apply
+to comps too. That is intended: a comp is free food with no cap, which is where
+an order limit matters most.
+
+What was checked, on the local chain (`server_input_bounds_test.sql` CASE 12):
+
+- a comped, phone-verified customer still gets `total` 0.00 and `is_comped`
+  true through the wrapper;
+- the sixth open comped order in 24 hours is refused, like anyone's;
+- a comp keyed on the profile of an account with no verified phone does not
+  let that account order. Comps added by phone are claimed only when the phone
+  is confirmed, so they are verified by construction. Read live 2026-11-12:
+  `comp_members` holds 1 row, 0 active.
+
+What does not go through the wrapper: the online zero-total path
+(`begin_checkout_session` → `insert_order_from_snapshot`) is frozen under
+CLAUDE.md §6 and is not covered by these rules. The call centre has no
+order-creation path at all.
+
+The app-side change in `apps/mobile/src/services/api.ts` is that `placeAndSync`
+now reads the server's sentence out of the error body, so a refusal shows its
+own copy instead of the generic apology. It does not change what a comped order
+costs or shows.
+
 ## Coupon usage is read through an admin RPC (2026-09-14)
 
 `couponsApi.listReferencedCodes()` used to select `orders.coupon_code` directly.

@@ -103,7 +103,6 @@ interface AppContextType {
   authReady: boolean;
   isAuthenticated: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<void>;
   signOut: () => Promise<void>;
 
   // Data load lifecycle
@@ -762,9 +761,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const signIn = useCallback(async (email: string, password: string) => {
     await auth.signIn(email, password);
   }, []);
-  const signUp = useCallback(async (email: string, password: string, fullName: string, phone?: string) => {
-    await auth.signUp(email, password, fullName, phone);
-  }, []);
   const signOut = useCallback(async () => {
     // Persist any debounced settings edit BEFORE the session ends — after sign-out
     // the queued write would run as a guest and RLS would reject it (losing the edit).
@@ -1300,7 +1296,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       authReady,
       isAuthenticated,
       signIn,
-      signUp,
       signOut,
       dataLoading,
       dataError,

@@ -24,6 +24,13 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-12 — `20261005120000_server_input_bounds` is written,
+> validated and NOT applied.** On merge it joins the unapplied set. It changes
+> live ordering behaviour: `place_customer_order` refuses a caller with no
+> verified phone or over the open-order and hourly limits, and five input
+> bounds land with it (§57). Its three numbers are owner decisions. Moyasar
+> still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-11 (later still) — `20261002120000_staff_actor_fk_set_null`
 > is written, validated and NOT applied, so on merge the count is THREE:**
 > Moyasar (frozen, §6), `20260929120000` (§51) and this file (§54).
@@ -7325,3 +7332,154 @@ none of the four columns, so nothing renders a missing actor.
 **Applying it is a §5 action, named by version.** Afterwards, a staff **Delete**
 in the console succeeds for an account that has history.
 
+## 57. Server input bounds and customer order limits — WRITTEN, NOT APPLIED (2026-11-12)
+
+`20261005120000_server_input_bounds.sql`. **Written 2026-11-12, validated,
+awaiting owner approval.** App-hardening checklist gaps S02#1, S04#1, S04#2,
+S05#3 and S07#1, plus one bug found while fixing them. The section number skips
+55–56, which the open Moyasar pull request uses.
+
+sha256 `1879deaee3bf962245bf7b7b5f37ba07670097d5ab120e9f585d8fe392a4f8f7`,
+747 lines / 38 126 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It changes live ordering behaviour.** A customer with no verified phone, or
+over either order limit, is refused from the moment it is applied. Its three
+numbers are owner decisions, recorded in `docs/OWNER_ACTIONS.md` §48.
+
+**MONEY PATH UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`).
+It redefines `place_customer_order`, the customer wrapper, and never
+`place_order` or `compute_order_snapshot`. **No deploy is implied:** no Edge
+Function changed. The app half reaches customers with the next EAS build, and
+the console half with the next web deploy.
+
+### What it does
+
+| Gap | Change | Before, measured on the local chain |
+| --- | --- | --- |
+| S04#1 | `place_customer_order` refuses a line of more than 50 of one item, read exactly as `place_order` reads it, with SQLSTATE `23514` and the name `order_items_quantity_max` in the message. **Not a table CHECK**: see below | a cash order of 51, or of 1,000,000, of one item was accepted |
+| S04#2 | `trg_profiles_text_bounds`: `full_name` normalised, at most 80 characters, no control or bidirectional formatting characters; `email` at most 254 | a 9,934-character name with a newline and U+202E was stored |
+| S04#2 | `trg_addresses_bounds`: `label` at most 60; latitude −90..90, longitude −180..180 | a 10,000-character label at (999, −999) was stored |
+| S04#2 | `handle_new_user` cuts a metadata name to 80 clean characters instead of letting the trigger refuse the signup; an email over 254 is not copied | a 152-character staff name was stored as given |
+| bug | `address_description_is_usable` trims `E' \t\r\n\f\x0B'` | `E'\v'` is the letter v, so `'villa'` trimmed to `'illa'` and was refused |
+| S05#3 | `product_images_admin_delete_select`, `banner_images_admin_delete_select`: SELECT for `authenticated`, `is_admin()`, scoped with `storage.allow_any_operation(array['object.delete','object.delete_many'])` | an administrator's `remove()` deleted 0 rows and reported success |
+| S07#1, S02#1 | `place_customer_order`: per-caller advisory lock; refuse a profile that is not `phone_verified`; refuse at `order_limit_open` open orders placed in the last 24 hours (default 5) or `order_limit_per_hour` orders in the last hour (default 10) | 30 orders in a row were accepted; an email-only account ordered |
+
+The triggers check a row on insert and when the guarded column changes. An
+existing row stays updatable on every other column, which the suite proves on
+rows that break every rule.
+
+**Why the open count has a 24-hour window.** `orders.status` moves only when
+staff move it in the console. The POS webhook writes `lazywait_status`, not
+`status`. A cash order placed 2026-09-26 is still `received` (read live
+2026-11-12). Without a window, a customer whose old orders were never closed
+would be refused for ever.
+
+**An idempotent retry is exempt.** A retry with the key of an order that
+already exists gets that order back, as before, even at the limit.
+
+**The two limits interact.** Only `admin_set_order_status` writes
+`orders.status`; no other function on the chain and no Edge Function sets it
+(checked 2026-11-12). For a customer whose orders staff do not advance, the
+effective rule is therefore 5 orders in any rolling 24 hours, and the hourly
+limit of 10 cannot bind first. `docs/OWNER_ACTIONS.md` §48 puts this next to
+the two numbers.
+
+**The bidirectional formatting characters are written as regex escapes**
+(U+061C, U+200E, U+200F, U+202A–U+202E, U+2066–U+2069), not as raw characters.
+A raw one is invisible in a diff and in SQL sent inline, so a changed one would
+change the name rule with nothing to see. The file calls the rule on each of
+the twelve, and on their neighbours, before it finishes.
+
+**The storage operation names were read from source, not guessed:**
+`supabase/storage` `src/http/routes/operations.ts` at commit
+`d0461d8748fc0f8346a25d3743155e15aa3ce091` (2026-11-10) sets
+`storage.object.delete` and `storage.object.delete_many`, unchanged since at
+least `4c945f9` (2025-01-09). The server writes them to the transaction-local
+`storage.operation` (`src/internal/database/postgres/scope.ts`) and authorises a
+delete by running it as the caller with RETURNING (`src/storage/object.ts`,
+`authorizeDeleteTargets`). Splinter lint 0025 flags only an empty, `true` or bare
+`bucket_id` qual (`supabase/splinter` commit `cd238c8`), so neither policy
+matches it. An administrator still cannot list either bucket.
+
+### What it does not cover
+
+- **The online checkout-session path** is frozen under CLAUDE.md §6, and this
+  file leaves it exactly as it is. That is why the line cap is a guard in the
+  cash wrapper and not a `CHECK` on `order_items`. The first version of this
+  file added the CHECK; Codex review on #445 pointed out that it also binds
+  `insert_order_from_snapshot`, which writes a paid order's lines after the
+  charge is captured, so a 51-unit online snapshot would have been charged and
+  then failed. That changes frozen payment behaviour even while it is dormant.
+  The file's assertion 6.1 now refuses to apply if any upper bound on
+  `order_items.quantity` exists, and the suite's CASE 1 inserts a 51-unit line
+  the way the snapshot path does and expects it to land. `compute_order_snapshot`
+  still accepts a line above 50, as it does today. Before online payment is
+  enabled, the payment change must refuse such a snapshot before any charge,
+  and can add the table CHECK then. The phone rule and the order limits do not
+  cover online orders either. Online payment is off, so none of this is
+  reachable today.
+- **The thresholds have no console control.** Changing them is a live write to
+  `app_settings`, a §5 action.
+
+### Preconditions it checks before changing anything
+
+`storage.operation()` and `storage.allow_any_operation(text[])` exist and
+`authenticated` can execute them (both exist live, read 2026-11-12; the grants
+were not read, so the file checks them), and both bucket ids exist. A policy
+calling a function the caller cannot execute would fail every storage query
+that applies SELECT policies.
+
+### Validation
+
+- **Local chain harness** (`.github/sql-ci/bootstrap.sql` now models the three
+  storage operation helpers from upstream): all 146 migrations apply; every
+  suite passes except the two quarantined ones.
+- **Paired suite** `server_input_bounds_test.sql`, 12 cases. **Every case fails
+  on the 8df5408 chain and passes with this file.** Case 11 drives two real
+  backends with dblink: with the limit at 5 and 4 orders open, session B waits
+  on session A's advisory lock and is refused once A commits. On the old chain
+  B waits on the profile row lock instead, then succeeds, leaving 6 orders.
+- **One existing suite changed, on purpose:** `order_read_contracts_test.sql`
+  CASE 10 places an order through the wrapper, so its customer is now
+  phone-verified.
+- **Mutation testing: 34 mutants, all killed by the suite** with the file's own
+  check stripped out. The file's own check also refuses 23 of them before they
+  land. **Five more after the line cap moved into the wrapper**, each killed by
+  both: the guard disabled with `if false and`, the bound at 51, only the first
+  line read, a quantity sent as a JSON string skipped, and the table CHECK put
+  back. Ten of the 34 were added after review, because three plausible mutants
+  survived the first suite: the hourly window cut to 1 minute, the open window
+  cut to 2 hours, and `object.list` added to the administrator's policy. The
+  suite now places orders at 59 minutes and 23 hours and expects them to count,
+  and lists as an administrator under every read route the Storage server
+  names.
+- **The file's check on the wrapper reads statements, not tokens.** Its first
+  version looked for `phone_verified` and `pg_advisory_xact_lock` anywhere in
+  the body, and a body with the lock commented out still applied. It now
+  strips comments and requires each of eleven guard statements exactly once
+  (eight when it was first written; the line cap added three).
+  That proves the statements are stored; it does not prove they refuse the
+  right callers, which is the suite's job. The storage check compares the
+  policy's operation list exactly, so an added `object.list` refuses the
+  apply.
+- **A defect the first draft had, and how the suite now catches it.** The draft
+  revoked the two name helpers from `authenticated`. The profile trigger runs as
+  the customer, so every name edit through the app would have failed with
+  `42501`, and the suite still passed: a plan cached while the session ran as
+  `postgres` had inlined the SQL helper and skipped its EXECUTE check. The
+  assessment's own demonstration, run in a fresh session, exposed it. The
+  helpers are now granted to `authenticated`, the file asserts that, and every
+  impersonation helper in the suite runs `discard plans` first. The revoke is
+  mutant M24.
+
+### Applying it (owner, §5, named by version)
+
+1. Read live how many customer profiles are not `phone_verified`. On
+   2026-11-12 there were 5: 2 email-confirmed (one placed a cash pickup order on
+   2026-09-26, still `received`), 1 with an unconfirmed email and 2 with neither.
+   All 5 would be refused.
+2. Confirm or change the three numbers (`OWNER_ACTIONS.md` §48).
+3. Apply `20261005120000` by name. Never "the outstanding migrations": the
+   frozen Moyasar file sorts first.
+4. Afterwards: `select order_limit_open, order_limit_per_hour from app_settings`
+   reads 5 and 10, the money-path pair is unchanged, and Moyasar is still absent.
