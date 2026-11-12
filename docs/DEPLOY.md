@@ -40,9 +40,31 @@ The root script intentionally:
 2. builds the Vite/admin application;
 3. exports the Expo customer web app into `dist/app`;
 4. scans every shipped bundle for build-tool libraries that must never ship (`scripts/bundle-forbidden-libs.mjs`);
-5. fails if any file under `dist/app/assets/` or `dist/app/_expo/` lacks a 32-hex content hash in its name (`scripts/check-immutable-asset-names.mjs`) — `vercel.json` serves both as `immutable` for a year, which is only correct for content-hashed names.
+5. fails if any file under `dist/app/assets/` or `dist/app/_expo/` lacks a 32-hex content hash in its name (`scripts/check-immutable-asset-names.mjs`) — `vercel.json` serves both as `immutable` for a year, which is only correct for content-hashed names;
+6. enforces the web performance budget (`scripts/web-budget.mjs`, below).
 
-Steps 4-5 run inside the build rather than beside it, because `npm run build` is what Vercel runs: a failure there is a deploy that does not happen.
+Steps 4-6 run inside the build rather than beside it, because `npm run build` is what Vercel runs: a failure there is a deploy that does not happen.
+
+### Web performance budget
+
+`scripts/web-budget.mjs` fails the build when `/app` grows past a threshold set just above what it measured on 2026-11-12. Sizes are brotli quality 4, the stand-in the assessment used for Vercel's on-the-fly compression; Vercel's own encoding measured about 6% larger for the entry, so compare these numbers with each other, not with a production transfer size.
+
+| Measure | Threshold | Measured 2026-11-12 | Why it matters |
+| --- | --- | --- | --- |
+| `/app` entry bundle (br) | 1040 KB | 1 014 118 B | One bundle by design; every first visit downloads all of it before anything renders. |
+| First load: entry + the 8 start-up fonts + brand mark (br) | 1900 KB | 1 862 605 B (entry 1 014 118, fonts 720 895, mark 127 592) | What a cold visit must fetch before the chooser is usable. With the old 885 px mark it was 2 123 038 B, which fails. |
+| Any UI image under `dist/app/assets/assets/` or `dist/*.png` (raw) | 150 KB | largest 127 587 B (the brand mark) | PNG does not compress on the wire. `dist/logo.png` (430 KB) is exempt by name: it is the iOS `apple-touch-icon` and the logo master, and neither UI draws it. |
+
+The start-up fonts are read from `DESIGN_SYSTEM_FONTS` in `apps/mobile/src/design-system/fonts.ts`, so registering another font is counted without editing the script. `src/lib/webBudget.test.ts` fails if the thresholds above drift from the script's.
+
+**Lower a threshold when a change makes room; raise one only in a change that says why the growth is worth it.** The experience targets the budget stands in for, measured with the assessment's throttled-phone harness (400 kbps, 400 ms RTT, 4x CPU), and not enforced in CI:
+
+- cold first paint under 2 s — met by the `/app` splash (first paint about 0.5 s; it was 22 s of blank page);
+- cold chooser usable under 26.5 s now, 15 s as the target;
+- warm chooser under 3.5 s, warm transfer under 60 KB, and **zero** revalidations of hashed assets on a warm load;
+- total long tasks under 1.5 s at 4x CPU.
+
+Do not reorder the mobile install behind the Vite build: root web source imports/transforms mobile/shared code whose TypeScript config depends on the Expo dependency tree.
 
 Local pre-release check:
 
