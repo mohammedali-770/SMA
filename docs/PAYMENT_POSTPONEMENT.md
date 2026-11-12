@@ -1,4 +1,21 @@
-# Payment & Refund Work — POSTPONED
+# Payment & Refund Work — POSTPONED (history)
+
+> **SUPERSEDED 2026-11-11. This document is now history.** The owner decided,
+> in conversation: *"our payment is confirmed it will be through moyasar / make
+> the required edits and remove unnecessary pices of code for other payment
+> gateway and keep moyasar / if you miss any integration information form
+> moyasar ask me I can provide"*. Moyasar is the payment provider. The Tap and
+> Geidea code was removed on the branch `feat/moyasar-only-20261111`.
+>
+> **Start at [`PAYMENTS.md`](PAYMENTS.md)** for how payment works now, what is
+> live, and the order of the owner steps to go live. Nothing live was changed by
+> the decision: every apply, deploy, key, dashboard change, switch to live, the
+> refund worker and the EAS build is still a separate owner approval
+> ([CLAUDE.md §5 and §6](../CLAUDE.md)).
+>
+> Everything below is kept as the record of the freeze (2026-07-29 to
+> 2026-11-11) and why the code looked the way it did. Where a passage read as a
+> current instruction and is now wrong, a dated note says so beside it.
 
 > **Status: POSTPONED (owner decision, 2026-07-29).**
 > The payment gateway provider has **not been selected yet**. Until it is,
@@ -48,6 +65,18 @@ treated as the final provider choice, and no further work is to be built on
 top of it until the decision is made.
 
 ## 2. What is frozen
+
+> **History, 2026-11-11.** Nothing in this table is frozen any more; repository
+> work keeping Moyasar the only provider is open ([CLAUDE.md §6](../CLAUDE.md)).
+> Several files it names no longer exist: `_shared/tap.ts`, `tapVerify.ts`,
+> `tapRefund.ts` and `geidea.ts` were deleted; the admin payment surface is now
+> `src/components/admin/MoyasarPaymentPanel.tsx`, `src/lib/moyasarAdminTest.ts`,
+> `src/components/admin/view/orders/PaymentDetails.tsx` and the payment slot of
+> `IntegrationCard.tsx` — **`TapPaymentPanel.tsx` and `tapAdminTest.ts` were
+> deleted**; the app's `TapWebView*.tsx` became `PaymentWebView*.tsx` and
+> `features/checkout/paymentFlow*` was deleted; `tap-admin-test-return` became
+> `payment-admin-test-return`. The current file list is the `payments` rule in
+> [`ownership.json`](ownership.json).
 
 No change of any kind — repository, Production, or configuration — may be made
 to:
@@ -243,6 +272,16 @@ Recorded so the state can be compared when the area is reopened.
 - **Refund trigger secret**: provisioned in Vault, retained, never printed.
   Without it `payment-refund` returns `503` and processes nothing — a second,
   independent reason no refund can run while the worker is disabled.
+
+  > **Corrected 2026-11-11.** The secret is not read from Vault. Both
+  > `payment-refund` and the driver `invoke_payment_refund_processor()` read
+  > `refund_trigger_secret` from the payment row's `secret_config`. A read-only
+  > check on 2026-11-11 found no such secret in Vault. A names-only read the
+  > same day listed the key on the payment row (`BACKUP_RECOVERY.md` §4.3); its
+  > value was not read, so whether it is non-blank is unknown (check by length,
+  > `OWNER_ACTIONS.md` §47.16). No migration creates it and no console field
+  > sets it. See
+  > [`PAYMENTS.md`](PAYMENTS.md) §6.
 - **Data**: 23 orders, **0 paid**, **0** orders enrolled for refund
   (`refund_state` all `none`), **0** rows in `order_refunds`,
   9 `payment_records`.
@@ -293,7 +332,8 @@ but it does not change the in-function `pending` release path.
 
 ### UPDATE 2026-08-19 — Tap answers this, with a 24-hour caveat
 
-Researched from Tap's public documentation (`docs/integrations/Tap_API_Reference.md`),
+Researched from Tap's public documentation (the Tap reference, deleted on
+2026-11-11 and kept in git history),
 under an explicit owner instruction to investigate Tap. **Not confirmed by Tap and
 not tested against a live account.**
 
@@ -371,6 +411,12 @@ account to exist, and the behaviour to be proven in the sandbox.
 
 ### Committed but DORMANT — the Tap card interop plugin (2026-08-19)
 
+> **History, 2026-11-11. The plugin was deleted.** `withTapCardInterop.js` and
+> its test were removed with the rest of the Tap code. The activation step
+> below no longer applies; do not recreate the plugin. The app now uses no
+> card SDK: Moyasar's hosted page runs in the in-app WebView
+> ([`PAYMENTS.md`](PAYMENTS.md) §5).
+
 `apps/mobile/plugins/withTapCardInterop.js` exists and is unit-tested, and is
 **deliberately not listed in `app.json` → plugins**. It therefore runs on no
 build and changes no binary. `card-react-native` is not a dependency, online
@@ -382,8 +428,8 @@ with no `codegenConfig`, so under the mandatory New Architecture on RN 0.86 it
 renders on Android (interop is on by default) but **fails silently on iOS**,
 where `RCTLegacyViewManagerInteropComponentView` matches a hardcoded allowlist
 that no third-party component is in. The library's own error message blames the
-build, so the cause is not where anyone would look. Full detail:
-`docs/integrations/Tap_API_Reference.md` §4.1.
+build, so the cause is not where anyone would look. Full detail was in the
+Tap reference §4.1, deleted on 2026-11-11 and kept in git history.
 
 **To activate**, once the SDK is installed and the freeze is lifted, add
 `"./plugins/withTapCardInterop"` to the plugins array. That is a payment change
@@ -394,6 +440,10 @@ Android SDK does not collide with Expo SDK 57. Both need an EAS build on a real
 device — neither can be settled from source.
 
 ## 8. Resume checklist (when the gateway is officially selected)
+
+> **Superseded 2026-11-11.** The gateway is selected. The current, ordered list
+> of owner steps is [`PAYMENTS.md`](PAYMENTS.md) §7, and the go-live checks are
+> §9 there. The list below is kept as written.
 
 Each item requires its own explicit owner approval — none of it is authorized
 by this document.
@@ -419,6 +469,15 @@ by this document.
 8. Update `docs/MIGRATIONS.md`, `PROJECT_STATUS.md` and `CLAUDE.md` §6.
 
 ## 9. Moyasar — the second candidate (2026-08-24)
+
+> **Updated 2026-11-11: Moyasar is chosen.** It is the only provider, and the
+> integration described here was extended and changed on
+> `feat/moyasar-only-20261111`. Read [`PAYMENTS.md`](PAYMENTS.md) for what it
+> does now. The cross-provider material in §9.4 to §9.6 describes a two-gateway
+> codebase that no longer exists. "Four things keep it inert" in §9.1 was true
+> on 2026-08-24; on 2026-11-11 the payment row named `moyasar` with a test key
+> saved, and what kept it inert was the unapplied migration and the July
+> deployed bundles (`PAYMENTS.md` §1).
 
 **Status: BUILT, INERT, NOT CHOSEN.** The owner said "maybe we will go with
 MOYASAR" and supplied `https://docs.moyasar.com/api/api-introduction`. That is an
@@ -589,12 +648,15 @@ is an operational requirement no code change removes.
 
 | Doc | Owns |
 | --- | --- |
-| `CLAUDE.md` §5, §6 | The standing payment/Tap freeze and approval rules |
+| `docs/PAYMENTS.md` | **Current** payment runbook (Moyasar), from 2026-11-11 |
+| `CLAUDE.md` §5, §6 | The approval rules; §6 records the 2026-11-11 decision and keeps the freeze as history |
 | `docs/MIGRATIONS.md` | Migration ledger and the only approved Production schema workflow |
 | `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle and refund enrolment rules |
-| `docs/integrations/Moyasar_API_Reference.md` | The researched Moyasar API contract and its seven open questions |
-| `docs/integrations/Tap_API_Reference.md` | The researched Tap API contract |
+| `docs/integrations/Moyasar_API_Reference.md` | The researched Moyasar API contract and its open questions |
 | `PROJECT_STATUS.md` | Overall project state and onboarding |
+
+The Tap API reference that this table once listed was deleted on 2026-11-11 and
+is kept in git history.
 
 ---
 
@@ -661,6 +723,13 @@ nowhere else. `resolveDefaultMethod` and `onlineUnavailableCashOn` were
 **deleted** rather than left unused: a helper that can manufacture a payment
 method out of settings is exactly what would reintroduce this, and the next
 author reaching for one would have found it sitting there looking supported.
+
+> **Updated 2026-11-11.** In the app (`apps/mobile/src/lib/payment.ts`),
+> `availableMethods`, `checkoutBlocked` and `clearIfUnavailable` now also take
+> the platform, and online payment is never offered on `web`
+> ([`PAYMENTS.md`](PAYMENTS.md) §3). The console's `src/lib/payment.ts` is
+> unchanged, so the two copies now differ on purpose. The guarantee below is
+> unchanged.
 
 What replaced it is `clearIfUnavailable(settings, chosen)`, whose signature is
 the guarantee — it returns the caller's own pick or `null`, so it can take a

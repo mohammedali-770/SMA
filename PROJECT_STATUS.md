@@ -99,11 +99,11 @@ For build commands and native configuration, use [`README_MOBILE.md`](README_MOB
 
 ## 5. Deliberately inactive/frozen areas
 
-### Payment and refunds — FROZEN
+### Payment and refunds — Moyasar decided, not live
 
-The final payment provider has not been selected. Existing Tap/payment/refund source remains for continuity/history, but ordinary work must not modify, deploy, schedule or test that area.
+**Changed 2026-11-12.** On 2026-11-11 the owner chose **Moyasar** (CLAUDE.md §6). The branch `feat/moyasar-only-20261111` removes the Tap and Geidea code and makes every payment path Moyasar-only. Read-only on 2026-11-11: online payment was off, every deployed payment function was still a July Tap-era bundle, and the refund job was off. Every step that changes that is its own owner approval, in the order in [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §47. Runbook: [`docs/PAYMENTS.md`](docs/PAYMENTS.md).
 
-Automated refund processing remains disabled. The authoritative decision is [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
+*History, until 2026-11-11:* The final payment provider has not been selected. Existing Tap/payment/refund source remains for continuity/history, but ordinary work must not modify, deploy, schedule or test that area. Automated refund processing remains disabled. The authoritative decision is [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 
 ### Push notifications — LIVE
 
@@ -270,7 +270,7 @@ Starting EAS/store builds requires explicit owner approval.
 | Latest migration status | `docs/MIGRATION_RECONCILIATION_20260812.md` |
 | Migration workflow/history | `docs/MIGRATIONS.md` |
 | Current owner/live-dashboard actions | `docs/OWNER_ACTIONS.md` |
-| Payment/refund freeze | `docs/PAYMENT_POSTPONEMENT.md` |
+| Payments (Moyasar) | `docs/PAYMENTS.md`; go-live steps `docs/OWNER_ACTIONS.md` §47; the freeze, history to 2026-11-11, `docs/PAYMENT_POSTPONEMENT.md` |
 | Git branch state | `docs/GIT_BRANCHES.md` |
 | Feature-retention evidence | `docs/BRANCH_FEATURE_RETENTION_AUDIT.md` |
 

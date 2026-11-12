@@ -161,6 +161,9 @@ Deno-only modules, so Vitest cannot execute them).
   wraps it in `.catch()`). The one uncovered case is an entirely **absent**
   `base_url` key, which `??` still resolves to the production host for that one
   best-effort call. Closing it is a one-line change to a frozen file.
+  *(2026-11-12: the payment freeze was lifted for repository work on
+  2026-11-11, when the owner chose Moyasar. The Moyasar-only change did not touch
+  this fallback, so the residual risk above still stands.)*
 
 ## Configuration (never committed)
 Set with the admin **Lazywait POS** card, or via SQL (service role / SQL editor):
@@ -450,8 +453,10 @@ instead of the live config row.) Field-by-field state:
   percentage is the one field that might invite the POS to recompute
   `subtotal × 1.15`.
 - **`is_paid` is supported but not wired.** It is a confirmed field, but telling
-  a cashier an order needs no cash is a financial signal and payment work is
-  frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
+  a cashier an order needs no cash is a financial signal and payment work was
+  frozen (CLAUDE.md §6) when this was written. Wiring it is still a separate
+  owner decision. *(2026-11-12: the provider is now Moyasar; `is_paid` is still
+  not sent.)*
 
 ### Unmapped modifiers — folded into `details`, never dropped, never re-priced
 Only a modifier carrying a `modifiers.lazywait_addon_id` can become a contract
@@ -952,11 +957,16 @@ stale during the invocation that deferred it. Both deferrals degrade to
 *awaiting* — never to skipping — on a runtime without `EdgeRuntime.waitUntil`.
 
 ## Online payment (prepared, not live)
-After the Geidea webhook verifies a payment and `confirm_order_payment` marks the
-local order paid, `payment-webhook` best-effort calls
+*Changed 2026-11-12: this said "the Geidea webhook". The provider is Moyasar
+(owner decision, 2026-11-11), and online payment was off on that date.*
+
+After Moyasar's payment is verified server-side and `confirm_order_payment` marks
+the local order paid, the confirmation (`_shared/moyasarVerify.ts`, reached from
+`payment-webhook`, `payment-verify` or the admin re-verify) best-effort calls
 `POST /pos/orders/update-online-payment` with the **server-trusted** total (only
 if the order already has a `lazywait_ref`). Never called from the frontend; never
-fatal. The payment gateway itself is a separate task.
+fatal. It sends `Card_Type: 'card'` whatever the Moyasar source was (mada, Apple
+Pay), `_shared/paymentSync.ts`.
 
 ## Webhook receiver (`lazywait-webhook`)
 Verifies `X-LazyWait-Signature` = HMAC-SHA256 **hex** of the body with the
@@ -1084,7 +1094,9 @@ is owner-supplied and replaces it once provided).
   block. Remaining assumed field names are in the reference doc's
   "STILL ASSUMED" section.
 - **Payment endpoints** (`update-cash-payment`, `update-online-payment`) are
-  typed/serialized/validated only; live wiring stays **frozen** (CLAUDE.md §6).
+  typed/serialized/validated only in this client. *(2026-11-12: this said live
+  wiring stays frozen. The freeze is lifted for repository work; the live call is
+  the one in "Online payment" above, and it runs only once online payment is on.)*
 - The client never re-POSTs Create Order once an `order_ref` exists and never
   reports a false success (reuses `shouldResendCreateOrder` +
   `classifyCreateOrderResult`).

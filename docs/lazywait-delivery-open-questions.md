@@ -90,8 +90,9 @@ still never marked `synced` unless the POS actually accepts it.
 7. **ANSWERED** — Can the POS show whether the order is paid or
    cash-payment-required? Yes: **`is_paid`** (boolean). The builder supports it;
    the live worker deliberately does **not** set it. Telling a cashier that an
-   order needs no cash is a financial signal, and payment work is frozen
-   (CLAUDE.md §6) — wiring it is a separate owner decision.
+   order needs no cash is a financial signal, and payment work was frozen
+   when this was written (CLAUDE.md §6; Moyasar is the provider since
+   2026-11-11) — wiring it is a separate owner decision.
 8. **ANSWERED 2026-08-27, negatively — and the duplication is now permanent.**
    The owner read a real delivery ticket: it shows `Order Type: Delivery` but
    **no address row at all**. The POS does **not** render the confirmed

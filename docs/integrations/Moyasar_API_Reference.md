@@ -10,20 +10,33 @@
 >
 > When Moyasar supplies their own reference or an account is opened, commit that
 > here and treat it as authoritative over this file.
+>
+> **Updated 2026-11-11** from Moyasar's public documentation read that day
+> (Allowed IPs, webhook verification, test cards, refunds), from the owner's
+> answers, and from the implementation on `feat/moyasar-only-20261111`. Still
+> not validated against the account: no request has been sent to Moyasar with
+> this code.
 
-> **THE PAYMENT FREEZE IS STILL IN FORCE.** See `docs/PAYMENT_POSTPONEMENT.md`.
-> Nothing in this document authorises enabling online payment, selecting Moyasar
-> as the provider, deploying a payment Edge Function, or applying a migration.
-> The provider decision has **not** been made — the owner's words were "maybe we
-> will go with MOYASAR". This reference and the code beside it exist so that
-> decision can be made against something concrete.
+> **MOYASAR IS THE PROVIDER (owner decision, 2026-11-11).** The owner said: "our
+> payment is confirmed it will be through moyasar / make the required edits and
+> remove unnecessary pices of code for other payment gateway and keep moyasar".
+> The runbook is [`docs/PAYMENTS.md`](../PAYMENTS.md). Nothing in this document
+> authorises enabling online payment, deploying a payment function, applying a
+> migration, entering a key or changing the Moyasar dashboard: each is a
+> separate owner approval (`CLAUDE.md` §5).
+>
+> *History:* until 2026-11-11 this banner said the payment freeze was in force
+> and the provider undecided ("maybe we will go with MOYASAR"); see
+> `docs/PAYMENT_POSTPONEMENT.md`.
 
 Our implementation: `supabase/functions/_shared/moyasar.ts` (amounts, config
 resolution, invoice payload, status mapping, webhook token, verification
 binding, sanitizers), `supabase/functions/_shared/moyasarVerify.ts` (invoice and
 payment retrieval, validate-and-confirm, invoice reconciliation),
 `supabase/functions/_shared/moyasarRefund.ts` (refund body, response
-classification, resolve-before-retry), and the `payment-*` Edge Functions.
+classification, resolve-before-retry), `supabase/functions/_shared/moyasarHttp.ts`
+(the only transport for Moyasar calls, with the optional static-IP proxy), and
+the `payment-*` Edge Functions.
 
 ---
 
@@ -62,6 +75,37 @@ single time; only the key ID prefix stays visible. A lost key must be
 regenerated, which is a credential change and therefore an owner action under
 `CLAUDE.md` §5.
 
+### 1.0 Allowed IPs — a LIVE blocker (researched 2026-11-11)
+
+Dashboard → Settings → API Keys → **Allowed IPs** restricts which addresses may
+make secret-key calls
+(https://docs.moyasar.com/guides/dashboard/setting-up-your-ip-whitelist):
+
+- in **live**, at least one address must be listed, and the live secret key is
+  **hidden until one is**;
+- a call from any other address gets **401** `authentication_error`, "This IP
+  Address is not whitelisted to do this operation";
+- a wrong or revoked key gets the same status and type, so only the message
+  tells them apart. `isMoyasarIpNotAllowed()` requires the message to name the
+  IP and the allow-list;
+- saving the list asks for a 6-digit code.
+
+Supabase Edge Functions have no static outbound IP (Supabase knowledge base,
+read 2026-11-11), so the owner chose a static-IP proxy service. When the Edge
+Function secret `MOYASAR_PROXY_URL` is set, `moyasarFetch()` sends every Moyasar
+call through it with `Deno.createHttpClient({ proxy })`; the https target is
+tunnelled, so the proxy never sees the secret key. `HTTPS_PROXY` as a function
+secret would route nothing. A value that cannot be used refuses every call,
+test included. Whether hosted Supabase supports `createHttpClient` is read from
+the edge-runtime source, not from Supabase's documentation; it is unproven until
+a live Test connection. Detail and owner steps: `docs/PAYMENTS.md` §8.1.
+
+What each caller does with the refusal: it is logged as
+`moyasar_request_refused` / `moyasar_ip_not_allowed` with the remedy; the admin
+actions say whether the proxy or the server's own address was refused;
+`payment-verify` answers `pending`; the refund worker releases the refund
+(§3.2).
+
 ### 1.1 The rule that decides the whole architecture
 
 > "Sending cardholder data to the merchant backend is prohibited and will result
@@ -77,7 +121,7 @@ reaches our infrastructure. Everything in §3 follows from this sentence.
 
 ---
 
-## 2. Amounts are MINOR units. Tap's are not.
+## 2. Amounts are MINOR units (the retired Tap integration's were not)
 
 Moyasar: "A positive integer representing the payment amount in the smallest
 currency unit." For SAR that is **halalas** — 1.00 SAR is `100`.
@@ -102,7 +146,11 @@ pinned by unit tests that include the specific floating-point traps:
 from an order in the first place.
 
 **Minimum invoice amount: `100` minor units (1.00 SAR).** The admin test invoice
-uses exactly this floor.
+uses exactly this floor (`MOYASAR_MIN_INVOICE_MINOR_UNITS`). A customer total
+under it can never be invoiced, so `payment-initiate` refuses it before opening
+an attempt, with `{status:'disabled', reason:'amount_below_minimum'}`, and the
+attempt RPCs refuse it too (`20261003120000`). A points redemption can leave
+such a remainder.
 
 ---
 
@@ -116,6 +164,10 @@ uses exactly this floor.
 | Read a payment (authoritative confirmation) | `GET /v1/payments/{id}` |
 | Refund | `POST /v1/payments/{id}/refund` |
 | Credential check (creates nothing) | `GET /v1/payments/{a-nonexistent-uuid}` |
+
+Every one of these goes through `moyasarFetch()` (§1.0). `PUT
+/v1/invoices/{id}/cancel` exists and is **not** used; whether to cancel an older
+invoice when a new attempt opens is an open question (`docs/PAYMENTS.md` §11).
 
 ### 3.1 Create an invoice — `POST /v1/invoices`
 
@@ -134,6 +186,23 @@ Documented request fields:
 
 Response carries `id`, `status`, `amount`, `currency`, `url` (**the hosted
 payment page**), `expired_at`, `payments: []`, `metadata`, and timestamps.
+
+**The hosted page URL.** Moyasar's documented example is
+`http://checkout.moyasar.com/invoices/<id>?lang=en`
+(https://docs.moyasar.com/api/invoices/01-create-invoice). `customerCheckoutUrl()`
+hands the app only `https` on `moyasar.com` or a subdomain, with no port and no
+credentials; `http` on that domain is **upgraded**. Anything else answers 502;
+a newly created invoice's attempt is also closed. `payment_records.checkout_url` keeps the URL exactly as
+Moyasar returned it.
+
+**`lang`.** Not a documented request field, but every invoice URL in Moyasar's
+documentation carries it. The server sets `lang=ar` or `lang=en` on the URL it
+hands out, from the app's language. Whether the page honours `ar` is unknown.
+
+**`expired_at`.** We always send it: one minute before the attempt's own
+`expires_at` (`invoiceExpiryForAttempt`), so no invoice outlives its attempt. An
+attempt with under three minutes left (the invoice would live less than two)
+gets no invoice.
 
 **`description` must be treated as customer-visible** — Moyasar says it is
 displayed on the invoice. So it never carries the internal `SM-…` order number
@@ -164,6 +233,22 @@ We always send `amount` explicitly rather than relying on the full-refund
 default, so a bookkeeping error surfaces as a mismatch instead of quietly
 returning the whole payment.
 
+From Moyasar's public documentation, read 2026-11-11 (not tested):
+
+- a refund can be made only from a `paid` or `captured` payment;
+- partial refunds are allowed; we assume one refund per payment, and the worker
+  sends at most one per order;
+- refunds carry fees; a **void** within about two hours is fee-free. Voiding is
+  not implemented;
+- an aggregation account needs balance to refund;
+- the money reaches a mada card in about 1 to 3 days, a credit card in about 7
+  to 14.
+
+How our worker handles responses: a 429, a 5xx or a network error is
+`pending` (released, retried later); a definitive 4xx is `failed`. A 401 from
+Allowed IPs is `pending` with `failure_code = 'moyasar_ip_not_allowed'`, with no
+attempt cap; a plain 401 is `failed` (`http_401`). Detail: `docs/PAYMENTS.md` §6.
+
 **Note the id: it is the PAYMENT, not the invoice.** This is why
 `payment_records.provider_ref` holds the payment id and the new
 `provider_checkout_ref` column holds the invoice — `order_refunds.charge_ref` is
@@ -186,9 +271,9 @@ That is worse than Tap, which offers a 24-hour `reference.idempotent` on charges
 **and** refunds. Two things close the gap, and they are the parts of this
 integration most worth reviewing:
 
-**Invoice creation — reconcile, never retry.** The Tap path retries a failed
-charge create once, which is safe there because of `reference.idempotent`. The
-Moyasar path does **not** retry. On a timeout or transport failure it calls
+**Invoice creation — reconcile, never retry.** The old Tap path (deleted
+2026-11-11) retried a failed charge create once, which was safe there because of
+`reference.idempotent`. The Moyasar path does **not** retry. On a timeout or transport failure it calls
 `findInvoiceByReference()`, which looks the invoice up by the per-attempt
 `reference_transaction` we stamped into its metadata, and adopts the existing
 invoice if the create actually landed. If the lookup itself fails, we create
@@ -236,7 +321,8 @@ reach a person; `failed` frees the one-live-refund slot and surfaces the row in
 for the same stated reason.
 
 This answers §7 for this provider. It does **not** authorise re-enabling the
-refund worker, which stays disabled.
+refund worker, which was still disabled on 2026-11-11. Re-enabling it is an owner
+step, after `refund_trigger_secret` exists (`docs/PAYMENTS.md` §6).
 
 ---
 
@@ -263,6 +349,25 @@ is configured differently than we believe — a reason to hold, not to proceed.
 **Invoice** — adds `canceled`, `on_hold` and `expired`. `on_hold` maps to
 **pending**, because it is not terminal and closing the attempt on it would
 strand a payment that may still complete.
+
+**Closed invoices are terminal (2026-11-11).** An invoice that is `expired` or
+`canceled` with no `paid` or `captured` payment can never be paid. It answers
+`expired` / `payExpired` or `cancelled` / `payCancelled`, and the attempt is
+closed with `failure_code` `invoice_expired` or `invoice_canceled`
+(`closedInvoiceOutcome`). A settled payment always wins. Until this change such
+an invoice read `pending`, which kept the app resuming a page nobody could pay
+and refusing every new order on that device, cash included.
+
+**A failed PAYMENT does not close its attempt.** An invoice can hold several
+payments; a declined card can be followed by Apple Pay on the same page. Only a
+closed invoice, or the attempt's own expiry, ends an attempt.
+
+**What `payment-verify` sends for `refunded`.** `failed`, with `payUnknown`
+(`verifyAnswerStatus`). Builds already in the field treat only `failed`,
+`cancelled` and `expired` as terminal.
+
+**SADAD.** A SADAD bill leaves the invoice `on_hold` for days and cannot be
+refunded. It must be off for this account; whether it is, is unknown (§11).
 
 ---
 
@@ -299,6 +404,17 @@ The token is still required — `resolveMoyasarConfig()` fails closed without on
 false for an empty configured secret, so an unconfigured provider can never
 degrade into accepting everything.
 
+### 6.0 Event names
+
+Moyasar's dashboard guide lists: `payment_paid`, `payment_faild` (Moyasar's own
+spelling), `payment_refunded`, `payment_voided`, `payment_authorized`,
+`payment_captured`, `payment_verified`. Creating a webhook through the API takes
+the secret as **`shared_secret`**; deliveries carry it as **`secret_token`**.
+
+`HANDLED_WEBHOOK_TYPES` acts on those, plus `payment_failed` and
+`payment_abandoned`. Anything else is acknowledged and ignored. The one
+non-payment event handled is `webhook_verification` (§6.3).
+
 ### 6.1 Two spellings of the failure event
 
 The dashboard guide's event table lists **`payment_faild`** — Moyasar's own
@@ -316,11 +432,40 @@ A non-2xx response is retried on a fixed ladder — immediate, +1m, +10m, +30m,
 +1h, +2h — and then the message is **dropped**. Moyasar asks for a 2xx before any
 slow work.
 
-Our handler returns `503` when the server-to-server payment fetch fails, so a
-transient Moyasar outage brings the event back rather than being acknowledged
-after we changed nothing. Every settled decision returns 200. Because delivery
+Our handler returns `503` when the server-to-server payment fetch fails (a
+network error included), and when our own stamp or read-back fails before the
+outcome is known, so the event comes back rather than being acknowledged after
+we changed nothing. A duplicate payment is acknowledged with 200: it is
+recorded, and a retry would only record it again. Every settled decision returns 200. Because delivery
 can be dropped entirely after six attempts, the webhook is **never** the only
 confirmation path — `payment-verify` is.
+
+### 6.3 Webhook verification (published by Moyasar 2026-11-11)
+
+A new webhook may need verifying before Moyasar delivers anything
+(https://docs.moyasar.com/api/other/webhooks/verify-webhook). Moyasar sends one
+event:
+
+| Field | Notes |
+| --- | --- |
+| `type` | `webhook_verification` |
+| `data.webhook_id` | the webhook being verified |
+| `data.verification_code` | 6 digits, entered in the dashboard |
+| `secret_token` | the webhook's secret, as on every event |
+
+- It is sent **once and never retried**.
+- The code must be entered within **30 minutes**.
+- Until it is, the webhook receives nothing, and events from before that are
+  **never delivered later**.
+
+`payment-webhook` matches the token against every configured slot (test, live,
+shared) in constant time. A match writes one `integration_sync_logs` row
+(`request.type = 'webhook_verification'`, the code in
+`response.verification_code`) and answers 200; a mismatch answers 401 and
+records nothing. It is handled even while the payment row is disabled, as long
+as the provider is `moyasar`. Nothing is fetched or confirmed. The console's
+Moyasar panel shows the code for 30 minutes. Register the webhook only after the
+new `payment-webhook` is deployed and its token saved: `docs/PAYMENTS.md` §8.2.
 
 ---
 
@@ -350,6 +495,20 @@ secret key is always resolved from the **attempt's stored mode**, so a live
 payment cannot be fetched with the test key that opened a test attempt. The
 `live` flag on a webhook envelope is compared as a second check that costs
 nothing.
+
+**A test-mode attempt never confirms (2026-11-11).** Moyasar's sandbox settles a
+test invoice exactly as live settles a real one, so the binding above would
+match. Any attempt whose stored mode is not `live` is refused before any order
+or payment state is written, and the attempt is marked failed with
+`failure_code = 'test_mode_attempt'`, reason `test_mode_attempt`,
+message key `payUnknown`. `payment-initiate` also refuses customer checkout in
+TEST mode (`{status:'disabled', reason:'test_mode'}`). The admin sandbox invoice
+has no attempt row, so it never reaches confirmation.
+
+**One paying payment per checkout or order.** A second settled payment that
+binds is recorded as a duplicate (`failure_code = 'duplicate_payment'`, status
+`failed`) and never reported paid; staff refund it by hand
+(`docs/PAYMENTS.md` §10).
 
 ---
 
@@ -403,10 +562,20 @@ rather than trusting the filter to have been applied.
 ## 10. Sandbox
 
 Test and live are fully separate; test mode does not touch live data or the
-banking networks. Test cards are published (e.g. mada `4201320111111010` →
-`paid`/APPROVED/`00`; `4201320000311101` → `failed`/INSUFFICIENT FUNDS/`51`), and
-**any card not on that list fails**. Name must be two words, expiry in the
-future, CVC any three digits.
+banking networks. Test cards are published, and **any card not on that list
+fails**. Name must be two words, expiry in the future, CVC any three digits.
+
+| Card | Result (Moyasar's documentation, read 2026-11-11) |
+| --- | --- |
+| mada `4201320111111010` | `paid` / APPROVED / `00` |
+| mada `4201320000311101` | `failed` / INSUFFICIENT FUNDS / `51` |
+| Visa `4111111111111111` | paid, with a 3-D Secure challenge |
+| Visa `4111114005765430` | paid, frictionless |
+| Mastercard `5421080101000000` | paid |
+
+**Apple Pay sandbox:** a real card in Wallet, with the test keys; only amounts
+from **200.00 to 300.00 SAR** succeed, others fail. The admin test invoice is
+1.00 SAR, so it cannot show an Apple Pay success.
 
 Those numbers are only reachable through Moyasar's hosted page, which is where
 they belong: no card value is ever typed into, stored by, or transmitted through
@@ -414,7 +583,13 @@ this repository.
 
 ---
 
-## 10a. Operational consequences of having two gateways
+## 10a. Operational consequences of having two gateways (history)
+
+> **History, 2026-11-11.** There is one gateway now. `decideCrossProviderAttempt()`
+> and the Tap code were removed. Two points still hold: everything touching
+> money that already exists follows the **row**, not the settings page; and the
+> credential names stay namespaced (`moyasar_*`), because Tap's July keys are
+> still in `secret_config` and must never be read as Moyasar's.
 
 These are not Moyasar facts; they are what having a *second* provider does to
 this system, and they are recorded here because each one caused a defect that had
@@ -456,13 +631,17 @@ operational requirement, not something the code can remove.
 
 ## 11. Open questions for Moyasar
 
-None of these are answerable from public documentation, and each one should be
-settled before the provider is selected.
+Written on 2026-08-24, before the provider was chosen. Answers are marked with
+their evidence; the rest are still open. New questions are at the end.
 
 1. **Does the invoice hosted page offer mada, Apple Pay and STC Pay for our
    account, and is that configured per-account or per-invoice?** The invoice
-   create body has no payment-method field.
+   create body has no payment-method field. **Answered in part, 2026-11-11, by
+   the owner:** mada, Visa / Mastercard and Apple Pay are enabled; STC Pay is
+   not. Still open: whether Apple Pay works on the hosted invoice inside a
+   third-party app's WebView (Q8).
 2. **Is `payment_faild` or `payment_failed` the event type actually sent?** §6.1.
+   Still open; both are accepted.
 3. **Does a metadata filter on `GET /v1/invoices` fail loudly on an unsupported
    key, or silently return everything?** §9. Our code is safe either way, but the
    answer decides whether the reconciliation path is a fast lookup or a scan.
@@ -472,20 +651,41 @@ settled before the provider is selected.
    for mada versus international cards?** Needed for financial reconciliation,
    not for the integration.
 6. **Is a refund possible after settlement, and is there a time limit?**
+   Partly answered from the public documentation (§3.2): refunds are made from
+   `paid` or `captured` payments, partial refunds are allowed, and refunds carry
+   fees. A time limit is not documented. Still open.
 7. **Does the account need separate activation for live, given the 405 meaning
-   in §8, and what is the process?**
+   in §8, and what is the process?** **Answered 2026-11-11 by the owner:** the
+   account has test and live keys. The live key is shown only once an Allowed
+   IP is listed (§1.0).
+8. **Does the hosted invoice offer Apple Pay inside a third-party app's
+   WKWebView** (`enableApplePay`, no injected scripts)? Moyasar's documentation
+   is silent. Release gate on a real device.
+9. **Which hosts does the 3-D Secure chain use, and can it open a new window?**
+   The app allows any `https` page and keeps `setSupportMultipleWindows={false}`.
+10. **What query parameters are appended to `success_url` and `back_url`?** Not
+    documented. `payment-return` keeps only a strict UUID, and tolerates a second
+    `?`.
+11. **Is SADAD enabled for invoices on this account?** It must be off (§5).
+12. **Is `lang=ar` on the invoice URL honoured?** (§3.1)
+13. **Can a 3-D Secure payment still in flight when its invoice expires complete
+    afterwards?** If it can, our code still confirms it, and a payment on a newer
+    invoice of the same session becomes a duplicate to refund.
 
 ---
 
 ## 12. What this document does NOT establish
 
-- That Moyasar is the chosen provider. **It is not.** The decision is open.
-- That any of this works. Nothing here has been run against a Moyasar account,
-  test or live. No key exists in this repository or in `integration_settings`.
-- That the code is deployed. No payment Edge Function has been deployed for this
-  change, and the migration beside it has **not** been applied
-  (`CLAUDE.md` §5, §6, §8).
-- Anything about fees, settlement, contracts or onboarding.
+- That any of this works. As of 2026-11-11 nothing here has been run against the
+  Moyasar account, test or live. A test publishable key is saved in the payment
+  row; no key is in this repository.
+- That the code is deployed. As of 2026-11-11 every deployed payment function is
+  a July Tap-era bundle, and `20260824100000`, `20261003120000` and
+  `20261004120000` are **not** applied (`docs/PAYMENTS.md` §1, §7).
+- Anything about fees, settlement or contracts.
+
+*History:* until 2026-11-11 the first line here said Moyasar was not the chosen
+provider.
 
 ---
 
@@ -493,7 +693,10 @@ settled before the provider is selected.
 
 | Doc | Owns |
 | --- | --- |
-| `CLAUDE.md` §5, §6 | The standing payment freeze and approval rules |
-| `docs/PAYMENT_POSTPONEMENT.md` | The authoritative postponement record and the resume checklist |
-| `docs/integrations/Tap_API_Reference.md` | The other candidate, for comparison |
-| `docs/MIGRATIONS.md` | The only approved Production schema workflow |
+| `docs/PAYMENTS.md` | The payment runbook: how it works, live state, owner steps, go-live checks |
+| `CLAUDE.md` §5, §6 | The approval rules and the 2026-11-11 decision |
+| `docs/PAYMENT_POSTPONEMENT.md` | History: the freeze, 2026-07-29 to 2026-11-11 |
+| `docs/MIGRATIONS.md` | The only approved Production schema workflow (§55, §56 for the Moyasar-only files) |
+
+The Tap API reference that this table once listed was deleted on 2026-11-11 and
+is kept in git history.

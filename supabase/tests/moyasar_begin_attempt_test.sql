@@ -14,7 +14,9 @@
 -- than decorative. Case 11 is the loyalty guard 20261003120000 ported: without
 -- it, two live checkout sessions could each be paid with the same points.
 -- Case 12 is Moyasar's 1.00 SAR invoice minimum, also 20261003120000: below it
--- an attempt could only end with no invoice.
+-- an attempt could only end with no invoice. Case 13 is the line cap, also
+-- 20261003120000: a snapshot line above 50 of one item opens no attempt,
+-- because insert_order_from_snapshot would write it after the charge.
 --
 -- No provider is contacted: begin_payment_attempt / begin_session_attempt only
 -- write a payment_records row. Nothing here schedules or invokes the refund
@@ -617,6 +619,91 @@ begin
   end if;
 
   raise notice 'CASE 12 ok: a total under 1.00 SAR opens no attempt, and exactly 1.00 does';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- CASE 13 — the line cap. The cash path caps a line at 50 of one item in
+-- place_customer_order (20261005120000). The session path writes its lines in
+-- insert_order_from_snapshot, AFTER the charge is captured, so the cap must
+-- refuse the session before an attempt exists. 23514, no payment row; a
+-- quantity sent as a JSON string is read the same way; exactly 50 is accepted.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_cust  uuid := 'c0000000-0000-0000-0000-0000000000fb';
+  v_items jsonb;
+  v_id    uuid;
+  v_state text;
+  v_msg   text;
+  r       record;
+begin
+  begin
+    insert into auth.users (id, email) values (v_cust, 'moyasar-linecap-suite@example.com')
+      on conflict (id) do nothing;
+  exception when undefined_table then
+    null;
+  end;
+  insert into public.profiles (id, role) values (v_cust, 'customer')
+    on conflict (id) do nothing;
+
+  foreach v_items in array array[
+      '{"items":[{"product_id":"00000000-0000-0000-0000-000000000001","quantity":51}]}'::jsonb,
+      '{"items":[{"product_id":"00000000-0000-0000-0000-000000000001","quantity":1},
+                 {"product_id":"00000000-0000-0000-0000-000000000002","quantity":"51"}]}'::jsonb,
+      '{"items":[{"product_id":"00000000-0000-0000-0000-000000000001","quantity":1000000}]}'::jsonb
+    ] loop
+    insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+      values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', v_items, 50, 50)
+      returning id into v_id;
+    v_state := null; v_msg := null;
+    begin
+      perform public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+    exception when others then
+      v_state := sqlstate; v_msg := sqlerrm;
+    end;
+    if v_state is distinct from '23514'
+       or v_msg is distinct from 'order_items_quantity_max: at most 50 of one item per order line.' then
+      raise exception 'CASE 13 FAILED: snapshot % opened an attempt (sqlstate %, %)',
+        v_items, coalesce(v_state, 'none'), coalesce(v_msg, 'no error');
+    end if;
+    if exists (select 1 from public.payment_records where checkout_session_id = v_id) then
+      raise exception 'CASE 13 FAILED: a refused snapshot still wrote a payment row';
+    end if;
+  end loop;
+
+  -- Refused BEFORE an open attempt is reused.
+  insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+    values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe',
+            '{"items":[{"product_id":"00000000-0000-0000-0000-000000000001","quantity":51}]}'::jsonb, 50, 50)
+    returning id into v_id;
+  insert into public.payment_records
+    (checkout_session_id, provider, status, amount, currency, mode, reference_transaction, initiated_at, expires_at)
+  values (v_id, 'moyasar', 'initiated', 50, 'SAR', 'live', 'sm_linecap_suite', now(), now() + interval '30 minutes');
+  v_state := null;
+  begin
+    perform public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+  exception when others then
+    v_state := sqlstate;
+  end;
+  if v_state is distinct from '23514' then
+    raise exception 'CASE 13 FAILED: an open attempt for a 51-unit line was reused (sqlstate %)', coalesce(v_state, 'none');
+  end if;
+
+  -- Exactly 50, and a snapshot with no items array, are accepted.
+  foreach v_items in array array[
+      '{"items":[{"product_id":"00000000-0000-0000-0000-000000000001","quantity":50}]}'::jsonb,
+      '{}'::jsonb
+    ] loop
+    insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
+      values (v_cust, 'pickup', 'b0000000-0000-0000-0000-0000000000fe', v_items, 50, 50)
+      returning id into v_id;
+    select * into r from public.begin_session_attempt(v_id, 'moyasar', 'live', 30);
+    if r.attempt_id is null or r.reused then
+      raise exception 'CASE 13 FAILED: snapshot % could not open its attempt', v_items;
+    end if;
+  end loop;
+
+  raise notice 'CASE 13 ok: a snapshot line above 50 opens no attempt and reuses none; 50 does';
 end $$;
 
 rollback;

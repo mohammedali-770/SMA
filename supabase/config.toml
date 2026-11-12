@@ -17,7 +17,7 @@ verify_jwt = true
 # order/session through Moyasar's hosted invoice, the only payment provider
 # (owner decision, 2026-11-11). Customer checkout is refused while the gateway
 # is in TEST mode; sandbox testing is the admin test in payment-test-config. See
-# docs/PAYMENT_POSTPONEMENT.md before touching any payment function or provider
+# docs/PAYMENTS.md before touching any payment function or provider
 # configuration.
 [functions.payment-initiate]
 verify_jwt = true

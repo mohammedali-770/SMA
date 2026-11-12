@@ -7219,8 +7219,8 @@ in the console succeeds for an account that has history.
 awaiting owner approval.** It is the database half of the owner's decision of
 2026-11-11 that Moyasar is the payment provider (CLAUDE.md §6).
 
-sha256 `d6d0f61c24f5b93437c03a562391bca9e7cc5c1c23e8fadf7123dd8ec447256c`,
-2 266 lines / 109 788 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `c0fe06f4a45fda3fb67c0b5515c46d137d9c6c6acba983ea4b84e50bd594453f`,
+2 299 lines / 112 061 bytes. **Re-hash the MERGED copy before applying**, per §15.
 **Amended 2026-11-12, still unapplied**, after the adversarial review of the
 Moyasar-only change. Finding C2: both attempt RPCs now refuse a total under
 Moyasar's 1.00 SAR invoice minimum. Finding C1, its re-verification: two
@@ -7241,7 +7241,7 @@ Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
 
 | Object | Before | After |
 | --- | --- | --- |
-| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard, and opens an attempt for any total above zero | the guard from `20260712170000:253-267`, ported verbatim; a total under 1.00 SAR refused with P0001 before any attempt is reused or opened |
+| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard, and opens an attempt for any total above zero | the guard from `20260712170000:253-267`, ported verbatim; a total under 1.00 SAR refused with P0001, and a snapshot line of more than 50 of one item refused with 23514, both before any attempt is reused or opened |
 | `begin_payment_attempt` | opens an attempt for any total above zero | a total under 1.00 SAR refused with P0001 before any attempt is reused or opened |
 | `invoke_payment_refund_processor` | returns NULL unless the provider is `tap`, so the refund worker can never be invoked | gates on `moyasar`, case-insensitively |
 | `open_order_refund_record` | falls back to provider `tap` | falls back to `moyasar` |
@@ -7305,7 +7305,7 @@ when the file was generated:
 
 | Function | Source | Substitutions |
 | --- | --- | --- |
-| `begin_session_attempt` | `20260824100000:186-268` | 3: three declarations, the guard block, and the minimum after the zero-total check |
+| `begin_session_attempt` | `20260824100000:186-268` | 4: three declarations, the guard block, the minimum after the zero-total check, and the line cap after the minimum |
 | `begin_payment_attempt` | `20260824100000:94-177` | 1: the minimum after the zero-total check |
 | `invoke_payment_refund_processor` | `20260729090000:186-262` | 1: the gate and its comment |
 | `open_order_refund_record` | `20260724120000:519-556` | 1: the literal |
@@ -7430,6 +7430,23 @@ Fixing those is a separate change.
   six are killed by the file's own block, and five by the suite; the sixth,
   moving the session minimum after the guard but still before reuse, changes no
   outcome the suite can see, and the block's position check kills it.
+- **The 2026-11-12 line cap** (`moyasar_begin_attempt_test.sql` Case 13).
+  `begin_session_attempt` refuses a snapshot line of more than 50 of one item
+  with 23514 `order_items_quantity_max: ...`, between the minimum and the
+  guard. It is the payment half of the cash cap in `20261005120000`
+  (`place_customer_order`, open PR #445): Codex review on #445 found that a
+  table CHECK there would bind `insert_order_from_snapshot`, which writes a
+  session's lines after the charge is captured. The cap therefore has to
+  refuse the session before an attempt exists, and it is deliberately **not** a
+  table CHECK either, because `20261005120000` refuses to apply while any upper
+  bound on `order_items.quantity` exists. The case refuses 51, a second line
+  of `"51"` sent as a JSON string, and 1 000 000, with no payment row written.
+  It refuses an open attempt for a 51-unit line rather than reusing it, and it
+  accepts exactly 50 and a snapshot with no items array. **Five mutants**, each
+  killed by both the file's own block (6.6c) and the suite: the cap removed,
+  the bound at 51, a JSON-string quantity skipped, only the first line read,
+  and the cap moved after the reuse lookup. Local chain: 148 migrations; 85
+  suites, 83 passed, 2 quarantined, 0 new failures.
 
 ### What it proves at apply time, and what it cannot
 

@@ -395,13 +395,43 @@ Both directions are checked above.
 | Location | Coarse Location | Yes, optional | **Linked** | same picker, coarse fallback |
 | Identifiers | User ID | Yes | **Linked** | `profiles.id` |
 | Identifiers | Device ID | Yes, **required** | **Linked** | `push_devices.expo_push_token` |
-| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card |
+| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card. **True only while online payment is off — see "Card payment through Moyasar" below** |
 | User Content | Other User Content | Yes, optional | **Linked** | `orders.notes`, `order_items.note` — free-text, printed on the kitchen ticket |
 | Diagnostics | Crash Data | Yes, **required** | **Linked** | Sentry. No user opt-out |
 | Diagnostics | Performance Data | Yes, **required** | **Linked** | Sentry, `tracesSampleRate` sampled |
 
 **Financial Info: NO. Health & Fitness: NO. Browsing History: NO. Search History:
 NO. Sensitive Info: NO. Contacts: NO.**
+
+### Card payment through Moyasar — OWNER DECISION PENDING, before online payment is switched on
+
+**Added 2026-11-12. The answers above are not changed here.** They are true while
+online payment is off, which it was on 2026-11-11 (read-only). On 2026-11-11 the
+owner chose Moyasar as the payment provider (CLAUDE.md §6). The day online payment
+is switched on (`OWNER_ACTIONS.md` §47.18), two answers need re-deciding by the
+owner, and a submission that declares them must go first:
+
+- **Financial Info → Payment Info**, now "NO";
+- **Purchases → Purchase History**, whose note says "no payment instrument".
+
+The facts the decision rests on, read from the code on 2026-11-12:
+
+- the customer types the card details on **Moyasar's hosted page**, which the
+  app shows inside its own payment screen (a WebView). The app's code never reads
+  the card number, expiry or CVV, and sends none of them anywhere;
+- Apple Pay, where it works, is offered by that same Moyasar page;
+- after a payment, our server stores what Moyasar returns about it, linked to the
+  order and so to the account: card scheme, the **last four digits**, issuer name
+  and country, and the authorisation code (`payment_records`;
+  `sanitizeMoyasarPayment` in `supabase/functions/_shared/moyasar.ts`). The card
+  number and any token are never stored;
+- what our server sends Moyasar is the amount, the currency, the fixed text
+  "Spicy Meal order", two opaque references and the return addresses. No name,
+  phone number or email (`RECORD_OF_PROCESSING.md` activity 15).
+
+Whether a card entered on a payment provider's page inside the app, plus a stored
+last four, counts as "Payment Info" collected by this app is the owner's call.
+Read Apple's own definitions on the day, rather than this paragraph.
 
 ### Two answers that are argued rather than guessed
 
@@ -537,6 +567,10 @@ processing.** External testing pulls in the reviewer sign-in problem below.
 > is cash on collection or delivery — no card is taken in the app. Prices include
 > VAT. Loyalty points are earned and redeemed on pickup orders only.
 
+*Both descriptions say no card is taken in the app. That is true while online
+payment is off, and must change before it is switched on (`OWNER_ACTIONS.md`
+§47.15).*
+
 **Beta app description (AR)** *(engineering-drafted, no native read — §29)*
 
 > سبايسي ميل هو تطبيق الطلب لمطعم سعودي. تصفّح القائمة، وكوّن طلبك مع الإضافات
@@ -615,6 +649,13 @@ update both, and Play in particular reuses them for every future review.
 ---
 
 ## 8. What is left, in order
+
+**`expo-web-browser` is gone from the next build (2026-11-11).** The Moyasar-only
+change removed it from `apps/mobile/app.json`'s plugins and from the app's
+dependencies. Only the old external payment browser used it; Moyasar's page now
+opens only in the in-app payment screen. No answer in this record named it, so
+none moves. That was read from the config, not off a built binary: check the
+next build's `Info.plist` and bundled privacy manifests as §3 and §5 did.
 
 **The next build is the first on Expo SDK 58 (2026-11-10).** Builds 23 to 27 were
 SDK 57. SDK 58's EAS image is Xcode 27.1 with the iOS 27 SDK, and Apple requires
@@ -854,7 +895,7 @@ they are switches precisely because they change.
 
 | Feature | Switch | Live value | What a customer sees when it is on |
 | --- | --- | --- | --- |
-| **Card payment at checkout** | `app_settings.online_payment_enabled` | **off** | A card option beside cash. **Dormant.** Turning it on is under the payment freeze (CLAUDE.md §6) |
+| **Card payment at checkout** | `app_settings.online_payment_enabled` | **off** | A card option beside cash, through Moyasar. **Dormant.** *Changed 2026-11-11: this said turning it on was under the payment freeze.* The provider is now Moyasar; turning it on is the last of the ordered owner steps in `OWNER_ACTIONS.md` §47, each its own approval |
 | Cash payment | `cash_payment_enabled`, `default_payment_method` | on, default `cash` | Pay when collecting, or on delivery |
 | Payment outage mode | `payment_outage_mode_enabled` | off | Nothing. The app reads it (`mappers.ts:410`) and no screen uses it |
 | Loyalty points | `loyalty_enabled` | on | Earn and redeem points |
@@ -902,5 +943,7 @@ the menu can be browsed without an account and sign-in is asked for at checkout.
 
 - A dormant feature is turned on for customers only together with a submission
   whose notes declare it.
-- For card payment, that is in addition to the freeze, not instead of it. Nothing
-  in this section changes any payment setting or behaviour.
+- For card payment, that is in addition to the go-live steps in
+  `OWNER_ACTIONS.md` §47, not instead of them. *Changed 2026-11-11: this said "in
+  addition to the freeze".* Nothing in this section changes any payment setting
+  or behaviour.

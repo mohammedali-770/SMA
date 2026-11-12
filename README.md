@@ -4,7 +4,7 @@ Spicy Meal is the production codebase for First Taste Trading Company's customer
 
 This repository is **not the old prototype/emulator anymore**. The customer app is a real Expo / React Native application, the staff console is a separate React web application, and Supabase is the server-side source of truth for authentication, catalog data, orders, operations, and integrations.
 
-> **Current development state:** pre-launch / release-readiness. The production branch contains the current application and backend definition, but native store/device validation is still a release gate. Payment/refund work remains deliberately frozen until the final payment provider is selected.
+> **Current development state:** pre-launch / release-readiness. The production branch contains the current application and backend definition, but native store/device validation is still a release gate. The payment provider is Moyasar (owner decision, 2026-11-11); online payment was off on that date, and the go-live steps are owner actions (`docs/OWNER_ACTIONS.md` §47).
 
 ## Product surfaces
 
@@ -49,7 +49,7 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 - WhatsApp login-delivery and profile phone-verification flows.
 - Account-deletion request/processing workflow.
 - Scheduled operations-health and alerting functions.
-- Payment/Tap source remains in the repository but is **provisional and frozen** while the final gateway decision is pending. Automated refund processing remains disabled. See [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
+- Online card payment is **Moyasar**, the provider the owner chose on 2026-11-11; the Tap and Geidea code is removed. Online payment and automated refunds were both off on 2026-11-11, and each step that turns them on is a separate owner approval ([`CLAUDE.md`](CLAUDE.md) §6, [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §47). *Changed 2026-11-12: this line said the payment code was provisional and frozen.*
 - Push notifications are **live**: order updates reach customers who allowed notifications automatically, and marketing is opt-out, so a broadcast reaches every one of them who has not switched offers off ([`CLAUDE.md`](CLAUDE.md) §7).
 
 ## Tech stack
@@ -191,7 +191,7 @@ Start with [`docs/README.md`](docs/README.md). The most important documents are:
 - [`docs/MIGRATION_RECONCILIATION_20260812.md`](docs/MIGRATION_RECONCILIATION_20260812.md) — latest read-only Production migration snapshot.
 - [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) — historical migration workflow/provenance ledger.
 - [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) — current owner/live-dashboard decisions.
-- [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md) — payment/refund freeze.
+- [`docs/PAYMENTS.md`](docs/PAYMENTS.md) — payments with Moyasar; [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md) — the payment freeze, history to 2026-11-11.
 - [`docs/BRANCH_FEATURE_RETENTION_AUDIT.md`](docs/BRANCH_FEATURE_RETENTION_AUDIT.md) — final feature-retention evidence from the branch cleanup.
 
 ## Important safety rules
@@ -200,7 +200,7 @@ Do not treat this repository like a sandbox:
 
 - Do not push directly to the production branch; use a fresh branch and PR.
 - Do not use `supabase db push` or `supabase migration repair` against production.
-- Do not modify payment/refund/provider behavior while the payment area is frozen.
+- Keep Moyasar the only payment provider. Do not apply a payment migration, deploy a payment function, enter a key, change the Moyasar dashboard, switch the payment row or online payment, or make a live payment or refund without explicit approval for that step.
 - Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag on or off without explicit approval. Marketing push has been opt-out since 2026-08-20, so a broadcast reaches nearly the whole active base.
 - Do not commit secrets, service-role keys or provider credentials.
 

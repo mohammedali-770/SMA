@@ -36,7 +36,7 @@ If the order is visible in the console but the branch/POS does not have a ticket
 4. Follow the branch's approved manual handling process if one exists.
 5. Tell the manager with the customer-safe order reference and time.
 
-Do not assume “the customer has paid.” Check the displayed payment/method state. Cash and online/payment states are different, and payment/refund work is currently owner-controlled/frozen.
+Do not assume “the customer has paid.” Check the displayed payment/method state. Cash and online/payment states are different, and refunds are owner-controlled. Online card payment, through Moyasar, was switched off on 2026-11-11.
 
 **العربية**
 
@@ -62,7 +62,7 @@ Do not guess or promise a refund.
 4. Do not retry payment, resend a payment request, or initiate a refund as a diagnostic action.
 5. Give the customer a clear next update/contact time after escalation.
 
-The final payment provider is not yet selected and payment/refund work is frozen. Financial corrections are owner/provider actions.
+The payment provider is Moyasar (owner decision, 2026-11-11). Online payment was switched off on that date, so a customer who paid online is unexpected until the owner turns it on. Financial corrections, refunds included, are owner actions in the Moyasar dashboard. A second payment for an order that was already paid is recorded as a "Duplicate payment" and must be refunded by the owner; it is never shown as paid.
 
 **العربية**
 
@@ -74,7 +74,7 @@ The final payment provider is not yet selected and payment/refund work is frozen
 4. لا تعِد محاولة الدفع ولا تبدأ استرجاعاً كطريقة للتجربة.
 5. بعد التصعيد أعطِ العميل موعداً واضحاً للتحديث القادم.
 
-مزود الدفع النهائي لم يُعتمد بعد، وأعمال الدفع والاسترجاع مجمدة حالياً وتدار من المالك.
+مزود الدفع هو Moyasar (قرار المالك بتاريخ 2026-11-11). كان الدفع الإلكتروني متوقفاً في ذلك التاريخ. التصحيحات المالية، ومنها الاسترجاع، يجريها المالك من لوحة Moyasar. إذا دُفع طلب مدفوع مرة ثانية، يُسجَّل الدفع الثاني «دفعاً مكرراً» ولا يظهر مدفوعاً، ويسترجعه المالك.
 
 ## 4. Product unavailable — صنف غير متوفر
 

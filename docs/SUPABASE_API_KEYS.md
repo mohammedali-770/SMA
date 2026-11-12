@@ -47,7 +47,7 @@ with that:**
    - a signed-out Edge Function call is not.
 
    Checked 2026-11-09: the app (`order-intake`, `account-delete-request`, the
-   frozen payment functions) and the console (seven admin functions) call Edge
+   payment functions) and the console (seven admin functions) call Edge
    Functions **only while signed in**, so the bearer there is the user's JWT.
    **Any future signed-out feature, such as the planned guest menu, must read
    through REST, not through an Edge Function.** Inside our functions,
@@ -87,14 +87,23 @@ with that:**
 
 **Not changed, on purpose:**
 
-- **The five payment functions and `_shared/paymentSync.ts`** are frozen
-  (CLAUDE.md §6). They import `adminClient()`, but a deployed function runs the
-  bundle it was deployed with, and deploys are manual (`deploy-functions.yml` is
-  `workflow_dispatch` only), so nothing here reaches them. **Owner decision
-  2026-11-09: they go dark when the legacy keys are deactivated**, which is
-  acceptable only because online payment is off — verify
+- **The payment functions and `_shared/paymentSync.ts`** were frozen
+  (CLAUDE.md §6) when this was written. They import `adminClient()`, but a
+  deployed function runs the bundle it was deployed with, and deploys are manual
+  (`deploy-functions.yml` is `workflow_dispatch` only), so nothing here reaches
+  them. **Owner decision 2026-11-09: they go dark when the legacy keys are
+  deactivated**, which is acceptable only because online payment is off — verify
   `app_settings.online_payment_enabled = false` immediately before step 8.
-  They are fixed whenever the payment freeze lifts.
+
+  **Changed 2026-11-12.** The freeze was lifted for repository work on
+  2026-11-11, when the owner chose Moyasar. The live bundles are still the July
+  Tap-era ones, so the paragraph above still describes Production. Five of the
+  seven Moyasar-only functions (`payment-initiate`, `-verify`, `-webhook`,
+  `-refund`, `-test-config`) build their clients with `adminClient()` /
+  `userClient()`, so the seven-function deploy (`OWNER_ACTIONS.md` §47.4) moves
+  them to the helper. **`_shared/paymentSync.ts:25` still reads
+  `SUPABASE_ANON_KEY` directly**, and that was not changed by the Moyasar work.
+  If online payment is on before step 8, check that file first.
 - **The JWT signing-key migration** is a separate, independent change. The
   user access tokens Supabase Auth issues are still signed by the project's JWT
   secret; rotating that secret would invalidate every session at once. Out of

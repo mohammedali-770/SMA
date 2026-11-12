@@ -189,6 +189,15 @@ present** — checked by name, not by absence of worry: no SMS or Call Log, no
 advertising SDK** — the only Google Play Services components in the manifest are
 `cloudmessaging` and `common.api`. So the advertising-ID declaration is "no".
 
+### The next bundle drops `expo-web-browser` — added 2026-11-12
+
+The Moyasar-only change removed `expo-web-browser` from `apps/mobile/app.json`'s
+plugins and from the app's dependencies on 2026-11-11. Only the old external
+payment browser used it; Moyasar's page now opens only in the in-app payment
+screen. It adds no permission named in this record. Whether the next bundle's
+manifest differs (for example in its `<queries>`) was not measured: read it as
+§3 read this one.
+
 ### The next bundle is minified with R8 — added 2026-11-10
 
 The bundle above was built on Expo SDK 57 with no code shrinking. From the SDK 58
@@ -467,7 +476,7 @@ if anything changes.
 | Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
 | Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
 | Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it. Since 2026-11-10 the app says so on screen before the Android 13+ prompt, and once as a notice on Android 12 and older, where the OS never asks (note under this table) |
-| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument |
+| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **True only while online payment is off — owner decision pending, see §6b** |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
 
 **Permissions are requested in context — changed 2026-11-10, no form answer
@@ -535,6 +544,36 @@ over-disclosure is an inaccuracy, an under-disclosure is an enforcement matter.
 Two boxes are unambiguous: **encrypted in transit** — yes, everything is HTTPS
 to Supabase; **users can request data deletion** — yes, and the URL is below.
 
+
+### 6b. Card payment through Moyasar — OWNER DECISION PENDING, before online payment is switched on
+
+**Added 2026-11-12. No answer in §6 is changed here.** They are true while online
+payment is off, which it was on 2026-11-11 (read-only). On 2026-11-11 the owner
+chose Moyasar as the payment provider (CLAUDE.md §6). Before online payment is
+switched on (`OWNER_ACTIONS.md` §47.18), the owner re-decides:
+
+- **Financial info → Payment info**, now "NO";
+- **Financial info → Purchase history**, where the table records `orders`;
+- **App content → Financial features**, which §9 already says changes again the
+  day online payment is enabled.
+
+The facts, read from the code on 2026-11-12:
+
+- the customer types the card details on **Moyasar's hosted page**, shown inside
+  the app's own payment screen (a WebView). The app's code never reads the card
+  number, expiry or CVV;
+- after a payment our server stores, linked to the order: card scheme, the
+  **last four digits**, issuer name and country, and the authorisation code
+  (`payment_records`; `sanitizeMoyasarPayment` in
+  `supabase/functions/_shared/moyasar.ts`). The card number and any token are
+  never stored;
+- our server sends Moyasar the amount, the currency, the fixed text "Spicy Meal
+  order", two opaque references and the return addresses. No name, phone number
+  or email (`RECORD_OF_PROCESSING.md` activity 15). Moyasar is a new recipient
+  for the "Shared" column.
+
+Whether that is "Payment info" collected by this app, and whether it is shared,
+is the owner's call against Google's definitions on the day.
 
 ### 6a. The answers the table does not carry — given 2026-09-16
 
@@ -731,6 +770,8 @@ in Play's sense whether or not money moves through the app.
 **This declaration is coupled to loyalty.** If loyalty is ever removed, this
 answer changes. If online payment is ever enabled, a *second* financial feature
 applies and this answer changes again — see the coupling table in §11.
+**2026-11-11: the provider is chosen (Moyasar)**, so this is now a step before
+online payment is switched on (§6b, `OWNER_ACTIONS.md` §47.15).
 
 ### Health features — the tick that should not have been there
 

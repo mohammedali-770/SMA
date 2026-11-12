@@ -29,12 +29,20 @@ against the Data Safety form and the privacy policy it links.
 | ID | Appears in | The claim | What must be true | Decided by |
 | --- | --- | --- | --- | --- |
 | **C-PICKUP** | short ar/en · full ar/en · release notes | points are earned on **pickup** orders | `app_settings.loyalty_pickup_only` is true | `place_order` / `compute_order_snapshot`; [`../LOYALTY.md`](../LOYALTY.md) §2 |
-| **C-CASH** | full ar/en · release notes | payment is **cash**, on pickup or delivery | no payment provider is selected; the freeze holds | CLAUDE.md §6 · PR #377 · [`../PAYMENT_POSTPONEMENT.md`](../PAYMENT_POSTPONEMENT.md) |
+| **C-CASH** | full ar/en · release notes | payment is **cash**, on pickup or delivery | `app_settings.online_payment_enabled` is false. *Changed 2026-11-11: this column said "no payment provider is selected; the freeze holds". The owner chose Moyasar that day, so only the switch keeps this claim true* | CLAUDE.md §6 · PR #377 · [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) §47 |
 | **C-VAT** | full ar/en | displayed prices **include VAT** | prices are VAT-inclusive as rendered | `previewTotals.ts` · `TotalsCard.tsx` |
 | **C-DELIVERY** | short ar/en · full ar/en | delivery is offered | delivery orders reach the POS | [`../LAZYWAIT.md`](../LAZYWAIT.md); live since 2026-08-27 |
 | **C-EXPORT** | full ar/en | you can request a copy of your data | the export screen ships in the installed build | `export_my_data()` is applied; the **screen** needs the next EAS build |
 | **C-NOPROMO** | *(absent by design)* | **no promo-code claim is made** | campaigns have no customer-facing UI | [`../DISCOUNTS_CAMPAIGNS.md`](../DISCOUNTS_CAMPAIGNS.md) · `GO_LIVE_READINESS.md` G6 |
 | **C-NOBRANCH** | *(absent by design)* | **no branch count is stated** | the marketing site says 16; Production has **1 active** of 40 | live `branches` |
+
+**C-CASH becomes false the day online payment is switched on.** On 2026-11-11 the
+owner chose Moyasar as the payment provider, and on the branch
+`feat/moyasar-only-20261111` the app can take a card through Moyasar's page. The
+switch was off on 2026-11-11 (read-only), so the copy below is still true and is
+**not changed here**. Before online payment is switched on
+(`OWNER_ACTIONS.md` §47.15 and §47.18), rewrite the "Payment" lines in both
+languages and in the release notes, and publish the new listing.
 
 **C-EXPORT is the one to watch before publishing.** `export_my_data()` is applied
 in Production, but the *Get a copy of my data* screen reaches customers only in

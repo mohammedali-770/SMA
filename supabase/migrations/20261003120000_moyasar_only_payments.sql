@@ -63,6 +63,16 @@
 --      marked paid and both reported paid. The caller records the loser as a
 --      duplicate to refund. Section 7.
 --
+--   8. begin_session_attempt refuses a snapshot with a line of more than 50 of
+--      one item, with 23514 'order_items_quantity_max: ...', before any
+--      attempt is opened or reused. insert_order_from_snapshot writes those
+--      lines AFTER the charge is captured, so this is the only point where
+--      the cap can stop a payment rather than strand one. It is the payment
+--      half of the cash cap in 20261005120000 (place_customer_order), which
+--      leaves this path alone, and the same number. It is deliberately NOT a
+--      table CHECK on order_items: 20261005120000 refuses to apply while any
+--      upper bound on order_items.quantity exists.
+--
 -- It also rewrites three object COMMENTS that named Tap as current:
 -- begin_payment_attempt, begin_session_attempt, and the
 -- payment_records.provider_checkout_ref column. The first two also name the
@@ -97,7 +107,7 @@
 -- migration that last defined it, changed only by anchored substitutions, each
 -- asserted to match EXACTLY ONCE when this file was generated:
 --
---   begin_session_attempt                20260824100000:186-268   3 (declare; guard; minimum)
+--   begin_session_attempt                20260824100000:186-268   4 (declare; guard; minimum; line cap)
 --   begin_payment_attempt                20260824100000:94-177    1 (minimum)
 --   invoke_payment_refund_processor      20260729090000:186-262   1 (the gate)
 --   open_order_refund_record             20260724120000:519-556   1 (the literal)
@@ -209,6 +219,9 @@ $guard$;
 --
 -- The minimum is the statement straight after the zero-total check: a total
 -- under 1.00 SAR, Moyasar's smallest invoice, opens no attempt (see 1b).
+--
+-- The line cap follows the minimum (item 8 above): a line above 50 of one
+-- item, read exactly as insert_order_from_snapshot reads it, opens no attempt.
 create or replace function public.begin_session_attempt(
   p_session_id     uuid,
   p_provider       text,
@@ -256,6 +269,7 @@ begin
   end if;
   if coalesce(v_session.total, 0) <= 0 then raise exception 'Order total must be greater than zero' using errcode = 'P0001'; end if;
   if v_session.total < 1.00 then raise exception 'Order total is below the online payment minimum of 1.00 SAR' using errcode = 'P0001'; end if;
+  if exists (select 1 from jsonb_array_elements(case when jsonb_typeof(v_session.snapshot->'items') = 'array' then v_session.snapshot->'items' else '[]'::jsonb end) as e(value) where coalesce((e.value ->> 'quantity')::int, 0) > 50) then raise exception 'order_items_quantity_max: at most 50 of one item per order line.' using errcode = '23514'; end if;
 
   -- Loyalty multi-spend guard: the live balance must still cover the points this
   -- session redeems PLUS points reserved by the customer's other live sessions.
@@ -317,7 +331,7 @@ revoke all on function public.begin_session_attempt(uuid, text, text, integer) f
 grant execute on function public.begin_session_attempt(uuid, text, text, integer) to service_role;
 
 comment on function public.begin_session_attempt(uuid, text, text, integer) is
-  'Opens (or reuses) THE single active payment attempt for a checkout session, for any provider. Refuses with P0001 when the customer''s live loyalty balance no longer covers the points this session redeems plus those reserved by their other live sessions: the concurrent-session multi-spend guard, under a lock on the profile row (since 20261003120000). Refuses with P0001 a total under Moyasar''s 1.00 SAR invoice minimum (since 20261003120000).';
+  'Opens (or reuses) THE single active payment attempt for a checkout session, for any provider. Refuses with P0001 when the customer''s live loyalty balance no longer covers the points this session redeems plus those reserved by their other live sessions: the concurrent-session multi-spend guard, under a lock on the profile row (since 20261003120000). Refuses with P0001 a total under Moyasar''s 1.00 SAR invoice minimum, and with 23514 a snapshot line of more than 50 of one item (both since 20261003120000).';
 
 -- ---------------------------------------------------------------------------
 -- 1b. begin_payment_attempt: Moyasar's invoice minimum
@@ -1815,6 +1829,7 @@ declare
   p_guard  integer;
   p_reuse  integer;
   p_min    integer;
+  p_cap    integer;
 begin
   -- 6.1 ONE DEFINITION EACH.
   foreach v_fn in array array['begin_session_attempt', 'begin_payment_attempt',
@@ -1938,6 +1953,24 @@ begin
   end if;
   if not (p_total < p_min and p_min < p_guard) then
     raise exception 'the minimum is out of place in begin_session_attempt (%, %, %)', p_total, p_min, p_guard;
+  end if;
+
+  -- 6.6c THE LINE CAP, in begin_session_attempt only, between the minimum and
+  --      the guard, so it runs before an attempt is reused or opened. 50 is
+  --      the cash cap in 20261005120000 and MAX_LINE_QUANTITY in the app.
+  p_cap := position(
+       'if exists (select 1 from jsonb_array_elements(case when '
+       || 'jsonb_typeof(v_session.snapshot->''items'') = ''array'' then '
+       || 'v_session.snapshot->''items'' else ''[]''::jsonb end) as e(value) where '
+       || 'coalesce((e.value ->> ''quantity'')::int, 0) > 50) then raise exception '
+       || '''order_items_quantity_max: at most 50 of one item per order line.'' '
+       || 'using errcode = ''23514''; end if;'
+       in v_src);
+  if p_cap = 0 then
+    raise exception 'begin_session_attempt does not refuse a snapshot line above 50';
+  end if;
+  if not (p_min < p_cap and p_cap < p_guard) then
+    raise exception 'the line cap is out of place in begin_session_attempt (%, %, %)', p_min, p_cap, p_guard;
   end if;
 
   select regexp_replace(regexp_replace(p.prosrc, '--[^\n]*', '', 'g'), '\s+', ' ', 'g') into v_src

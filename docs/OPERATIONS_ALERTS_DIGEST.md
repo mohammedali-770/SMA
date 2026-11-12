@@ -348,7 +348,11 @@ classification lives in `condition_code`/severity. Charset is enforced:
 alert**, and that is deliberate rather than an inconsistency: the card's
 `critical` flag decides whether it may move the *platform* rollup, while alert
 severity says how loudly to shout. `payment` has worked the same way since
-20260807. `branch_availability:health` is also **not** gated behind
+20260807. *(2026-11-12: the `payment` card and its alerts are labelled
+**Payment / Moyasar** / **الدفع / Moyasar** in the console from the merge of
+`feat/moyasar-only-20261111`, and in database-rendered alert text and the card's
+configured test only once `20261003120000` is applied. Rows already rendered keep
+"Payment / Tap". `OPERATIONS_HEALTH_CENTER.md` has the detail.)* `branch_availability:health` is also **not** gated behind
 `optional_system_alerts_enabled` — that flag exists for the *configuration*
 states of optional integrations, not for a real failure of an always-on
 internal mechanism.
@@ -644,7 +648,8 @@ migration-history tables.
    **Corrected 2026-09-13: this said "exactly 5 jobs (3 pre-existing + the 2
    above)".** The database now holds **10** jobs, **9** active; the single
    inactive one is `payment-refund-worker`, deliberately off under the §6
-   payment freeze. Count this subsystem's three rather than the total, which
+   payment freeze. *(2026-11-12: the freeze is lifted for repository work; the
+   job stays off until the owner re-enables it, `OWNER_ACTIONS.md` §47.16.)* Count this subsystem's three rather than the total, which
    grows with unrelated features.
 2. Latest evaluator runs are `success` (or safe skips), cadence ≈ 5 min.
 3. Yesterday's digest exists in both languages after 08:00 Riyadh.
