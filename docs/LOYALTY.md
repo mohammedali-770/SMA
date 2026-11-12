@@ -738,14 +738,16 @@ their value, the average per customer) and a ledger of customers with the
 point-adjustment controls. Both are visible to admins and accountants at AAL2;
 only admins adjust.
 
-**The tiles come from `admin_loyalty_stats()`** (`20261008120000`,
-`docs/MIGRATIONS.md` §59): the count of profiles with role `customer` and the sum
+**The tiles come from `admin_loyalty_stats()`** (`20261008120000`, added by
+#457 and described in `docs/MIGRATIONS.md` there): the count of profiles with role `customer` and the sum
 of their points. Value and average are computed from those two and the
 configured value of a point, as before. They used to be summed in the browser
 over every profile, which each staff sign-in downloaded; past PostgREST's
 1 000-row cap that sum was silently wrong (196 136 points shown against
-1 000 079 at 5 000 customers). **Until the migration is applied the tiles show
-"—" and a notice naming it, never a number.**
+1 000 079 at 5 000 customers). **The migration ships first:** #457 is merged
+and applied before this console change merges, because a merge deploys the
+console (CLAUDE.md §13). If the function is ever missing anyway, the tiles show
+"—" and a notice naming it, never a number.
 
 **The ledger is read 50 customers at a time**, ordered by name and then id, with
 "Show more" and an empty state, and only when the Loyalty section is opened

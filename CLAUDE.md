@@ -292,17 +292,6 @@ Moyasar-only files. **Name the target by version.** A bulk
 apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
 
-**AMENDED 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
-written, validated and awaiting approval, so on merge it joins the unapplied
-set, making it EIGHT:** the seven named below and this file. It adds one
-read-only function, `admin_loyalty_stats()`, gated on `is_staff()` exactly as
-`profiles_select_own_or_staff` is, for the console's Loyalty tiles. It redefines
-nothing and the money path is self-asserted. The console half deploys on merge
-(§13) and shows "—" in the tiles until the file is applied, so apply it before
-or right after the merge. `20260824100000` still sorts first, so a bulk apply
-would take the Moyasar files first. **Name the target by version.** Detail:
-`docs/MIGRATIONS.md` §59, owner step `docs/OWNER_ACTIONS.md` §50.
-
 **AMENDED 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
 is written, validated and awaiting approval, so on merge the outstanding set is
 SEVEN:** `20260824100000`, `20260929120000`, `20261002120000`,
