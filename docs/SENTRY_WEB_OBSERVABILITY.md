@@ -1,6 +1,8 @@
 # Spicy Meal — Web / Admin Sentry Observability
 
-> **Updated 2026-08-12.** Companion to `SENTRY_OBSERVABILITY.md` for the two browser surfaces built and deployed together.
+> **Updated 2026-11-11.** Companion to `SENTRY_OBSERVABILITY.md` for the two browser surfaces built and deployed together.
+>
+> **Measured 2026-11-11: neither web surface sends readable stack traces from production.** The admin-web source-map upload did not run for the production build, and `/app` has no source-map path at all. Detail under "Source maps" below.
 
 ## Surfaces
 
@@ -8,7 +10,7 @@
 | --- | --- | --- |
 | `admin-web` | staff/admin Vite application at `/` | `@sentry/react` browser SDK |
 | `expo-web` | customer Expo web export at `/app` | browser observability implementation |
-| native (separate) | iOS/Android Expo app | `@sentry/react-native` 7.11.x |
+| native (separate) | iOS/Android Expo app | `@sentry/react-native` 8.28.x (`~8.28.0` in `apps/mobile/package.json` since the Expo SDK 58 upgrade) |
 
 The two web surfaces share the same release commit but remain distinguishable by surface/environment tags.
 
@@ -20,6 +22,8 @@ The web/admin surfaces use the same Sentry organization/project strategy as mobi
 - `SENTRY_AUTH_TOKEN` is a **server/build secret** used for source-map upload tooling and must never be exposed through `VITE_*` or `EXPO_PUBLIC_*`.
 
 The Aug 11 native release work recorded the EAS production token setup. Vercel remains a separate environment: verify its current `SENTRY_AUTH_TOKEN` before relying on **admin-web** production symbolication rather than treating a historical setup statement as permanent truth.
+
+**Read on 2026-11-11, it was not there.** The production console build carried none of the marks the upload leaves (next section), so the token was absent from the environment that built it.
 
 ## Initialization and release identity
 
@@ -35,9 +39,17 @@ The source modules/tests are the authority for exact sampling values; do not dup
 
 Do **not** treat the two browser surfaces as having one source-map upload path.
 
-### Admin web (`/`) — implemented
+### Admin web (`/`) — implemented in source, not running in production
 
 `vite.config.ts` enables hidden Vite source maps only when `SENTRY_AUTH_TOKEN` exists, runs the official Sentry Vite plugin, uploads the maps, and removes them from the deployed output.
+
+**Measured 2026-11-11 by plain GETs of the production site: the upload is not running.**
+
+- The production console entry, `assets/main-CqsZiU3h.js`, and its `supabaseKey` chunk were built from commit `622a133`, which the entry inlines. Neither contains a Sentry debug ID: zero `sentry-dbid`, zero `_sentryDebugIdIdentifier`, no `sourceMappingURL`.
+- The installed plugin (`@sentry/vite-plugin` 5.4.0) injects a debug ID into every JS chunk whenever it runs with source maps on. The injection is in the `renderChunk` hook of `@sentry/bundler-plugins`.
+- So the plugin did not run for that build, which means `SENTRY_AUTH_TOKEN` was not in the environment that built it. On this project that is Vercel's own production build, because the gated GitHub deploy job is skipped (CLAUDE.md §13).
+
+Until it is fixed, admin-web events reach Sentry with minified frames. The fix is a setting, not code: the owner adds `SENTRY_AUTH_TOKEN` to the Vercel project's Production environment as a sensitive build variable (`OWNER_ACTIONS.md` §11). The evidence that it worked is `sentry-dbid` in the next production `main-*.js`, then an approved test event with a readable stack.
 
 For admin-web production symbolication:
 
@@ -55,6 +67,8 @@ expo export --platform web --clear --output-dir ../../dist/app
 ```
 
 It injects public release/environment metadata, but it **does not generate/upload a separate Expo-web source-map set to Sentry** and deliberately does not read/forward `SENTRY_AUTH_TOKEN`.
+
+**Measured 2026-11-11:** the production `/app` entry, `entry-cd9713086d63a9e558548cd8274fe48b.js` (commit `622a133`, about 4.4 MB), carries one Sentry debug ID but no `sourceMappingURL`, and a GET for its `.map` returns 403. No map is ever produced, so there is nothing to upload even once a token exists, and every `/app` event reaches Sentry with minified frames. Adding the token to Vercel does not change this; the export itself has to produce and upload maps.
 
 Therefore:
 
