@@ -4,46 +4,39 @@
  */
 
 import React, { useState } from 'react';
-import { LogIn, UserPlus, Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandMark } from '../design-system/ui/BrandMark';
 import { useOpsLang } from './ops/useOpsLang';
 
 /**
- * Email + password authentication gate (Supabase Auth / GoTrue). This replaces
- * the old client-side role switcher and the simulated phone OTP: a real session
- * is required before any data loads, and the signed-in user's profiles.role
- * decides which app (customer vs admin) is shown. SMS/OTP is intentionally not
- * used here (out of scope for this build).
+ * Email + password SIGN-IN for the staff console (Supabase Auth / GoTrue). A
+ * real session is required before any data loads, and the signed-in user's
+ * profiles.role decides which app is shown.
+ *
+ * There is deliberately no sign-up. Staff accounts are created by an
+ * administrator through the staff-accounts Edge Function (Settings → Staff
+ * accounts), and customers sign in to the app with WhatsApp. A "Create Account"
+ * tab used to sit here: anyone could make an email/password account on the
+ * console domain, which shares its browser session with /app, and place cash
+ * orders with no phone number behind them (S02#1, 2026-11-11). The server now
+ * refuses an order from an account without a verified phone
+ * (20261005120000), and this screen no longer offers the account.
  */
 export const AuthScreen: React.FC = () => {
   const { t, dir, toggle } = useOpsLang('en');
-  const { signIn, signUp } = useApp();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const { signIn } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setNotice(null);
     setBusy(true);
     try {
-      if (mode === 'signin') {
-        await signIn(email.trim(), password);
-      } else {
-        if (!fullName.trim()) { setError('Please enter your full name'); setBusy(false); return; }
-        await signUp(email.trim(), password, fullName.trim(), phone.trim() || undefined);
-        // If email confirmation is required the session won't exist yet; tell the
-        // user. With auto-confirm the auth listener signs them straight in.
-        setNotice('Account created. If sign-in does not continue automatically, please sign in.');
-        setMode('signin');
-      }
+      await signIn(email.trim(), password);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed');
     } finally {
@@ -70,58 +63,10 @@ export const AuthScreen: React.FC = () => {
         <div className="flex flex-col items-center text-center mb-6">
           <BrandMark className="w-14 h-14 rounded-2xl object-contain bg-con-surface border border-con-line mb-3" />
           <h1 className="text-lg font-black text-ember tracking-tight">SPICY MEAL</h1>
-          <p className="text-[11px] text-con-text-2 font-bold mt-1">
-            {mode === 'signin' ? t('authSignInTitle') : t('authSignUpTitle')}
-          </p>
-        </div>
-
-        {/* Mode switch */}
-        <div className="flex gap-1.5 p-1 bg-con-surface-2 rounded-xl border border-con-line mb-5">
-          <button
-            type="button"
-            onClick={() => { setMode('signin'); setError(null); setNotice(null); }}
-            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signin' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
-          >
-            <LogIn className="w-3.5 h-3.5" /> {t('authSignIn')}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode('signup'); setError(null); setNotice(null); }}
-            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signup' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
-          >
-            <UserPlus className="w-3.5 h-3.5" /> {t('authSignUp')}
-          </button>
+          <p className="text-[11px] text-con-text-2 font-bold mt-1">{t('authSignInTitle')}</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
-          {mode === 'signup' && (
-            <>
-              <div>
-                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authFullName')}</label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Mohammed Ali"
-                  className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
-                  aria-label="Full name"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authPhone')}</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+966 5X XXX XXXX"
-                  className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
-                  aria-label="Phone number"
-                />
-              </div>
-            </>
-          )}
-
           <div>
             <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authEmail')}</label>
             <input
@@ -152,9 +97,6 @@ export const AuthScreen: React.FC = () => {
           {error && (
             <p className="text-[11px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2">{error}</p>
           )}
-          {notice && (
-            <p className="text-[11px] text-mint font-bold bg-mint-tint border border-mint-line rounded-lg p-2">{notice}</p>
-          )}
 
           <button
             type="submit"
@@ -162,7 +104,7 @@ export const AuthScreen: React.FC = () => {
             className="w-full bg-ember text-white text-xs font-black py-2.5 rounded-full shadow-sm hover:bg-ember/95 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            {mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {t('authSignIn')}
           </button>
         </form>
 

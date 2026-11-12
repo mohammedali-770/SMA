@@ -151,11 +151,7 @@ export const OPS_STRINGS = {
 
     // sign-in
     authSignInTitle: 'تسجيل الدخول إلى حسابك',
-    authSignUpTitle: 'إنشاء حساب جديد',
     authSignIn: 'تسجيل الدخول',
-    authSignUp: 'إنشاء حساب',
-    authFullName: 'الاسم الكامل',
-    authPhone: 'رقم الجوال (اختياري)',
     authEmail: 'البريد الإلكتروني',
     authPassword: 'كلمة المرور',
     authWorking: 'جارٍ المتابعة…',
@@ -370,11 +366,7 @@ export const OPS_STRINGS = {
     optionOnlyBody: 'Every item is still orderable at these branches.',
 
     authSignInTitle: 'Sign in to your account',
-    authSignUpTitle: 'Create your account',
     authSignIn: 'Sign In',
-    authSignUp: 'Sign Up',
-    authFullName: 'Full Name',
-    authPhone: 'Phone (optional)',
     authEmail: 'Email',
     authPassword: 'Password',
     authWorking: 'Working…',

@@ -3,6 +3,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
+import { MAX_LINE_QUANTITY } from '../features/cart/quantityLimit';
 import { radius, type as typeScale } from '../design-system/generated/tokens';
 import { makeStyles } from '../theme/makeStyles';
 
@@ -11,19 +12,22 @@ interface Props {
   onIncrement: () => void;
   onDecrement: () => void;
   min?: number;
+  /** The + button stops here. Defaults to the order-line cap the database enforces. */
+  max?: number;
   small?: boolean;
   busy?: boolean;
   itemLabel?: string;
 }
 
 export function QtyStepper({
-  value, onIncrement, onDecrement, min = 1, small, busy = false, itemLabel,
+  value, onIncrement, onDecrement, min = 1, max = MAX_LINE_QUANTITY, small, busy = false, itemLabel,
 }: Props) {
   const { t } = useI18n();
   const styles = useStyles();
   const size = small ? 30 : 38;
   const slop = Math.ceil((44 - size) / 2);
   const decDisabled = busy || value <= min;
+  const incDisabled = busy || value >= max;
   const withItem = (base: string) => (itemLabel ? `${base}, ${itemLabel}` : base);
 
   return (
@@ -31,7 +35,7 @@ export function QtyStepper({
       style={[styles.wrap, { height: size }, busy && styles.busy]}
       accessibilityRole={itemLabel ? 'adjustable' : undefined}
       accessibilityLabel={itemLabel ? `${t('quantity')}, ${itemLabel}` : undefined}
-      accessibilityValue={itemLabel ? { now: value, min } : undefined}
+      accessibilityValue={itemLabel ? { now: value, min, max } : undefined}
     >
       <Pressable
         accessibilityRole="button"
@@ -54,13 +58,13 @@ export function QtyStepper({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={withItem(t('increaseQty'))}
-        accessibilityState={{ disabled: busy }}
+        accessibilityState={{ disabled: incDisabled }}
         onPress={onIncrement}
-        disabled={busy}
+        disabled={incDisabled}
         hitSlop={slop}
         style={({ pressed }) => [styles.btn, { width: size, height: size }, pressed && styles.pressed]}
       >
-        <Text style={[styles.sign, busy && styles.signDisabled]}>+</Text>
+        <Text style={[styles.sign, incDisabled && styles.signDisabled]}>+</Text>
       </Pressable>
     </View>
   );

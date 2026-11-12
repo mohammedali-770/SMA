@@ -5,6 +5,7 @@ import { CART_STORAGE_KEY as CART_KEY } from '../lib/storageKeys';
 import { noteCartAdd } from '../features/cart/suggestionStore';
 import { computeUnitPrice, makeCartItemId, cartSubtotal } from '../utils/format';
 import { uuidv4 } from '../utils/uuid';
+import { clampQuantity, incrementQuantity, mergeQuantities } from '../features/cart/quantityLimit';
 import type { CartItem, Modifier, Product, ProductVariant } from '../types/models';
 
 export interface CartValue {
@@ -105,8 +106,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const unitPrice = computeUnitPrice(product, selected, tier);
     setItems((prev) => {
       const existing = prev.find((it) => it.cartItemId === cartItemId);
-      return existing ? prev.map((it) => it.cartItemId === cartItemId ? { ...it, quantity: it.quantity + quantity } : it)
-        : [...prev, { cartItemId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote }];
+      // Capped at MAX_LINE_QUANTITY: the database refuses a longer line.
+      return existing ? prev.map((it) => it.cartItemId === cartItemId ? { ...it, quantity: mergeQuantities(it.quantity, quantity) } : it)
+        : [...prev, { cartItemId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity: clampQuantity(quantity), unitPrice, note: trimmedNote }];
     });
   }, []);
 
@@ -119,13 +121,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => {
       if (!prev.some((it) => it.cartItemId === oldId)) return prev;
       if (newId !== oldId && prev.some((it) => it.cartItemId === newId)) {
-        return prev.filter((it) => it.cartItemId !== oldId).map((it) => it.cartItemId === newId ? { ...it, quantity: it.quantity + quantity } : it);
+        return prev.filter((it) => it.cartItemId !== oldId).map((it) => it.cartItemId === newId ? { ...it, quantity: mergeQuantities(it.quantity, quantity) } : it);
       }
-      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote } : it);
+      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity: clampQuantity(quantity), unitPrice, note: trimmedNote } : it);
     });
   }, []);
 
-  const incrementLine = useCallback((id: string) => setItems((p) => p.map((it) => it.cartItemId === id ? { ...it, quantity: it.quantity + 1 } : it)), []);
+  const incrementLine = useCallback((id: string) => setItems((p) => p.map((it) => it.cartItemId === id ? { ...it, quantity: incrementQuantity(it.quantity) } : it)), []);
   const decrementLine = useCallback((id: string) => setItems((p) => p.flatMap((it) => it.cartItemId !== id ? [it] : it.quantity - 1 <= 0 ? [] : [{ ...it, quantity: it.quantity - 1 }])), []);
   const removeLine = useCallback((id: string) => setItems((p) => p.filter((it) => it.cartItemId !== id)), []);
   const clear = useCallback(() => setItems([]), []);

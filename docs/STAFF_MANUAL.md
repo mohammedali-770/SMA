@@ -404,6 +404,34 @@ Do not assume those internal alerts page a human. Independent external monitorin
 - لا ترسل رموز التحقق أو كلمات المرور أو أسرار مزودي الخدمة في المحادثات.
 - عند فقدان الوصول، صعّد للمسار المعتمد ولا تتجاوز الصلاحيات أو التحقق الإضافي.
 
+### No "Create Account" on the console — لا يوجد «إنشاء حساب» في لوحة التحكم
+
+**English**
+
+The console sign-in screen offers **sign-in only**. Until 2026-11-12 it also had
+a **Create Account** tab, and anyone could make an email/password account there.
+Nobody needed it: staff accounts are created by an administrator in
+**Settings → Staff accounts**, and customers sign in to the app with their
+WhatsApp number. Such an account also shares the browser session with the
+customer web app, so it could place cash orders with no phone number behind them.
+
+- **A new staff member needs an account:** ask an administrator to create it.
+  Do not make one yourself.
+- **A customer says the website asked them to sign in with WhatsApp before
+  ordering:** that is expected. An order now needs a verified phone number.
+
+**العربية**
+
+شاشة الدخول إلى لوحة التحكم **للدخول فقط**. حتى 2026-11-12 كان فيها أيضاً تبويب
+**إنشاء حساب** يسمح لأي شخص بإنشاء حساب ببريد وكلمة مرور. لم يكن أحد يحتاجه: حسابات
+الموظفين ينشئها المسؤول من **الإعدادات ← حسابات الموظفين**، والعملاء يدخلون التطبيق
+برقم واتساب. وكان هذا الحساب يشارك جلسة المتصفح مع تطبيق العملاء على الويب، فيستطيع
+تقديم طلبات دفع نقدي دون رقم جوال.
+
+- **موظف جديد يحتاج حساباً:** اطلب من المسؤول إنشاءه، ولا تنشئه بنفسك.
+- **عميل يقول إن الموقع طلب منه الدخول برقم واتساب قبل الطلب:** هذا متوقع، فالطلب
+  يحتاج الآن رقم جوال موثّقاً.
+
 ### Signed in with the wrong account — الدخول بحساب غير صحيح
 
 **English**
