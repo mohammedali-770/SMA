@@ -47,6 +47,19 @@ import { isServiceCall } from '../_shared/apiKeys.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const CHUNK = 100;
+// How long one Expo request may take, headers and body together. Past it the
+// request is abandoned and its whole chunk counts as failed (the catch in
+// sendToDevices). 10 s is what admin-push-dispatch gives the browser push
+// services. Until 2026-11-11 there was no limit: against a socket that accepts
+// and never answers, a pos_sync dispatch was still pending at 20 s, holding a
+// 'processing' claim that is never reclaimed. Now a send slower than 10 s is
+// recorded as failed instead of waited on: pos_sync finalizes terminal 'failed'
+// (never resent), order_status records 'failed' (reclaimable within
+// MAX_SEND_ATTEMPTS), and test/broadcast count the chunk as failed. Expo may
+// still have accepted a request that timed out, so 'failed' here means "not
+// confirmed", not "not delivered". Exported so a test that loads this module can
+// read the value instead of repeating it.
+export const EXPO_SEND_TIMEOUT_MS = 10_000;
 // Bounded retry: a TOTAL send failure may be reclaimed until this many
 // attempts have been made; after that the failure is TERMINAL (exhausted).
 const MAX_SEND_ATTEMPTS = 5;
@@ -204,6 +217,7 @@ async function sendToDevices(
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(messages),
+        signal: AbortSignal.timeout(EXPO_SEND_TIMEOUT_MS),
       });
       const payload = await res.json().catch(() => null) as
         { data?: { status: string; details?: { error?: string } }[] } | null;
