@@ -78,7 +78,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
 | WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
 | Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
-| Payments | [Payment postponement](PAYMENT_POSTPONEMENT.md) — **frozen**, read this first |
+| Payments | [CLAUDE.md §6](../CLAUDE.md): Moyasar is the provider (2026-11-11), read this first · [Payment postponement](PAYMENT_POSTPONEMENT.md): history, superseded |
 | Maps | [Maps](MAPS.md) |
 | Sentry | [Mobile](SENTRY_OBSERVABILITY.md) · [Web and admin](SENTRY_WEB_OBSERVABILITY.md) |
 | Account deletion | [Deletion scheduler](account-deletion-scheduler.md) |
@@ -89,7 +89,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | | |
 | --- | --- |
 | [Decision records](decisions/README.md) | Why a choice was made, what was rejected, and what it costs |
-| [Payment postponement](PAYMENT_POSTPONEMENT.md) | Why payments are frozen and what the freeze covers |
+| [Payment postponement](PAYMENT_POSTPONEMENT.md) | Why payments were frozen until 2026-11-11 and what the freeze covered (superseded by CLAUDE.md §6) |
 | [Discounts and campaigns](DISCOUNTS_CAMPAIGNS.md) | The schema, and the business questions still open |
 | [Loyalty](LOYALTY.md) | How points are earned and spent, the four rules that shape it, and the corrected customer terms |
 | [Legal documents audit](LEGAL_DOCUMENTS_AUDIT.md) | Every live legal document read against the code: what was false, what was corrected, and what was verified accurate |
