@@ -1931,6 +1931,9 @@ own explicit owner approval.
 **ONE action remains, and it is yours: enable `external_dispatch_enabled`.**
 That is the step that actually starts mail.
 
+**Amended 2026-11-11: that action now has two prerequisites**, §46 steps 3 and
+4. Set `SMTP_ALLOWED_HOSTS`, then redeploy the dispatcher.
+
 **Nothing has been enabled and no alert has reached anyone.** The flag is still
 false and the outbox still holds its same 136 rows with zero on the `email`
 channel.
@@ -2050,6 +2053,13 @@ act. There is **one** admin with an email address today.
    request. How the secrets were created without anyone seeing one is below.
 4. **Enable it** — set `external_dispatch_enabled` true. **This is the only step
    left, and the only one that actually sends mail.**
+
+   **Two steps come first, added 2026-11-11 (§46 steps 3 and 4):** set
+   `SMTP_ALLOWED_HOSTS` to the relay's name, then redeploy
+   `operations-alert-dispatch`. The first is the only rule that refuses a
+   relay name pointing into private space. The second matters because the
+   only recorded deploy (v1, 2026-09-07) predates the SMTP guard, so the
+   running dispatcher may not check the endpoint at all.
 
    **How:** admin console → **Alerts** tab → **Settings** → the **"External
    dispatch (email)"** checkbox. You must be signed in as an admin **with your
@@ -3650,6 +3660,53 @@ are taken by the PDPL work in an open pull request.)
 **Done looks like:** each step done, with the date written back into the record it
 points at, and the matching `GO_LIVE_READINESS.md` row — B8, B10, C9 to C13 —
 moved off ⬜.
+
+## 46. Addresses an admin can store — one secret and three redeploys
+
+**Opened 2026-11-11.** Three Edge Functions connect to an address an
+administrator stored, and each now checks it more strictly **in the
+repository**. `email-test-config` validates the SMTP endpoint (it checked
+nothing before) and no longer shows the connection error's text.
+`admin-push-dispatch` admits only the four browser push services and no
+explicit port. The shared SMTP guard requires a mail port. **None of this runs
+until each function is redeployed.** Behaviour and evidence:
+`docs/OPERATIONS_ALERTS_DIGEST.md` ("What the SMTP guard cannot see") and
+`docs/ADMIN_PUSH_NOTIFICATIONS.md` ("A public hostname was not enough").
+
+Each step is its own §5 action. Approval for one is not approval for the next.
+
+1. **Redeploy `email-test-config`.** The live relay passes the new guard.
+   Measured read-only on 2026-11-11, by counts only: the one email-provider row
+   is enabled, uses a mail port, and has a host that passes the lexical rules.
+   **Done looks like:** the console's "Send test email" to
+   your own address arrives. If it shows a code in parentheses instead, the
+   sentence before the code says which setting to change.
+2. **Redeploy `admin-push-dispatch`.** The live subscription passes the new
+   rule, measured the same way: 1 subscription, on the list, no explicit port.
+   **Done looks like:** the bell's test notification still arrives on your
+   phone. If `docs/SUPABASE_API_KEYS.md` step 3 has not been done yet, one
+   deploy of this function covers both changes.
+3. **Before alert mail is turned on: set `SMTP_ALLOWED_HOSTS`** as an Edge
+   Function secret, to the relay's name, which is `mail.spicymeal.com.sa` today.
+   It is the only rule that refuses a public name that resolves into private
+   space. Secrets are project-wide, so it pins the test button as well.
+   **Done looks like:** "Send test email" still arrives.
+4. **Before alert mail is turned on: redeploy `operations-alert-dispatch`.**
+   LIVE VERIFY first, in the dashboard, which version runs. The only recorded
+   deploy is v1 (2026-09-07 07:18:43 UTC). Its five-file bundle predates the
+   SMTP guard, which merged on 2026-09-14, so if v1 is what runs, the
+   dispatcher checks nothing and ignores step 3. Redeploying is harmless while
+   dispatch is off, because the handler returns `disabled` before it reads the
+   endpoint. If `docs/SUPABASE_API_KEYS.md` step 3 is still pending, one deploy
+   covers both.
+5. Then §28 step 4, which turns alert mail on.
+
+**What this does not touch:** customer push (`push-dispatch`, `CLAUDE.md` §7)
+is a different function on a different channel and is unchanged. There is no
+migration and no data change.
+
+**Done looks like:** steps 1 to 4 done, with the date of each written here and
+in the two documents above.
 
 ## Owner-action closeout rule
 

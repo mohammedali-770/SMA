@@ -236,8 +236,44 @@ export function parseTargetEndpoint(raw: unknown): string | null {
 export const ENDPOINT_NOT_A_URL = 'endpoint_not_a_url';
 export const ENDPOINT_NOT_HTTPS = 'endpoint_not_https';
 export const ENDPOINT_HAS_CREDENTIALS = 'endpoint_has_credentials';
+export const ENDPOINT_HAS_PORT = 'endpoint_has_port';
 export const ENDPOINT_NOT_PUBLIC = 'endpoint_not_public';
 export const ENDPOINT_NOT_ALLOWED = 'endpoint_not_allowed';
+
+/**
+ * The push services a browser hands out endpoints on, matched by suffix.
+ * Chrome and the other Chromium browsers use FCM. Chrome's Beta, Dev and Canary
+ * channels use Google's staging endpoint `jmt17.google.com` instead (Chromium
+ * `components/push_messaging`: `kPushMessagingStagingGcmEndpoint`, returned for
+ * every non-Stable channel). Firefox uses Mozilla's autopush, Safari and a Home
+ * Screen web app on iOS use Apple's service, and Edge on Windows uses WNS, whose
+ * hosts are per region under `notify.windows.com`.
+ *
+ * THIS IS THE DEFAULT, NOT A SUGGESTION (2026-11-11). Until then an unset
+ * `ADMIN_PUSH_ALLOWED_HOSTS` meant "any public hostname", and a public hostname
+ * is a weaker property than it sounds: `10.0.0.5.sslip.io` is one, and wildcard
+ * DNS answers it with 10.0.0.5. A browser hands out endpoints only on its
+ * vendor's push service, so naming the services costs a real subscription
+ * nothing, provided the list names every service a browser uses. The first
+ * version missed Chrome's pre-release channels; review caught it (2026-11-12).
+ */
+export const DEFAULT_PUSH_SERVICE_HOSTS: readonly string[] = [
+  'fcm.googleapis.com',
+  'jmt17.google.com',
+  'updates.push.services.mozilla.com',
+  'web.push.apple.com',
+  'notify.windows.com',
+];
+
+/**
+ * The list `refusePushEndpoint` checks against. An operator value REPLACES the
+ * default rather than adding to it, and a blank one counts as unset, so an
+ * empty secret cannot open every host.
+ */
+function pushAllowlist(allowlist: string | null | undefined): string {
+  const configured = (allowlist ?? '').trim();
+  return configured === '' ? DEFAULT_PUSH_SERVICE_HOSTS.join(',') : configured;
+}
 
 /**
  * Why this endpoint must not be POSTed to, or null if it may be.
@@ -246,10 +282,17 @@ export const ENDPOINT_NOT_ALLOWED = 'endpoint_not_allowed';
  * endpoint is non-empty, so the stored value is whatever the caller sent — and
  * an authenticated ADMIN AT AAL2 is what it takes to store one. This is
  * therefore not an anonymous SSRF; it is containment for a compromised admin
- * session or a leaked service key, which bypasses RLS entirely. Exactly the
- * same reasoning, and exactly the same host rules, as `smtpTarget.ts`: without
- * it, one row edit turns this function into a connector to any address the Edge
- * runtime can reach, the cloud metadata endpoint included.
+ * session or a leaked service key, which bypasses RLS entirely. The same
+ * reasoning, and the same host rules, as `smtpTarget.ts`: without it, one row
+ * edit turns this function into a connector to any address the Edge runtime
+ * can reach, the cloud metadata endpoint included.
+ *
+ * WHAT IT CHECKS: HTTPS, no credentials, no explicit port, a public hostname,
+ * and that the host is one of `DEFAULT_PUSH_SERVICE_HOSTS` or of the operator's
+ * replacement list. The host rules are lexical and no name is resolved, which
+ * is why the service list is what does the containing: it is the rule a
+ * wildcard-DNS name cannot satisfy. No operator list can re-admit an IP
+ * literal, an internal name or a port, because those are refused first.
  *
  * **IT IS NOT THE WHOLE GUARD.** A refusal here only stops the request; the
  * matching `redirect: 'manual'` in the handler is what stops a legitimate host
@@ -257,7 +300,10 @@ export const ENDPOINT_NOT_ALLOWED = 'endpoint_not_allowed';
  * needed, and neither implies the other.
  *
  * Found by review on #398 — the first version validated nothing and fetched
- * whatever was in the row.
+ * whatever was in the row. The service list and the port rule followed on
+ * 2026-11-11, when an assessment found the public-hostname test admitted
+ * `https://10.0.0.5.sslip.io/`, any attacker's host, and
+ * `https://fcm.googleapis.com:8443/`.
  */
 export function refusePushEndpoint(endpoint: string, allowlist?: string | null): string | null {
   let url: URL;
@@ -270,9 +316,12 @@ export function refusePushEndpoint(endpoint: string, allowlist?: string | null):
   // `https://user:pass@host/` is a credential this process would transmit, and
   // no push service uses one.
   if (url.username !== '' || url.password !== '') return ENDPOINT_HAS_CREDENTIALS;
+  // The URL parser normalises `:443` to '', so this refuses only a port that
+  // is not the HTTPS default. None of the four push services uses another.
+  if (url.port !== '') return ENDPOINT_HAS_PORT;
   const host = normalizeHost(url.hostname);
   if (!isPublicHostname(host)) return ENDPOINT_NOT_PUBLIC;
-  if (!isAllowedHost(host, allowlist)) return ENDPOINT_NOT_ALLOWED;
+  if (!isAllowedHost(host, pushAllowlist(allowlist))) return ENDPOINT_NOT_ALLOWED;
   return null;
 }
 
