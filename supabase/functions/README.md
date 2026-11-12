@@ -74,7 +74,7 @@ Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-1
 | `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
 | `payment-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to (renamed from `tap-admin-test-return` on 2026-11-11) |
 
-These functions need migration `20260824100000_moyasar_payment_provider` (`begin_payment_attempt`, `begin_session_attempt`, `payment_records.provider_checkout_ref`), so it must be applied, named by version, before any of them is deployed. They then deploy as one set: an older bundle beside a new one can open an invoice that nothing confirms.
+These functions need two migrations, applied in this order and each named by version, before any of them is deployed: `20260824100000_moyasar_payment_provider` (`begin_payment_attempt`, `begin_session_attempt`, `payment_records.provider_checkout_ref`), then `20261003120000_moyasar_only_payments` (the loyalty multi-spend guard on `begin_session_attempt`, the 1.00 SAR minimum on both attempt RPCs, and the refund driver's Moyasar gate). `20261004120000_drop_tap_payment_rpcs` is applied only after the deploy. They then deploy as one set: an older bundle beside a new one can open an invoice that nothing confirms.
 
 Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`. Each of these is a separate owner approval: applying a payment migration, deploying a payment function, entering keys or the webhook secret, enabling online payment, and re-enabling automated refunds.
 

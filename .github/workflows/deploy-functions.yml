@@ -27,11 +27,15 @@ name: Deploy Supabase Functions
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Deploying an Edge Function requires explicit owner approval every time
-# (CLAUDE.md §5). The payment functions deploy as ONE set ('all' below), and only
-# after migration 20260824100000_moyasar_payment_provider has been applied: a new
+# (CLAUDE.md §5). The payment functions deploy as ONE set ('all' below): a new
 # payment bundle beside an older one can open a Moyasar invoice that nothing
-# confirms (supabase/functions/README.md). Nothing here grants any approval; the
-# guards below only make it hard to deploy by accident.
+# confirms. They deploy only after BOTH prerequisite migrations are applied, in
+# this order, each named by version: 20260824100000_moyasar_payment_provider,
+# then 20261003120000_moyasar_only_payments. Without the second, the session
+# flow opens payments with no loyalty multi-spend guard and no 1.00 SAR minimum.
+# 20261004120000_drop_tap_payment_rpcs is applied only AFTER this deploy
+# (supabase/functions/README.md). Nothing here grants any approval; the guards
+# below only make it hard to deploy by accident.
 #
 # Migrations are NOT run here — this only deploys functions, so it can never
 # touch the database schema.
@@ -154,7 +158,7 @@ jobs:
           if [ "$FNS" = "all" ]; then
             # Every payment function, the admin sandbox return page included.
             FNS="payment-initiate payment-verify payment-webhook payment-return payment-refund payment-test-config payment-admin-test-return"
-            echo "::warning::Deploying the whole payment set. It needs its own explicit owner approval (CLAUDE.md §5), and migration 20260824100000_moyasar_payment_provider must already be applied."
+            echo "::warning::Deploying the whole payment set. It needs its own explicit owner approval (CLAUDE.md §5). Migrations 20260824100000_moyasar_payment_provider and then 20261003120000_moyasar_only_payments must already be applied, in that order. 20261004120000_drop_tap_payment_rpcs is applied only after this deploy."
           fi
 
           for fn in $FNS; do

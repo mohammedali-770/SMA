@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**223 TypeScript test files declaring 3496 test blocks, plus 84 SQL suites.**
+**223 TypeScript test files declaring 3497 test blocks, plus 84 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -334,7 +334,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-31 files, 820 declared test blocks.
+31 files, 821 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -346,7 +346,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 17 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/apiKeys.test.ts` | 16 | key selection |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
-| `supabase/functions/_shared/deployFunctionsWiring.test.ts` | 8 | deploy-functions.yml |
+| `supabase/functions/_shared/deployFunctionsWiring.test.ts` | 9 | deploy-functions.yml |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |

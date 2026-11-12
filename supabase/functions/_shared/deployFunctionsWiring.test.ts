@@ -157,3 +157,39 @@ describe('jwt_flag reads only the named table', () => {
     expect(jwtFlag('alph', dir).ok).toBe(false);
   });
 });
+
+// The payment set needs TWO migrations live first, in order, and the third only
+// after it. Guidance that named the first alone shipped the session flow
+// without 20261003120000's loyalty multi-spend guard and 1.00 SAR minimum: a
+// customer could pay two live sessions with the same points. Each place an
+// operator reads before deploying names all three, in that order.
+describe('the deploy guidance names every migration the payment set needs', () => {
+  const FIRST = '20260824100000_moyasar_payment_provider';
+  const SECOND = '20261003120000_moyasar_only_payments';
+  const AFTER = '20261004120000_drop_tap_payment_rpcs';
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+
+  /** The header comment above `on:`, joined into one line. */
+  const header = workflow
+    .slice(0, workflow.indexOf('\non:'))
+    .split('\n')
+    .map((line) => line.replace(/^#\s?/, ''))
+    .join(' ');
+  /** The ::warning the `all` preset prints. */
+  const warning = /echo "::warning::Deploying the whole payment set\.[^"]*"/.exec(workflow)?.[0] ?? '';
+  /** The README paragraph about what these functions need. */
+  const readmeNeeds = readme.split('\n').find((line) => line.startsWith('These functions need')) ?? '';
+
+  it.each([
+    ['the workflow header', header],
+    ["the 'all' warning", warning],
+    ['supabase/functions/README.md', readmeNeeds],
+  ])('%s: both prerequisites in order, the drop only after the deploy', (_where, text) => {
+    expect(text).toContain(FIRST);
+    expect(text).toContain(SECOND);
+    expect(text.indexOf(FIRST)).toBeLessThan(text.indexOf(SECOND));
+    expect(text).toContain(AFTER);
+    expect(text.indexOf(SECOND)).toBeLessThan(text.indexOf(AFTER));
+    expect(text.slice(text.indexOf(AFTER))).toMatch(/only after/i);
+  });
+});
