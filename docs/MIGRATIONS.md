@@ -24,6 +24,14 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11 (later still) — `20261002120000_staff_actor_fk_set_null`
+> is written, validated and NOT applied, so on merge the count is THREE:**
+> Moyasar (frozen, §6), `20260929120000` (§51) and this file (§54).
+> `20261001120000` (§53) is not among them: it was applied at 12:30:50 UTC the
+> same day. This file lets a staff account that filed, resolved or revealed
+> something be deleted. The two unfrozen files are independent; apply each on
+> its own approval. Moyasar still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-11 (later) — `20261001120000_prune_operational_run_history`
 > is written, validated and NOT applied, so on merge the count is THREE:**
 > Moyasar (frozen, §6), `20260929120000` (§51) and this file (§53). It keeps the
@@ -7125,3 +7133,71 @@ over about three days.
    for the seconds the rewrite takes, and pg_cron writes to it every minute, so
    run it at a quiet time. Without it the database stops growing but does not
    shrink.
+
+## 54. Staff accounts can be deleted after ordinary work — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261002120000_staff_actor_fk_set_null.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** App-hardening checklist, finding D01.
+
+sha256 `2fb83cfd710bf6b38418f0648a8d3d375bb86f460617b6f9f080fbc76fbe5577`,
+120 lines / 6 370 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It changes four foreign keys and one NOT NULL, and nothing else.** No function
+is redefined, no row is written, and no deploy is implied. **MONEY PATH
+UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`).
+
+### The defect, reproduced
+
+Deleting a staff account removes its `auth.users` row, which cascades to its
+profile. Four actor columns pointed at `profiles` with the default
+`ON DELETE NO ACTION`. Once a staff member had used one of these features, the
+cascade was refused with **23503**, and the console's staff **Delete** failed:
+
+| Column | Written when |
+| --- | --- |
+| `branch_delivery_requests.requested_by` (also NOT NULL) | a branch operator files a delivery-closure request |
+| `branch_delivery_requests.resolved_by` | the call centre resolves one |
+| `branch_reference_entries.created_by` | an admin creates a reference entry |
+| `branch_reference_reveals.revealed_by` | an operator reveals a reference secret |
+
+Read live 2026-11-11: Production carries **exactly these four** NO ACTION keys
+into `profiles`, and none into `auth.users`. The checklist assessment found two
+of the three manageable staff accounts already in that state.
+
+Offboarding therefore fell back to demotion, which keeps the person's name,
+phone and email. That is the opposite of what the delete is for.
+
+### The fix, and its one cost
+
+All four become `ON DELETE SET NULL`, and `requested_by` becomes nullable. That
+is the convention every other actor column already follows (`role_change_audit`,
+`comp_member_audit`, `branch_delivery_events`, `loyalty_transactions`).
+
+The cost: after an account is deleted, its requests, entries and reveal records
+stay, but no longer say who acted. `bdr_resolution_coherent` allows that, since
+a resolved request must carry `resolved_at`, not `resolved_by`. The console reads
+none of the four columns, so nothing renders a missing actor.
+
+### Validation
+
+- **Paired suite** `staff_account_deletion_test.sql`:
+  - **CASE 1:** an operator files a request, the call centre declines it, an
+    admin creates a secret entry and a second operator reveals it. Then every
+    account is deleted, plus a control operator with no history. Every delete
+    succeeds, and every record stays with its actor cleared.
+  - **CASE 2:** no foreign key anywhere in `public` may block deleting a profile
+    or an account. This is also asserted by the file itself, so a future table
+    recording an actor with the default NO ACTION fails CI.
+- **Reproduced first:** without the file, CASE 1 fails with the production error,
+  `23503 … branch_delivery_requests_requested_by_fkey`.
+- **Mutation testing: 4 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by the suite:
+  - `requested_by` left NOT NULL, which turns 23503 into 23502;
+  - `resolved_by` left NO ACTION;
+  - `revealed_by` left NO ACTION;
+  - `revealed_by` made `ON DELETE CASCADE`, which would delete the reveal audit
+    along with the person.
+
+**Applying it is a §5 action, named by version.** Afterwards, a staff **Delete**
+in the console succeeds for an account that has history.
+
