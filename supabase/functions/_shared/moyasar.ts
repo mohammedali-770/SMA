@@ -975,6 +975,21 @@ export const DUPLICATE_PAYMENT = 'duplicate_payment';
 export const DUPLICATE_PAYMENT_MESSAGE = 'Duplicate payment: the order was already paid. Refund this payment.';
 
 /**
+ * The message confirm_order_payment raises (P0001) when the order is already
+ * paid by a DIFFERENT payment (20261003120000). It is decided under the order's
+ * row lock, so two payments confirmed at the same moment cannot both pass it,
+ * which the read before the stamp in moyasarVerify.ts cannot promise.
+ */
+export const ORDER_ALREADY_PAID_BY_ANOTHER = 'order_already_paid_by_another_payment';
+
+/** Is this RPC error confirm_order_payment's "already paid by another payment"? */
+export function isOrderAlreadyPaidByAnother(error: { message?: unknown; code?: unknown } | null | undefined): boolean {
+  if (!error) return false;
+  return String(error.code ?? '') === 'P0001'
+    && String(error.message ?? '').includes(ORDER_ALREADY_PAID_BY_ANOTHER);
+}
+
+/**
  * PostgREST filter that leaves recorded duplicates out of an "attempts" lookup.
  * A duplicate row is a record of money to give back, not an attempt: a lookup
  * that took the newest row as THE attempt would otherwise read a duplicate,

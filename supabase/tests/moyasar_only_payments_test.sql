@@ -1,7 +1,8 @@
 -- ============================================================================
 -- Moyasar-only payments (migration 20261003120000_moyasar_only_payments.sql):
--- the refund driver's provider gate, the refund ledger's fallback provider and
--- the staff alert label.
+-- the refund driver's provider gate, the refund ledger's fallback provider,
+-- the staff alert label, and confirm_order_payment's one-payment-per-order
+-- refusal.
 --
 -- The loyalty multi-spend guard is covered by moyasar_begin_attempt_test.sql
 -- and the payment card by operations_health_center_test.sql.
@@ -173,6 +174,101 @@ begin
   end if;
 
   raise notice 'CASE 3 ok: the payment alert reads Payment / Moyasar and الدفع / Moyasar';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- CASE 4: confirm_order_payment pays an order ONCE. Before 20261003120000 it
+-- checked only the calling payment's own provider_ref, so a second payment on
+-- the same order (two invoices, confirmed at the same moment) upserted a
+-- second paid row and rewrote paid_at. The refusal is decided after the
+-- order's `for update`, which is what serialises two concurrent callers; this
+-- case pins the decision itself, sequentially, and the local race repro
+-- (order_race_repro.ts) drove it concurrently through the real handlers.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_owner   uuid := gen_random_uuid();
+  o         public.orders;
+  v_after   public.orders;
+  v_paid_at timestamptz;
+  v_state   text;
+  v_msg     text;
+begin
+  insert into auth.users (id) values (v_owner) on conflict (id) do nothing;
+  insert into public.orders (customer_id, branch_id, order_type, status,
+                             payment_method, payment_status, subtotal, total)
+  values (v_owner, 'b0000000-0000-0000-0000-0000000000fd', 'pickup', 'received',
+          'online', 'pending', 64.00, 64.00)
+  returning * into o;
+
+  -- The first payment pays it.
+  v_after := public.confirm_order_payment(o.id, 'moyasar', 'pay_case4_A', 64.00, null);
+  if v_after.payment_status is distinct from 'paid' then
+    raise exception 'CASE 4 FAILED: the first payment did not pay the order (%)', v_after.payment_status;
+  end if;
+  v_paid_at := v_after.paid_at;
+
+  -- Its replay returns the order unchanged: the genuine payment is never refused.
+  v_after := public.confirm_order_payment(o.id, 'moyasar', 'pay_case4_A', 64.00, null);
+  if v_after.paid_at is distinct from v_paid_at or v_after.payment_status is distinct from 'paid' then
+    raise exception 'CASE 4 FAILED: the replay of the paying payment changed the order (% / %)',
+      v_after.payment_status, v_after.paid_at;
+  end if;
+
+  -- A second payment is refused with the named error, and writes nothing.
+  v_state := null;
+  begin
+    perform public.confirm_order_payment(o.id, 'moyasar', 'pay_case4_B', 64.00, null);
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_msg = message_text;
+  end;
+  if v_state is distinct from 'P0001' or v_msg is distinct from 'order_already_paid_by_another_payment' then
+    raise exception 'CASE 4 FAILED: a second payment was not refused as already paid (% / %)',
+      coalesce(v_state, 'no error'), coalesce(v_msg, 'NULL');
+  end if;
+  if exists (select 1 from public.payment_records where provider_ref = 'pay_case4_B') then
+    raise exception 'CASE 4 FAILED: the refused payment left a payment_records row';
+  end if;
+
+  -- So does a confirmation with no payment id, which used to add a paid row.
+  v_state := null;
+  begin
+    perform public.confirm_order_payment(o.id, 'moyasar', null, 64.00, null);
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_msg = message_text;
+  end;
+  if v_state is distinct from 'P0001' or v_msg is distinct from 'order_already_paid_by_another_payment' then
+    raise exception 'CASE 4 FAILED: a ref-less confirmation of a paid order was not refused (% / %)',
+      coalesce(v_state, 'no error'), coalesce(v_msg, 'NULL');
+  end if;
+
+  if (select count(*) from public.payment_records where order_id = o.id and status = 'paid') <> 1 then
+    raise exception 'CASE 4 FAILED: the order has % paid rows, expected 1',
+      (select count(*) from public.payment_records where order_id = o.id and status = 'paid');
+  end if;
+  if (select paid_at from public.orders where id = o.id) is distinct from v_paid_at then
+    raise exception 'CASE 4 FAILED: paid_at moved';
+  end if;
+
+  -- An UNPAID order still reaches the amount check first: the refusal did not
+  -- swallow the existing mismatch error.
+  insert into public.orders (customer_id, branch_id, order_type, status,
+                             payment_method, payment_status, subtotal, total)
+  values (v_owner, 'b0000000-0000-0000-0000-0000000000fd', 'pickup', 'received',
+          'online', 'pending', 30.00, 30.00)
+  returning * into o;
+  v_state := null;
+  begin
+    perform public.confirm_order_payment(o.id, 'moyasar', 'pay_case4_C', 29.00, null);
+  exception when others then
+    get stacked diagnostics v_state = returned_sqlstate, v_msg = message_text;
+  end;
+  if v_msg is null or v_msg not like 'Payment amount % does not match order total %' then
+    raise exception 'CASE 4 FAILED: an amount mismatch on an unpaid order raised % / %',
+      coalesce(v_state, 'no error'), coalesce(v_msg, 'NULL');
+  end if;
+
+  raise notice 'CASE 4 ok: an order is paid by one payment; its replay passes, a second payment is refused';
 end $$;
 
 rollback;

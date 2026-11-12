@@ -7054,14 +7054,17 @@ over about three days.
 awaiting owner approval.** It is the database half of the owner's decision of
 2026-11-11 that Moyasar is the payment provider (CLAUDE.md §6).
 
-sha256 `6f70ae41b1ff332592643169055b70ae56b2b7e6ea100e12eac021a3c886a147`,
-2 072 lines / 100 150 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `d6d0f61c24f5b93437c03a562391bca9e7cc5c1c23e8fadf7123dd8ec447256c`,
+2 266 lines / 109 788 bytes. **Re-hash the MERGED copy before applying**, per §15.
 **Amended 2026-11-12, still unapplied**, after the adversarial review of the
-Moyasar-only change (finding C2): both attempt RPCs now refuse a total under
-Moyasar's 1.00 SAR invoice minimum. The fingerprint, the counts and the
-expected hashes below are the amended file's.
+Moyasar-only change. Finding C2: both attempt RPCs now refuse a total under
+Moyasar's 1.00 SAR invoice minimum. Finding C1, its re-verification: two
+order-first payments confirmed at the same moment were both marked paid, so
+`confirm_order_payment` now refuses, under the order's row lock, a payment for
+an order another payment has already paid (sections 7 and 8 of the file). The
+fingerprint, the counts and the expected hashes below are the amended file's.
 
-**It redefines six functions and rewrites three comments, and nothing else.**
+**It redefines seven functions and rewrites three comments, and nothing else.**
 No row is written, no grant or cron job changes, and it does not create
 `refund_trigger_secret`. **MONEY PATH UNTOUCHED, and the file asserts it**
 before and after: `place_order` `12b6816d…` and `compute_order_snapshot`
@@ -7079,6 +7082,7 @@ Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
 | `open_order_refund_record` | falls back to provider `tap` | falls back to `moyasar` |
 | `operations_health_snapshot_internal` | the payment card's `configured` flag is Tap's resolver, so a Moyasar row always reads `not_configured` | mirrors `resolveMoyasarConfig` |
 | `operations_alerts_render_event` | `Payment / Tap`, `الدفع / Tap` | `Payment / Moyasar`, `الدفع / Moyasar` |
+| `confirm_order_payment` | after the `for update`, checks only THIS payment's own `provider_ref`, so a second payment on an already-paid order upserts a second paid row and rewrites `paid_at` (reproduced on the local chain through the real handlers, not read live) | refuses that payment with P0001 `order_already_paid_by_another_payment`, after the early return that lets the paying payment's replay through; the caller records it as a duplicate to refund |
 
 The three comments are those of `begin_payment_attempt`,
 `begin_session_attempt` and `payment_records.provider_checkout_ref`, which
@@ -7142,6 +7146,7 @@ when the file was generated:
 | `open_order_refund_record` | `20260724120000:519-556` | 1: the literal |
 | `operations_health_snapshot_internal` | `20260925120000:113-1206` | 1: the payment configuration read and its comment |
 | `operations_alerts_render_event` | `20260820160000:1577-1651` | 2: the two labels |
+| `confirm_order_payment` | `20260827120000:207-259` | 1: the refusal, inserted after the early return |
 
 A `pg_get_functiondef` diff of each function, before and after, on the local
 chain shows only those hunks.
@@ -7163,6 +7168,13 @@ and whitespace collapsed, live and repository hash the same: `6925d1a4…` and
 ported is the one running today. `begin_session_attempt` and
 `begin_payment_attempt` are not live at all.
 
+**`confirm_order_payment` was NOT read live for this amendment** (no
+Production access was used). Instead the file refuses to apply unless the body
+it replaces is `20260827120000`'s: comment-stripped and whitespace-collapsed,
+`md5` `6a0ae6eb9963d6f79fc2b086d4583ece`, computed on the local chain. A live
+body that has drifted therefore stops the apply rather than being overwritten.
+Reading it live before approval is a cheap read-only check worth doing.
+
 **Hashes to expect after the apply**, computed on the local chain from this
 file before anything is sent:
 
@@ -7174,6 +7186,7 @@ file before anything is sent:
 | `open_order_refund_record` | `140778650aaea14bd32d4e087ae68ad9` (1 139) | `81c0ff702d8f5adbec5ddc450896329b` |
 | `operations_health_snapshot_internal` | `1e300b3d61759729e523d7c74224ce78` (49 281) | `54c3f7b243ca0cb7628c99f2438b7447` |
 | `operations_alerts_render_event` | `9214c2932078957a227ad61ac678f26d` (2 632) | `da6f2ae7ac65d0fb0a6e93c2ac0e7375` |
+| `confirm_order_payment` | `9b60284bda2582054d8db785067c1711` (2 123) | `6aea1c3ae258c6479deff265ec698efc` |
 
 They hold only for the sha256 above. **Check which side of the apply a hash
 describes before calling a mismatch** (CLAUDE.md §8).

@@ -33,6 +33,7 @@ import {
   fromMinorUnits,
   isGenuineConfirmation,
   isMoyasarIpNotAllowed,
+  isOrderAlreadyPaidByAnother,
   lastFourOf,
   mapMoyasarPaymentStatus,
   sanitizeMoyasarInvoice,
@@ -381,9 +382,10 @@ export async function validateAndConfirmMoyasarPayment(
       }
     } else {
       // Order-first flow. ALREADY PAID BY ANOTHER PAYMENT? Then this one paid
-      // nothing: confirm_order_payment would mark a second paid row and rewrite
-      // paid_at. Decided before the stamp, so the attempt is left for the
-      // payment that is still its own.
+      // nothing. Decided before the stamp, so the attempt is left for the
+      // payment that is still its own. This read is the fast path, not the
+      // guarantee: two payments confirmed at once can both read "unpaid" here,
+      // and confirm_order_payment settles that under the order lock below.
       const { data: paidRows, error: paidErr } = await admin.from('payment_records')
         .select('provider, provider_ref')
         .eq('order_id', attempt.order_id).eq('status', 'paid');
@@ -406,7 +408,9 @@ export async function validateAndConfirmMoyasarPayment(
         console.error('moyasar provider_ref stamp did not land', JSON.stringify({
           attempt: String(attempt.id).slice(0, 36),
         }));
-        return { outcome: 'failed', paid: false, reason: 'stamp_failed' };
+        // 'pending', as on the session path: the payment may be genuine, and a
+        // terminal answer makes the app give up on a payment a retry confirms.
+        return { outcome: 'pending', paid: false, reason: 'stamp_failed' };
       }
 
       const { data, error } = await admin.rpc('confirm_order_payment', {
@@ -416,6 +420,13 @@ export async function validateAndConfirmMoyasarPayment(
         p_amount: paidMajor,
         p_raw: sanitized,
       });
+      if (isOrderAlreadyPaidByAnother(error)) {
+        // ANOTHER PAYMENT WON THE RACE. The read above ran before that
+        // payment's confirm committed, so only the order's row lock can tell,
+        // and confirm_order_payment decides it there (20261003120000). This
+        // attempt carries this payment id now, so it becomes the record.
+        return await duplicate('stamped', attempt.order_id);
+      }
       if (error) {
         await admin.from('integration_sync_logs').insert({
           provider: 'moyasar', order_id: attempt.order_id, direction: 'webhook', status: 'failed',

@@ -150,7 +150,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_variant_snooze` | 1 | `20260923120000_branch_variant_availability.sql` |
 | `compute_campaign_discount` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
 | `compute_order_snapshot` | 9 | `20260924120000_place_order_variant_availability.sql` |
-| `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
+| `confirm_order_payment` | 4 | `20261003120000_moyasar_only_payments.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
 | `current_staff_branch_id` | 1 | `20260820100500_ops_branch_scoping.sql` |

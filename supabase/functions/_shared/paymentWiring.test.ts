@@ -795,6 +795,32 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
     expect(check).toBeLessThan(order.indexOf("admin.rpc('confirm_order_payment'"));
   });
 
+  it('order flow: the lock-path refusal from confirm_order_payment is a duplicate, checked before any other error', () => {
+    const order = paid.slice(paid.indexOf('} else {'));
+    const confirm = order.indexOf("admin.rpc('confirm_order_payment'");
+    const lock = order.indexOf('if (isOrderAlreadyPaidByAnother(error)) {');
+    const generic = order.indexOf('if (error) {', confirm);
+    expect(lock).toBeGreaterThan(confirm);
+    expect(lock).toBeLessThan(generic);
+    expect(order.slice(lock, generic)).toContain("return await duplicate('stamped', attempt.order_id);");
+  });
+
+  it('confirm_order_payment raises the one message the caller matches, after the early return', async () => {
+    const { ORDER_ALREADY_PAID_BY_ANOTHER } = await import('./moyasar.ts');
+    const sql = readFileSync(
+      new URL('../../migrations/20261003120000_moyasar_only_payments.sql', import.meta.url),
+      'utf8',
+    );
+    const body = sql.slice(sql.indexOf('create or replace function public.confirm_order_payment('));
+    const early = body.indexOf("and provider_ref = p_provider_ref and status = 'paid'");
+    const refusal = body.indexOf(
+      `if v_order.payment_status = 'paid' then\n    raise exception '${ORDER_ALREADY_PAID_BY_ANOTHER}'\n      using errcode = 'P0001'`,
+    );
+    expect(early).toBeGreaterThan(-1);
+    expect(refusal).toBeGreaterThan(early);
+    expect(refusal).toBeLessThan(body.indexOf('if p_amount is distinct from v_order.total then'));
+  });
+
   it('records a duplicate as failed, never as paid', () => {
     const rec = section(
       verify,

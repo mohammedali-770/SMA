@@ -56,6 +56,13 @@
 --      same way. A points redemption can leave such a remainder.
 --      payment-initiate refuses it first; this is the second line.
 --
+--   7. confirm_order_payment refuses, under the order's row lock, a payment
+--      for an order that ANOTHER payment has already paid: P0001
+--      'order_already_paid_by_another_payment'. Two order-first payments on
+--      two invoices of one order, confirmed at the same moment, were both
+--      marked paid and both reported paid. The caller records the loser as a
+--      duplicate to refund. Section 7.
+--
 -- It also rewrites three object COMMENTS that named Tap as current:
 -- begin_payment_attempt, begin_session_attempt, and the
 -- payment_records.provider_checkout_ref column. The first two also name the
@@ -96,6 +103,7 @@
 --   open_order_refund_record             20260724120000:519-556   1 (the literal)
 --   operations_health_snapshot_internal  20260925120000:113-1206  1 (the predicate)
 --   operations_alerts_render_event       20260820160000:1577-1651 2 (the labels)
+--   confirm_order_payment                20260827120000:207-259   1 (the refusal, inserted)
 --
 -- The pre-images were hashed against the LIVE functions, read-only, on
 -- 2026-11-11, with md5(prosrc) and md5(pg_get_functiondef):
@@ -2070,3 +2078,189 @@ begin
   end if;
 end
 $verify$;
+
+-- ---------------------------------------------------------------------------
+-- 7. confirm_order_payment: one paying payment per order, decided under the lock
+-- ---------------------------------------------------------------------------
+-- An order-first order can hold two invoices: the first attempt expires, a
+-- second opens, and a payment then settles LATE on the first while another is
+-- paid on the second. moyasarVerify.ts reads "already paid by another
+-- payment?" before it stamps and confirms, but two confirmations that overlap
+-- (two webhooks, or a webhook and the admin re-verify) both read "unpaid"
+-- there. This function then locked the order and checked only THIS payment's
+-- own provider_ref, so both upserted a paid row, the second rewrote paid_at,
+-- and both callers answered paid. Reproduced on the local chain (two paid
+-- rows, MULTIPLE_SUCCESSFUL_CAPTURES opened by the watchdog).
+--
+-- The decision now sits where only one caller can be at a time: after the
+-- `for update`, an order already paid is refused with P0001
+-- 'order_already_paid_by_another_payment' unless a paid row already carries
+-- THIS (provider, provider_ref). That exception follows the existing early
+-- return, so the genuine payment, its replay and a webhook racing
+-- payment-verify for it all still return the order unchanged. A raise rolls
+-- the call back, so nothing is written here; the caller records the payment as
+-- a duplicate to refund (moyasarVerify.ts, isOrderAlreadyPaidByAnother).
+--
+-- An order paid with no payment id (p_provider_ref NULL) is refused the same
+-- way: before this it inserted a second paid row with a NULL ref.
+--
+-- DERIVED, NOT RETYPED: 20260827120000_lazywait_delivery_sync.sql:207-259,
+-- the only current definition, with one block inserted after the early return.
+-- The block just below refuses the apply unless the body being replaced is
+-- that one (comment-stripped, whitespace-collapsed md5
+-- 6a0ae6eb9963d6f79fc2b086d4583ece, computed on the local chain; the live
+-- body has NOT been read for this file, so a live body that differs refuses
+-- the apply rather than being silently overwritten). Same signature, same header, same
+-- ACL, so no deploy is implied by the SQL; the caller's handling ships with
+-- the Moyasar-only payment functions.
+do $confirm_pre$
+declare
+  v_n    integer;
+  v_hash text;
+begin
+  select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'confirm_order_payment';
+  if v_n <> 1 then
+    raise exception 'expected exactly one confirm_order_payment, found %', v_n;
+  end if;
+  select md5(btrim(regexp_replace(regexp_replace(p.prosrc, '--[^\n]*', '', 'g'), '\s+', ' ', 'g')))
+    into v_hash
+    from pg_proc p
+   where p.oid = to_regprocedure('public.confirm_order_payment(uuid,text,text,numeric,jsonb)');
+  if v_hash is distinct from '6a0ae6eb9963d6f79fc2b086d4583ece' then
+    raise exception 'confirm_order_payment is not the 20260827120000 body (normalized md5 %): re-derive this section',
+      coalesce(v_hash, 'NULL');
+  end if;
+end
+$confirm_pre$;
+
+create or replace function public.confirm_order_payment(
+  p_order_id uuid,
+  p_provider text,
+  p_provider_ref text,
+  p_amount numeric,
+  p_raw jsonb default null
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'Order % not found', p_order_id;
+  end if;
+
+  if p_provider_ref is not null and exists (
+    select 1 from public.payment_records
+    where provider = p_provider and provider_ref = p_provider_ref and status = 'paid'
+  ) then
+    return v_order;
+  end if;
+
+  -- Already paid, and not by this payment (the early return above): this one
+  -- paid nothing. Decided under the lock, so of two payments confirmed at
+  -- once exactly one gets here first. As of 20261003120000.
+  if v_order.payment_status = 'paid' then
+    raise exception 'order_already_paid_by_another_payment'
+      using errcode = 'P0001', detail = format('order %s', p_order_id);
+  end if;
+
+  if p_amount is distinct from v_order.total then
+    insert into public.payment_records (order_id, provider, provider_ref, status, amount, raw)
+      values (p_order_id, p_provider, p_provider_ref, 'failed', coalesce(p_amount, 0), p_raw);
+    raise exception 'Payment amount % does not match order total %', p_amount, v_order.total;
+  end if;
+
+  insert into public.payment_records (order_id, provider, provider_ref, status, amount, raw)
+    values (p_order_id, p_provider, p_provider_ref, 'paid', p_amount, p_raw)
+  on conflict (provider, provider_ref) where provider_ref is not null
+    do update set status = 'paid', amount = excluded.amount, raw = excluded.raw, updated_at = now();
+
+  update public.orders
+    set payment_status   = 'paid',
+        payment_provider = p_provider,
+        paid_at          = now(),
+        -- Delivery is released here too, as of 20260827120000.
+        lazywait_sync_state  = case when lazywait_sync_state = 'awaiting_payment'
+                                    then 'pending' else lazywait_sync_state end,
+        sync_next_attempt_at = case when lazywait_sync_state = 'awaiting_payment'
+                                    then now() else sync_next_attempt_at end,
+        updated_at = now()
+    where id = p_order_id
+    returning * into v_order;
+
+  return v_order;
+end $$;
+
+revoke all on function public.confirm_order_payment(uuid, text, text, numeric, jsonb) from public, anon, authenticated;
+grant execute on function public.confirm_order_payment(uuid, text, text, numeric, jsonb) to service_role;
+
+-- ---- 8. Self-verification for section 7 ------------------------------------
+-- Cardinality first; the statement matched against the comment-stripped body
+-- so a comment cannot satisfy it, and its POSITION checked, because the same
+-- check placed before the early return would refuse the genuine payment's
+-- replay. Behaviour (refusal, replay, race) is proven by
+-- supabase/tests/moyasar_only_payments_test.sql on the local chain.
+do $confirm_verify$
+declare
+  v_n    integer;
+  v_src  text;
+  v_txt  text;
+  p_ret  integer;
+  p_dup  integer;
+  p_amt  integer;
+begin
+  select count(*) into v_n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'confirm_order_payment';
+  if v_n <> 1 then
+    raise exception 'expected exactly one confirm_order_payment, found %', v_n;
+  end if;
+
+  if has_function_privilege('anon', 'public.confirm_order_payment(uuid,text,text,numeric,jsonb)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.confirm_order_payment(uuid,text,text,numeric,jsonb)', 'EXECUTE') then
+    raise exception 'confirm_order_payment is executable by a client role';
+  end if;
+  if not has_function_privilege('service_role', 'public.confirm_order_payment(uuid,text,text,numeric,jsonb)', 'EXECUTE') then
+    raise exception 'confirm_order_payment is not executable by service_role';
+  end if;
+
+  select p.prosecdef::text || ':' || p.provolatile::text || ':' || coalesce(array_to_string(p.proconfig, ';'), '-'),
+         regexp_replace(regexp_replace(p.prosrc, '--[^\n]*', '', 'g'), '\s+', ' ', 'g')
+    into v_txt, v_src
+    from pg_proc p
+   where p.oid = to_regprocedure('public.confirm_order_payment(uuid,text,text,numeric,jsonb)');
+  if v_txt is distinct from 'true:v:search_path=public' then
+    raise exception 'confirm_order_payment header changed: %', coalesce(v_txt, 'NULL');
+  end if;
+
+  p_ret := position('and status = ''paid'' ) then return v_order; end if;' in coalesce(v_src, ''));
+  p_dup := position('if v_order.payment_status = ''paid'' then raise exception ''order_already_paid_by_another_payment'' using errcode = ''P0001''' in coalesce(v_src, ''));
+  p_amt := position('if p_amount is distinct from v_order.total then' in coalesce(v_src, ''));
+  if p_ret = 0 or p_dup = 0 or p_amt = 0 then
+    raise exception 'confirm_order_payment is missing a statement (early return %, refusal %, amount check %)',
+      p_ret, p_dup, p_amt;
+  end if;
+  if not (p_ret < p_dup and p_dup < p_amt) then
+    raise exception 'confirm_order_payment refuses in the wrong place (early return %, refusal %, amount check %)',
+      p_ret, p_dup, p_amt;
+  end if;
+
+  -- The money path, again, after the last replace in this file.
+  select md5(pg_get_functiondef(p.oid)) into v_txt
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'place_order';
+  if v_txt is distinct from '12b6816d256c29b76edf947ae1a7ea77' then
+    raise exception 'place_order moved to %', coalesce(v_txt, 'NULL');
+  end if;
+  select md5(pg_get_functiondef(p.oid)) into v_txt
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'compute_order_snapshot';
+  if v_txt is distinct from '22e2d42935459e7bf93abb2941b56325' then
+    raise exception 'compute_order_snapshot moved to %', coalesce(v_txt, 'NULL');
+  end if;
+end
+$confirm_verify$;

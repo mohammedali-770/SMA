@@ -15,7 +15,7 @@
  *     1.00 SAR minimum (20261003120000). The loyalty guard is not modelled; the
  *     SQL suite proves it;
  *   - finalize_checkout_session, row picker included (20260712170000);
- *   - confirm_order_payment (20260827120000).
+ *   - confirm_order_payment (20260827120000, with 20261003120000's refusal).
  *
  * Every RPC is atomic: on an error nothing it wrote survives, as in Postgres.
  * Each call yields to the event loop first, so two flows started together
@@ -657,6 +657,10 @@ const RPCS: Record<string, (db: FakePaymentDb, a: Row) => unknown> = {
         )
     ) {
       return o;
+    }
+    // 20261003120000: paid by ANOTHER payment, decided under the order lock.
+    if (o.payment_status === 'paid') {
+      throw new PgError('order_already_paid_by_another_payment', 'P0001');
     }
     if (round2(a.p_amount) !== round2(o.total)) {
       throw new PgError(`Payment amount ${String(a.p_amount)} does not match order total ${String(o.total)}`);

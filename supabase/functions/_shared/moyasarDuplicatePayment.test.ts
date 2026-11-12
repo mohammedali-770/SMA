@@ -274,6 +274,124 @@ describe('a second payment is a DUPLICATE: recorded for a refund, never paid (C1
   });
 });
 
+/**
+ * An order-first order with two invoices: the first attempt expired (it keeps
+ * its invoice, which can still settle late), the second is open.
+ */
+async function orderWithTwoInvoices() {
+  const order = db.order({ total: 64 });
+  const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+  const inv1 = String(init.body.invoiceId);
+  const [a1] = db.attempts({ provider_checkout_ref: inv1 });
+  db.updateRow('payment_records', a1, { status: 'failed', failure_code: 'expired' });
+  db.insertRow('payment_records', {
+    order_id: order.id,
+    provider: 'moyasar',
+    status: 'initiated',
+    amount: 64,
+    mode: 'live',
+    provider_checkout_ref: 'inv_2',
+    reference_transaction: 'sm_2',
+  });
+  moyasar.invoices.set('inv_2', {
+    id: 'inv_2',
+    status: 'initiated',
+    amount: 6400,
+    currency: 'SAR',
+    url: 'https://checkout.moyasar.com/invoices/inv_2',
+    metadata: {},
+    payments: [],
+  });
+  return { order, inv1 };
+}
+
+describe('two order payments confirmed AT ONCE: decided under the order lock (C1 part 3, D3)', () => {
+  // The verifier's order_race_repro: pay_1's webhook passes its "already paid?"
+  // read and is held at its stamp; pay_2's webhook runs to the end; pay_1 then
+  // continues. The read alone cannot see pay_2, so confirm_order_payment must.
+  it('the second to confirm is a duplicate, the order is paid once and paid_at stands', async () => {
+    const { order, inv1 } = await orderWithTwoInvoices();
+    const p1 = moyasar.pay(inv1, 'pay_1', 'paid');
+    const p2 = moyasar.pay('inv_2', 'pay_2', 'paid');
+
+    const gate = db.hold('payment_records.update'); // pay_1's stamp, after its D3 read
+    const first = webhook(p1);
+    await gate.entered;
+    expect((await webhook(p2)).body).toEqual({ status: 'paid', outcome: 'paid' });
+    const paidAt = db.rows('orders')[0].paid_at;
+    gate.release();
+
+    expect((await first).body).toEqual({ status: 'acknowledged', outcome: 'failed' });
+    expect(db.rows('orders')[0].paid_at).toBe(paidAt);
+    expect(paidRowsOf(order.id)).toEqual([expect.objectContaining({ provider_ref: 'pay_2' })]);
+    // pay_1 was stamped on its own attempt before confirm refused it, so that
+    // row is the record: the invoice it paid, its id, the order, refundable.
+    expect(db.attempts({ provider_ref: 'pay_1' })).toEqual([
+      expect.objectContaining({
+        status: 'failed',
+        failure_code: DUPLICATE_PAYMENT,
+        failure_message_safe: DUPLICATE_PAYMENT_MESSAGE,
+        provider_checkout_ref: inv1,
+        order_id: order.id,
+      }),
+    ]);
+    expect(duplicateLogs()).toEqual([
+      expect.objectContaining({ order_id: order.id, request: { payment_id: 'pay_1', order: order.id } }),
+    ]);
+    expect(db.rows('integration_sync_logs').filter((r) => r.error === 'confirm_failed')).toHaveLength(0);
+
+    // Both replayed: the winner still paid, the loser still not, one log each.
+    expect((await webhook(moyasar.payments.get('pay_2')!)).body.status).toBe('paid');
+    expect((await webhook(moyasar.payments.get('pay_1')!)).body.status).not.toBe('paid');
+    expect(paidRowsOf(order.id)).toHaveLength(1);
+    expect(duplicateLogs()).toHaveLength(1);
+    expect((await call('payment-verify', { orderId: order.id })).body).toEqual({
+      status: 'paid',
+      orderId: order.id,
+    });
+  });
+
+  it('the result itself, from the lock path: paid false, reason duplicate_payment, the order named', async () => {
+    const { order, inv1 } = await orderWithTwoInvoices();
+    const p1 = moyasar.pay(inv1, 'pay_1', 'paid');
+    const p2 = moyasar.pay('inv_2', 'pay_2', 'paid');
+    const [a1] = db.attempts({ provider_checkout_ref: inv1 });
+    const gate = db.hold('payment_records.update'); // after the D3 read, at the stamp
+    const run = validateAndConfirmMoyasarPayment(db.client() as never, a1 as unknown as MoyasarAttempt, p1, {
+      liveMode: true,
+    });
+    await gate.entered;
+    await webhook(p2);
+    gate.release();
+    expect(await run).toEqual({
+      outcome: 'failed',
+      paid: false,
+      reason: DUPLICATE_PAYMENT,
+      orderId: order.id,
+    });
+    // Refused inside confirm_order_payment, which is what reached the lock.
+    expect(
+      db.rpcLog.filter((c) => c.name === 'confirm_order_payment' && c.args.p_provider_ref === 'pay_1'),
+    ).toHaveLength(1);
+  });
+
+  it('CRITICAL: the SAME payment confirmed twice at once is paid both times, never a duplicate', async () => {
+    const { order, inv1 } = await orderWithTwoInvoices();
+    const p1 = moyasar.pay(inv1, 'pay_1', 'paid');
+    const gate = db.hold('payment_records.update'); // the first webhook, at its stamp
+    const first = webhook(p1);
+    await gate.entered;
+    const second = await webhook(p1); // the second runs to the end: stamps, confirms
+    gate.release();
+    expect(second.body).toEqual({ status: 'paid', outcome: 'paid' });
+    expect((await first).body).toEqual({ status: 'paid', outcome: 'paid' });
+    expect((await call('payment-verify', { orderId: order.id })).body.status).toBe('paid');
+    expect(paidRowsOf(order.id)).toEqual([expect.objectContaining({ provider_ref: 'pay_1' })]);
+    expect(duplicateLogs()).toHaveLength(0);
+    expect(db.rows('payment_records').filter((r) => r.failure_code === DUPLICATE_PAYMENT)).toHaveLength(0);
+  });
+});
+
 describe('payment-verify answers the checkout, not the duplicate it happened to find', () => {
   // verify read the session while it was still unpaid; another payment
   // consumed it before verify's own finalize ran.
@@ -422,6 +540,26 @@ describe('an unknown outcome is never reported paid or failed', () => {
     // Moyasar's retry confirms it.
     expect((await webhook(p1)).body.status).toBe('paid');
     expect(db.rows('checkout_sessions')[0]).toMatchObject({ status: 'consumed' });
+  });
+
+  it('order flow: a stamp that cannot be read back answers pending to payment-verify, not failed', async () => {
+    const order = db.order({ total: 64 });
+    const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    const p1 = moyasar.pay(String(init.body.invoiceId), 'pay_1', 'paid');
+    const gate = db.hold('payment_records.update'); // the stamp
+    const verifying = call('payment-verify', { orderId: order.id });
+    await gate.entered;
+    db.failNext('payment_records.select', { message: 'read-back failed' });
+    gate.release();
+    // Terminal 'failed' here made the app give up on a payment a retry confirms.
+    expect((await verifying).body).toEqual({
+      status: 'pending',
+      messageKey: 'payUnknown',
+      orderId: order.id,
+    });
+    expect(db.rpcLog.filter((c) => c.name === 'confirm_order_payment')).toHaveLength(0);
+    expect((await webhook(p1)).body.status).toBe('paid');
+    expect(paidRowsOf(order.id)).toEqual([expect.objectContaining({ provider_ref: 'pay_1' })]);
   });
 
   it('a read-back that fails after finalize answers pending; the order stands and verify reports it', async () => {

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**223 TypeScript test files declaring 3497 test blocks, plus 84 SQL suites.**
+**223 TypeScript test files declaring 3503 test blocks, plus 84 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -334,7 +334,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-31 files, 821 declared test blocks.
+31 files, 827 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -352,13 +352,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/moyasar.test.ts` | 114 | minor units (halalas) |
-| `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 17 | a declined payment no longer closes its attempt (C1 part 1) |
+| `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 21 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 38 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
 | `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 9 | no invoice outlives its attempt (C1 part 4) |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 16 | a session with nothing payable is answered terminal, without a key |
-| `supabase/functions/_shared/paymentWiring.test.ts` | 66 | payment functions talk to Moyasar only |
+| `supabase/functions/_shared/paymentWiring.test.ts` | 68 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
