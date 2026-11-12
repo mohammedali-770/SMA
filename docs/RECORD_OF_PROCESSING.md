@@ -6,6 +6,9 @@
 > **lawful-basis column is engineering's reading of what each activity relies
 > on, not legal advice**; counsel's review is `OWNER_ACTIONS.md` §44.
 >
+> **Updated 2026-11-12:** activity 15, Moyasar, added for the owner's decision of
+> 2026-11-11. Not reviewed by counsel either.
+>
 > **Why it exists.** PDPL Art 31 and Implementing Regulation (IR) Art 33 require
 > the controller to keep a written record of its processing, keep it current,
 > give it to SDAIA on request, and keep it **for five years after the processing
@@ -57,6 +60,7 @@
 | 12 | **Hosting and request logs** | Serve the web console, the web app and the policy pages | Visitors | IP address and request details, in the providers' own logs | Vercel; Supabase | Set by each provider's plan; **not readable from the repository** | Legitimate interest |
 | 13 | **Staff and administrators** | Run the branches and the console securely | Staff | Name, number, email, role, authenticator (TOTP) enrolment, audit trails of their actions, browser push subscriptions for closure alerts | Supabase; the browser's push service (admin web push, `docs/ADMIN_PUSH_NOTIFICATIONS.md`); the email provider for operations alerts | For as long as the person has access | Contract (employment) — counsel to confirm |
 | 14 | **Customer support** | Answer questions and complaints | Customers who get in touch | Whatever the customer sends by phone, WhatsApp or email | The business phone line; Meta for WhatsApp chats; the email provider | Outside the app's systems; the policy says "while we need them … and for a reasonable period afterwards" | Contract; legitimate interest |
+| 15 | **Online card payment (Moyasar)** — *added 2026-11-12; not yet in use* | Take payment for an order, confirm it, and refund it | Customers who choose online payment | **What our server sends Moyasar** (`buildInvoicePayload`, `supabase/functions/_shared/moyasar.ts`, called from `payment-initiate`): the amount, the currency, the fixed text "Spicy Meal order", an invoice expiry, two references — a random `sm_…` value and an `ORD-`/`CS-` value made from the first 12 hex digits of the order or checkout-session id — and the two return addresses, which carry that order or session id. **No name, phone number or email is sent.** **What the customer gives Moyasar directly**, on Moyasar's page inside the app: the card details, or Apple Pay. **What we keep** (`payment_records`, linked to the order): amount, currency, status, Moyasar's payment and invoice ids, card scheme, the last four digits, issuer name and country, and the authorisation and reference codes (`sanitizeMoyasarPayment`). Never the card number or a token | **Moyasar**, the payment processor. The card issuer, for 3-D Secure, and Apple, for Apple Pay, receive data from the customer directly | Kept with its order (activity 3). Account deletion does not clear it; it holds no name or number | Contract; legal obligation (financial records) |
 
 ## Where the data goes outside the Kingdom
 
@@ -74,6 +78,7 @@ protection commitments in our contract with that provider."*
 | Vercel | United States company, global edge network | 12 |
 | Lazywait | **Unknown** — the POS vendor's hosting is not visible from here | 3 |
 | Email provider | **Unknown** — named in the policy only as "our email provider" | 13, 14 |
+| Moyasar | **Unknown from here.** Moyasar is a Saudi company; where it stores and processes data is not visible from the repository. If it stays in the Kingdom, this is not a transfer. The owner's contract with Moyasar settles it, and counsel confirms | 15 |
 
 **What the law asks for each of these, read 2026-11-10.** Hosting with a
 foreign processor is a transfer (PDPL Art 1(9), Art 29). SDAIA has published
@@ -120,6 +125,10 @@ them; the owner can.
    the oldest from 2026-07-23**, so nothing stale has built up yet. A retention
    period for inactive device records is the fix, and it needs an owner
    decision on the period, as for finding 1. Found in review on #427.
+6. **The privacy policy does not name Moyasar** (added 2026-11-12). The owner chose
+   Moyasar on 2026-11-11. Activity 15 is not in use while online payment is off
+   (read-only, 2026-11-11), but the policy must name Moyasar before it is switched
+   on. Editing the live policy is an owner action (`OWNER_ACTIONS.md` §47.15).
 
 ## Keeping this record true
 

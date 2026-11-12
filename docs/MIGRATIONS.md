@@ -24,6 +24,19 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-11-11, the Moyasar-only change — two Moyasar-only files are
+> written, validated and NOT applied: `20261003120000_moyasar_only_payments`
+> (§55) and `20261004120000_drop_tap_payment_rpcs` (§56).** On merge the
+> outstanding set is SIX: `20260824100000`, `20260929120000` (§51),
+> `20261002120000` (§54, #436, merged 2026-11-12), `20261005120000` (§57,
+> #445, merged 2026-11-12) and these two.
+> `20261001120000` (§53) is not among them: it was applied at 12:30:50 UTC the
+> same day. **The Moyasar files have a required order:** `20260824100000`, then
+> `20261003120000`, then the Moyasar-only `payment-initiate` deploy, then
+> `20261004120000`, each on its own approval. The second refuses to apply
+> before the first, and the fourth before the second. `20260824100000` still
+> sorts ahead of everything. **Name the target by version.**
+
 > **Updated 2026-11-12 — `20261005120000_server_input_bounds` is written,
 > validated and NOT applied.** On merge it joins the unapplied set. It changes
 > live ordering behaviour: `place_customer_order` refuses a caller with no
@@ -7332,12 +7345,352 @@ none of the four columns, so nothing renders a missing actor.
 **Applying it is a §5 action, named by version.** Afterwards, a staff **Delete**
 in the console succeeds for an account that has history.
 
+## 55. Moyasar-only payment objects — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261003120000_moyasar_only_payments.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** It is the database half of the owner's decision of
+2026-11-11 that Moyasar is the payment provider (CLAUDE.md §6).
+
+sha256 `c0fe06f4a45fda3fb67c0b5515c46d137d9c6c6acba983ea4b84e50bd594453f`,
+2 299 lines / 112 061 bytes. **Re-hash the MERGED copy before applying**, per §15.
+**Amended 2026-11-12, still unapplied**, after the adversarial review of the
+Moyasar-only change. Finding C2: both attempt RPCs now refuse a total under
+Moyasar's 1.00 SAR invoice minimum. Finding C1, its re-verification: two
+order-first payments confirmed at the same moment were both marked paid, so
+`confirm_order_payment` now refuses, under the order's row lock, a payment for
+an order another payment has already paid (sections 7 and 8 of the file). The
+fingerprint, the counts and the expected hashes below are the amended file's.
+
+**It redefines seven functions and rewrites three comments, and nothing else.**
+No row is written, no grant or cron job changes, and it does not create
+`refund_trigger_secret`. **MONEY PATH UNTOUCHED, and the file asserts it**
+before and after: `place_order` `12b6816d…` and `compute_order_snapshot`
+`22e2d429…`, one definition each.
+
+### What it fixes, measured live 2026-11-11
+
+Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
+
+| Object | Before | After |
+| --- | --- | --- |
+| `begin_session_attempt` | `20260824100000`'s body, which has no loyalty multi-spend guard, and opens an attempt for any total above zero | the guard from `20260712170000:253-267`, ported verbatim; a total under 1.00 SAR refused with P0001, and a snapshot line of more than 50 of one item refused with 23514, both before any attempt is reused or opened |
+| `begin_payment_attempt` | opens an attempt for any total above zero | a total under 1.00 SAR refused with P0001 before any attempt is reused or opened |
+| `invoke_payment_refund_processor` | returns NULL unless the provider is `tap`, so the refund worker can never be invoked | gates on `moyasar`, case-insensitively |
+| `open_order_refund_record` | falls back to provider `tap` | falls back to `moyasar` |
+| `operations_health_snapshot_internal` | the payment card's `configured` flag is Tap's resolver, so a Moyasar row always reads `not_configured` | mirrors `resolveMoyasarConfig` |
+| `operations_alerts_render_event` | `Payment / Tap`, `الدفع / Tap` | `Payment / Moyasar`, `الدفع / Moyasar` |
+| `confirm_order_payment` | after the `for update`, checks only THIS payment's own `provider_ref`, so a second payment on an already-paid order upserts a second paid row and rewrites `paid_at` (reproduced on the local chain through the real handlers, not read live) | refuses that payment with P0001 `order_already_paid_by_another_payment`, after the early return that lets the paying payment's replay through; the caller records it as a duplicate to refund |
+
+The three comments are those of `begin_payment_attempt`,
+`begin_session_attempt` and `payment_records.provider_checkout_ref`, which
+described Tap as a current provider.
+
+**The guard defect.** `20260824100000`'s header promises "same locking, same
+reuse-or-expire logic" as the Tap pair, but it copied the July body from before
+`20260712170000` added the guard. Without it, two live checkout sessions can
+each be paid with the same points. Each session is priced against the full
+balance, and `insert_order_from_snapshot` later clamps the second deduction to
+what is left but keeps the second discount. The guard refuses to open a payment
+unless the live balance covers this session's points plus those reserved by the
+customer's other live sessions, under a lock on the profile row. A refusal is
+`P0001 'Your loyalty points balance changed. Please rebuild your order.'`, which
+`payment-initiate` logs and answers with its generic "Could not start the
+payment". The file has never run in Production, so nobody was affected.
+
+**The payment card.** The new `configured` flag requires, check for check with
+`resolveMoyasarConfig` (`supabase/functions/_shared/moyasar.ts`):
+- provider `moyasar`;
+- the secret key for the selected mode, carrying that mode's prefix, `sk_test_`
+  or `sk_live_`. A live key filed under test is not ready;
+- a webhook token for that mode, or the shared `moyasar_webhook_secret_token`.
+  An empty mode-specific token does not fall through to the shared one, which is
+  the resolver's `??`;
+- no merchant id.
+
+Both values are trimmed of exactly what `String.prototype.trim()` removes. Only
+booleans leave the statement; no key or token is selected.
+
+### Ordering, and why the file enforces it
+
+1. **`20260824100000` first.** This file refuses to apply until
+   `begin_payment_attempt`, `begin_session_attempt` and
+   `payment_records.provider_checkout_ref` exist. Without that check, its
+   `create or replace` would create `begin_session_attempt` on its own, and a
+   later apply of `20260824100000` would silently put the unguarded body back.
+   Proven: on a chain without `20260824100000`, the file stops at its first
+   check and creates nothing.
+2. **Both before the Moyasar-only `payment-initiate` is deployed.** That deploy
+   is what first calls `begin_payment_attempt` and `begin_session_attempt`, and
+   selects `provider_checkout_ref`.
+3. **`20261004120000` (§56) after that deploy.** It refuses to apply before this
+   file.
+
+Each is its own §5 action, named by version. **`20260824100000` still sorts
+ahead of every outstanding file, so a bulk apply takes it first.** This file is
+independent of `20260929120000`, `20261001120000` and `20261002120000`.
+
+### Derived, not retyped
+
+Every body is the current definition from the migration that last defined it,
+changed only by anchored substitutions. Each was asserted to match exactly once
+when the file was generated:
+
+| Function | Source | Substitutions |
+| --- | --- | --- |
+| `begin_session_attempt` | `20260824100000:186-268` | 4: three declarations, the guard block, the minimum after the zero-total check, and the line cap after the minimum |
+| `begin_payment_attempt` | `20260824100000:94-177` | 1: the minimum after the zero-total check |
+| `invoke_payment_refund_processor` | `20260729090000:186-262` | 1: the gate and its comment |
+| `open_order_refund_record` | `20260724120000:519-556` | 1: the literal |
+| `operations_health_snapshot_internal` | `20260925120000:113-1206` | 1: the payment configuration read and its comment |
+| `operations_alerts_render_event` | `20260820160000:1577-1651` | 2: the two labels |
+| `confirm_order_payment` | `20260827120000:207-259` | 1: the refusal, inserted after the early return |
+
+A `pg_get_functiondef` diff of each function, before and after, on the local
+chain shows only those hunks.
+
+**The pre-images were hashed against the live functions**, read-only, on
+2026-11-11:
+
+| Function | live `md5(prosrc)` | live `md5(pg_get_functiondef)` | Against its source file |
+| --- | --- | --- | --- |
+| `invoke_payment_refund_processor` | `52a3faab…` | `9e31bb04…` | byte-identical |
+| `operations_health_snapshot_internal` | `10265270…`, 47 919 chars | `47c7553a…` | byte-identical |
+| `operations_alerts_render_event` | `605c1ada…` | `85d67661…` | byte-identical |
+| `open_order_refund_record` | `0532e1c7…`, 1 021 chars | `780d39e5…` | comment-trimmed |
+| `tap_begin_session_attempt`, the guard's source | `35773fe3…`, 3 608 chars | `1e5bc676…` | comment-stripped, lines joined |
+
+The last two are not byte-identical to their files. With `--` comments removed
+and whitespace collapsed, live and repository hash the same: `6925d1a4…` and
+`588fc392…`. So the statements are the ones in the files, and the guard being
+ported is the one running today. `begin_session_attempt` and
+`begin_payment_attempt` are not live at all.
+
+**`confirm_order_payment` was NOT read live for this amendment** (no
+Production access was used). Instead the file refuses to apply unless the body
+it replaces is `20260827120000`'s: comment-stripped and whitespace-collapsed,
+`md5` `6a0ae6eb9963d6f79fc2b086d4583ece`, computed on the local chain. A live
+body that has drifted therefore stops the apply rather than being overwritten.
+Reading it live before approval is a cheap read-only check worth doing.
+
+**Hashes to expect after the apply**, computed on the local chain from this
+file before anything is sent:
+
+| Function | `md5(prosrc)` | `md5(pg_get_functiondef)` |
+| --- | --- | --- |
+| `begin_payment_attempt` | `9add3686b376e30ec4795a4695230df5` (3 429 chars) | `5dd3e36fa8015648bdf15455262be1d7` |
+| `begin_session_attempt` | `c856cdd32c8dbf5937441a685c58dfe0` (4 509 chars) | `8093e83a1a6ac4129284177fe1a0d5f2` |
+| `invoke_payment_refund_processor` | `afad660670f6d46b5e9c75e9f4d12c71` (2 677) | `2920cd9b992a2a1c1e61e07cfdd9e287` |
+| `open_order_refund_record` | `140778650aaea14bd32d4e087ae68ad9` (1 139) | `81c0ff702d8f5adbec5ddc450896329b` |
+| `operations_health_snapshot_internal` | `1e300b3d61759729e523d7c74224ce78` (49 281) | `54c3f7b243ca0cb7628c99f2438b7447` |
+| `operations_alerts_render_event` | `9214c2932078957a227ad61ac678f26d` (2 632) | `da6f2ae7ac65d0fb0a6e93c2ac0e7375` |
+| `confirm_order_payment` | `9b60284bda2582054d8db785067c1711` (2 123) | `6aea1c3ae258c6479deff265ec698efc` |
+
+They hold only for the sha256 above. **Check which side of the apply a hash
+describes before calling a mismatch** (CLAUDE.md §8).
+
+### A trim-set trap, found while mirroring the resolver
+
+The Tap predicate trimmed with `E' \t\n\r\f\v'`. **PostgreSQL has no `\v`
+escape**, so `E'\v'` is the letter `v`, measured as `ascii(E'\v') = 118`. The
+set trims a leading or trailing letter v and leaves a vertical tab in place.
+The new predicate spells the 25 code points `String.prototype.trim()` removes as
+`\u` escapes, enumerated with Node 22 and Deno 2.9.4.
+
+**The same set is still used in two places this file does not touch:**
+- the email card of the same snapshot, for `host` and `from_email`;
+- `address_description_is_usable` (`20260802120000`). It trims a lowercase v
+  from either end of a delivery landmark, so `villa` measures 4 and is refused
+  (measured on the local chain).
+
+Fixing those is a separate change.
+
+### What it deliberately does not do
+
+- **It does not create `refund_trigger_secret`.** The driver reads it from the
+  payment row's `secret_config`, not from Vault, and keeps returning NULL
+  without it. Creating it is an owner step.
+- **It adds no provider allow-list to `begin_payment_attempt` or
+  `begin_session_attempt`.** Both stay provider-parameterised. Their only caller
+  passes `moyasar`, and the service role they require can write
+  `payment_records` directly, so a refusal there would guard nothing.
+- **It does not touch the `payment-refund-worker` cron job**, which is inactive
+  live.
+- **It does not drop the Tap RPCs.** That is §56, after the deploy.
+
+### Validation
+
+- **Local chain harness** (`.github/sql-ci/run.sh`, Postgres 16 + PostGIS 3):
+  - base, at `2b69ab1`: 144 migrations, 82 suites, 80 passed, 2 quarantined;
+  - with this file: **145 migrations, 83 suites, 81 passed, 2 quarantined, 0
+    new failures**;
+  - the idempotence report is identical to the base, and the file re-applies
+    cleanly.
+- **Every new case fails without the file and passes with it:**
+  - `moyasar_begin_attempt_test.sql` Case 11, the guard. Of two live sessions
+    each redeeming 80 of 100 points, the first is refused while the other is
+    live, and pays once the other has expired. A reuse of its attempt is refused
+    once the balance no longer covers it. A session without points is never
+    checked;
+  - `operations_health_center_test.sql`. The Tap readiness cases become 20
+    Moyasar checks. Without the file, every check that expects `configured`
+    fails, and so does provider `tap`;
+  - `moyasar_only_payments_test.sql`. The refund gate, through the harness's
+    `net.http_post` recorder: a `tap` row sends nothing, an enabled `moyasar` row
+    posts to `/functions/v1/payment-refund` with the secret verbatim, and a
+    disabled row or a blank secret still sends nothing. Also the refund fallback
+    and both labels.
+- **Mutation testing: 16 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by a paired suite:
+  - the guard dropped, the `tap` gate kept, the `tap` fallback kept, the Tap
+    predicate kept;
+  - in the predicate: `sk_` instead of the mode's prefix; no token check; an
+    ASCII-only trim set; the old `E'\v'` set; an empty mode token falling
+    through; live mode reading the test key slot; no provider check;
+  - the Arabic label kept; a case-sensitive refund gate;
+  - the guard after the reuse lookup, counting its own session, counting
+    expired sessions.
+
+  Three of them survived the block's first version, which matched statement
+  fragments. The block now compares the whole guard and the whole predicate,
+  comments removed and whitespace collapsed.
+- **The 2026-11-12 amendment, the 1.00 SAR minimum** (`moyasar_begin_attempt_test.sql`
+  Case 12): 0.50 and 0.99 refused by both RPCs with no row written, exactly
+  1.00 accepted, and an open attempt for a 0.50 total refused rather than
+  reused. Local chain with it: 147 migrations, 84 suites, all passing but the
+  two quarantined. **Six mutants**: each minimum removed, `<=` (refusing exactly
+  1.00), a 0.50 threshold, and each minimum moved after the reuse lookup. All
+  six are killed by the file's own block, and five by the suite; the sixth,
+  moving the session minimum after the guard but still before reuse, changes no
+  outcome the suite can see, and the block's position check kills it.
+- **The 2026-11-12 line cap** (`moyasar_begin_attempt_test.sql` Case 13).
+  `begin_session_attempt` refuses a snapshot line of more than 50 of one item
+  with 23514 `order_items_quantity_max: ...`, between the minimum and the
+  guard. It is the payment half of the cash cap in `20261005120000`
+  (`place_customer_order`, PR #445, merged 2026-11-12): Codex review on #445 found that a
+  table CHECK there would bind `insert_order_from_snapshot`, which writes a
+  session's lines after the charge is captured. The cap therefore has to
+  refuse the session before an attempt exists, and it is deliberately **not** a
+  table CHECK either, because `20261005120000` refuses to apply while any upper
+  bound on `order_items.quantity` exists. The case refuses 51, a second line
+  of `"51"` sent as a JSON string, and 1 000 000, with no payment row written.
+  It refuses an open attempt for a 51-unit line rather than reusing it, and it
+  accepts exactly 50 and a snapshot with no items array. **Five mutants**, each
+  killed by both the file's own block (6.6c) and the suite: the cap removed,
+  the bound at 51, a JSON-string quantity skipped, only the first line read,
+  and the cap moved after the reuse lookup. Local chain: 148 migrations; 85
+  suites, 83 passed, 2 quarantined, 0 new failures.
+
+### What it proves at apply time, and what it cannot
+
+The block **calls** the snapshot and the renderer and reads their results back
+as values. The payment card must be in a legitimate state, report `enabled` and
+`configured` as booleans consistent with that state, and carry no key material.
+
+It does **not** call `invoke_payment_refund_processor`, which can POST to the
+refund worker, or `begin_session_attempt` and `begin_payment_attempt`, which
+write `payment_records`. A trigger function cannot be called directly. Those
+four are proven on the local chain only.
+
+**What the card reads after the apply depends on what the owner saved**, which
+no check reads. It is `not_monitored` if the selected mode's secret key and a
+webhook token are saved, and `not_configured` otherwise. With optional alerts
+on, a `not_configured` card raises `payment:configuration`.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20260824100000` by name. Verify that `begin_payment_attempt`,
+   `begin_session_attempt` and `payment_records.provider_checkout_ref` exist.
+2. Apply `20261003120000` by name, after re-hashing the merged copy.
+3. Verify read-only: the six hashes above, one definition each, the money-path
+   pair unchanged, and `anon` and `authenticated` unable to execute any of the
+   six.
+
+A timed-out apply is unknown until a read settles it (§52).
+
+## 56. Tap payment RPCs dropped — WRITTEN, NOT APPLIED (2026-11-11)
+
+`20261004120000_drop_tap_payment_rpcs.sql`. **Written 2026-11-11, validated,
+awaiting owner approval.** It drops `tap_begin_payment_attempt(uuid, text,
+integer)` and `tap_begin_session_attempt(uuid, text, integer)`, which open a
+payment attempt with the provider hard-coded to `tap`.
+
+sha256 `c95d950a7a1cd18401a5c94fc2aba459adfb33a5ebeddbae447b423e42a168ce`,
+159 lines / 7 873 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It drops two functions and nothing else.** No row is written:
+`payment_records` keeps its 9 Tap history rows, and the provider-scoped
+one-active indexes stay, because they guard Moyasar against a double charge
+too. **MONEY PATH UNTOUCHED, and the file asserts it.**
+
+### Apply it only after the Moyasar-only `payment-initiate` is deployed
+
+The live `payment-initiate` (v8, deployed 2026-07-13) still calls both functions
+on its `tap` branch. That branch cannot be reached while the payment row's
+provider is `moyasar`, but it is the only way back to Tap while v8 is live.
+After the Moyasar-only deploy, nothing calls them.
+
+The file also **refuses to apply before `20261003120000`**, so the loyalty guard
+is never dropped with its last copy.
+
+### Measured live 2026-11-11, read-only
+
+- Both functions exist, `SECURITY DEFINER`, executable by service_role only.
+- No other function body in any schema names `tap_begin_`, and `pg_depend`
+  lists no dependents.
+- Their only callers are in `supabase/functions/payment-initiate`.
+
+### What the file checks
+
+- **Before the drop:** `20261003120000` is applied (one `begin_session_attempt`,
+  carrying the guard), and no other function body and no cron command names a
+  `tap_begin_` function. plpgsql bodies are not tracked in `pg_depend`, so the
+  drop alone could not see such a caller.
+- **The drop** runs without `CASCADE`, so a dependent object fails the apply
+  instead of disappearing with it.
+- **After:** neither name exists under any signature. `begin_payment_attempt`
+  and `begin_session_attempt` are present and service_role only, and the session
+  one still carries the guard. The money path is unchanged.
+
+### Validation
+
+- **Local chain harness:** **146 migrations, 83 suites, 81 passed, 2
+  quarantined, 0 new failures**. The idempotence report is identical to the
+  base, and the file re-applies cleanly.
+- **Suites:**
+  - `tap_reference_order_opaque_test.sql` is **deleted**. Its subject is gone,
+    and with this file it fails at its first call. The opaque-reference rule
+    for Moyasar is covered by `moyasar_begin_attempt_test.sql` Cases 1 and 8;
+  - `moyasar_begin_attempt_test.sql` Case 4 called the Tap RPC and failed the
+    same way. It now writes a provider `tap` initiated row directly, in the
+    shape of the three live July rows, and also asserts that the Moyasar path
+    leaves that row alone;
+  - **new** `drop_tap_payment_rpcs_test.sql` fails without this file and passes
+    with it. It keeps asserting the drop on every later chain.
+- **Mutation testing: 3 mutants, each killed twice**, by the file's own block
+  and, with the block removed, by the suite:
+  - one function left in place;
+  - `begin_session_attempt` dropped as well;
+  - the precondition removed and the file applied before `20261003120000`. The
+    first version of the post-check missed this one; it now asserts the guard
+    too.
+
+### Applying it (owner, §5, named by version)
+
+1. Confirm that the Moyasar-only `payment-initiate` is deployed:
+   `list_edge_functions` shows a version newer than v8.
+2. Apply `20261004120000` by name, after re-hashing the merged copy.
+3. Verify read-only: no `pg_proc` row is named `tap_begin_payment_attempt` or
+   `tap_begin_session_attempt`.
+
+**Rollback**, as a new migration: re-create the two functions from
+`20260724180000` and `20260712170000`, each with its revoke/grant pair.
+
 ## 57. Server input bounds and customer order limits — WRITTEN, NOT APPLIED (2026-11-12)
 
 `20261005120000_server_input_bounds.sql`. **Written 2026-11-12, validated,
 awaiting owner approval.** App-hardening checklist gaps S02#1, S04#1, S04#2,
-S05#3 and S07#1, plus one bug found while fixing them. The section number skips
-55–56, which the open Moyasar pull request uses.
+S05#3 and S07#1, plus one bug found while fixing them. Sections 55–56 are the
+Moyasar-only change's.
 
 sha256 `1879deaee3bf962245bf7b7b5f37ba07670097d5ab120e9f585d8fe392a4f8f7`,
 747 lines / 38 126 bytes. **Re-hash the MERGED copy before applying**, per §15.

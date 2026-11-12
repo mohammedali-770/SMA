@@ -13,19 +13,19 @@ major_version = 15
 [functions.order-intake]
 verify_jwt = true
 
-# PROVISIONAL/FROZEN payment surface. The signed-in customer initiates payment
-# for their own order/session. Current source supports Tap (hosted charge) and
-# Moyasar (hosted invoice), and retains older Geidea scaffold code, but the final
-# provider has NOT been selected and Moyasar is inert — see CLAUDE.md §6.
+# Payment surface. The signed-in customer initiates payment for their own
+# order/session through Moyasar's hosted invoice, the only payment provider
+# (owner decision, 2026-11-11). Customer checkout is refused while the gateway
+# is in TEST mode; sandbox testing is the admin test in payment-test-config. See
+# docs/PAYMENTS.md before touching any payment function or provider
+# configuration.
 [functions.payment-initiate]
 verify_jwt = true
 
-# PROVISIONAL/FROZEN provider webhook surface. No user JWT; provider authenticity
-# is verified inside the function — Tap by its HMAC hashstring, Moyasar by the
-# `secret_token` in the body. Neither is trusted as evidence of payment: both
-# paths re-fetch server-to-server before confirming anything. See
-# docs/PAYMENT_POSTPONEMENT.md before touching any payment function or provider
-# configuration.
+# Moyasar webhook. No user JWT; Moyasar's authenticity is checked inside the
+# function by the `secret_token` in the body, and that token is never trusted as
+# evidence of payment: the payment is re-fetched server-to-server before anything
+# is confirmed.
 [functions.payment-webhook]
 verify_jwt = false
 
@@ -83,34 +83,38 @@ verify_jwt = true
 [functions.staff-accounts]
 verify_jwt = true
 
-# ---- Provisional payment/refund functions (FROZEN) -----------------------
-# These functions remain in source for the existing checkout stack, but ordinary
-# work must not change/deploy/test them while the final payment provider is
-# unresolved. Authoritative decision: docs/PAYMENT_POSTPONEMENT.md.
+# ---- Payment/refund functions (Moyasar) ----------------------------------
+# Deploying any of these, applying a payment migration and changing payment
+# configuration each remain a separate owner approval (CLAUDE.md §5).
+# Authoritative record: docs/PAYMENT_POSTPONEMENT.md.
 
-# Customer-side Tap verification path. Requires a valid user JWT and reads the
+# Customer-side verification path. Requires a valid user JWT and reads the
 # customer's own order/session under RLS before server-side provider checks.
 [functions.payment-verify]
 verify_jwt = true
 
-# Public HTTPS return page used by the existing Tap checkout path. It does not
-# trust the browser to mark payment state by itself.
+# Public HTTPS return page Moyasar's hosted invoice sends the customer back to
+# (success_url and back_url). It marks nothing paid; the app verifies
+# server-side.
 [functions.payment-return]
 verify_jwt = false
 
 # Refund processor. No user JWT because it is a server/scheduled path; it fails
 # closed behind its dedicated authentication contract. Automated refund
-# scheduling is intentionally disabled while payment/refund work is frozen.
+# scheduling (the payment-refund-worker cron job) stays off until the owner
+# re-enables it.
 [functions.payment-refund]
 verify_jwt = false
 
-# Admin-only Tap configuration/diagnostic test surface. Frozen with the rest of
-# the payment area; secret values remain server-side.
+# Admin-only (AAL2) Moyasar status, connection test, re-verify and sandbox test
+# invoice; secret values remain server-side.
 [functions.payment-test-config]
 verify_jwt = true
 
-# Public informational return page for the isolated admin Tap test checkout.
-[functions.tap-admin-test-return]
+# Public informational return page for the isolated admin TEST invoice (its
+# success_url and back_url). Marks nothing paid. Renamed from
+# tap-admin-test-return on 2026-11-11.
+[functions.payment-admin-test-return]
 verify_jwt = false
 
 # ---- Account deletion ----------------------------------------------------

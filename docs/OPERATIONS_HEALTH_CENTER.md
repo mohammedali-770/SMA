@@ -116,9 +116,21 @@ configuration error has the highest precedence.
   read-only; the call-centre console is where an operator sees which branch and
   acts on it.
 
-- **Payment / Tap** — enabled/configured metadata, safe payment status counts,
+- **Payment / Moyasar** — enabled/configured metadata, safe payment status counts,
   recent stale initiated attempts, latest paid time, and payment-related Order
-  Integrity incident counts. No Tap API availability probe exists in v1.
+  Integrity incident counts. No provider availability probe exists in v1.
+
+  *Changed 2026-11-12.* The card was **Payment / Tap**. On the branch
+  `feat/moyasar-only-20261111` the console labels it **Payment / Moyasar**
+  (**الدفع / Moyasar**), and that reaches the console on merge. The database half
+  waits for `20261003120000` to be applied (`OWNER_ACTIONS.md` §47.3). Until then:
+  - the card's **configured** test is still Tap's, so against the Moyasar row it
+    reads `not_configured`;
+  - alert emails rendered by the database still say **Payment / Tap**.
+
+  After the apply, "configured" follows Moyasar's own rule: provider `moyasar`,
+  the selected mode's secret key with the matching `sk_test_` / `sk_live_` prefix,
+  and a webhook token for that mode. No merchant id is needed.
 - **Push Notifications** — master flag, safe device/opt-in counts, and aggregate
   send-ledger status. No push is sent.
 - **Email / SMTP** — configuration completeness only. No email is sent.
@@ -206,6 +218,24 @@ The page:
 Admin and accountant/staff users receive the same safe read-only Health Center
 view. Existing admin-only controls remain in their original management panels.
 Customers have no access.
+
+## Duplicate Moyasar payments — not shown here
+
+**Added 2026-11-12.** If a customer pays twice for one order or checkout session,
+the Moyasar-only payment code records the second payment as a `failed`
+`payment_records` row with `failure_code = 'duplicate_payment'`, plus one
+`integration_sync_logs` row with `error = 'duplicate_payment'`. It is never
+reported paid.
+
+**Nothing on this page, and no alert, shows it.** The watchdog's
+`MULTIPLE_SUCCESSFUL_CAPTURES` rule counts paid rows only, and a duplicate is
+`failed`. An order's receipt shows only its newest payment record, so it may show
+the duplicate or hide it. Nothing refunds a duplicate automatically; making that
+automatic needs an owner decision (`OWNER_ACTIONS.md` §47.20).
+
+**How to find and refund one** — the read-only queries and the refund in the
+Moyasar dashboard, which is a live money action and an owner approval — is owned
+by [`PAYMENTS.md`](PAYMENTS.md) §10.
 
 ## Change control
 

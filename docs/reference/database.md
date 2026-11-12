@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **147**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261005120000_server_input_bounds.sql`.
+Migration files in the repository: **149**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261005120000_server_input_bounds.sql`.
 
 ## Tables
 
@@ -127,8 +127,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
-| `begin_payment_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
-| `begin_session_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
+| `begin_payment_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
+| `begin_session_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `branch_availability_sweep` | 5 | `20260923120000_branch_variant_availability.sql` |
 | `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
@@ -150,7 +150,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_variant_snooze` | 1 | `20260923120000_branch_variant_availability.sql` |
 | `compute_campaign_discount` | 2 | `20260920120000_promo_disclosure_hardening.sql` |
 | `compute_order_snapshot` | 9 | `20260924120000_place_order_variant_availability.sql` |
-| `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
+| `confirm_order_payment` | 4 | `20261003120000_moyasar_only_payments.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
 | `current_staff_branch_id` | 1 | `20260820100500_ops_branch_scoping.sql` |
@@ -197,7 +197,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `invoke_admin_push_dispatch` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `invoke_lazywait_sync_processor` | 1 | `20260720120000_lazywait_sync_scheduler.sql` |
 | `invoke_operations_alert_dispatch` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
-| `invoke_payment_refund_processor` | 1 | `20260729090000_payment_refund_scheduler.sql` |
+| `invoke_payment_refund_processor` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `is_admin` | 2 | `20260810142000_staff_mfa_aal2.sql` |
 | `is_branch_operator` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `is_call_center` | 1 | `20260820100500_ops_branch_scoping.sql` |
@@ -223,7 +223,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `normalize_manual_pos_sync_notification` | 1 | `20260813143000_manual_only_pos_resend.sql` |
 | `normalize_modifier_availability` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `normalize_variant_availability` | 1 | `20260923120000_branch_variant_availability.sql` |
-| `open_order_refund_record` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
+| `open_order_refund_record` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `operations_alert_settings_get` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alert_settings_safe` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alert_settings_update` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
@@ -236,7 +236,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_alerts_evaluate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_outbox_for_event` | 3 | `20260913120000_alert_recovery_email_pairing.sql` |
-| `operations_alerts_render_event` | 3 | `20260820160000_branch_availability_health_card.sql` |
+| `operations_alerts_render_event` | 4 | `20261003120000_moyasar_only_payments.sql` |
 | `operations_alerts_safe_bool` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_safe_int` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_sanitize_evidence` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
@@ -246,7 +246,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_digest_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_digest_preview` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_health_overall_state` | 2 | `20260807150000_order_flow_health_card.sql` |
-| `operations_health_snapshot_internal` | 6 | `20260925120000_health_card_variant_coverage.sql` |
+| `operations_health_snapshot_internal` | 7 | `20261003120000_moyasar_only_payments.sql` |
 | `operations_health_summary` | 2 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `order_integrity_acknowledge_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_admin_summary` | 1 | `20260721170000_order_integrity_watchdog.sql` |

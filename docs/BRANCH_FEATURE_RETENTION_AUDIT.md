@@ -59,7 +59,7 @@ Source-level retention is only phase 1. Final classification as deletable waits 
 | `feat/ds-admin-shell-ops` | Admin shell and language-aware typography | Current shell/sidebar/header and DS language/font helpers remain | **RETAINED / NEWER** |
 | `feat/ds-auth-surface` | Customer auth/OTP DS migration without changing auth authority | `LoginScreen`, `PhoneOtpLogin`, `OtpCodeInput`, Saudi phone input use current DS | **RETAINED / NEWER** |
 | `feat/ds-checkout-payment-surface` | Safe `__DEV__` fixture/preview surfaces | `dev-fixture`, fixture gate/safety modules and tests remain | **RETAINED** |
-| `feat/ds-checkout-payment-ui` | Checkout/payment visual migration while preserving frozen payment logic | Current checkout/payment screens use DS; provider behavior remains frozen | **RETAINED / NEWER** |
+| `feat/ds-checkout-payment-ui` | Checkout/payment visual migration while preserving frozen payment logic | Current checkout/payment screens use DS; provider behavior was frozen when audited (since 2026-11-11 Moyasar is the provider: `docs/PAYMENTS.md`) | **RETAINED / NEWER** |
 | `feat/ds-home-menu-surface` | Home/menu/banner/product-card DS surface | Current `HomeMenuScreen`, `BannerCarousel`, `ProductCard` remain | **RETAINED** |
 | `feat/ds-modal-focus` | Portal modal, focus trap, Escape, restore focus, inert background | `src/components/admin/view/shared/ModalShell.tsx` contains all of those behaviors | **RETAINED** |
 | `feat/ds-order-type-legacy-removal` | Order-type DS migration and removal of legacy theme/Button/Notice path | Current `OrderTypeSelectScreen` is DS-based and legacy components are no longer authoritative | **RETAINED / NEWER** |

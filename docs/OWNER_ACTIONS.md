@@ -29,9 +29,25 @@ What remains is the native/device proof:
 
 Source references: `README_MOBILE.md`, `docs/RELEASE_CHECKLIST.md`, `docs/BRANCH_FEATURE_RETENTION_AUDIT.md`.
 
-## 2. Final payment-provider decision
+## 2. Final payment-provider decision — DECIDED 2026-11-11: Moyasar
 
-**Status:** OWNER DECISION — blocking all new payment/refund work.
+**Status:** DECIDED. The go-live steps that follow from it are §47.
+
+> **Decided 2026-11-11, in conversation.** The owner: *"our payment is confirmed
+> it will be through moyasar / make the required edits and remove unnecessary
+> pices of code for other payment gateway and keep moyasar"*. Answers the same
+> day: test and live keys exist; mada, Visa / Mastercard and Apple Pay are
+> enabled (no STC Pay); refunds automatic via Moyasar; sandbox first, then live;
+> a static-IP proxy service for Moyasar's Allowed IPs. The branch
+> `feat/moyasar-only-20261111` removes the Tap and Geidea code and makes every
+> payment path Moyasar-only (CLAUDE.md §6). **Nothing live follows from that.**
+> Every apply, deploy, key, dashboard change and switch is a separate §5
+> approval, listed in order in §47.
+>
+> The text below is the decision register as it stood until 2026-11-11, kept as
+> history. Do not act on it.
+
+**History — status until 2026-11-11:** OWNER DECISION — blocking all new payment/refund work.
 
 The final payment gateway has not been selected. Existing Tap/payment/refund source remains provisional and frozen; older Geidea scaffold code also remains in the server tree.
 
@@ -45,7 +61,7 @@ Until the decision is made:
 
 When a provider is selected, reopen the area through a separate reviewed plan that addresses provider verification, idempotency/reconciliation, ambiguous refund outcomes and migration/deployment order.
 
-Authoritative decision: `docs/PAYMENT_POSTPONEMENT.md`.
+Authoritative decision until 2026-11-11: `docs/PAYMENT_POSTPONEMENT.md`.
 
 ## 3. Backup / PITR / restore capability
 
@@ -100,7 +116,12 @@ from cron.job
 where jobname = 'payment-refund-worker';
 ```
 
-Expected while the payment freeze is active: `active = false`.
+Expected: `active = false` until the owner re-enables it as step 47.16, after the
+Moyasar-only migration and payment deploy (§47). **Changed 2026-11-11:** this used
+to say "while the payment freeze is active"; the freeze is lifted for repository
+work only, and the job still stays off until that step. After 47.16 the expected
+value is `true`, and a restore that brings it back as `true` before the payment
+row and functions match must be switched off again.
 
 A restore/runbook must never assume the manual disabled state is reproduced automatically.
 
@@ -458,6 +479,11 @@ internal systems, and is not translated. Fixing that is display-only and
 genuinely worth doing — it needs your approval under §5 first, and should be its
 own change.
 
+*Still true on 2026-11-12, on the Moyasar-only branch:* the catches in
+`runOnlinePayment` and `verifyPaymentSession` still show `payment-initiate`'s
+English error text. The freeze no longer applies, so it is ordinary repository
+work now, still its own change.
+
 **Note for CI:** the `payments` ownership rule covers only
 `supabase/functions/payment-*`, `tap-*` and the shared payment helpers. A
 freeze-touching change in the **mobile** app fires no rule at all, so CI will not
@@ -665,7 +691,11 @@ all of: a manual run from the Actions tab; an explicitly named function list
 dialog and pressing Run deployed frozen code); and the literal string `DEPLOY`
 typed into a confirmation field. Deploying an Edge Function still requires
 explicit owner approval every time under CLAUDE.md §5, and the payment functions
-are frozen on top of that under §6.
+are frozen on top of that under §6. **Changed 2026-11-11:** the freeze is lifted
+for repository work. The payment functions now deploy as one set of seven
+(`all`), each function's `verify_jwt` is read from `supabase/config.toml` when the
+job runs, and deploying them is still its own §5 approval (§47.4,
+`DEPLOY.md` §12).
 
 **On the historical risk specifically.** Adding the token does not recreate the 2026-07-13 exposure —
 that configuration no longer exists. It removes the last accidental barrier in
@@ -801,6 +831,11 @@ Three consequences the owner should hold:
   freeze lifted, or an explicit decision to ship the current payment helpers with
   it, which is a payment-behaviour decision and not an authorization one. Detail
   in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) §2.
+
+  **Changed 2026-11-11:** the freeze is lifted for repository work, and the
+  Moyasar-only `payment-test-config` keeps the same `is_admin()` gate. It now
+  deploys only as part of the seven-function payment set, after both payment
+  migrations (§47.4). That deploy is what makes the AAL2 gate live.
 
   **The same risk applies to the four redeployed on 2026-08-23, and the answer is
   partly verified and partly not.** `push-dispatch` and `email-test-config` had
@@ -2762,6 +2797,55 @@ keys `errOrder*`), shown at checkout when the server refuses an order:
 The English for each sits beside it in the same file. «قطعة» ("piece") is the
 word to check first: it reads oddly for a drink or a sauce.
 
+**Widened 2026-11-12 — the Moyasar-only change (§47).** All engineering-drafted,
+none read by a native speaker. Brand names stay in Latin script.
+
+Customer-facing, in the app (ships with the EAS build in §47.17):
+
+- the payment screen footer (`apps/mobile/src/app/payment/checkout.tsx`):
+  «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.» — English: *"Your card details
+  are entered on Moyasar's secure page."*;
+- the web build's payment stub (`apps/mobile/src/components/PaymentWebView.web.tsx`):
+  «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.», replacing a line that called the
+  web build a trial version;
+- `payBelowMinimum` (`apps/mobile/src/i18n/strings.ts`), shown when points leave
+  a total under 1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال.
+  استخدم نقاطاً أقل، أو ادفع نقداً.»
+
+Admin-facing, in the console (live on merge):
+
+1. «مزوّد الدفع المحفوظ ليس 'moyasar'. احفظ بطاقة الدفع أعلاه لتخزينه.»
+2. «انشر دوال الدفع الخاصة بـ Moyasar أولاً.»
+3. «دالة payment-test-config على الخادم أقدم من Moyasar. قراءاتها تخص بوابة الدفع
+   السابقة فلا تُعرض هنا، واختبار الاتصال فيها لا يختبر Moyasar.»
+4. «يفيد الخادم بأن Moyasar غير جاهز (<reason>).»
+5. «رمز التحقق من الويب هوك: <code>»
+6. «أرسله Moyasar الساعة <t1>. أدخله في Moyasar ← الإعدادات ← Webhooks خلال 30
+   دقيقة من وصوله، أي قبل <t2>. لا يرسل Moyasar أي أحداث إلى الويب هوك قبل إدخاله.»
+7. «بادئة المفتاح (sk_test_)»
+8. «رمز الويب هوك السري (test)»
+9. «سُجّلت هذه المحاولة عبر مزوّد دفع لم يعد مستخدماً. تُعرض للاطلاع فقط ولا يمكن
+   إعادة التحقق منها.»
+10. «إعادة التحقق من الدفع عبر Moyasar»
+11. «الدفع الإلكتروني عبر Moyasar. لا يُرسل الطلب الإلكتروني إلى الكاشير حتى يتم
+    التحقق من دفعه.»
+12. «فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع
+    التجريبي.»
+13. «الدفع / Moyasar» — the payment label in Operations Health and Operations
+    Alerts. The alert emails the database renders carry it only after
+    `20261003120000` is applied (§47.3).
+
+Admin-facing, on the sandbox return page (`payment-admin-test-return`, live after
+§47.4): «اكتمل اختبار الدفع» and its two sentences.
+
+Staff-facing, in `docs/STAFF_MANUAL.md` §3 (a document, not the product): the
+paragraph that replaced «مزود الدفع النهائي لم يُعتمد بعد…», naming Moyasar and the
+duplicate-payment record.
+
+The lines in 1 to 12 are listed in the console sources
+(`src/components/admin/MoyasarPaymentPanel.tsx`, `view/orders/PaymentDetails.tsx`,
+`SettingsPanel.tsx`); a line wrapped above is one line there.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -2862,6 +2946,11 @@ a full credential form — the deployed `AdminDashboard` chunk ships
 is unapplied, no function is deployed), but §6 says choosing the provider is a
 deliberate owner action and the console currently presents it as a dropdown.
 Worth a guard rather than a redesign.
+
+**Changed 2026-11-11, on the branch `feat/moyasar-only-20261111`:** the card now
+offers `['moyasar']` only, and a stored provider other than `moyasar` opens and
+saves as `moyasar`. The owner chose Moyasar the same day, so the dropdown
+question is settled. The deployed console changes on merge.
 
 ## 38. Google Play first release (Android) — the five owner steps
 
@@ -3516,6 +3605,11 @@ then, and receivers accept both. **The steps, in this order, each a separate
 8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
    (reversible). **The five frozen payment functions stop working here — owner
    decision 2026-11-09**, acceptable only while online payment is off.
+   **Changed 2026-11-11:** this describes the July Tap-era bundles. Five of the
+   seven Moyasar-only functions build their clients with `adminClient()` /
+   `userClient()`, which prefer the new keys, so the deploy in §47.4 moves them.
+   `_shared/paymentSync.ts:25` still reads `SUPABASE_ANON_KEY` directly. Read
+   `SUPABASE_API_KEYS.md` §2 before step 8 if online payment is on by then.
 9. A cleanup PR removes the fallbacks.
 
 **Rollback:** reactivate the legacy keys; no redeploy needed.
@@ -3719,11 +3813,426 @@ migration and no data change.
 **Done looks like:** steps 1 to 4 done, with the date of each written here and
 in the two documents above.
 
+## 47. Moyasar go-live — the owner steps, in order
+
+**Opened 2026-11-12.** On 2026-11-11 the owner decided that Moyasar is the
+payment provider (CLAUDE.md §6). The branch `feat/moyasar-only-20261111` makes
+Moyasar the only provider in the code, the tests and the documents. **Merging it
+changes nothing a customer can do**: online payment is off, and every payment
+function in Production is still a July Tap-era bundle. (§46 is the admin-address guards,
+#442.)
+
+The runbook behind these steps, with the detail of each, is `PAYMENTS.md`; this
+section is the owner's checklist. **Every numbered step below is its own
+CLAUDE.md §5 approval**, named when it is due. Approval for one step is not
+approval for the next. **None of them had been done on 2026-11-12.** Where a step needs a secret, the value goes into the
+console or the Supabase dashboard, never into a chat.
+
+**Live state, read-only, 2026-11-11:**
+
+- `app_settings.online_payment_enabled` is **false** since 10:56 UTC. An admin
+  had switched it on that morning with Moyasar in TEST mode; the owner switched
+  it off;
+- the payment row (`integration_settings`, `provider_type = 'payment'`) is
+  provider `moyasar`, **enabled**, mode `test`, with a test publishable key.
+  Tap's `merchant_id`, `source_id` and `transaction_expiry_minutes` are still in
+  its `public_config`;
+- `20260824100000` is unapplied, so `begin_payment_attempt`,
+  `begin_session_attempt` and `payment_records.provider_checkout_ref` do not
+  exist;
+- `payment_records` holds only `tap` rows: 6 failed, 3 initiated and expired,
+  0 paid. `order_refunds` is empty;
+- the `payment-refund-worker` cron job is inactive. `refund_trigger_secret` is
+  not in Vault. **Whether it is in the payment row's `secret_config` is not
+  settled here:** `BACKUP_RECOVERY.md` §4.3 lists that key name on the row on
+  2026-11-11 (names only), while the Moyasar work's notes say it must be
+  generated. 47.16 checks before it writes.
+
+### The order is not a preference
+
+Each step either refuses to run out of order or breaks something if it does.
+The apply/deploy order is enforced in three places: the migrations refuse
+(`20261003120000` before `20260824100000`, `20261004120000` before
+`20261003120000`), the deploy workflow prints the order, and
+`deployFunctionsWiring.test.ts` fails if the guidance drops a step.
+
+### 47.1 Merge the pull request
+
+**Done looks like:** the merge commit is on `claude/project-build-ie4b56`.
+
+What a merge does by itself, because the console and `/app` deploy on merge
+(`DEPLOY.md` §9):
+
+- the console's Integrations → Payments panel says **"Deploy the Moyasar payment
+  functions first."** It hides the July function's key readings, which describe
+  Tap's keys, and disables Test connection. That is expected until 47.4;
+- Settings → Payment Methods lets Online Payment be switched **on** only while the
+  payment row is enabled, names Moyasar and is in live mode. Switching it off is
+  always allowed. **This guards the console control, not the setting:**
+  `set_payment_settings` checks `is_admin()` alone, so a direct call can still
+  turn it on;
+- the web build (`/app`) never offers online payment, whatever the setting says;
+- old Tap payment records on an order's receipt are shown read-only, with a note
+  that the provider is no longer used.
+
+### 47.2 Apply `20260824100000_moyasar_payment_provider`, by version
+
+Its sha256 is
+`4c0123c91969ee10bc52b2f5221597bb516fc7fabe7f904d3e8b88215e93ef5e` (274 lines /
+14 529 bytes). Re-hash the merged copy before sending (CLAUDE.md §15).
+
+**This file used to be the frozen one.** It is now step 1 of the apply order,
+and it still sorts ahead of every outstanding file, so **name it by version and
+never apply "whatever is outstanding"** (CLAUDE.md §8).
+
+**Done looks like, read-only:**
+
+```sql
+select count(*) from supabase_migrations.schema_migrations
+ where name = 'moyasar_payment_provider';                      -- 1
+select proname from pg_proc
+ where pronamespace = 'public'::regnamespace
+   and proname in ('begin_payment_attempt', 'begin_session_attempt');  -- 2 rows
+select column_name from information_schema.columns
+ where table_schema = 'public' and table_name = 'payment_records'
+   and column_name = 'provider_checkout_ref';                  -- 1 row
+```
+
+### 47.3 Apply `20261003120000_moyasar_only_payments`, by version
+
+Fingerprint and the expected post-apply hashes: `MIGRATIONS.md` §55. Re-hash the
+merged copy first. It refuses to apply before 47.2.
+
+What it changes once applied:
+
+- `begin_session_attempt` gets the loyalty multi-spend guard, so a customer
+  cannot pay two live sessions with the same points;
+- both attempt functions refuse a total under 1.00 SAR, Moyasar's invoice
+  minimum;
+- `begin_session_attempt` refuses a checkout session with a line of more than
+  50 of one item, before any payment, matching the cash cap;
+- `confirm_order_payment` refuses, under the order's row lock, a payment for an
+  order another payment has already paid;
+- the refund driver runs only for a `moyasar` row, and the refund ledger falls
+  back to `moyasar` instead of `tap`;
+- the Operations Health payment card's "configured" test follows Moyasar's
+  rules, and staff alerts read **Payment / Moyasar** and **الدفع / Moyasar**.
+
+**The money path is untouched**, and the file asserts it: `place_order`
+`12b6816d…`, `compute_order_snapshot` `22e2d429…`.
+
+**Done looks like:** one history row named `moyasar_only_payments`, and the
+function hashes in `MIGRATIONS.md` §55 read back read-only.
+
+### 47.4 Deploy the seven payment functions, as one set
+
+`payment-initiate`, `payment-verify`, `payment-webhook`, `payment-return`,
+`payment-refund`, `payment-test-config` and `payment-admin-test-return`, together
+(`DEPLOY.md` §12). **Only after 47.2 and 47.3.** Without 47.3 the session flow
+opens payments with no loyalty multi-spend guard, and only `payment-initiate`'s
+own check enforces the 1.00 SAR minimum.
+
+A new payment bundle beside an older one can open a Moyasar invoice that nothing
+confirms, so deploy all seven in one run.
+
+**Done looks like, read-only** (Supabase dashboard or `list_edge_functions`):
+
+- all seven show a new version deployed today;
+- `verify_jwt` is **false** on `payment-webhook`, `payment-return`,
+  `payment-refund` and `payment-admin-test-return`, and **true** on the other
+  three, matching `supabase/config.toml`;
+- the console's Moyasar panel no longer says "Deploy the Moyasar payment
+  functions first."
+
+This deploy also makes `payment-test-config`'s AAL2 admin gate live, which closes
+the exception recorded in `GO_LIVE_READINESS.md` D3. Customer checkout stays
+refused while the row is in TEST mode: `payment-initiate` answers
+`{status:'disabled', reason:'test_mode'}`.
+
+### 47.5 Apply `20261004120000_drop_tap_payment_rpcs`, by version — after 47.4
+
+Fingerprint: `MIGRATIONS.md` §56. **Only after 47.4**: the July
+`payment-initiate` still calls both functions on its Tap branch. It refuses to
+apply before 47.3.
+
+**Done looks like:** `select count(*) from pg_proc where proname like
+'tap_begin_%'` returns 0.
+
+### 47.6 Delete the old `tap-admin-test-return` function
+
+A deletion is a destructive Production action. Do it only after 47.4, because
+the new `payment-test-config` points its sandbox return at
+`payment-admin-test-return`.
+
+**Done looks like:** the function list has no `tap-admin-test-return`.
+
+### 47.7 Enter the TEST keys and the TEST webhook token in the console
+
+Admin → Integrations → Payments (the Moyasar card): the test secret key, the
+test publishable key, and a test webhook secret token you choose. The token is
+the value you will also type into Moyasar in 47.8.
+
+**Done looks like:** the Moyasar panel's readiness rows read OK for "Key for
+mode (test)", "Key prefix (sk_test_)" and "Webhook secret (test)", and **Test
+connection** answers "Connection OK".
+
+**A badge that can mislead:** the card's per-field "configured" badge reads the
+whole row, and Tap's July keys are still in `secret_config`. So every Moyasar
+secret field can read "configured" while empty. Trust the panel's readiness
+rows, not the badge.
+
+### 47.8 Register the TEST webhook in Moyasar, then enter its code within 30 minutes
+
+**Only after 47.4 and 47.7.** The July `payment-webhook` answers Moyasar's
+one-time verification event with 200 and records nothing, and Moyasar never
+sends it again. Without the token saved, the new function refuses it (401).
+Either way the code is lost and a new one must be requested.
+
+1. Moyasar Dashboard → Settings → Webhooks, in test mode. URL:
+   `https://wxfmmnihidsdyemasstf.supabase.co/functions/v1/payment-webhook`.
+   Secret token: the value from 47.7.
+2. Moyasar sends one `webhook_verification` event. The console's Moyasar panel
+   shows the six-digit code for 30 minutes, with the time it arrived and the
+   deadline.
+3. Enter the code in Moyasar within 30 minutes. Five wrong entries lock it.
+   Moyasar delivers no event to the webhook before it is verified.
+
+If the code is missed, request a new one in Moyasar.
+
+**Done looks like:** Moyasar shows the webhook as verified.
+
+The code lands in `integration_sync_logs`, which an admin or an accountant,
+signed in at AAL2, can read (`is_staff()`). Branch and call-centre staff cannot.
+It is short-lived and useful only with access to the Moyasar dashboard.
+
+### 47.9 The sandbox test, from the console
+
+The sandbox is the console's admin test, **not** a customer order. Customer
+checkout is refused in TEST mode by design, so a test card can never pay for a
+real order.
+
+1. Moyasar panel → run the sandbox checkout. It opens an isolated **1.00 SAR**
+   TEST invoice, linked to no order, in a browser tab.
+2. Pay with Moyasar's test cards: mada `4201320111111010`; Visa
+   `4111111111111111` (3-D Secure challenge) or `4111114005765430`
+   (frictionless); Mastercard `5421080101000000`. For a decline, mada
+   `4201320000311101`.
+3. Read the result back in the panel.
+
+**Done looks like:** an approved card reads paid, the decline card reads failed,
+and no order changed. Also check that the hosted page shows Arabic with
+`lang=ar`; that parameter is undocumented.
+
+**What this does NOT test:** the app's payment WebView, Apple Pay, or the return
+to the app. Apple Pay in Moyasar's sandbox succeeds only for 200.00-300.00 SAR,
+and this invoice is 1.00 SAR. Those are covered by 47.18.
+
+### 47.10 Choose the static-IP proxy service
+
+Moyasar refuses live secret-key calls from any address that is not on its
+**Allowed IPs** list (Dashboard → Settings → API Keys). Supabase Edge Functions
+have no fixed outbound address. The owner chose a static-IP outbound proxy
+service on 2026-11-11.
+
+**You need from the service:** its URL (`http://` or `https://`, with
+`user:pass@` if it uses credentials) and **every** outbound IP it can use.
+Prefer an `https://` proxy URL where the service offers one: the proxy's own
+credentials travel in clear to an `http://` proxy. With an `https://` target the
+proxy only tunnels, so it never sees the Moyasar key.
+
+**Unknown, and it matters:** the code uses `Deno.createHttpClient` with a proxy.
+Supabase's documentation does not mention it. Support comes from the
+edge-runtime source (1.68.0 and later). If the hosted runtime lacks it, every
+Moyasar call is refused with `moyasar_proxy_unsupported` once the secret is set,
+TEST included. The live Test connection in 47.13 is the proof.
+
+### 47.11 Set `MOYASAR_PROXY_URL` as an Edge Function secret
+
+Supabase dashboard → Edge Functions → Secrets. **Never paste it into a chat.**
+
+- `HTTPS_PROXY` does **not** work as a function secret: the runtime reads that
+  from the process environment, and function secrets are per-worker values;
+- an unusable value (another scheme, a value that does not parse) refuses
+  **every** Moyasar call, TEST included, before anything is sent;
+- set it after the sandbox test (47.9), so a bad value cannot be mistaken for a
+  sandbox failure, and before 47.13. Any later sandbox run goes through the
+  proxy too.
+
+**Done looks like:** the secret name is listed. The value cannot be read back,
+and does not need to be.
+
+### 47.12 List the proxy's IPs in Moyasar's Allowed IPs
+
+Moyasar Dashboard → Settings → API Keys → Allowed IPs. Live needs at least one
+address, and the live key stays hidden until one is listed. Saving asks for a
+6-digit code.
+
+**Done looks like:** every outbound IP from 47.10 is listed. Proven only by
+47.13.
+
+### 47.13 Switch to live and enter the LIVE keys and webhook
+
+1. In the Moyasar card, switch the mode to **live**. The console asks for
+   confirmation.
+2. Save the live secret key, the live publishable key and a live webhook token.
+3. Register the live webhook in Moyasar's live mode, as in 47.8, and enter its
+   code within 30 minutes.
+4. Run **Test connection** in LIVE mode.
+
+**Done looks like:** "Connection OK". That proves the proxy route (47.11) and the
+Allowed IPs list (47.12). A refusal names whether the proxy or the server's own
+address was refused.
+
+### 47.14 Make sure the payment row is enabled
+
+It was already enabled on 2026-11-11. The console's Online Payment switch opens
+only when the row is enabled, names Moyasar and is in live mode. It does not
+check that the live keys are saved; 47.13's Test connection is that check.
+
+### 47.15 Update the customer documents, before customers can pay by card
+
+Each is a live write, and each must land **before** 47.18:
+
+- **`privacy_policy`**: name Moyasar as the payment processor
+  (`RECORD_OF_PROCESSING.md` activity 15);
+- **`payment_policy`** and **`cancellation_refund_policy`**: on 2026-09-03 both
+  said payment is cash, that no online provider is selected, and that refunds are
+  settled in cash at the branch (`GO_LIVE_READINESS.md` G5). Both promise to be
+  updated before an online option appears. This was not in the brief that
+  produced this section; it is here because the documents say so;
+- the store answers: App Store "Financial Info" (`APP_STORE_SUBMISSION.md` §4)
+  and Play "Payment info" (`PLAY_STORE_SUBMISSION.md` §6) need your re-decision;
+  the cash-only listing claim C-CASH (`store/LISTING_COPY.md`) must change; and
+  the App Review notes must stop saying card payment is off
+  (`APP_STORE_SUBMISSION.md` §11).
+
+### 47.16 Make sure `refund_trigger_secret` exists, and re-enable the refund job
+
+**Only after 47.3 and 47.4, and before 47.18.** The secret lives in the payment
+row's `secret_config`, not in Vault. Both the refund driver and `payment-refund`
+read it there, and no migration creates it.
+
+**First check whether it already exists**, by length, never by value:
+`select length(secret_config->>'refund_trigger_secret') from
+public.integration_settings where provider_type = 'payment'`. A Tap-era value
+would work unchanged, because the driver sends it to `payment-refund` and
+`payment-refund` compares it with the same field. If it is null, generate it
+**inside Postgres**, so the value is never seen, by the same method as §28:
+
+```sql
+update public.integration_settings
+   set secret_config = coalesce(secret_config, '{}'::jsonb)
+       || jsonb_build_object('refund_trigger_secret',
+                             encode(extensions.gen_random_bytes(32), 'hex'))
+ where provider_type = 'payment'
+   and coalesce(btrim(secret_config->>'refund_trigger_secret'), '') = '';
+```
+
+Then the same length check returns 64. Saving the payment card later does not
+remove it: the save merges secret fields.
+
+Then re-enable the `payment-refund-worker` cron job (every 5 minutes) and watch
+one run.
+
+**Done looks like:** `select jobname, active from cron.job where jobname =
+'payment-refund-worker'` shows `active = true`, and a run succeeds.
+
+### 47.17 The EAS build that carries the app half
+
+iOS and Android. It ships Apple Pay in the payment WebView, the new WebView
+rules, the 1.00 SAR message, the "refunded" handling, the Moyasar footer, the
+guard that makes Place order do nothing while a payment run is in flight, and the removal of
+`expo-web-browser`.
+
+**Builds already in customers' hands keep their old behaviour.** In LIVE mode
+they open Moyasar's page in the system browser, which works but offers no Apple
+Pay. They keep a short window in which Place order stays enabled during a "Try
+again" payment run.
+
+### 47.18 Turn on online payment, then the small live payment and its refund
+
+**Online payment is one global setting.** There is no per-customer switch in the
+code, so the live test happens with online payment offered to every customer.
+Pick a quiet hour.
+
+1. Settings → Payment Methods → Online Payment **on**. The console allows it only
+   after 47.13 and 47.14.
+2. On a real iPhone with a card in Wallet, and on a real Android phone, run the
+   device checks in `RELEASE_CHECKLIST.md` §7 "Online payment (Moyasar)": the
+   Apple Pay sheet appears inside the payment WebView, a 3-D Secure challenge
+   card completes, and the app returns to the order.
+3. Make one small live payment for a real order.
+4. Refund it, and confirm the money comes back. **Read 47.20 first: cancelling
+   the order does not refund it.** The automatic refund runs only for a paid
+   order that never reached the POS after the customer's resends. Producing one
+   on purpose has to be agreed with you before trying (`PAYMENTS.md` §9 B);
+   otherwise refund by hand in the Moyasar dashboard. A refund made there is not
+   written back to the order: as far as the code shows, the order still reads
+   paid. Note it by hand.
+
+**Done looks like:** the order reads paid, the order reaches the kitchen, the
+refund reads refunded in Moyasar, and the card statement shows it (mada 1-3
+days, credit cards 7-14 days).
+
+If anything fails, switch Online Payment off. Switching off is always allowed.
+It stops new checkout sessions only: a session opened before the switch can
+still be resumed and paid until it expires.
+
+### 47.19 Ask Moyasar support
+
+- Is Apple Pay on the hosted invoice supported inside a third-party app's
+  WKWebView (`enableApplePay`, no injected scripts)?
+- Does `checkout.moyasar.com` honour `lang=ar`?
+- Can a 3-D Secure payment still in flight complete after its invoice expires?
+- Confirm that SADAD and STC Pay are off for invoices. SADAD leaves an invoice
+  `on_hold` for days and cannot be refunded.
+- Could the hosted page ever be served from a domain other than `moyasar.com`?
+  The server hands the app only `https` on `moyasar.com` or a subdomain, so any
+  other domain fails closed.
+
+### 47.20 Decisions the code leaves to you
+
+- **A cancelled paid order is NOT refunded automatically.** The owner's answer on
+  2026-11-11 was "automatic via Moyasar". The code enrols an automatic refund in
+  one case only: a paid order that never reached the POS after the customer's
+  resends (`order_refund_due`, reason `pos_delivery_failed_after_customer_retries`).
+  An admin cancelling a paid online order reverses loyalty points and refunds no
+  money. Until that changes, refund a cancelled paid order by hand in the Moyasar
+  dashboard. Making cancellation refund automatically is a code and migration
+  change.
+- **A duplicate payment is recorded, not refunded.** If a customer pays twice for
+  one order or checkout session, the second payment is recorded as a `failed`
+  `payment_records` row with `failure_code = 'duplicate_payment'` and the message
+  *"Duplicate payment: the order was already paid. Refund this payment."*, plus
+  one `integration_sync_logs` row with `error = 'duplicate_payment'`. It is never
+  reported paid. **Nothing alerts on it**: the watchdog's
+  `MULTIPLE_SUCCESSFUL_CAPTURES` rule counts paid rows only. Finding and
+  refunding one is `PAYMENTS.md` §10.
+  Refunding duplicates automatically is a separate decision.
+- **A refund refused by Moyasar's Allowed IPs is retried forever.** It is
+  released, not failed, and re-claimed every run until the configuration is
+  fixed. There is no attempt cap.
+- **Should `set_payment_settings` itself refuse online payment** unless the row is
+  enabled, Moyasar and live? Today only the console refuses. That would be a
+  migration.
+- **Tap's leftover keys** in `public_config` and `secret_config` can be removed.
+  Nothing reads them. Optional.
+
+**Read the residual risks before 47.18.** The changes and their review record
+them, and `PAYMENTS.md` §12 owns the list. The two most likely to reach a
+customer: builds already in the field leave Place order enabled during a "Try
+again" payment run, so a cash order can sit beside a payable invoice; and a
+payment that completes late on an expired invoice, after the customer paid a
+newer one, becomes a duplicate to refund by hand.
+
+**Done looks like for this section:** every step above marked with its date and
+evidence, `GO_LIVE_READINESS.md` G1 and G2 updated, and §2 closed.
+
 ## 48. Server input bounds and customer order limits — three numbers, then one apply
 
 **Opened 2026-11-12.** `20261005120000_server_input_bounds.sql` is written,
 validated and NOT applied. Detail: `docs/MIGRATIONS.md` §57. Section 46 is #442's
-(merged) and 47 is the open Moyasar pull request's.
+and 47 is the Moyasar go-live.
 
 It makes the database enforce rules the app already had, adds three refusals to
 `place_customer_order`, and lets an administrator's image delete actually

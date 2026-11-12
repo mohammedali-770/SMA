@@ -8,6 +8,18 @@ permission behavior was changed except to fix a confirmed security bug.
 
 ---
 
+> **CORRECTION (2026-11-12) — the payment provider.** This audit describes "the
+> prepared Geidea payment flow". On 2026-11-11 the owner chose **Moyasar**
+> (CLAUDE.md §6), and the branch `feat/moyasar-only-20261111` removes the Tap and
+> Geidea code. So **L-2** and the Geidea `apiPassword` in §10 describe code that
+> no longer exists, and the `payment-initiate` rate-limit note in §11 now concerns
+> Moyasar invoice creation. Online payment was off on 2026-11-11 (read-only).
+> The `payment/return.tsx` deep-link finding under "What the audit deliberately
+> did not touch" is no longer held back by a freeze. **Whether the Moyasar-only
+> change closes it was not checked**: this audit does not describe the finding,
+> and that file changed by 11 lines on the branch. The findings below are kept as
+> the 2026-07-08 snapshot. Payment detail now: [`PAYMENTS.md`](PAYMENTS.md).
+
 > **CORRECTION (2026-08-23) — `push-dispatch` is no longer what this audit describes.**
 > Four places below (§4, §8, §9, and the closing risk list) call `push-dispatch`
 > an inert `501` stub with `verify_jwt=false` and no caller auth, and ask for a

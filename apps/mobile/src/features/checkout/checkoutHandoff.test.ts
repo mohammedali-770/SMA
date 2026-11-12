@@ -6,8 +6,8 @@ import {
   startCheckoutHandoff,
 } from './checkoutHandoff';
 
-const URL_A = 'https://checkout.tap.company/pay/aaa?token=secret-a';
-const URL_B = 'https://checkout.tap.company/pay/bbb?token=secret-b';
+const URL_A = 'https://checkout.moyasar.com/invoices/aaaaaaaa-0000-4000-8000-000000000001?lang=en';
+const URL_B = 'https://checkout.moyasar.com/invoices/bbbbbbbb-0000-4000-8000-000000000002?lang=ar';
 
 describe('checkoutHandoff', () => {
   it('exposes the in-flight url only for the matching session id', () => {

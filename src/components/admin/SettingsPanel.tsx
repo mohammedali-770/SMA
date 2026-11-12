@@ -5,6 +5,7 @@ import { ADMIN_LOCALES } from './adminLocales';
 import { NumericCommitField } from './view/NumericCommitField';
 import { Price } from '../Price';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
+import { canEnableOnlinePayment } from '../../lib/onlinePaymentGate';
 import { mapConfig } from '../../lib/map';
 import { admin, catalog } from '../../lib/api';
 import { isPlaceholderValue, mailtoLink, telLink, whatsappLink } from '../../lib/supportContact';
@@ -16,7 +17,7 @@ export const SettingsPanel: React.FC = () => {
   const {
     brandSettings, updateBrandSettings, loyaltySettings, updateLoyaltySettings,
     profiles, updateCustomerPoints, loyaltyMutationsEnabled, currentUser, adminLang,
-    paymentSettings, updatePaymentSettings, writeError,
+    paymentSettings, updatePaymentSettings, writeError, integrationSettings,
   } = useApp();
 
   /**
@@ -81,7 +82,24 @@ export const SettingsPanel: React.FC = () => {
               payForm.cashEnabled !== paymentSettings.cashEnabled ||
               payForm.defaultMethod !== paymentSettings.defaultMethod ||
               payForm.outageMode !== paymentSettings.outageMode;
+            // Online payment may be switched ON only for an enabled Moyasar gateway
+            // in live mode: payment-initiate refuses customer checkout in test mode.
+            // Switching it OFF is always allowed. The row is the one the
+            // Integrations panel edits (admin-only, so an accountant never has it).
+            const onlineCanTurnOn = canEnableOnlinePayment(
+              integrationSettings.find(r => r.provider_type === 'payment'),
+            );
+            const onlineNeedsLive = isRTL
+              ? 'فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع التجريبي.'
+              : 'Switch Moyasar to live mode and enable it first — customer checkout is refused in test mode.';
             const handleSavePayments = () => {
+              // Checked again here: the switch may have been drafted while the
+              // gateway still qualified.
+              if (payForm.onlineEnabled && !paymentSettings.onlineEnabled && !onlineCanTurnOn) {
+                setPaySaved(false);
+                setPayError(onlineNeedsLive);
+                return;
+              }
               setPaySaving(true); setPayError(null); setPaySaved(false);
               // Never send a default whose method is disabled — coerce to null so the
               // server resolves the first enabled method (place_order does the same).
@@ -423,17 +441,20 @@ export const SettingsPanel: React.FC = () => {
                             <span className="font-black text-con-text text-[11px]">{isRTL ? 'الدفع الإلكتروني' : 'Online Payment'}</span>
                           </div>
                           <p className="text-[9.5px] text-con-text-3 font-semibold leading-relaxed">
-                            {isRTL ? 'بوابة الدفع غير مفعّلة بعد؛ الطلبات الإلكترونية لا تُرسل للكاشير حتى يتأكد الدفع.' : 'No gateway yet; online orders are held from POS until payment is verified.'}
+                            {isRTL ? 'الدفع الإلكتروني عبر Moyasar. لا يُرسل الطلب الإلكتروني إلى الكاشير حتى يتم التحقق من دفعه.' : 'Online payment uses Moyasar. An online order is held from the POS until its payment is verified.'}
                           </p>
                           <select
                             value={payForm.onlineEnabled ? 'true' : 'false'}
                             onChange={(e) => setPayForm(f => ({ ...f, onlineEnabled: e.target.value === 'true' }))}
                             className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant || paySaving}
+                            disabled={isAccountant || paySaving || (!payForm.onlineEnabled && !onlineCanTurnOn)}
                           >
                             <option value="true">{isRTL ? 'مفعّل' : 'Enabled'}</option>
                             <option value="false">{isRTL ? 'معطّل' : 'Disabled'}</option>
                           </select>
+                          {!isAccountant && !onlineCanTurnOn && (
+                            <p className="text-[9.5px] text-amber-ink font-semibold leading-relaxed">{onlineNeedsLive}</p>
+                          )}
                         </div>
 
                         {/* CASH toggle */}

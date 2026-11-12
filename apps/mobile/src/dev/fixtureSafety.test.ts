@@ -57,6 +57,7 @@ const FORBIDDEN = [
   { pattern: /refund[A-Za-z]*\s*\(/i, label: 'a refund call' },
   { pattern: /\bfetch\s*\(/, label: 'fetch(' },
   { pattern: /\btap\b(?!e)/i, label: 'Tap payment provider' },
+  { pattern: /moyasar/i, label: 'Moyasar payment provider' },
   { pattern: /placeOrder|createOrder|payment-initiate|checkout-session/i, label: 'order/payment creation' },
 ];
 
@@ -66,6 +67,15 @@ describe('fixture mechanism cannot reach production systems', () => {
     for (const { pattern, label } of FORBIDDEN) {
       expect(pattern.test(src), `${file} must not reference ${label}`).toBe(false);
     }
+  });
+
+  it('the list names the current payment provider, not only the old one', () => {
+    // A guard that only knows the previous provider passes over the code most
+    // likely to be pasted into a fixture today.
+    const hits = (src: string) => FORBIDDEN.filter(({ pattern }) => pattern.test(src)).map(({ label }) => label);
+    expect(hits("import { fetchInvoice } from '../lib/moyasarClient';")).toContain('Moyasar payment provider');
+    expect(hits("const api = 'https://api.moyasar.com/v1/invoices';")).toContain('Moyasar payment provider');
+    expect(hits("const sdk = require('tap-payments');")).toContain('Tap payment provider');
   });
 
   it('every fixture mutator is a no-op', () => {

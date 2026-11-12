@@ -426,16 +426,18 @@ export const checkout = {
 };
 
 // ---------------------------------------------------------------------------
-// Tap Payments (online checkout). The app NEVER trusts the redirect result — it
-// opens the Tap hosted checkout URL, then calls payment-verify, which retrieves
-// the charge server-side and confirms only on CAPTURED. No secret key ever
-// reaches the app; amounts/status are always server-authoritative.
+// Online payment through Moyasar's hosted invoice page. The app NEVER trusts
+// the redirect result — it opens the invoice URL, then calls payment-verify,
+// which fetches the invoice and its payment server-side and confirms only on a
+// clean `paid`. No secret key ever reaches the app; amounts/status are always
+// server-authoritative.
 // ---------------------------------------------------------------------------
 export interface PaymentInitiateResult {
   provider?: string;
   status?: string;            // 'disabled' | 'already_paid' | undefined
+  reason?: string;            // with 'disabled': 'test_mode' (gateway in TEST mode) or 'amount_below_minimum' (total under 1.00 SAR)
   mode?: string;              // 'test' | 'live'
-  chargeId?: string;
+  invoiceId?: string;         // the Moyasar invoice id
   checkoutUrl?: string | null;
   needsVerify?: boolean;
   checkoutSessionId?: string;
@@ -455,15 +457,10 @@ async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Pr
   return data as T;
 }
 export const payments = {
-  /** Start (or reuse) a Tap charge for an online order. Returns the hosted URL. */
-  initiate: (orderId: string, language: 'ar' | 'en') =>
-    invokePaymentFn<PaymentInitiateResult>('payment-initiate', { orderId, language }),
-  /** Server-authoritative verification after returning from checkout. */
-  verify: (orderId: string) => invokePaymentFn<PaymentVerifyResult>('payment-verify', { orderId }),
-  /** Start (or reuse) a Tap charge for a CHECKOUT SESSION (order not yet created). */
+  /** Start (or reuse) a Moyasar invoice for a CHECKOUT SESSION (order not yet created). */
   initiateSession: (checkoutSessionId: string, language: 'ar' | 'en') =>
     invokePaymentFn<PaymentInitiateResult>('payment-initiate', { checkoutSessionId, language }),
-  /** Verify a session's charge; on 'paid' the response carries the created orderId. */
+  /** Verify a session's payment; on 'paid' the response carries the created orderId. */
   verifySession: (checkoutSessionId: string) =>
     invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId }),
 };

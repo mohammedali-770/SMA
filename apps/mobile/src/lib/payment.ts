@@ -1,11 +1,13 @@
 /**
- * Pure payment-method helpers for the customer mobile app. Mirrors the web
- * app's src/lib/payment.ts so both clients gate checkout identically.
+ * Pure payment-method helpers for the customer mobile app. Started as a mirror
+ * of the console's src/lib/payment.ts; the one deliberate difference is that
+ * online payment is offered only in the native app (see onlineSupportedOn).
  *
  * Cash payment exists but is controlled by Admin settings and is NEVER assumed.
- * Online payment has no gateway yet. `place_order` is the server-authoritative
- * gate (a client cannot pick a disabled method or fake payment_status); these
- * helpers only mirror it for the UI.
+ * Online payment is Moyasar's hosted page, opened in the app's payment WebView,
+ * and is likewise switched by Admin settings. `place_order` is the
+ * server-authoritative gate (a client cannot pick a disabled method or fake
+ * payment_status); these helpers only mirror it for the UI.
  *
  * THE CUSTOMER CHOOSES; NOTHING CHOOSES FOR THEM (owner decision, 2026-09-14).
  * There is deliberately no `resolveDefaultMethod` here any more. Paying is a
@@ -33,17 +35,28 @@ export interface PaymentMethodSettings {
   outageMode: boolean;
 }
 
+/**
+ * Online payment runs only in the native app. Moyasar's hosted page opens in the
+ * in-app payment WebView, which a browser build cannot host, and
+ * `online_payment_enabled` is one global setting — so without this, switching
+ * online payment on for the app would also offer the web build (/app) a method
+ * it cannot complete. `platform` is the caller's `Platform.OS`.
+ */
+function onlineSupportedOn(platform: string): boolean {
+  return platform !== 'web';
+}
+
 /** Methods a customer may choose right now (order preserved: online, then cash). */
-export function availableMethods(s: PaymentMethodSettings): PaymentMethod[] {
+export function availableMethods(s: PaymentMethodSettings, platform: string): PaymentMethod[] {
   const out: PaymentMethod[] = [];
-  if (s.onlineEnabled) out.push('online');
+  if (s.onlineEnabled && onlineSupportedOn(platform)) out.push('online');
   if (s.cashEnabled) out.push('cash');
   return out;
 }
 
 /** True when NO method is enabled -> checkout must be blocked. */
-export function checkoutBlocked(s: PaymentMethodSettings): boolean {
-  return availableMethods(s).length === 0;
+export function checkoutBlocked(s: PaymentMethodSettings, platform: string): boolean {
+  return availableMethods(s, platform).length === 0;
 }
 
 /**
@@ -58,8 +71,9 @@ export function checkoutBlocked(s: PaymentMethodSettings): boolean {
 export function clearIfUnavailable(
   s: PaymentMethodSettings,
   chosen: PaymentMethod | null,
+  platform: string,
 ): PaymentMethod | null {
-  return chosen && availableMethods(s).includes(chosen) ? chosen : null;
+  return chosen && availableMethods(s, platform).includes(chosen) ? chosen : null;
 }
 
 /**

@@ -8,9 +8,9 @@
  *
  * An object type intersected with `undefined` is `never`. So every
  * `<WebView …>` written without a type argument fails to typecheck, each prop
- * "not assignable to type 'never'". That includes the frozen payment screen
- * (`src/app/payment/checkout.tsx`). CLAUDE.md §6 does not let a dependency
- * upgrade edit that file, so the fix has to live outside it.
+ * "not assignable to type 'never'". That includes the payment screen
+ * (`src/app/payment/checkout.tsx`) and the delivery map. Correcting the type
+ * once, here, keeps a dependency upgrade from having to edit either.
  *
  * HOW. `tsconfig.json` maps the exact specifier `react-native-webview` to this
  * file, for TypeScript. Metro reads the same `paths`, but Expo's resolver skips

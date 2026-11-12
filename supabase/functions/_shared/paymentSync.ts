@@ -1,6 +1,8 @@
 /**
- * Post-payment Lazywait handoff, shared by the Tap webhook + verify paths.
- * Runs ONLY after confirm_order_payment has marked the order paid server-side.
+ * Post-payment Lazywait handoff, called from moyasarVerify.ts once a Moyasar
+ * payment is confirmed — by the webhook, the customer's verify or the admin
+ * re-verify alike. Runs ONLY after confirm_order_payment (or
+ * finalize_checkout_session) has marked the order paid server-side.
  * Both helpers are best-effort and never throw — a POS hiccup must never undo a
  * confirmed payment; the background sync worker + reaper reconcile the tail.
  */

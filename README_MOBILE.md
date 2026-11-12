@@ -49,7 +49,7 @@ The app is portrait-only, phone-focused on iOS (`supportsTablet: false`), and de
 - System / Light / Dark appearance.
 - Sentry crash/error observability.
 
-Moyasar is the payment provider (owner decision, 2026-11-11, [`CLAUDE.md`](CLAUDE.md) §6). The app's payment code is still the Tap-era code until the Moyasar-only change (#446) merges. Payment work goes through its own pull request, and any live payment test is an owner action. The freeze that applied until then is in [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md), kept as history.
+Online card payment goes through **Moyasar**, the provider the owner chose on 2026-11-11 (`CLAUDE.md` §6). The app opens Moyasar's hosted page only inside its own payment screen (`app/payment/checkout.tsx`), with Apple Pay enabled on iOS; the web build never offers online payment. Online payment was switched off on 2026-11-11, and a live payment or refund is its own owner approval, so do not use one as a test. The go-live steps, the EAS build among them, are `docs/OWNER_ACTIONS.md` §47; the device checks are `docs/RELEASE_CHECKLIST.md` §7. *Changed 2026-11-12: this paragraph said the payment code was frozen.*
 
 Push notifications are live. The Profile → Notifications toggles register a real device, order-status pushes reach customers who allowed notifications automatically, and marketing has been opt-out since 2026-08-20, so a broadcast reaches every one of them who has not switched offers off. Changes to notification copy, targeting or dispatch behaviour are customer-facing — see `CLAUDE.md` §7.
 

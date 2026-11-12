@@ -4,19 +4,18 @@ import { buildReturnDeepLink, escapeHtmlAttr } from './returnLink.ts';
 /**
  * payment-return — the HTTPS URL the payment provider redirects the customer's
  * browser to after checkout (providers require a real https redirect target; a
- * raw app scheme is not reliable). Tap uses it as the charge `redirect.url`;
- * Moyasar uses it as both the invoice `success_url` and `back_url`. This page
- * marks NOTHING paid: it only bounces back into the app via the fixed
- * spicymeal:// deep link so the app can run the authoritative server
- * verification (payment-verify).
+ * raw app scheme is not reliable). Moyasar uses it as both the invoice
+ * `success_url` and `back_url`. This page marks NOTHING paid: it only bounces
+ * back into the app via the fixed spicymeal:// deep link so the app can run the
+ * authoritative server verification (payment-verify).
  *
  * Open-redirect safe: it only ever navigates to our own fixed scheme + path, and
  * the single `order` / `session` parameter is passed through only after strict
  * UUID validation. EVERY provider-supplied query parameter is IGNORED as
- * untrusted — Tap's `tap_id`, and the unsigned `id` Moyasar appends, alike. The
- * `id` in particular is exactly the value Moyasar's own guide says must be
- * re-fetched server-side before an order is accepted, and payment-verify is
- * where that happens; nothing here reads it.
+ * untrusted, the unsigned `id` Moyasar appends included. That `id` is exactly
+ * the value Moyasar's own guide says must be re-fetched server-side before an
+ * order is accepted, and payment-verify is where that happens; nothing here
+ * reads it.
  *
  * RENDER FIX (content-type CASE — verified live): the Supabase shared *.functions
  * edge rewrites the exact lowercase token `text/html` to `text/plain` + a
@@ -24,7 +23,7 @@ import { buildReturnDeepLink, escapeHtmlAttr } from './returnLink.ts';
  * which shows the page as RAW SOURCE and blocks its redirect. The cased subtype
  * `text/HTML` is matched case-insensitively by browsers (RFC 2045) yet is NOT
  * caught by that lowercase rewrite — so the page renders as real HTML and the
- * redirect fires. (Same technique the tap-admin-test-return page documents; the
+ * redirect fires. (Same technique the payment-admin-test-return page documents; the
  * inline <script>/meta-refresh/app-scheme were NOT the trigger — the lowercase
  * content-type was.) The body is emitted as explicit UTF-8 bytes so the runtime
  * cannot reinterpret the encoding, and the <meta charset> in the head keeps the

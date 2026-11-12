@@ -1,9 +1,12 @@
 /**
  * payment/return — the in-app landing for the `spicymeal://payment/return` deep
- * link that Tap's browser redirect bounces back to (via the payment-return Edge
- * Function). Its whole job is to resolve an interrupted payment on COLD START:
- * on Android the OS may relaunch the killed app straight into this route, so the
- * CheckoutScreen promise that would normally verify the charge never runs.
+ * link that the payment-return Edge Function bounces to (Moyasar's success_url
+ * and back_url point at that function). The in-app payment WebView intercepts
+ * the return before that page renders, so the app reaches this route only when
+ * the deep link is opened from outside it — the return page reached in a
+ * browser, say. Its whole job is to resolve that payment, including on a COLD
+ * START, when the CheckoutScreen promise that would normally verify it is not
+ * running.
  *
  * It trusts NOTHING from the redirect except a strict-UUID `session` (or legacy
  * `order`) id, seeds the shared, unit-tested recovery (recoverPendingSession),
