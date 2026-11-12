@@ -71,6 +71,22 @@ would have rendered those two codes perfectly and told the operator nothing:
   beside a connectivity error, which on a screen whose purpose is reassurance
   about discount exposure is the exact failure it exists to prevent.
 
+- **Saving the bounds no longer moves the expiry (fixed 2026-11-12).** PostgREST
+  returns a `timestamptz` in the database session zone, which is UTC in
+  Production. The editor put that UTC wall clock into its `datetime-local`
+  field, and the save read the field back as the browser's own time. In Riyadh
+  every save moved the expiry **three hours earlier**, a save that changed only
+  the usage limit included, and the shift added up with each save. The field
+  now shows the stored instant on the browser's clock (`toLocalInputValue`, the
+  exact inverse of `toIso`). An expiry left as it was loaded is written back as
+  the stored value itself (`boundsEndsAt`), so it cannot move even in the one
+  hour a year that a daylight-saving zone repeats.
+- **The list's dates are Riyadh calendar dates.** It sliced the UTC string, so a
+  code starting or ending between 00:00 and 02:59 Riyadh, midnight included,
+  was listed on the day before.
+- Neither defect had touched a real code. The 2026-11-11 assessment read
+  Production read-only and found 2 coupons, neither with an expiry.
+
 Writes are ordinary RLS-gated table operations rather than an RPC:
 `coupons_admin_all` is an `ALL` policy for `authenticated` with `is_admin()` on
 both `USING` and `WITH CHECK`, so role AND AAL2 already gate every one.
@@ -614,6 +630,10 @@ trap is closed too.
 - `comp_member_audit` is permanent. It deliberately does **not** use
   `ops_change_events`, which self-prunes after one day: fine for operational
   noise, useless as a money trail.
+- The audit list's **Time** column is Riyadh time, `YYYY-MM-DD HH:mm:ss`, with
+  Latin digits in both languages (since 2026-11-12). It used the device's zone
+  and, in Arabic, Arabic-Indic digits and a 12-hour clock, so an owner abroad
+  read a different time from the one recorded in Riyadh.
 
 Every write goes through `admin_set_comp_member`, which is SECURITY DEFINER and
 gated on `public.is_admin()` — role **and** AAL2. There is **no client write
@@ -711,6 +731,35 @@ language for money nobody paid, and `order_refund_due` (which requires
 `total > 0`) will never enrol it. The defect pre-dates this work; comped orders
 make it reachable. Flagged rather than fixed, because changing refund language
 is payment-adjacent and §6 is active.
+
+## Comped orders and the customer order limits (2026-11-12)
+
+`20261005120000_server_input_bounds` (written, **NOT applied**) adds three
+refusals to `place_customer_order`: no verified phone, too many open orders,
+too many orders in the hour. A comped customer's cash order goes through that
+wrapper like any other — `SM-2026-000055` and `-000056` did — so the rules apply
+to comps too. That is intended: a comp is free food with no cap, which is where
+an order limit matters most.
+
+What was checked, on the local chain (`server_input_bounds_test.sql` CASE 12):
+
+- a comped, phone-verified customer still gets `total` 0.00 and `is_comped`
+  true through the wrapper;
+- the sixth open comped order in 24 hours is refused, like anyone's;
+- a comp keyed on the profile of an account with no verified phone does not
+  let that account order. Comps added by phone are claimed only when the phone
+  is confirmed, so they are verified by construction. Read live 2026-11-12:
+  `comp_members` holds 1 row, 0 active.
+
+What does not go through the wrapper: the online zero-total path
+(`begin_checkout_session` → `insert_order_from_snapshot`) is frozen under
+CLAUDE.md §6 and is not covered by these rules. The call centre has no
+order-creation path at all.
+
+The app-side change in `apps/mobile/src/services/api.ts` is that `placeAndSync`
+now reads the server's sentence out of the error body, so a refusal shows its
+own copy instead of the generic apology. It does not change what a comped order
+costs or shows.
 
 ## Coupon usage is read through an admin RPC (2026-09-14)
 

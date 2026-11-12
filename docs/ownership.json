@@ -275,9 +275,10 @@
     },
     {
       "id": "alert-dispatch",
-      "why": "The only Edge Function that opens an outbound connection to an address read out of a database row, on a pg_cron schedule, with the service-role client. No rule covered it at all until 2026-09-14 — the alerts rules keyed on the admin UI and the digest migrations, so the dispatcher was deployed and scheduled with its owning document untouched. The endpoint guard in _shared/smtpTarget.ts (whose host rules moved to _shared/publicHost.ts on 2026-09-19, shared with the admin push sender) and the absence of denomailer's debug.allowUnsecure are both load-bearing and both invisible in a diff that merely 'fixes a connection error'.",
+      "why": "The SMTP connections to an address read out of a database row. The dispatcher makes one on a pg_cron schedule with the service-role client, and no rule covered it at all until 2026-09-14 — the alerts rules keyed on the admin UI and the digest migrations, so it was deployed and scheduled with its owning document untouched. The endpoint guard in _shared/smtpTarget.ts (whose host rules moved to _shared/publicHost.ts on 2026-09-19, shared with the admin push sender) and the absence of denomailer's debug.allowUnsecure are both load-bearing and both invisible in a diff that merely 'fixes a connection error'. email-test-config was added on 2026-11-11: it connects to the same row when an admin presses 'send test email', and it had neither the guard nor an owning document for two months after the dispatcher was fixed, while it returned the connection error's text to the browser.",
       "sources": [
         "supabase/functions/operations-alert-dispatch/**",
+        "supabase/functions/email-test-config/**",
         "supabase/functions/_shared/smtpTarget.ts",
         "supabase/functions/_shared/publicHost.ts"
       ],

@@ -11,6 +11,11 @@ notification and it arrives.
 all 7 `sent`** — real closure notices delivered to a real phone, not merely the
 confirmation tap.
 
+**The endpoint rule tightened on 2026-11-11, in the repository only.** The sender
+now admits only the four browser push services and refuses an explicit port
+(§3c, "A public hostname was not enough"). The deployed version 1 still applies
+the old rule until `admin-push-dispatch` is redeployed (§5, item 7).
+
 **THE BELL TAP ANSWERED THE ONE QUESTION NO PROBE COULD REACH.**
 `assertVapidKeyPair` runs only inside the deployed function, AFTER the caller
 gate, so every external probe stopped at 401 and the key pairing stayed unproven
@@ -288,10 +293,12 @@ the same reasoning, and now literally the same host rules, as `smtpTarget.ts`.
 
 Two halves, and neither implies the other:
 
-- **`refusePushEndpoint`** requires HTTPS, no credentials in the URL, and a
-  public dotted hostname — refusing IP literals in all four spellings, IPv6,
-  and the `.local` / `.internal` / `.localhost` / `.home.arpa` suffixes. An
-  optional `ADMIN_PUSH_ALLOWED_HOSTS` narrows it further.
+- **`refusePushEndpoint`** requires HTTPS, no credentials in the URL, no
+  explicit port, and a public dotted hostname — refusing IP literals in all
+  four spellings, IPv6, and the `.local` / `.internal` / `.localhost` /
+  `.home.arpa` suffixes. Since 2026-11-11 the host must also be one of the four
+  browser push services, and `ADMIN_PUSH_ALLOWED_HOSTS` replaces that list
+  rather than narrowing "any public host".
 - **`redirect: 'manual'`** stops a *checked* host handing the request on. The
   guard is otherwise undone by one `Location` header.
 
@@ -299,6 +306,53 @@ The host rules moved to `supabase/functions/_shared/publicHost.ts` rather than
 being copied: duplicating forty lines of security-critical host parsing is how
 two copies of a rule drift apart. The 34-case SMTP suite passes unchanged, which
 is what makes the extraction verified rather than assumed.
+
+### A public hostname was not enough (2026-11-11)
+
+**The host rules read the string. Nothing resolves the name.** So
+`https://10.0.0.5.sslip.io/` is a public hostname by those rules, and wildcard
+DNS answers it with 10.0.0.5. Until 2026-11-11 an unset
+`ADMIN_PUSH_ALLOWED_HOSTS` meant "any public hostname", and an assessment that
+day found the sender admitted 5 of the 17 hostile endpoints it tried: `10.0.0.5.sslip.io`,
+`127.0.0.1.nip.io`, `169.254.169.254.nip.io`, an arbitrary attacker host, and
+`https://fcm.googleapis.com:8443/`. A compromised admin session could therefore
+store a subscription that made the sender POST into the network behind it.
+
+**A browser never hands out an endpoint anywhere but its vendor's push service**,
+so the sender now admits only those services, matched by suffix:
+
+| Host | Who issues it |
+| --- | --- |
+| `fcm.googleapis.com` | Chrome and the other Chromium browsers |
+| `jmt17.google.com` | Chrome Beta, Dev and Canary: Chromium's staging endpoint for every non-Stable channel |
+| `updates.push.services.mozilla.com` | Firefox |
+| `web.push.apple.com` | Safari, and a Home Screen web app on iOS |
+| `notify.windows.com` | Edge on Windows (per-region hosts under it) |
+
+It also refuses any explicit port. The URL parser turns `:443` into the
+default, so `https://updates.push.services.mozilla.com:443/…` still passes and
+`:8443` does not.
+
+**`ADMIN_PUSH_ALLOWED_HOSTS` replaces the list; it does not add to it.** Setting
+it to `fcm.googleapis.com` admits Chrome alone, and setting it to a host that is
+not on the list admits that host. A blank value counts as unset, so an empty
+secret cannot open every host. No value re-admits an IP literal, an internal
+name or a port, because those are refused before the list is read.
+
+**The live subscription is on the list.** Measured read-only on 2026-11-11, by
+counts only: 1 subscription, 1 on the default list, 0 with an explicit port. The
+redeploy changes nothing for the owner's phone.
+
+**If an admin's browser uses a service that is not on the list**, the sender
+refuses the endpoint before any request is made. The function log names the
+origin with reason `endpoint_not_allowed`, and the failure count rises on every
+send. **A refusal never prunes the row:** it stays until the list admits the
+host or the admin turns the bell off. The remedy is to set
+`ADMIN_PUSH_ALLOWED_HOSTS` to the five hosts plus the new one, and then have that
+admin enable the bell again. That step matters: enabling the bell resets the
+count (`save_admin_push_subscription` sets `failure_count = 0`), and a count left
+above the prune threshold would delete the row at its first ordinary failure once
+the host is admitted.
 
 ### A subscription is deleted on 404 and 410, and on nothing else
 
@@ -475,6 +529,12 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
 6. ~~**Delete the Home Screen icon and re-add it**, last.~~ **DONE 2026-09-20 —
    the bell was tapped and notifications arrive.** See §1 — iOS fixes an
    installed web app's capabilities at install time, which is why this was last.
+7. **Redeploy `admin-push-dispatch`**, so the running sender carries the
+   2026-11-11 endpoint rule (§3c, "A public hostname was not enough"). Until
+   then version 1 POSTs to any public host on any port. The live subscription
+   passes the new rule, so nothing changes for the owner's phone. If
+   `docs/SUPABASE_API_KEYS.md` step 3 has not happened yet, one deploy covers
+   both. Steps: `docs/OWNER_ACTIONS.md` §46.
 
 **CORRECTION, 2026-09-19.** An earlier revision of this list said to generate the
 key "so the private half never crosses the wire, the way the alert-dispatch

@@ -38,6 +38,26 @@ authoritative columns to one customer-visible state, and
 `apps/mobile/src/features/orders/orderConfirmation.test.ts` are the shared
 contract. Change one, change the other in the same commit.
 
+### Refused before an order exists (2026-11-12, NOT applied)
+
+`20261005120000_server_input_bounds` adds four refusals that happen before any
+order row is written, so none of the states below is entered and no POS ticket
+is made. Each comes back from `order-intake` as HTTP 400 with the server's
+sentence, and since the same change `placeAndSync` reads that sentence so the
+checkout shows it in the customer's language (`userMessage.ts`):
+
+| Refusal | Server sentence | App key |
+| --- | --- | --- |
+| no verified phone | *Please verify your phone number before placing an order.* | `errOrderPhoneUnverified` |
+| `order_limit_open` open orders (default 5) placed in the last 24 h | *You already have N orders in progress. …* | `errOrderOpenLimit` |
+| `order_limit_per_hour` orders (default 10) in the last hour | *You have placed N orders in the last hour. …* | `errOrderHourlyLimit` |
+| more than 50 of one item on a line | *order_items_quantity_max: at most 50 of one item per order line.* (SQLSTATE 23514) | `errOrderQuantityLimit` |
+
+A retry with the idempotency key of an order that already exists still returns
+that order. The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in
+`MIGRATIONS.md` §57. These cover cash orders only: the online checkout-session
+path is frozen and does not go through `place_customer_order`.
+
 ## 3. The states
 
 | State | Meaning | Success hero? | Resend? | Branch number? |

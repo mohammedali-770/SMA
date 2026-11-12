@@ -32,6 +32,13 @@ is owned by Issue #76.
 > remain structurally blocked by the v2 constraint — that part of the v1
 > story survives intact.
 >
+> **AMENDED 2026-11-11 — the flag is still the only thing keeping mail off the
+> wire, but it is no longer the only step left.** Two come before it: set
+> `SMTP_ALLOWED_HOSTS`, because the endpoint guard reads names without
+> resolving them; and redeploy `operations-alert-dispatch`, whose only recorded
+> deploy (v1, 2026-09-07) predates the guard itself. Both are explained under
+> "What the SMTP guard cannot see" below, and listed in `OWNER_ACTIONS.md` §46.
+>
 > The lesson worth keeping: this document grew a v2 section at the top while
 > its **Status** block, its outbox section, its defaults table, its runbook
 > guarantees and its closing "future version" section all still described v1.
@@ -687,6 +694,10 @@ console path rather than of the setting — see `CLAUDE.md` §8, which records
 the measurement and the standing rule that an agent does not reach around the
 gate with the service key.
 
+**Two steps come before the flag, as of 2026-11-11:** set `SMTP_ALLOWED_HOSTS`,
+and redeploy the dispatcher. "What the SMTP guard cannot see", below, says why
+each one is needed.
+
 **Expected volume at the default `critical` floor**, measured 2026-09-13 over
 the preceding 7 days: **4** `critical` opens, versus 56 `warning` opens and 60
 `info` recoveries. So single-digit emails per week as configured; lowering the
@@ -704,12 +715,15 @@ service key, which bypasses RLS entirely. One row edit turned a scheduled,
 service-role Edge Function into a connector to any address it could reach.
 
 `_shared/smtpTarget.ts` now parses the row and refuses, with a reason code, an
-IP literal in any of its four spellings (dotted, decimal, hex, octal) and IPv6;
-loopback, private and link-local space — `169.254.169.254` is the cloud metadata
-endpoint; the `.local`, `.internal` and `.home.arpa` suffixes; a malformed
-hostname; and a port outside 1-65535. An optional `SMTP_ALLOWED_HOSTS`
-environment allowlist pins the endpoint further; unset, which is how it stands,
-means "any public hostname" — so setting it only ever narrows.
+IP literal in any of its four spellings (dotted, decimal, hex, octal) and IPv6,
+so loopback, private and link-local space are refused **when written as an
+address**, `169.254.169.254` (the cloud metadata endpoint) among them; the
+`.local`, `.internal` and `.home.arpa` suffixes; a malformed hostname; and a
+port outside 1-65535, narrowed to the mail ports on 2026-11-11. The
+`SMTP_ALLOWED_HOSTS` environment allowlist pins the endpoint by name. Unset
+means "any public hostname", and setting it only ever narrows. **It must be set
+before external dispatch is turned on.** "What the SMTP guard cannot see",
+below, says why.
 
 **THE HOST RULES MOVED TO `_shared/publicHost.ts` ON 2026-09-19, and this
 paragraph would otherwise send a reader to a file that no longer holds them.**
@@ -748,6 +762,80 @@ What *could* regress is somebody setting `debug.allowUnsecure` to silence that
 error, at which point the password crosses the wire in cleartext and nothing else
 would notice. `_shared/smtpTarget.test.ts` pins the absence of `allowUnsecure`
 and `noStartTLS` in the dispatcher source.
+
+### What the SMTP guard cannot see, and the second caller it now covers (2026-11-11)
+
+**Every host rule is lexical. No name is ever resolved.** The section above used
+to say the guard refuses "loopback, private and link-local space", which reads
+as if it checked where a name points. It never did. It refuses those spaces
+only when they are written as an address. `127.0.0.1.nip.io` and
+`10.0.0.5.sslip.io` are well-formed public hostnames that wildcard DNS answers
+with 127.0.0.1 and 10.0.0.5, so both pass. The 2026-11-11 assessment resolved
+the second one and got 10.0.0.5. `smtpTarget.test.ts` now pins that the guard
+admits such a name, so the gap cannot be written out of the documentation again
+without a test changing too. Resolving the name inside the guard would not
+close it: denomailer resolves it again when it connects, and a name can answer
+differently the second time.
+
+**So `SMTP_ALLOWED_HOSTS` is required before alert mail is turned on.** It is
+the only rule that a name pointing inward cannot satisfy. Set it to the relay's
+name, today `mail.spicymeal.com.sa`, as an Edge Function secret. Secrets are
+project-wide, so the test button below reads the same value. The steps are in
+`OWNER_ACTIONS.md` §46.
+
+**The guard now requires a mail port, where it used to accept any port.** It
+admitted 1-65535, so a relay entry of `attacker-controlled.example:6379`
+passed. It now admits 25, 465, 587 and 2525, and refuses anything else as
+`smtp_port_not_allowed`. That alone keeps the cloud metadata service out of
+reach, even through wildcard DNS, because that service answers on 80. 2525 is
+in the set because Supabase's Edge runtime refuses outgoing connections to 25
+and 587 (its documented limits), which is also why the live relay uses 465.
+Measured read-only on 2026-11-11, by counts only: the one email-provider row is
+enabled, its port is a mail port, and its host passes the lexical rules.
+
+**The guard now covers `email-test-config` too.** The console's "send test
+email" button connected to the same row with no guard at all, and returned up
+to 300 characters of the connection error. denomailer builds that error out of
+whatever answers, so the button was also a banner grabber. Against a loopback
+listener sending an SSH banner, denomailer throws
+`NaN: 2.0-OpenSSH_9.6 internal-host,`, and the old button would have shown it
+to the admin as `Send failed — NaN: 2.0-OpenSSH_9.6 internal-host,`. A
+refused recipient carried the far server's own words, internal host names
+included. The button now refuses a bad endpoint with its reason code before
+connecting, and reports a failed send as one of seven codes with a fixed
+sentence (`classifySmtpFailure`):
+
+| Code | Meaning |
+| --- | --- |
+| `smtp_connect_failed` | No connection: refused, timed out, reset, or the name did not resolve. One code on purpose, because refused versus timed out is the open-versus-filtered signal a port scan reads. On port 25 or 587 the sentence adds that Supabase blocks those ports. |
+| `smtp_tls_failed` | The TLS handshake failed: the port does not match the TLS/SSL setting, or the certificate does not fit the name. |
+| `smtp_not_secure` | The server offered no encryption, so denomailer refused to send the password. |
+| `smtp_auth_failed` | Reply 530, 534 or 535. |
+| `smtp_rejected` | Any other 4xx or 5xx reply. The three-digit code is kept; the server's text is not. |
+| `smtp_not_smtp` | Something answered, but not as an SMTP server. |
+| `smtp_send_failed` | Anything else. |
+
+Each mapping was checked against a real denomailer 1.6.0 error from a loopback
+listener under Deno 2.9.4, not inferred from its source. `TimedOut` and
+`ConnectionReset` are the exceptions: they are Deno's own error classes and were
+not reproduced. **What is left, stated rather than claimed away:** the category
+still says whether something answered, and so does the time a send takes. The
+guard limits where a send can go. The classification only stops the far end's
+words coming back.
+
+**The alert path cannot reach the new rule while dispatch is off.** The
+handler returns `disabled` before it reads the endpoint, and
+`alertDispatchWiring.test.ts` now pins that order. Measured 2026-11-11:
+`external_dispatch_enabled` is false.
+
+**The deployed dispatcher may predate its own guard. Check before turning
+dispatch on.** The only recorded deploy of `operations-alert-dispatch` is v1, at
+2026-09-07 07:18:43 UTC. Its bundle was five files and `smtpTarget.ts` was not
+one of them, because the guard merged a week later, on 2026-09-14 (#374). No
+later deploy is recorded. If v1 is still what runs, the dispatcher connects to
+the stored host with no validation and never reads `SMTP_ALLOWED_HOSTS`. The
+repository cannot show which bundle is live; the dashboard can. Either way,
+redeploy before turning dispatch on.
 
 ### The digest footer — defect recorded 2026-09-13, FIXED 2026-09-15 (unapplied)
 

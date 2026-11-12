@@ -286,10 +286,27 @@ the first, and the fourth before the second. No SQL can tell whether step 3
 happened, so holding 3 before 4 is the approver's job. Paragraphs below that
 call `20260824100000` "frozen on purpose" describe the freeze as it stood when
 they were written. **On merge of the Moyasar-only change the outstanding set is
-FIVE:** `20260824100000`, `20260929120000`, `20261002120000` (#436, merged
-2026-11-12) and the two Moyasar-only files. **Name the target by version.** A bulk
+SIX:** `20260824100000`, `20260929120000`, `20261002120000` (#436, merged
+2026-11-12), `20261005120000` (#445, merged 2026-11-12) and the two
+Moyasar-only files. **Name the target by version.** A bulk
 apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
+
+**AMENDED 2026-11-12 — `20261005120000_server_input_bounds` is written,
+validated and awaiting approval. On merge it joins the unapplied set.** On the base
+branch at `9a90253` that set is Moyasar (frozen, §6),
+`20260929120000_db_advisor_hardening` and `20261002120000_staff_actor_fk_set_null`
+(#436), so on merge it is FOUR. The new file caps a cash order
+line at 50 of one item (in `place_customer_order`, not as a table CHECK, so the
+frozen snapshot insert is untouched), bounds customer-editable names, emails, address labels and
+coordinates, fixes the landmark trim that treated the letter v as whitespace,
+lets an administrator's image delete actually delete, and makes
+`place_customer_order` refuse a caller with no verified phone or over the
+open-order and hourly limits. **It changes live ordering behaviour**, and its
+three numbers are owner decisions (`docs/OWNER_ACTIONS.md` §48). The money path
+is self-asserted unchanged. `20260824100000` still sorts ahead of it, so a bulk
+apply would take the frozen payment file first. **Name the target by version.**
+Detail: `docs/MIGRATIONS.md` §57.
 
 **AMENDED 2026-11-11 (later) — `20261002120000_staff_actor_fk_set_null` is
 written, validated and awaiting approval, so on merge the outstanding set is
@@ -303,6 +320,37 @@ self-asserted. The two unfrozen files are independent, each on its own
 approval, and `20260824100000` still sorts first. **Name the target by
 version.** Detail: `docs/MIGRATIONS.md` §54.
 
+**Superseded on the count by the note above, kept for its record of the prune apply:** with #436 merged, the default branch holds 146 repository files and THREE unapplied (Moyasar, `20260929120000`, `20261002120000`). The live read below stays true for its date.
+
+**Current position 2026-11-11, read live AFTER the run-history prune apply: 145
+repository files on the default branch / 149 live history rows / TWO unapplied
+— `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
+`20260929120000_db_advisor_hardening`, written, validated and awaiting
+approval.** Latest live version `20261111123050`; the most recent apply is
+`20261001120000` (ledger row 104, `docs/MIGRATIONS.md` §53). Reconciled **by
+name** against the default branch at `8df5408`: 141 files applied, 2 superseded
+(ledger rows 8-9), and these 2. The delta against the read below is **+1 file
+and +1 row**: #435 merged the file, and this apply landed it. Two is still the
+shape that looks safe and is not: `20260824100000` sorts first. **Name the
+target by version.**
+
+**THE FIRST RUN WORKED, measured 2026-11-12.** The apply itself added a
+function and a daily job and deleted nothing. The job's first run, 01:10 UTC on
+2026-11-12, succeeded in 14.55 s: the run log went 661 568 → 465 386 rows (its
+200 000-row nightly cap), both ledgers were cut to 30 days, and every job kept
+its newest run and newest success. The alerts evaluator fell from 12.45 s to
+7.98 s on average. Two more nights clear the run log's backlog. Detail:
+`docs/MIGRATIONS.md` §53.
+
+**HASH WHAT THE DATABASE STORED, NOT WHAT YOU SENT.**
+`supabase_migrations.schema_migrations.statements` keeps the full SQL each
+`apply_migration` call ran. Here it hashes to the merged file byte for byte
+(`c95300da…`), and row 103's does too. It is the one check of an inline apply
+that reads the database's copy rather than the caller's.
+
+**Superseded 2026-11-11 (afternoon) — `20261001120000` is APPLIED. The
+amendment below is kept as written, and its THREE is no longer the count.**
+
 **AMENDED 2026-11-11 — `20261001120000_prune_operational_run_history` is
 written, validated and awaiting approval, so on merge the outstanding set is
 THREE:** Moyasar (frozen, §6), `20260929120000_db_advisor_hardening` and this
@@ -314,8 +362,9 @@ unfrozen files are independent, each on its own approval, and
 `20260824100000` still sorts first. **Name the target by version.** Detail:
 `docs/MIGRATIONS.md` §53.
 
-**Current position 2026-11-11, read live AFTER the guest-menu policy apply: 144
-repository files on the default branch / 148 live history rows / TWO unapplied
+**Superseded, kept because the count is the point — the position read live
+2026-11-11, AFTER the guest-menu policy apply: 144 repository files on the
+default branch / 148 live history rows / TWO unapplied
 — `20260824100000_moyasar_payment_provider`, frozen on purpose (§6), and
 `20260929120000_db_advisor_hardening`, written, validated and awaiting
 approval.** Latest live version `20261111045833`; the most recent apply is

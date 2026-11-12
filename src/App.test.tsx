@@ -54,7 +54,6 @@ function ctx(over: Record<string, unknown> = {}) {
     retryProfile: vi.fn().mockResolvedValue(undefined),
     signOut: vi.fn().mockResolvedValue(undefined),
     signIn: vi.fn(),
-    signUp: vi.fn(),
     ...over,
   };
 }

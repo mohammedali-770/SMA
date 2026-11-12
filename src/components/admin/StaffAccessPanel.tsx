@@ -9,6 +9,7 @@ import { Text } from '../../design-system/ui/Text';
 import { RoleAuditEntry, StaffAccount, StaffRole, staffAccess } from '../../lib/staffAccessApi';
 import { isOpsConsoleRole } from '../../lib/roles';
 import { BranchOption, StaffAccountsSection } from './StaffAccountsSection';
+import { exactTime } from './view/adminTime';
 
 const SELECT = [
   'min-h-10 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-2.5',
@@ -249,7 +250,7 @@ export const StaffAccessPanel: React.FC<{
                   <td className="px-3 py-2"><Text variant="caption" numeric as="span">{a.old_role} → {a.new_role}</Text></td>
                   <td className="px-3 py-2"><Text variant="caption" as="span">{a.reason}</Text></td>
                   <td className="px-3 py-2"><Text variant="caption" as="span">{a.changed_by_name || a.changed_by_email || '—'}</Text></td>
-                  <td className="px-3 py-2"><Text variant="caption" numeric as="span">{new Date(a.changed_at).toLocaleString(isRTL ? 'ar-SA' : 'en-GB')}</Text></td>
+                  <td className="px-3 py-2"><Text variant="caption" numeric as="span">{exactTime(a.changed_at, lang)}</Text></td>
                 </tr>
               ))}
               {audit.length === 0 ? <tr><td colSpan={5} className="p-6 text-center"><Text variant="body" tone="tertiary" as="span">{isRTL ? 'لا توجد تغييرات صلاحيات مسجلة.' : 'No role changes recorded.'}</Text></td></tr> : null}

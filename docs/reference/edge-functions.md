@@ -62,6 +62,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/authHook.ts`
 - `_shared/cors.ts`
 - `_shared/deployFunctionsWiring.test.ts`
+- `_shared/emailTestConfigWiring.test.ts`
 - `_shared/lazywait.test.ts`
 - `_shared/lazywait.ts`
 - `_shared/lazywaitApi.test.ts`
@@ -69,6 +70,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/lazywaitBaseUrlWiring.test.ts`
 - `_shared/lazywaitCatalog.test.ts`
 - `_shared/lazywaitCatalog.ts`
+- `_shared/lazywaitGateLogWiring.test.ts`
 - `_shared/moyasar.test.ts`
 - `_shared/moyasar.ts`
 - `_shared/moyasarDuplicatePayment.test.ts`
@@ -83,6 +85,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/paymentVerifyTerminal.test.ts`
 - `_shared/paymentWiring.test.ts`
 - `_shared/publicHost.ts`
+- `_shared/pushDispatchTimeoutWiring.test.ts`
 - `_shared/pushReadyCopyWiring.test.ts`
 - `_shared/rest.test.ts`
 - `_shared/rest.ts`

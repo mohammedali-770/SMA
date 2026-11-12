@@ -5,6 +5,7 @@
 
 import { formatAmount } from '../design-system/generated/money';
 import { Product, Category } from '../types';
+import { readCsv } from './csvReader';
 
 /**
  * Calculates distance in kilometers between two coordinates using the Haversine formula.
@@ -82,6 +83,57 @@ export function formatRiyadhDateTime(iso: string): string {
   const date = d.toLocaleDateString('en-CA', { timeZone: RIYADH_TZ }); // YYYY-MM-DD
   const time = d.toLocaleTimeString('en-GB', { timeZone: RIYADH_TZ, hour: '2-digit', minute: '2-digit', hour12: false });
   return `${date} ${time}`;
+}
+
+/**
+ * The console's clock: Riyadh wall time, Latin digits, 24-hour, whatever the
+ * device's zone and whatever language the console is showing.
+ *
+ * Audit trails and hover times used `toLocaleString()` in the DEVICE zone with
+ * no label, while reports and receipts were already Riyadh — so an owner
+ * abroad read 21:30 for a 00:30 Riyadh event. In Arabic, `ar-SA` also rendered
+ * Arabic-Indic digits and a 12-hour clock beside Latin-digit prices, which is
+ * what `design-system/money.ts` rules out for numbers.
+ *
+ * Assembled from `formatToParts`, so the shape is fixed here rather than
+ * borrowed from a locale's punctuation, which differs between ICU builds.
+ */
+const RIYADH_CLOCK = new Intl.DateTimeFormat('en-GB', {
+  timeZone: RIYADH_TZ,
+  numberingSystem: 'latn',
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
+
+type ClockInput = string | number | Date | null | undefined;
+
+function riyadhClock(input: ClockInput): { date: string; time: string } | null {
+  if (input === null || input === undefined || input === '') return null;
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  const part: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {};
+  for (const { type, value } of RIYADH_CLOCK.formatToParts(d)) part[type] = value;
+  return {
+    date: `${part.year}-${part.month}-${part.day}`,
+    time: `${part.hour}:${part.minute}:${part.second}`,
+  };
+}
+
+/** "YYYY-MM-DD HH:mm:ss" in Riyadh time; "—" when there is no usable instant. */
+export function formatRiyadhDateTimeSeconds(input: ClockInput): string {
+  const clock = riyadhClock(input);
+  return clock ? `${clock.date} ${clock.time}` : '—';
+}
+
+/** "HH:mm:ss" in Riyadh time; "—" when there is no usable instant. */
+export function formatRiyadhTimeSeconds(input: ClockInput): string {
+  const clock = riyadhClock(input);
+  return clock ? clock.time : '—';
 }
 
 /**
@@ -189,6 +241,12 @@ export function riyadhRangeToUtc(start: string, end: string): { fromIso: string;
 
 /**
  * Creates a sample CSV data URL for menu import.
+ *
+ * `%EF%BB%BF` is the UTF-8 byte-order mark. Without it Excel opens the file in
+ * the computer's legacy code page and the Arabic sample rows are unreadable —
+ * and an administrator who then saves it gets a file the import refuses. The
+ * text after the mark is the nine-column template, unchanged; the import strips
+ * the mark again (`readCsv`, and `FileReader.readAsText` for a chosen file).
  */
 export function getCSVTemplateData(): string {
   const headers = 'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url\n';
@@ -196,40 +254,142 @@ export function getCSVTemplateData(): string {
   const row2 = 'Sides,المقبلات,Crispy French Fries,بطاطس مقلية مقرمشة,Classic golden fries,بطاطس ذهبية كلاسيكية,12.00,310,https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&h=400&q=80\n';
   const row3 = 'Drinks,المشروبات,Ice Cold Orange Juice,عصير برتقال مثلج,Fresh squeezed orange juice,عصير برتقال طازج معصور,10.00,120,\n';
   
-  return 'data:text/csv;charset=utf-8,' + encodeURIComponent(headers + row1 + row2 + row3);
+  return 'data:text/csv;charset=utf-8,%EF%BB%BF' + encodeURIComponent(headers + row1 + row2 + row3);
 }
+
+/** The menu template's columns. A row may stop after the seventh, never run past the ninth. */
+const MENU_CSV_COLUMNS = 9;
+
+/** A price cell: digits, then optionally a point and one or two more. No separators, no currency. */
+const MENU_CSV_PRICE = /^\d+(?:\.\d{1,2})?$/;
+
+/**
+ * A calories cell, when it is not blank: a whole number, digits only. A
+ * trailing point and zeros ("450.0") is still that whole number — Excel writes
+ * it so when the column is formatted with decimal places — and reads as 450.
+ */
+const MENU_CSV_CALORIES = /^\d+(?:\.0+)?$/;
+
+/** The template's Arabic columns: category_name_ar, product_name_ar, description_ar. */
+const MENU_CSV_ARABIC_COLUMNS = [1, 3, 5];
+
+/** A character of the Arabic script, in the blocks a menu is written in (U+FEFF excluded). */
+const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFC]/;
+
+/** A letter of any script. A cell of question marks, digits and spaces has none. */
+const ANY_LETTER = /\p{L}/u;
+
+/**
+ * The import's refusals, in both console languages. The older row messages
+ * below are still English-only; these are new and are not.
+ */
+const MENU_CSV_TEXT = {
+  notUtf8: {
+    en:
+      'This file is not saved as UTF-8, so its Arabic text cannot be read, and nothing was imported. ' +
+      'In Excel use Save As and choose "CSV UTF-8 (Comma delimited)", then import the new file.',
+    ar:
+      'هذا الملف غير محفوظ بترميز UTF-8، لذلك تعذّرت قراءة النص العربي فيه ولم يُستورد أي شيء. ' +
+      'في Excel اختر «حفظ باسم» ونوع الملف «CSV UTF-8»، ثم استورد الملف الجديد.',
+  },
+  unclosedQuote: (row: number) => ({
+    en:
+      `Row ${row} opens a quoted cell that is never closed, so every row after it would be read ` +
+      `into that one cell. Nothing was imported. Check the quotation marks on row ${row}.`,
+    ar:
+      `في الصف ${row} علامة اقتباس تفتح خلية ولا تُغلق، فتُقرأ كل الصفوف التي بعدها داخل تلك الخلية. ` +
+      `لم يُستورد أي شيء. راجع علامات الاقتباس في الصف ${row}.`,
+  }),
+  tooWide: (row: number, count: number) => ({
+    en:
+      `Row ${row} has ${count} columns, but the template has ${MENU_CSV_COLUMNS}. A comma inside a cell ` +
+      `must be inside quotes — saving from Excel as "CSV UTF-8" does this for you.`,
+    ar:
+      `عدد الأعمدة في الصف ${row} هو ${count}، بينما في النموذج ${MENU_CSV_COLUMNS} أعمدة. ` +
+      'الفاصلة داخل الخلية يجب أن تكون بين علامتي اقتباس، والحفظ من Excel بصيغة «CSV UTF-8» يفعل ذلك تلقائياً.',
+  }),
+  badCalories: (row: number, raw: string) => ({
+    en:
+      `Row ${row} has an invalid calories value: "${raw}". ` +
+      'Write a whole number with no separators, such as 1200, or leave the cell empty.',
+    ar:
+      `قيمة السعرات الحرارية في الصف ${row} غير صالحة: "${raw}". ` +
+      'اكتب رقماً صحيحاً بدون فواصل، مثل 1200، أو اترك الخلية فارغة.',
+  }),
+};
 
 /**
  * Parses a CSV string and returns new categories and products.
+ *
+ * Positional, in the template's nine-column order; the header row is skipped,
+ * not read. Fields come from `readCsv`, so a quoted cell may hold commas, line
+ * breaks and doubled quotes. Two problems refuse the WHOLE text, because no row
+ * of it can be trusted: text that was not saved as UTF-8 (it holds U+FFFD, or
+ * its Arabic columns hold question marks and no Arabic), and a quote that never
+ * closes. Everything else is a per-row warning, and the other rows still go
+ * through.
  */
-export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
+export function parseCSVMenu(
+  csvText: string,
+  existingCategories: Category[],
+  lang: 'en' | 'ar' = 'en',
+): {
   categories: Category[];
   products: Product[];
   errors: string[];
 } {
-  const lines = csvText.split('\n');
   const products: Product[] = [];
   const newCategories: Category[] = [...existingCategories];
   const errors: string[] = [];
-
-  if (lines.length <= 1) {
-    errors.push('The CSV file is empty or missing headers.');
+  const refuse = (message: string) => {
+    errors.push(message);
     return { categories: newCategories, products, errors };
+  };
+
+  // U+FFFD is what a UTF-8 decoder writes wherever the bytes were not UTF-8.
+  // Excel's plain "CSV (Comma delimited)" on an Arabic Windows PC saves in
+  // windows-1256, and `FileReader.readAsText` decodes as UTF-8, so every Arabic
+  // name arrived as a run of U+FFFD — and used to be imported exactly so.
+  if (csvText.includes('\uFFFD')) return refuse(MENU_CSV_TEXT.notUtf8[lang]);
+
+  const { rows, unclosedQuoteRow } = readCsv(csvText);
+  if (unclosedQuoteRow !== null) return refuse(MENU_CSV_TEXT.unclosedQuote(unclosedQuoteRow)[lang]);
+
+  const isBlank = (cells: string[]) => cells.every((c) => c.trim() === '');
+  if (rows.slice(1).every(isBlank)) return refuse('The CSV file is empty or missing headers.');
+
+  // The same mistake on a computer whose legacy code page has no Arabic at all
+  // (English Windows, windows-1252): Excel writes "?" for every Arabic letter.
+  // That is valid UTF-8, so there is no U+FFFD to find. The file is
+  // recognised by two things together: not one Arabic letter in the Arabic
+  // columns, and at least one Arabic cell with a "?" and no letter of any
+  // script ("????", "12 ???? ????"), which is what an Arabic name becomes.
+  // Neither alone is enough. One stray "?" in a real Arabic sheet has Arabic
+  // beside it, and English placeholder text such as "Thirsty?" has letters, so
+  // both import as before.
+  const arabicCells = rows.slice(1).flatMap((r) => MENU_CSV_ARABIC_COLUMNS.map((c) => r[c] ?? ''));
+  const replacedCell = (c: string) => c.includes('?') && !ANY_LETTER.test(c);
+  if (arabicCells.some(replacedCell) && !arabicCells.some((c) => ARABIC_SCRIPT.test(c))) {
+    return refuse(MENU_CSV_TEXT.notUtf8[lang]);
   }
 
-  // Parse headers
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-  
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  for (let i = 1; i < rows.length; i++) {
+    const cells = rows[i].map((c) => c.trim());
+    // A blank line, or a row of empty cells, which Excel writes for an empty
+    // row inside the used range.
+    if (isBlank(cells)) continue;
 
-    // Basic CSV cell parsing (simple split by comma, ignoring nested commas for safety in mockup)
-    // For a robust simulation, split by comma or match comma-separated-values pattern
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-    
     if (cells.length < 7) {
       errors.push(`Row ${i + 1} has insufficient columns (expected at least 7 columns).`);
+      continue;
+    }
+
+    // Content past the ninth column means the row does not have the template's
+    // shape — most often an UNQUOTED comma in a hand-typed row, which shifts
+    // every later cell, the price among them. Empty trailing cells are fine.
+    const lastFilled = cells.reduce((last, c, index) => (c !== '' ? index : last), -1);
+    if (lastFilled >= MENU_CSV_COLUMNS) {
+      errors.push(MENU_CSV_TEXT.tooWide(i + 1, lastFilled + 1)[lang]);
       continue;
     }
 
@@ -240,7 +400,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
     const descEn = cells[4];
     const descAr = cells[5];
     const priceRaw = cells[6];
-    const caloriesRaw = cells[7] || '0';
+    const caloriesRaw = cells[7] ?? '';
     const imageUrl = cells[8] || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
 
     if (!catNameEn || !catNameAr || !prodNameEn || !prodNameAr || !priceRaw) {
@@ -248,13 +408,25 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
       continue;
     }
 
-    const price = parseFloat(priceRaw);
-    if (isNaN(price) || price <= 0) {
+    // A plain number, as the template writes it: "29" or "29.00". NOT
+    // parseFloat, which reads the leading digits of anything — so a quoted
+    // "1,000.00" became 1, and a description shifted into this column by an
+    // unquoted comma ("12 قطعة") became 12, each a wrong price on the live menu.
+    if (!MENU_CSV_PRICE.test(priceRaw) || Number(priceRaw) <= 0) {
       errors.push(`Row ${i + 1} has an invalid price: "${priceRaw}".`);
       continue;
     }
+    const price = Number(priceRaw);
 
-    const calories = parseInt(caloriesRaw);
+    // The same rule for calories, which the menu shows the customer. parseInt
+    // read a quoted "1,200" as 1 — the quoted-comma defect again, on a
+    // nutrition figure — and silently wrote 0 for anything it could not read.
+    // Blank still means 0, as it always did.
+    if (caloriesRaw !== '' && !MENU_CSV_CALORIES.test(caloriesRaw)) {
+      errors.push(MENU_CSV_TEXT.badCalories(i + 1, caloriesRaw)[lang]);
+      continue;
+    }
+    const calories = caloriesRaw === '' ? 0 : Number(caloriesRaw);
 
     // Find or create category
     let category = newCategories.find(c => c.nameEn.toLowerCase() === catNameEn.toLowerCase());
@@ -284,7 +456,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
       descriptionEn: descEn,
       descriptionAr: descAr,
       price,
-      calories: isNaN(calories) ? 0 : calories,
+      calories,
       imageUrl: imageUrl || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
       isActive: true,
       modifierGroupIds: ['mg-heat-level'] // default heat level modifier group assigned

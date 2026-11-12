@@ -1,3 +1,5 @@
+import { MAX_LINE_QUANTITY } from '../features/cart/quantityLimit';
+
 /**
  * EN/AR strings for the customer app. Extends the web app's mobileLocales with
  * keys the native screens need. `t(key)` returns the active-language string.
@@ -15,6 +17,12 @@ export const STRINGS = {
     errTimeout: 'That took too long. Please try again.',
     errRateLimited: 'Too many attempts. Please wait a moment and try again.',
     errServer: 'Something went wrong on our side. Please try again shortly.',
+    // Order refusals from place_customer_order (20261005120000). Each says
+    // what the customer can do next.
+    errOrderPhoneUnverified: 'To place an order, sign in with your WhatsApp number.',
+    errOrderOpenLimit: 'You already have several orders in progress. Please wait until one is ready before placing another.',
+    errOrderHourlyLimit: 'You have placed several orders in the last hour. Please try again a little later.',
+    errOrderQuantityLimit: `You can order up to ${MAX_LINE_QUANTITY} of one item.`,
     cancel: 'Cancel',
     close: 'Close',
     back: 'Back',
@@ -389,6 +397,10 @@ export const STRINGS = {
     errTimeout: 'استغرقت العملية وقتاً طويلاً. حاول مرة أخرى.',
     errRateLimited: 'محاولات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
     errServer: 'حدث خطأ لدينا. حاول مرة أخرى بعد قليل.',
+    errOrderPhoneUnverified: 'لتقديم طلب، سجّل الدخول برقم واتساب الخاص بك.',
+    errOrderOpenLimit: 'لديك عدة طلبات قيد التنفيذ. يرجى الانتظار حتى يجهز أحدها قبل تقديم طلب جديد.',
+    errOrderHourlyLimit: 'لقد قدّمت عدة طلبات خلال الساعة الماضية. يرجى المحاولة مرة أخرى بعد قليل.',
+    errOrderQuantityLimit: `يمكنك طلب ${MAX_LINE_QUANTITY} قطعة كحد أقصى من الصنف الواحد.`,
     cancel: 'إلغاء',
     close: 'إغلاق',
     back: 'رجوع',

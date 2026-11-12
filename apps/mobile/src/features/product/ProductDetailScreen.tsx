@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../components/Header';
 import { Price } from '../../components/Price';
 import { QtyStepper } from '../../components/QtyStepper';
+import { incrementQuantity } from '../cart/quantityLimit';
 import { ErrorView, LoadingView } from '../../components/StateViews';
 import { radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { StatusPill } from '../../design-system/ui/Chip';
@@ -227,7 +228,7 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
               inputStyle={styles.noteInput}
             />
           </View>
-          <View style={[styles.qtyRow, rtlRow]}><Text variant="heading">{t('quantity')}</Text><QtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} /></View>
+          <View style={[styles.qtyRow, rtlRow]}><Text variant="heading">{t('quantity')}</Text><QtyStepper value={qty} onIncrement={() => setQty(incrementQuantity)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} /></View>
         </View>
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}><Pressable onPress={save} style={({ pressed }) => [styles.addBtn, rtlRow, !canSave && styles.addBtnDim, pressed && canSave && { opacity: 0.9 }]} accessibilityRole="button">

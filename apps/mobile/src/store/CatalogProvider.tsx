@@ -10,8 +10,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 
 import { catalog } from '../services/api';
-import { failureMessage } from '../lib/errors/reportFailure';
+import { reportFailure } from '../lib/errors/reportFailure';
 import { useI18n } from '../i18n/I18nProvider';
+import type { StringKey } from '../i18n/strings';
 import {
   buildAvailabilityMatrix, buildModifierAvailabilityMatrix, buildVariantAvailabilityMatrix,
   mapBranch, mapBrandSettings, mapCategory,
@@ -119,7 +120,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   // Safe: _layout nests I18nProvider OUTSIDE AppStoreProvider.
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // The failure is kept as a key and translated when shown, so a change of
+  // language re-renders it rather than reloading the menu.
+  const [errorKey, setErrorKey] = useState<StringKey | null>(null);
+  const error = errorKey ? t(errorKey) : null;
   const [branches, setBranches] = useState<Branch[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -135,6 +139,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
+  // Only the newest load may write state. An older load that settles late (a
+  // second "Try Again" while the first is still in flight) is ignored.
+  const loadSeq = useRef(0);
   // The matrix seeds every product x branch to available before applying stored
   // exceptions, so a partial refresh needs the same id lists the full load used.
   const matrixSeed = useRef<{
@@ -149,12 +156,14 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     mounted.current = true;
+    const seq = ++loadSeq.current;
+    const isCurrent = () => mounted.current && seq === loadSeq.current;
     setLoading(true);
-    setError(null);
+    setErrorKey(null);
     (async () => {
       try {
         const raw = await catalog.all();
-        if (!mounted.current) return;
+        if (!isCurrent()) return;
         const mappedBranches = raw.branches.map(mapBranch);
         const mappedProducts = raw.products.map((p) => mapProduct(p, raw.links, raw.productVariants));
         const groups: Record<string, ModifierGroup> = {};
@@ -177,13 +186,18 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setDeliveryZones((raw.deliveryZones ?? []).map(mapDeliveryZone));
       } catch (e) {
         // Was rendering the raw provider message straight onto the menu screen.
-        if (mounted.current) setError(failureMessage(e, t, { subsystem: 'menu', op: 'load_catalog' }));
+        // Reported once, here; translated when shown (see errorKey).
+        if (isCurrent()) {
+          setErrorKey(reportFailure(e, { subsystem: 'menu', op: 'load_catalog' }).messageKey);
+        }
       } finally {
-        if (mounted.current) setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     })();
     return () => { mounted.current = false; };
-  }, [reloadTick, t]);
+    // Not `t`: depending on the translation function reloaded the whole menu on
+    // every change of language (store/catalogLanguage.test.tsx).
+  }, [reloadTick]);
 
   // Mirror of the order context's branch. The persisted source of truth lives in
   // OrderContextProvider; this stays the accessor the menu/product/checkout

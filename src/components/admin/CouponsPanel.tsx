@@ -47,6 +47,7 @@ import {
   couponState,
   couponsApi,
   normaliseCode,
+  toLocalInputValue,
   validateDraft,
   type Coupon,
   type CouponBounds,
@@ -55,6 +56,7 @@ import {
   type CouponState,
   type DraftProblem,
 } from '../../lib/couponsApi';
+import { riyadhDateOnly } from '../../utils/calculations';
 import { Price } from '../Price';
 
 const INPUT = [
@@ -497,8 +499,13 @@ export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
                       )}
                     </td>
                     <td className={TD}>
+                      {/* The RIYADH calendar date. PostgREST returns these in
+                          UTC, so slicing the string put a code that starts or
+                          ends between 00:00 and 02:59 Riyadh — midnight, the
+                          natural choice — on the previous day. */}
                       <Text variant="caption" tone="secondary" as="span">
-                        {(c.starts_at ?? '—').slice(0, 10)} → {(c.ends_at ?? '—').slice(0, 10)}
+                        {c.starts_at ? riyadhDateOnly(c.starts_at) : '—'} →{' '}
+                        {c.ends_at ? riyadhDateOnly(c.ends_at) : '—'}
                       </Text>
                     </td>
                     <td className={TD}>
@@ -563,7 +570,11 @@ export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
                               maxDiscountAmount:
                                 c.max_discount_amount === null ? '' : String(c.max_discount_amount),
                               usageLimit: c.usage_limit === null ? '' : String(c.usage_limit),
-                              endsAt: c.ends_at ? c.ends_at.slice(0, 16) : '',
+                              // The inverse of what the save does, NOT a slice
+                              // of the UTC string: slicing showed the UTC wall
+                              // clock, the save read it as local time, and in
+                              // Riyadh every save moved the expiry 3 h earlier.
+                              endsAt: toLocalInputValue(c.ends_at),
                             });
                           }}
                         />
@@ -671,7 +682,11 @@ export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
                             label={isRTL ? 'حفظ الحدود' : 'Save bounds'}
                             onClick={() =>
                               void act(async () => {
-                                await couponsApi.updateBounds(c.id, bounds);
+                                // The stored instant goes with the bounds, so an
+                                // Expires field left as loaded is written back
+                                // exactly rather than re-parsed (couponsApi's
+                                // `boundsEndsAt`).
+                                await couponsApi.updateBounds(c.id, bounds, c.ends_at);
                                 setEditing(null);
                               })
                             }

@@ -328,12 +328,6 @@ export const auth = {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
   },
-  async signUp(email: string, password: string, fullName: string, phone?: string) {
-    const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { full_name: fullName, phone } },
-    });
-    if (error) throw new Error(error.message);
-  },
   async signOut() { await supabase.auth.signOut(); },
   /**
    * The signed-in user's profile row, or `null` when there is genuinely no row

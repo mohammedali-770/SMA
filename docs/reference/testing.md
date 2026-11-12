@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**225 TypeScript test files declaring 3554 test blocks, plus 85 SQL suites.**
+**236 TypeScript test files declaring 3690 test blocks, plus 86 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -111,6 +111,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
+- `supabase/tests/server_input_bounds_test.sql`
 - `supabase/tests/staff_access_directory_test.sql`
 - `supabase/tests/staff_account_deletion_test.sql`
 - `supabase/tests/staff_mfa_aal2_test.sql`
@@ -130,7 +131,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-80 files, 1140 declared test blocks.
+83 files, 1158 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -147,6 +148,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
+| `apps/mobile/src/features/cart/quantityLimit.test.ts` | 7 | MAX_LINE_QUANTITY |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
@@ -187,7 +189,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
-| `apps/mobile/src/lib/errors/userMessage.test.ts` | 7 | describeFailure |
+| `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
+| `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
 | `apps/mobile/src/lib/observability/config.test.ts` | 19 | Sentry identity |
@@ -208,6 +211,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/services/rpcContractParity.test.ts` | 23 | the SQL reader |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
+| `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
@@ -217,7 +221,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-112 files, 1551 declared test blocks.
+117 files, 1630 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -226,28 +230,31 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
 | `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
 | `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
-| `src/components/admin/CompMembersPanel.test.tsx` | 12 | CompMembersPanel |
-| `src/components/admin/CouponsPanel.test.tsx` | 20 | the standing answer to |
+| `src/components/admin/CompMembersPanel.test.tsx` | 13 | CompMembersPanel |
+| `src/components/admin/CouponsPanel.test.tsx` | 24 | the standing answer to |
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
+| `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
-| `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
+| `src/components/admin/MenuManagementPanel.test.tsx` | 20 | product price validation — the money contract |
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 13 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
-| `src/components/admin/ReportsPanel.test.tsx` | 17 | CSV export — the machine contract |
+| `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
-| `src/components/admin/StaffAccessPanel.test.tsx` | 4 | StaffAccessPanel |
+| `src/components/admin/StaffAccessPanel.test.tsx` | 5 | StaffAccessPanel |
 | `src/components/admin/staffAccounts.test.ts` | 10 | validateNewOpsAccount |
 | `src/components/admin/StatsPanel.test.tsx` | 24 | the ranked chart |
 | `src/components/admin/view/adminNav.test.ts` | 23 | grouping is total |
 | `src/components/admin/view/AdminSidebar.test.tsx` | 29 | structure |
+| `src/components/admin/view/adminTime.test.ts` | 4 | exactTime |
 | `src/components/admin/view/alerts/alertsView.test.ts` | 18 | load contract |
 | `src/components/admin/view/branches/DeliveryAreasEditor.test.tsx` | 10 | DeliveryAreasEditor |
 | `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
+| `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
 | `src/components/admin/view/health/HealthSystemCard.test.tsx` | 5 | branch_availability health card |
 | `src/components/admin/view/health/healthView.test.ts` | 22 | polling contract |
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 4 | admin rule filter ↔ watchdog rule set |
@@ -259,6 +266,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
+| `src/components/AuthScreen.test.tsx` | 4 | AuthScreen |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
 | `src/components/ops/branchConsole.test.ts` | 56 | duration and reason vocabularies |
 | `src/components/ops/BranchConsole.test.tsx` | 43 | BranchConsole |
@@ -294,7 +302,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
-| `src/lib/couponsApi.test.ts` | 33 | normaliseCode — the difference between a working code and a dead one |
+| `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |
 | `src/lib/googleMaps.test.ts` | 14 | closeRing / openRing — GeoJSON rings are closed, editor paths are open |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |
@@ -332,27 +340,30 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
 | `src/lib/supabaseKey.test.ts` | 8 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
-| `src/utils/calculations.test.ts` | 35 | getVATBreakdown |
+| `src/utils/calculations.test.ts` | 64 | getVATBreakdown |
+| `src/utils/csvReader.test.ts` | 15 | readCsv — fields and records |
 
 ### `supabase/functions/`
 
-32 files, 854 declared test blocks.
+35 files, 893 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
-| `supabase/functions/_shared/adminPush.test.ts` | 44 | scopeFor |
+| `supabase/functions/_shared/adminPush.test.ts` | 50 | scopeFor |
 | `supabase/functions/_shared/adminPushWiring.test.ts` | 29 | the admin channel is separate from the customer channel |
-| `supabase/functions/_shared/alertDispatchWiring.test.ts` | 17 | operations-alert-dispatch is inert until deliberately enabled |
+| `supabase/functions/_shared/alertDispatchWiring.test.ts` | 18 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/apiKeys.test.ts` | 16 | key selection |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/deployFunctionsWiring.test.ts` | 9 | deploy-functions.yml |
+| `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 7 | email-test-config validates the SMTP endpoint before connecting |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
+| `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/moyasar.test.ts` | 118 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 24 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
@@ -361,10 +372,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 9 | no invoice outlives its attempt (C1 part 4) |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
 | `supabase/functions/_shared/paymentWiring.test.ts` | 68 | payment functions talk to Moyasar only |
+| `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
-| `supabase/functions/_shared/smtpTarget.test.ts` | 12 | parseSmtpTarget |
+| `supabase/functions/_shared/smtpTarget.test.ts` | 24 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
 | `supabase/functions/_shared/webhookReliabilityWiring.test.ts` | 11 | lazywait-webhook |
 | `supabase/functions/_shared/webPush.test.ts` | 29 | base64url |
