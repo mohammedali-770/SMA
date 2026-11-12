@@ -497,6 +497,37 @@ out of one of the two on deploy — a user-visible change worth its own decision
 not a side effect of a lockout fix. Native builds are unaffected: they keep the
 session in the device keystore (S-1).
 
+## S-4 The app's database reads had no timeout — INFO (availability) — FIXED 2026-11-12
+
+Not a confidentiality finding; recorded here because it changes how
+`apps/mobile/src/lib/supabase.ts` builds the client this document owns.
+
+React Native's Android networking sets no connect, read or write timeout, and
+supabase-js adds none, so a read on a stalled connection stayed pending for
+ever. Measured against a server that never answered: still pending at 15 s, and
+in the local web build `/app/select` showed only a spinner at 90 s, with no
+Retry, because `CatalogProvider` shows Retry only on an error.
+
+The client now passes `global: { fetch: readTimeoutFetch }`
+(`apps/mobile/src/lib/readTimeoutFetch.ts`). It aborts a **GET or HEAD to
+`/rest/v1/`** after 20 s, with a plain `setTimeout` and a hand-composed caller
+signal because React Native may lack `AbortSignal.timeout` and `AbortSignal.any`.
+The rejection is an `AbortError`, which postgrest-js surfaces as `{ error }` and
+does not retry, so `catalog.all()` rejects and the existing error and Retry path
+takes over.
+
+**What it does not touch, deliberately:** every write and RPC (so order
+placement), every Edge Function under `/functions/v1/` (payment and order
+intake), and every auth call under `/auth/v1/`. A write abandoned client-side may
+still commit, and a timed-out auth read is not something the auth client should
+be asked to interpret. The session storage, the keys and the RLS model are
+unchanged.
+
+**The console is not changed.** Its client (`src/lib/supabase.ts`) runs report
+exports and operations reads that can legitimately run long on a staff
+connection, it is not where the stall was measured, and a browser applies its
+own limits. Adding it there is a separate decision.
+
 ## What the audit deliberately did not touch
 
 - **`apps/mobile/src/app/payment/return.tsx`.** A deep-link finding was confirmed

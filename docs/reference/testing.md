@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**236 TypeScript test files declaring 3690 test blocks, plus 86 SQL suites.**
+**241 TypeScript test files declaring 3749 test blocks, plus 87 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -114,6 +114,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/prune_operational_run_history_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
+- `supabase/tests/rls_initplan_live_board_order_year_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
 - `supabase/tests/server_input_bounds_test.sql`
 - `supabase/tests/staff_access_directory_test.sql`
@@ -151,10 +152,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-83 files, 1158 declared test blocks.
+88 files, 1217 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
+| `apps/mobile/src/components/headerBack.test.ts` | 5 | resolveBack |
 | `apps/mobile/src/components/headerInset.test.ts` | 6 | header top inset — exactly one source per screen |
 | `apps/mobile/src/components/iosPurposeStrings.test.ts` | 11 | iOS Info.plist purpose strings (GO_LIVE_READINESS B8, N1) |
 | `apps/mobile/src/components/legacyButtonBehaviour.test.ts` | 5 | legacy Button — behaviour is unchanged by the consolidation |
@@ -169,6 +171,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/ordersTabGate.test.tsx` | 4 | the Orders tab renders OrdersScreen only for a signed-in customer |
 | `apps/mobile/src/features/auth/returnPath.test.ts` | 8 | safeReturnPath — what is allowed through |
 | `apps/mobile/src/features/cart/quantityLimit.test.ts` | 7 | MAX_LINE_QUANTITY |
+| `apps/mobile/src/features/cart/repriceCart.test.ts` | 24 | repriceCart — the price the cart shows is the price the menu now asks |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
@@ -212,6 +215,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
+| `apps/mobile/src/lib/navigationLatch.test.ts` | 12 | createNavigationLatch |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
 | `apps/mobile/src/lib/observability/config.test.ts` | 19 | Sentry identity |
 | `apps/mobile/src/lib/observability/sanitize.test.ts` | 28 | isSensitiveKey |
@@ -223,6 +227,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/orderSelectGrantParity.test.ts` | 6 | customer order select ↔ database grant parity |
 | `apps/mobile/src/lib/payment.test.ts` | 7 | online payment is offered only in the native app |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
+| `apps/mobile/src/lib/readTimeoutFetch.test.ts` | 17 | isTimedRead — the boundary |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
@@ -232,6 +237,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
 | `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/catalogLanguage.test.tsx` | 4 | the menu does not reload when the language changes |
+| `apps/mobile/src/store/catalogMapping.test.ts` | 1 | mapPricedMenu |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/darkContrastContract.test.ts` | 10 | dark inks clear WCAG AA for normal text |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
