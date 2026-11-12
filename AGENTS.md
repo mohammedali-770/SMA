@@ -48,7 +48,7 @@ Codex flags only P0 and P1 findings on GitHub, so every rule below says which it
 
 ### Payments and push
 
-- **P0:** a change to payment initiation, verification, webhooks, refunds, the refund worker's schedule, payment records, the payment provider configuration or a payment migration, in any file (migrations and other SQL included), when CLAUDE.md §6 as it stands on the base branch does not allow it. Editing §6 or the payment documents in the same pull request does not make a change allowed.
+- **P0:** a change, in any file (migrations and other SQL included), to payment initiation, verification, return or webhook behaviour; payment-specific checkout-session behaviour; refunds or the refund worker's schedule; payment records; payment business rules or financial reconciliation (amounts, idempotency keys, retry policy); the payment provider configuration; payment or refund testing; a payment migration; or any path in the `payments` rule of [`docs/ownership.json`](docs/ownership.json) — when CLAUDE.md §6 as it stands on the base branch does not allow it. Editing §6 or the payment documents in the same pull request does not make a change allowed.
   Safe path: what §6 does not allow waits until §6, on the base branch, allows it.
 - **P1:** a change to `push-dispatch` copy, targeting, audience or dispatch behaviour, or to the device-registration defaults in `apps/mobile/src/features/notifications/`; or, in SQL, a change to `push_devices.promos_enabled` (its default or existing rows) or to `register_push_device` (§7).
 - **P1:** anything that lets the staff web-push channel reach `push_devices`, or the customer channel reach `admin_push_*` (§7).
@@ -67,4 +67,4 @@ Codex flags only P0 and P1 findings on GitHub, so every rule below says which it
 
 - **P0:** a secret value, JWT, OTP or customer personal data in code, fixtures, logs or pull-request text; or a non-public credential in a `VITE_*` or `EXPO_PUBLIC_*` variable (§9).
 - **P1:** owned code changed without its owning document (`docs/ownership.json`), or a hand edit under `docs/reference/` (§14).
-- **P1:** text that disagrees with §6 as the pull request leaves it, by describing as current a payment provider other than the one §6 names, or payment as frozen when §6 says it is not, or the reverse; text that describes push as dormant; or a dated live measurement presented as current (§14).
+- **P1:** text that disagrees with §6 as the pull request leaves it: describing a payment provider as selected or current when §6 names a different one, or none; describing payment as frozen when §6 says it is not, or the reverse; text that describes push as dormant; or a dated live measurement presented as current (§14).

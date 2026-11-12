@@ -53,7 +53,9 @@ import { describe, expect, it } from 'vitest';
  *   - function DDL in quoted text (a DO block, a function body, or a string it
  *     may EXECUTE) that mentions a called function. Only text that can run is
  *     read: the quoted text's own comments, the message of a RAISE and the
- *     value of a top-level COMMENT ON are not;
+ *     value of a top-level COMMENT ON are not. The exception is a line comment
+ *     that reaches the end of the quoted text: an E'\n' escape or a format()
+ *     argument can end it at run time, so that text is read whole;
  *   - a DROP ... CASCADE of a table (foreign tables included), a view
  *     (materialized ones included), a type, a domain, a schema, an extension
  *     or a language, and any DROP OWNED, at top level or in quoted text,
@@ -402,8 +404,14 @@ const COMMENT_VALUE = /^\s*comment\s+on\b[\s\S]*\bis\s*e?$/i;
  * the message of a RAISE. Text that does not read as SQL (a message with an
  * apostrophe, a regular expression) is kept whole, so nothing is dropped on a
  * guess.
+ *
+ * A line comment that reaches the end of the text is also kept whole. Its end
+ * can be supplied at run time by an E'\n' escape or a format() argument, and
+ * whatever follows then runs: `execute E'-- note\n drop function …'` drops the
+ * function on PG16. Reading that tail as comment text would hide the DDL.
  */
 function runnableText(segment: string): string {
+  if (/--[^\n]*$/.test(segment)) return segment;
   try {
     const render: Render = (q) => (isRaiseMessage(q.before) ? "''" : `'${runnableText(q.body)}'`);
     return scanSql(segment, render).statements.join(';\n');
@@ -704,9 +712,10 @@ const brief = (sql: string) => {
  *     function is a suspect (see `Chain`): this reader may have normalised a
  *     type differently from Postgres, or DROP ROUTINE matched an OUT argument.
  *
- * Any other unmatched drop is a no-op in Postgres too. It is the defensive
- * `drop … if exists` before a first `create`, or a drop of a signature that
- * never existed, which Postgres skips with a NOTICE.
+ * Any other unmatched drop changes nothing a client calls. With IF EXISTS it is
+ * the defensive `drop … if exists` before a first `create`, or a drop of a
+ * signature that never existed, which Postgres skips with a NOTICE. Without IF
+ * EXISTS Postgres raises an error and the migration does not apply at all.
  */
 function cannotReplay(chain: Chain, called: ReadonlySet<string>): string[] {
   const problems = chain.implicitDrops.map(
@@ -966,6 +975,29 @@ describe('DDL the replay cannot follow', () => {
     const refusal =
       'fixture.sql: function DDL in quoted text (a DO block, a function body or a string) mentions validate_coupon, and the replay runs only top-level statements';
     expect(problems).toEqual([refusal, refusal]);
+  });
+
+  // From the 2026-11-12 re-verification. In each, a line comment's end is
+  // supplied at run time, by an E'\n' escape or a format() argument, and the
+  // DDL after it runs: on PG16 the first two really rename and drop
+  // validate_coupon. Read as comment text, the DDL used to vanish.
+  it.each([
+    `do $$ begin execute E'-- rename the old overload first\\n  alter function public.validate_coupon(text, numeric) rename to validate_coupon_v1'; end $$;`,
+    `do $$ begin execute format('-- the old overload goes first %s drop function public.validate_coupon(text, numeric)', E'\\n'); end $$;`,
+    `select cron.schedule('nightly-cleanup', '0 3 * * *', E'-- nightly\\n  drop function if exists public.validate_coupon(text, numeric)');`,
+  ])('still refuses function DDL that follows a line comment ended at run time: %s', (sql) => {
+    expect(check(VALIDATE_COUPON, sql, ['validate_coupon']).problems).toEqual([
+      'fixture.sql: function DDL in quoted text (a DO block, a function body or a string) mentions validate_coupon, and the replay runs only top-level statements',
+    ]);
+  });
+
+  it('still refuses a CASCADE drop that follows a line comment ended at run time', () => {
+    const { problems } = check(
+      '',
+      `do $$ begin execute E'-- rebuild\\n  drop table public.push_devices cascade'; end $$;`,
+      [],
+    );
+    expect(problems).toHaveLength(1);
   });
 
   it('still refuses an unmatched drop that Postgres could have matched to a live overload', () => {
