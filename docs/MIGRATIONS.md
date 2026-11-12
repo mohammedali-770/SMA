@@ -38,13 +38,23 @@ to Production.**
 > sorts ahead of everything. **Name the target by version.**
 
 > **Updated 2026-11-12 (later) — `20261007120000_audit_trail` is written,
-> validated and NOT applied (§58).** On merge it joins the unapplied set, which
-> on this branch's base is the six listed in the note below, so SEVEN. It adds
+> validated and NOT applied (§59).** On merge it joins the unapplied set, which
+> is the seven listed in the note below, so EIGHT. It adds
 > append-only audit tables for order status changes and admin edits, and the
 > sender and content of a broadcast; it changes no customer-visible behaviour
 > and the money path is self-asserted. Apply it BEFORE deploying
 > `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
 > target by version.**
+
+> **Updated 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
+> is written, validated and NOT applied, so on merge the outstanding set is
+> SEVEN:** `20260824100000`, `20260929120000` (§51), `20261002120000` (§54),
+> `20261003120000` (§55), `20261004120000` (§56), `20261005120000` (§57) and
+> this file (§58). It makes three RLS policies call `is_staff()` once per
+> statement, gives the console's live board one id set, and numbers an order
+> with the Riyadh year. It changes no visible row. The money path is
+> self-asserted unchanged. Moyasar still sorts first. **Name the target by
+> version.**
 
 > **Updated 2026-11-12 — `20261005120000_server_input_bounds` is written,
 > validated and NOT applied.** On merge it joins the unapplied set. It changes
@@ -7846,7 +7856,140 @@ that applies SELECT policies.
 4. Afterwards: `select order_limit_open, order_limit_per_hour from app_settings`
    reads 5 and 10, the money-path pair is unchanged, and Moyasar is still absent.
 
-## 58. Audit trail — WRITTEN, NOT APPLIED (2026-11-12)
+## 58. RLS init-plans, the live board's id set and the order-number year — WRITTEN, NOT APPLIED (2026-11-12)
+
+`20261006120000_rls_initplan_live_board_order_year.sql`. **Written 2026-11-12,
+validated, awaiting owner approval.** Assessment findings P01#2, P01#3 and
+R06#5.
+
+sha256 `489d7529bcb213b18d64609fd2bbb4bc217b44c274cc8cce1aacc369f53c6c0a`,
+565 lines / 29 606 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It changes no visible row and no order on the live board.** Its one
+customer-visible effect is the order-number year in the first three hours of
+1 January, Riyadh time. **MONEY PATH UNTOUCHED, and the file asserts it**
+before and after (`12b6816d…` / `22e2d429…`). **No deploy is implied:** both
+functions keep their signatures.
+
+### What it does
+
+| Finding | Change | Measured on the local chain, 50 000 synthetic orders |
+| --- | --- | --- |
+| P01#2 | `profiles_select_own_or_staff`, `orders_select_own_or_staff` and `loyalty_tx_select_own_or_staff` read `(<owner> = (select auth.uid())) or (select public.is_staff())`. `is_staff()` becomes an InitPlan: once per statement, filter `((owner = $0) OR $1)` | My Orders 1 746–1 913 ms → 21–31 ms for a customer with 0, 1 or 7 orders; 32–36 → 4–7 ms for one with 1 025. Staff profiles list (5 008) 293–416 → 3.4–4.1 ms |
+| P01#3 | `admin_list_orders_with_items`: the bounded arm is one `o.id in ((recent window) union (open orders))`. The unbounded call (`p_limit` null) is the second arm with its filter switched off | Live board, `p_limit` 500: 332–412 ms → 50–70 ms, 71–118 ms with a generic plan. The plan no longer walks `orders_created_at_idx` removing 49 500 rows |
+| R06#5 | `set_order_number` takes the year from `now() at time zone 'Asia/Riyadh'` | an order at 2026-12-31 21:30 UTC (00:30 on 1 January in Riyadh) was numbered `SM-2026-…` with the session in UTC, as Production's is |
+
+Both bodies are derived from their only current definitions (`20260824130000`
+and `20260709120000`) by one anchored substitution each.
+
+**The live board's predicate departs from the finding's sketch, and the reason
+is measured.** The sketch kept `p_limit is null or` at the top of the WHERE.
+Inside the function that shape was no faster: 348–415 ms against 335–391 ms
+before. PostgreSQL pulls an IN subquery up into a join before it folds
+`p_limit is null` away, so any OR at the top still filters the whole table.
+Moving the null case inside the second arm leaves a bare IN, which becomes a
+join. The unbounded call measured 5.1–5.3 s before and after: it returns every
+order either way.
+
+### Same rows, measured
+
+- **RLS, at 50 000 orders**, row count and md5 of the sorted id set for
+  `orders`, `profiles` and `loyalty_transactions`, plus My Orders' first page,
+  as eight callers: customers with 7, 1, 1 025 and 0 orders; an administrator
+  and an accountant, each at aal2 and at aal1. **All 32 identical before and
+  after.** An administrator at aal1 sees 0 orders, 1 profile (their own) and 0
+  loyalty rows; at aal2, all 50 000 / 5 008 / 37 950.
+- **Live board, at 50 000 orders**, the md5 of the whole returned document is
+  identical before and after for `p_limit` 500, 20 000, 5, 1, 0, −3 and null.
+
+### What it does not do
+
+- **`checkout_sessions_select_own` is not touched.** It still calls
+  `auth.uid()` and `is_staff()` per row, and it belongs to the payment path.
+  The file asserts its text is unchanged.
+- **No other policy is touched.** 24 more call `is_staff()` or `is_admin()`
+  bare on the local chain, read 2026-11-12;
+  `campaign_redemptions_select_own_or_staff` has the same own-or-staff shape.
+  None was measured as a hot path. The file asserts every policy other than
+  the three is byte-identical before and after.
+- **No index is added.** A partial index on open orders, without the rewrite,
+  measured no faster (391–438 ms).
+- **No existing order is renumbered.**
+- **My Orders still reads the orders index in order.** The filter is now cheap,
+  but the `OR $1` still keeps the planner off `(customer_id, created_at)`, so
+  the cost grows with the table at about 0.5 µs per order. That is about 25 ms
+  at 50 000 orders.
+
+### Preconditions it checks before changing anything
+
+- Each of the three policies is SELECT, `TO authenticated`, permissive, with no
+  WITH CHECK, and reads the pre-image or the post-image qual.
+- There is one `is_staff()`, and `authenticated` can execute it.
+- There is one of each function, and each body matches the pre-image or the
+  post-image with comments and whitespace ignored. **The pre-images were read
+  from the migration chain, not from Production.** If Production holds a
+  different body, the apply refuses rather than overwrite it.
+- `order_number_seq` exists and the server knows `Asia/Riyadh`.
+- The money-path pair hashes `12b6816d…` / `22e2d429…`.
+
+### What the file checks after the change
+
+- The three quals are exactly the new text. Every other policy is
+  byte-identical to a snapshot taken before the change.
+- `admin_list_orders_with_items`: one overload, with the same arguments, return
+  type, SECURITY DEFINER, STABLE, `search_path` and grants. A non-staff call
+  still refuses with `42501`, read back as a value. The new predicate is run
+  read-only for a bounded and an unbounded call, because a `plpgsql` body is
+  not name-resolved when it is created. The body has one UNION and no top-level
+  OR.
+- `set_order_number`: one overload, the same return type, security,
+  `search_path` and grants, and still the `set_orders_number` trigger's
+  function. **The year is checked as an outcome.** The stored body runs as a
+  trigger on a scratch table, with the session in UTC and `now()` replaced by
+  2026-12-31 21:30 UTC, 20:59:59 UTC and a mid-year instant. They must give
+  `SM-2027`, `SM-2026` and `SM-2026`. `nextval()` is replaced as well, so the
+  check does not use up a real order number: a sequence advance survives a
+  rollback. The body must also equal its pre-image with only the year
+  expression replaced. This check runs in its own `DO` block, after the main
+  verification. It creates a `pg_temp` probe function, and
+  `rpcContractParity.test.ts` refuses quoted function DDL in any block that
+  also names a function the app calls, here `admin_list_orders_with_items`.
+- Both bodies hash to the values computed from this file before it was applied.
+- The money-path pair is unchanged.
+
+### Validation
+
+- **Local chain harness:** all 150 migrations apply, and the file re-applies
+  cleanly. 87 suites run: 85 pass, the 2 quarantined fail as before, 0 new
+  failures.
+- **Paired suite** `rls_initplan_live_board_order_year_test.sql`, 5 cases. On
+  the chain without this file, cases 1, 3, 4 and 5 fail and the run exits
+  non-zero. Case 2 passes on both chains, by design: it checks that 21
+  caller/table pairs see the same rows under the new quals, under the old quals
+  in the same transaction, and against an oracle computed as `postgres`.
+- **Mutation testing: 7 mutants, each refused by the file's own check and failed
+  by the suite** with that check stripped out:
+  - `orders`' `is_staff()` left bare;
+  - the open-order arm of the UNION dropped;
+  - the top-level OR kept, which is the finding's sketch;
+  - the `p_limit is null` switch dropped from the second arm;
+  - `checkout_sessions_select_own` wrapped as well;
+  - the year taken in UTC;
+  - the year expression left unchanged.
+
+  Only the switch mutant is caught by the body hash alone in the file. The
+  suite catches it on the unbounded call's rows.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261006120000` by name. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first.
+2. Afterwards, read-only: the three quals read `… OR ( SELECT is_staff() AS
+   is_staff))`; `checkout_sessions_select_own` is unchanged; `place_order`
+   `12b6816d…` and `compute_order_snapshot` `22e2d429…` are unchanged; and the
+   Moyasar file is still unapplied unless it was applied on its own approval.
+
+## 59. Audit trail — WRITTEN, NOT APPLIED (2026-11-12)
 
 `20261007120000_audit_trail.sql`. **Written 2026-11-12, validated, awaiting
 owner approval.** App-hardening checklist gaps S09#1, S09#2 and S09#3.
@@ -7861,7 +8004,7 @@ are as they were. It adds no trigger to `orders` other than its own, nothing on
 a payment table and nothing on `integration_settings`. It writes no row.
 
 **It implies two deploys, each AFTER the apply and each its own approval:**
-`push-dispatch` and `staff-accounts` (`docs/OWNER_ACTIONS.md` §49). Both
+`push-dispatch` and `staff-accounts` (`docs/OWNER_ACTIONS.md` §50). Both
 handlers survive being deployed first, by design, but lose the new record until
 the apply lands.
 
@@ -8007,4 +8150,4 @@ The residue is a few identity values on the two audit tables.
 3. Afterwards, read-only: both tables exist with RLS on and one policy each;
    `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…`
    unchanged; then deploy `push-dispatch` and `staff-accounts`, each on its own
-   approval (`docs/OWNER_ACTIONS.md` §49).
+   approval (`docs/OWNER_ACTIONS.md` §50).

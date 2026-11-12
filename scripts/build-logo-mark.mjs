@@ -32,11 +32,26 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** The approved master artwork. Never overwritten by this script. */
 const SOURCE = join(ROOT, 'public/logo.png');
 
-/** Every copy of the derived mark. Kept byte-identical so all surfaces match. */
+/**
+ * Every copy of the derived mark, with the square size each is written at
+ * (null = the trimmed master's own size, 885 px today).
+ *
+ * The two UI copies are DOWNSCALED to 450 px: 3x the largest place the mark is
+ * drawn (the 150 pt launch intro, `apps/mobile/src/app/index.tsx`). At full size
+ * it was 388 KB, the launch screen's LCP image, and finished 44 s after the
+ * chooser was usable on a throttled cold load; nothing displays more than 150 pt
+ * of it. The console's `public/` copy is shown at 56 CSS px at most.
+ *
+ * `assets/logo-mark.png` stays FULL SIZE on purpose. No UI ships it: it is the
+ * source `scripts/build-play-feature-graphic.mjs` composites onto the Play
+ * feature graphic at 380 px, and `play-feature-graphic:check` pins that output
+ * byte-for-byte. Downscaling it would silently soften a published store asset.
+ */
+const UI_SIZE = 450;
 const TARGETS = [
-  join(ROOT, 'public/logo-mark.png'),
-  join(ROOT, 'assets/logo-mark.png'),
-  join(ROOT, 'apps/mobile/assets/logo-mark.png'),
+  { path: join(ROOT, 'public/logo-mark.png'), size: UI_SIZE },
+  { path: join(ROOT, 'assets/logo-mark.png'), size: null },
+  { path: join(ROOT, 'apps/mobile/assets/logo-mark.png'), size: UI_SIZE },
 ];
 
 /** Luminance at or above this is treated as pure backdrop and fully cleared. */
@@ -169,11 +184,70 @@ function trimToSquare({ width, height, pixels }) {
   return { width: side, height: side, pixels: out };
 }
 
+/**
+ * Exact area-average downscale of a square RGBA image to `side` px, in
+ * PREMULTIPLIED alpha. Each output pixel is the coverage-weighted mean of the
+ * source pixels under its footprint, fractional edges included, so a
+ * non-integer ratio (885 -> 450) does not alternate 1- and 2-pixel boxes.
+ * Premultiplying matters here as it does in build-play-feature-graphic.mjs: the
+ * mark has a transparent surround, and averaging straight RGBA would pull its
+ * anti-aliased edge toward the black stored under alpha 0 — a dark halo.
+ */
+function downscaleArea({ width, height, pixels }, side) {
+  if (side >= width && side >= height) return { width, height, pixels };
+  const out = Buffer.alloc(side * side * 4);
+  const sx = width / side;
+  const sy = height / side;
+
+  for (let y = 0; y < side; y++) {
+    const y0 = y * sy;
+    const y1 = y0 + sy;
+    for (let x = 0; x < side; x++) {
+      const x0 = x * sx;
+      const x1 = x0 + sx;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      let area = 0;
+
+      for (let yy = Math.floor(y0); yy < Math.min(height, Math.ceil(y1)); yy++) {
+        const wy = Math.min(yy + 1, y1) - Math.max(yy, y0);
+        for (let xx = Math.floor(x0); xx < Math.min(width, Math.ceil(x1)); xx++) {
+          const w = wy * (Math.min(xx + 1, x1) - Math.max(xx, x0));
+          const i = ((yy * width) + xx) * 4;
+          const alpha = pixels[i + 3] * w;
+          r += pixels[i] * alpha;
+          g += pixels[i + 1] * alpha;
+          b += pixels[i + 2] * alpha;
+          a += alpha;
+          area += w;
+        }
+      }
+
+      const o = ((y * side) + x) * 4;
+      out[o] = a === 0 ? 0 : Math.round(r / a);
+      out[o + 1] = a === 0 ? 0 : Math.round(g / a);
+      out[o + 2] = a === 0 ? 0 : Math.round(b / a);
+      out[o + 3] = Math.round(a / area);
+    }
+  }
+
+  return { width: side, height: side, pixels: out };
+}
+
 const check = process.argv.includes('--check');
-const mark = encodePng(trimToSquare(knockOutBackdrop(decodePng(readFileSync(SOURCE)))));
+const master = trimToSquare(knockOutBackdrop(decodePng(readFileSync(SOURCE))));
+const encoded = new Map();
+const markAt = (size) => {
+  const key = size ?? 'full';
+  if (!encoded.has(key)) encoded.set(key, encodePng(size == null ? master : downscaleArea(master, size)));
+  return encoded.get(key);
+};
 
 let stale = false;
-for (const target of TARGETS) {
+for (const { path: target, size } of TARGETS) {
+  const mark = markAt(size);
   let current = null;
   try {
     current = readFileSync(target);

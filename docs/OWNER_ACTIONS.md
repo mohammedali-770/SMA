@@ -4317,12 +4317,34 @@ either.
 **Done looks like:** the three numbers confirmed in writing here, the apply
 recorded as a ledger row in `docs/MIGRATIONS.md`, and §57 marked APPLIED.
 
-## 49. Audit trail — one apply, then two deploys, in that order
+## 49. RLS init-plans, the live board and the order-number year — one apply
+
+**Opened 2026-11-12.** `20261006120000_rls_initplan_live_board_order_year.sql`
+is written, validated and NOT applied. Detail: `docs/MIGRATIONS.md` §58.
+
+It makes a customer's My Orders and the staff profiles list fast at volume, and
+the console's live board cheap to poll. It also numbers an order placed between
+00:00 and 02:59 Riyadh time on 1 January with the new year, not the old one.
+**Nobody sees a different row, and the live board shows the same orders.**
+There is no number to decide, and nothing to deploy.
+
+### The step
+
+1. **Apply `20261006120000` by name** (§5). Never "the outstanding migrations":
+   the Moyasar file `20260824100000` sorts first. It is independent of the
+   other outstanding files and can go before or after any of them.
+2. **Check afterwards**, read-only: the three policy quals end in
+   `OR ( SELECT is_staff() AS is_staff))`, `checkout_sessions_select_own` is
+   unchanged, and `place_order` `12b6816d…` and `compute_order_snapshot`
+   `22e2d429…` are unchanged.
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
+and §58 marked APPLIED.
+
+## 50. Audit trail — one apply, then two deploys, in that order
 
 **Opened 2026-11-12.** `20261007120000_audit_trail.sql` is written, validated
-and NOT applied. Detail: `docs/MIGRATIONS.md` §58. (This number was the next
-free one on this branch's base; a parallel change may also claim §49, in which
-case one of them is renumbered at merge.)
+and NOT applied. Detail: `docs/MIGRATIONS.md` §59.
 
 It closes checklist gaps S09#1-3. After it:
 
@@ -4366,7 +4388,7 @@ changes, and the money path is asserted unchanged.
    `22e2d429…` unchanged.
 
 **Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`
-and §58 marked APPLIED, then both deploys recorded with their versions.
+and §59 marked APPLIED, then both deploys recorded with their versions.
 
 ## Owner-action closeout rule
 

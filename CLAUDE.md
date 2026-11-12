@@ -294,14 +294,26 @@ apply would now take all three Moyasar files in filename order, the drop file
 before the deploy it must follow.
 
 **AMENDED 2026-11-12 (later) — `20261007120000_audit_trail` is written,
-validated and awaiting approval. On merge it joins the unapplied set**, which on
-this branch's base is the SIX named in the 2026-11-11 Moyasar note above, so
-SEVEN. It adds append-only `order_status_audit` and `admin_action_audit`, and
+validated and awaiting approval. On merge it joins the unapplied set**, which
+is the SEVEN named in the `20261006120000` note below, so EIGHT. It adds
+append-only `order_status_audit` and `admin_action_audit`, and
 `notification_log.sent_by`/`content`; it redefines no existing function and the
 money path is self-asserted. It must be applied BEFORE `push-dispatch` and
-`staff-accounts` are deployed (`docs/OWNER_ACTIONS.md` §49). `20260824100000`
+`staff-accounts` are deployed (`docs/OWNER_ACTIONS.md` §50). `20260824100000`
 still sorts ahead of it, so a bulk apply would take the Moyasar file first.
-**Name the target by version.** Detail: `docs/MIGRATIONS.md` §58.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §59.
+
+**AMENDED 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
+is written, validated and awaiting approval, so on merge the outstanding set is
+SEVEN:** `20260824100000`, `20260929120000`, `20261002120000`,
+`20261003120000`, `20261004120000`, `20261005120000` and this file. It makes
+three own-or-staff RLS policies call `is_staff()` once per statement instead of
+once per row, gives `admin_list_orders_with_items` one UNION id set, and takes
+the order-number year in Riyadh time. It changes no visible row and redefines
+nothing on the money path, which it self-asserts. `checkout_sessions` is not
+touched. `20260824100000` still sorts first, so a bulk apply would take the
+Moyasar files first. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §58.
 
 **AMENDED 2026-11-12 — `20261005120000_server_input_bounds` is written,
 validated and awaiting approval. On merge it joins the unapplied set.** On the base
