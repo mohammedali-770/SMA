@@ -478,13 +478,13 @@ Architecture diagrams or README text must not describe the provisional Tap stack
 
 Enabled end-to-end 2026-08-17. `PUSH_CLIENT_ENABLED` is `true`, `apps/mobile/app.json` carries the `expo-notifications` plugin and `google-services.json`, EAS holds iOS APNs (Sandbox & Production) plus Android FCM V1 credentials, and the `integration_settings` push master flag is enabled, so `push-dispatch` passes its gate and delivers.
 
-Customers opt in from Profile → Notifications. Registration writes go through the `register_push_device` / `deactivate_push_device` SECURITY DEFINER RPCs — there is no client write path on `push_devices`, so the token-format guard and the shared-device ownership transfer cannot be bypassed by a direct REST write.
+Since 2026-11-10 the first run shows an in-app consent screen (order updates and occasional offers) and raises the OS prompt only from its Allow button. Granting the permission registers the device with both channels on, and Profile → Notifications is where a customer turns either channel off (`CLAUDE.md` §7). Registration writes go through the `register_push_device` / `deactivate_push_device` SECURITY DEFINER RPCs — there is no client write path on `push_devices`, so the token-format guard and the shared-device ownership transfer cannot be bypassed by a direct REST write.
 
 Delivery paths:
 
-- **order_status** — fired by `order-intake` (service role, best-effort, `waitUntil`) and by admin status changes. Idempotent per `(order_id, status)` via the unique index plus the `send_status` lifecycle, and anti-spoofed by re-reading the order's real status server-side. Targets only that order's customer, and only devices with `order_updates_enabled` (**defaults TRUE**).
+- **order_status** — fired by admin status changes in the console. `order-intake` also sent `received` until 2026-08-27; a new order's first message is now the POS outcome (`pos_sync`, below). Idempotent per `(order_id, status)` via the unique index plus the `send_status` lifecycle, and anti-spoofed by re-reading the order's real status server-side. Targets only that order's customer, and only devices with `order_updates_enabled` (**defaults TRUE**).
 - **pos_sync** — POS confirmation lifecycle, consumed from deduplicated events under a fenced claim.
-- **broadcast** — admin-initiated, immediate, non-recallable. Targets only devices with `promos_enabled` (**defaults FALSE** — marketing is strictly opt-in).
+- **broadcast** — admin-initiated, immediate, non-recallable. Targets only devices with `promos_enabled = true`. Marketing has been opt-out since 2026-08-20, so that is every device that allowed notifications and has not switched offers off. The column default is FALSE but never decides a live device, because every registration passes both preferences.
 - **test** — admin-initiated, targets only the calling admin's own registered devices.
 
 Payloads carry only `{ type, orderId }`; tap navigation resolves through `resolveNotificationRoute`'s allow-list, so a payload can never open an arbitrary route or an external URL.

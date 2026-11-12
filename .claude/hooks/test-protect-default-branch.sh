@@ -9,8 +9,17 @@
 # That is how the jq / python3 / node branches, the broken-interpreter
 # fallback and the no-parser branch are each exercised independently.
 #
+# CI runs this in .github/workflows/change-control.yml, beside
+# protect-default-branch.test.sh, and with GUARD_TEST_STRICT=1. Until
+# 2026-11-11 nothing ran it: the other suite uses whichever parser the runner
+# finds first, so a guard changed to fail OPEN when no parser works passed CI
+# 80/80 while this file reported the regression.
+#
 # Usage:  bash .claude/hooks/test-protect-default-branch.sh
-# Exit 0 = every assertion passed.
+#         GUARD_TEST_STRICT=1 bash .claude/hooks/test-protect-default-branch.sh
+# Exit 0 = every assertion passed. Under GUARD_TEST_STRICT=1, a skipped
+# scenario is a failure too: without it, a machine missing node or python3
+# would quietly run a smaller suite and still report a pass.
 # ============================================================================
 
 set -u
@@ -24,6 +33,12 @@ trap 'rm -rf "$TMP"' EXIT
 
 PASS=0
 FAIL=0
+SKIP=0
+STRICT="${GUARD_TEST_STRICT:-0}"
+
+skip() {
+  SKIP=$((SKIP + 1)); printf '  skip %s\n' "$1"
+}
 
 # --- payloads ---------------------------------------------------------------
 P_WRITE='{"tool_name":"Write","tool_input":{"file_path":"x","content":"y"}}'
@@ -235,21 +250,21 @@ if [ -n "$NODE_ABS" ]; then
   make_fake_jq "$BIN_JQ"
   parser_suite "jq" "$BIN_JQ:$BASE_PATH"
 else
-  printf '  skip jq suite (needs node to back the jq test double)\n'
+  skip "jq suite (needs node to back the jq test double)"
 fi
 
 if [ -n "$PY_ABS" ]; then
   link_real "$BIN_PY" python3 "$PY_ABS"
   parser_suite "python3" "$BIN_PY:$BASE_PATH"
 else
-  printf '  skip python3 suite (python3 unavailable)\n'
+  skip "python3 suite (python3 unavailable)"
 fi
 
 if [ -n "$NODE_ABS" ]; then
   link_real "$BIN_NODE" node "$NODE_ABS"
   parser_suite "node" "$BIN_NODE:$BASE_PATH"
 else
-  printf '  skip node suite (node unavailable)\n'
+  skip "node suite (node unavailable)"
 fi
 
 printf -- '-- fallback and failure modes\n'
@@ -262,6 +277,8 @@ if [ -n "$NODE_ABS" ]; then
   assert_deny  "broken stub + node still denies on protected"   "$P_WRITE" "$REPO_PROT" "$BIN_STUB:$BASE_PATH" 'protected branch'
   assert_deny  "broken stub + node still fails closed on junk"  "$P_MALFORMED" "$REPO_FEAT" "$BIN_STUB:$BASE_PATH" 'unparseable'
   assert_deny  "empty input fails closed"                       ""         "$REPO_FEAT" "$BIN_NODE:$BASE_PATH" 'empty PreToolUse input'
+else
+  skip "broken-python3 fallback and empty-input scenarios (need node behind the stub)"
 fi
 
 # No parser at all must fail closed rather than fall through to allow. Each
@@ -270,6 +287,15 @@ fi
 assert_unreachable "no-parser scenario really exposes no parser" "$BIN_NONE:$BASE_PATH" jq python3 node
 assert_deny "no working parser fails closed" "$P_WRITE" "$REPO_FEAT" "$BIN_NONE:$BASE_PATH" 'no working JSON parser'
 
+# The property CLAUDE.md §11 states, asserted where it matters. With no parser
+# the guard cannot even read which tool is asking, and it must still refuse a
+# write on a protected branch and a push to a protected ref. The feature-branch
+# case above would not notice a guard that failed open only on these two.
+assert_deny "no working parser: protected-branch Write still denied" \
+  "$P_WRITE" "$REPO_PROT" "$BIN_NONE:$BASE_PATH" 'no working JSON parser'
+assert_deny "no working parser: push to a protected ref still denied" \
+  "$P_BASH_PROT" "$REPO_FEAT" "$BIN_NONE:$BASE_PATH" 'no working JSON parser'
+
 # A broken python3 with NO jq and NO node behind it is still "no working
 # parser": the guard must not fall through to allow merely because a parser
 # NAME resolved. Kept in its own directory so the scenario above stays clean.
@@ -277,7 +303,13 @@ BIN_STUBONLY="$TMP/bin-stub-only"; mkdir -p "$BIN_STUBONLY"
 make_broken_python3 "$BIN_STUBONLY"
 assert_unreachable "broken-stub scenario exposes no jq and no node" "$BIN_STUBONLY:$BASE_PATH" jq node
 assert_deny "broken python3 alone fails closed" "$P_WRITE" "$REPO_FEAT" "$BIN_STUBONLY:$BASE_PATH" 'no working JSON parser'
+assert_deny "broken python3 alone: protected-branch Write still denied" \
+  "$P_WRITE" "$REPO_PROT" "$BIN_STUBONLY:$BASE_PATH" 'no working JSON parser'
 
 # --- summary ----------------------------------------------------------------
-printf -- '----\n%d passed, %d failed\n' "$PASS" "$FAIL"
+printf -- '----\n%d passed, %d failed, %d skipped\n' "$PASS" "$FAIL" "$SKIP"
+if [ "$STRICT" = 1 ] && [ "$SKIP" -gt 0 ]; then
+  printf 'GUARD_TEST_STRICT=1: %d scenario group(s) did not run, so a pass here would prove less than it says\n' "$SKIP"
+  exit 1
+fi
 [ "$FAIL" -eq 0 ]
