@@ -9,8 +9,7 @@ import { sourceToRegExp } from '../../e2e/serve-dist.mjs';
  * than silently misread it.
  */
 describe('e2e/serve-dist.mjs source patterns', () => {
-  const matches = (source: string, path: string): boolean =>
-    (sourceToRegExp(source) as RegExp).test(path);
+  const matches = (source: string, path: string): boolean => (sourceToRegExp(source) as RegExp).test(path);
 
   it.each([
     ['/app/(.*)', '/app/x', true],
