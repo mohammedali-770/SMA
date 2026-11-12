@@ -2008,15 +2008,28 @@ app that break outlives the fix: an installed iOS or Android build keeps the
 call shapes it was built with, because there are no over-the-air updates, until
 a new store build reaches each customer.
 
-Until 2026-11-11 nothing caught it. The SQL suites call these functions
-positionally, so a rename replays and passes; the 2026-11-11 reliability
+Until 2026-11-11 nothing caught it for the RPCs clients actually call. Most SQL
+suites call these functions positionally (`manual_only_pos_resend_test.sql`
+passes a bare uuid), so a rename replays and passes: the 2026-11-11 reliability
 assessment renamed `request_customer_pos_resend`'s `p_order_id` to `p_id` and
-`manual_only_pos_resend_test.sql` still exited 0. Now
-`apps/mobile/src/services/rpcContractParity.test.ts` replays this directory in
-filename order (overloads, drops and renames included) and fails CI unless every
-`supabase.rpc` call in `apps/mobile/src` and `src` is accepted by exactly one
-live definition. It refuses, rather than skips, a call it cannot read and
-function DDL hidden in a DO block.
+that suite still exited 0. The one exception is `compute_campaign_discount`.
+`discounts_campaigns_test.sql` and `promo_disclosure_test.sql` call it by name,
+so renaming any of its parameters already failed the SQL suites; its only client
+call, `src/lib/campaigns.ts`, is not wired into any surface.
+
+Now `apps/mobile/src/services/rpcContractParity.test.ts` replays this directory
+in filename order (overloads, function drops and renames included) and fails CI
+unless every `supabase.rpc` call in `apps/mobile/src` and `src` is accepted by
+exactly one live definition. It refuses, rather than skips, what it cannot
+follow: a call it cannot read; function DDL in a DO block, a function body or a
+string it may EXECUTE, when that DDL mentions a called function; and any DROP …
+CASCADE of a table, view, type, domain, schema, extension or language, or DROP
+OWNED, because each can remove a function without naming it. In a review
+experiment on a local PG16 replay (2026-11-12, never Production), a rebuild of
+`push_devices` ending in `drop table … cascade` applied cleanly and took
+`register_push_device` with the table's rowtype, while the test still counted
+it live and passed. Write such a drop without CASCADE and drop the dependent
+functions by name, so that Postgres refuses rather than removes.
 
 **It compares source with source.** A rename made on both sides passes it and
 still breaks every installed build, which keeps sending the old name. Keep the

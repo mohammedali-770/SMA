@@ -11,12 +11,15 @@ import { describe, expect, it } from 'vitest';
  * PostgREST resolves `supabase.rpc('fn', { p_order_id })` by the function name
  * AND the argument names. A migration that renames or drops a parameter, or
  * adds one with no DEFAULT, therefore breaks the call with PGRST202 ("Could not
- * find the function ... in the schema cache") — and until this file, it passed
- * every CI gate:
+ * find the function ... in the schema cache") — and until this file, for the
+ * functions a shipped client calls, it passed every CI gate:
  *
- *   - the SQL suites call these functions POSITIONALLY
+ *   - most SQL suites call these functions POSITIONALLY
  *     (`manual_only_pos_resend_test.sql` passes a bare uuid), so a rename
- *     replays and passes;
+ *     replays and passes. The exception is `compute_campaign_discount`:
+ *     `discounts_campaigns_test.sql` and `promo_disclosure_test.sql` call it
+ *     by name, so renaming one of its parameters already failed them, and its
+ *     only client call, `src/lib/campaigns.ts`, is not wired into any surface;
  *   - the app tests mock supabase, so they never see a signature at all.
  *
  * Measured by the 2026-11-11 reliability assessment (R01): with
@@ -42,10 +45,24 @@ import { describe, expect, it } from 'vitest';
  * every parameter without a DEFAULT is sent. None is PGRST202; more than one is
  * PGRST203, which PostgREST refuses as ambiguous.
  *
- * IT FAILS LOUDLY RATHER THAN GUESS. A call whose function name or argument
- * object is not a literal, a `.rpc` reference that is not a direct call, and
- * function DDL hidden in a DO block or dynamic SQL that mentions a called
- * function are all reported as failures, never skipped.
+ * IT FAILS LOUDLY RATHER THAN GUESS. Each of these is reported as a failure,
+ * never skipped:
+ *
+ *   - a call whose function name or argument object is not a literal, or a
+ *     `.rpc` reference that is not a direct call;
+ *   - function DDL in quoted text (a DO block, a function body, or a string it
+ *     may EXECUTE) that mentions a called function. Only text that can run is
+ *     read: the quoted text's own comments, the message of a RAISE and the
+ *     value of a top-level COMMENT ON are not;
+ *   - a DROP ... CASCADE of a table (foreign tables included), a view
+ *     (materialized ones included), a type, a domain, a schema, an extension
+ *     or a language, and any DROP OWNED, at top level or in quoted text,
+ *     whatever it names. Each can remove functions without naming them, and
+ *     only a database can tell which: in the 2026-11-12 review a `push_devices`
+ *     rebuild ending in `drop table … cascade` applied cleanly on a local PG16
+ *     replay and took `register_push_device`, which returns that rowtype;
+ *   - a drop that matched no live definition, when Postgres could have matched
+ *     it to a live overload of a called function.
  *
  * WHAT IT DOES NOT PROVE, said rather than implied:
  *
@@ -58,6 +75,11 @@ import { describe, expect, it } from 'vitest';
  *     `undefined` passes here and fails live.
  *   - It does not check grants or return shapes: EXECUTE revoked from the
  *     calling role (42501), or a changed return type, both pass.
+ *   - It follows only the dependencies listed above. A function that a CASCADE
+ *     removes another way passes: through a parameter DEFAULT that calls a
+ *     function dropped with CASCADE, for one. So does DDL whose words appear in
+ *     no single string or statement (`format('%s function …', 'drop')`). No
+ *     migration used CASCADE on a drop on 2026-11-12.
  *   - It says nothing about Production. Whether a migration is APPLIED is
  *     `docs/MIGRATIONS.md`'s question, answered by a dated read-only check.
  */
@@ -89,16 +111,34 @@ const IDENT_ONLY = new RegExp(`^${IDENT}$`);
 const unquote = (s: string) => (s.startsWith('"') ? s.slice(1, -1).replace(/""/g, '"') : s.toLowerCase());
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** A string literal or dollar-quoted body, and the statement text that leads up to it. */
+interface Quoted {
+  body: string;
+  /**
+   * Its statement from the start up to the opening quote, comments removed and
+   * earlier quotes rendered. It is what tells the message of a RAISE, or the
+   * value of a COMMENT ON, from a string that can run.
+   */
+  before: string;
+}
+
+/** What a statement's text holds in place of a quote. */
+type Render = (quote: Quoted, dollar: boolean) => string;
+
+/** Hides a quote's contents, so a statement reads as its code alone. */
+const mask: Render = (_quote, dollar) => (dollar ? '$$' : "''");
+
 /**
- * Split SQL into top-level statements, with comments removed and the contents
- * of string literals and dollar-quoted bodies masked. Function bodies are
- * opaque here on purpose: a `create function` inside one does not run when the
- * migration does. What they contain is returned separately, so DDL hidden in a
- * DO block can be refused rather than ignored.
+ * Split SQL into top-level statements, with comments removed and each string
+ * literal and dollar-quoted body replaced by what `render` returns (masked, by
+ * default). Function bodies are opaque here on purpose: a `create function`
+ * inside one does not run when the migration does. What they contain is
+ * returned separately, so DDL hidden in a DO block can be refused rather than
+ * ignored.
  */
-function scanSql(sql: string): { statements: string[]; quoted: string[] } {
+function scanSql(sql: string, render: Render = mask): { statements: string[]; quoted: Quoted[] } {
   const statements: string[] = [];
-  const quoted: string[] = [];
+  const quoted: Quoted[] = [];
   const identChar = /[A-Za-z0-9_$]/;
   let current = '';
   let i = 0;
@@ -142,8 +182,9 @@ function scanSql(sql: string): { statements: string[]; quoted: string[] } {
           body += sql[j++];
         }
       }
-      quoted.push(body);
-      current += "''";
+      const quote = { body, before: current };
+      quoted.push(quote);
+      current += render(quote, false);
       i = j + 1;
     } else if (c === '"') {
       // A doubled "" inside a quoted identifier is an escaped quote, not its end.
@@ -159,8 +200,9 @@ function scanSql(sql: string): { statements: string[]; quoted: string[] } {
     } else if (tag) {
       const end = sql.indexOf(tag, i + tag.length);
       if (end < 0) throw new Error(`unterminated dollar quote ${tag}`);
-      quoted.push(sql.slice(i + tag.length, end));
-      current += '$$';
+      const quote = { body: sql.slice(i + tag.length, end), before: current };
+      quoted.push(quote);
+      current += render(quote, true);
       i = end + tag.length;
     } else if (c === ';') {
       if (current.trim()) statements.push(current.trim());
@@ -337,18 +379,91 @@ const signatureOf = (schema: string, name: string, params: Param[]) =>
     .map((p) => p.type)
     .join(', ')})`;
 
+const inputCount = (params: Param[]) => params.filter((p) => p.mode !== 'out').length;
+
+/**
+ * The message of a RAISE, which is shown and never run: `raise [level] '…'`,
+ * or the value of a `using message|detail|hint = '…'` option.
+ */
+function isRaiseMessage(before: string): boolean {
+  return (
+    /\braise(?:\s+(?:debug|log|info|notice|warning|exception))?\s*e?$/i.test(before) ||
+    (/\b(?:message|detail|hint)\s*:?=\s*e?$/i.test(before) && /\braise\b[\s\S]*\busing\b/i.test(before))
+  );
+}
+
+/** The value of a top-level `comment on … is '…'`: stored as a description, never run. */
+const COMMENT_VALUE = /^\s*comment\s+on\b[\s\S]*\bis\s*e?$/i;
+
+/**
+ * The text of a quoted segment that can RUN. It is re-scanned with the same
+ * reader, so its own comments drop out, and every string inside it is kept in
+ * place, because a string may be EXECUTEd or fed to format(); the exception is
+ * the message of a RAISE. Text that does not read as SQL (a message with an
+ * apostrophe, a regular expression) is kept whole, so nothing is dropped on a
+ * guess.
+ */
+function runnableText(segment: string): string {
+  try {
+    const render: Render = (q) => (isRaiseMessage(q.before) ? "''" : `'${runnableText(q.body)}'`);
+    return scanSql(segment, render).statements.join(';\n');
+  } catch {
+    return segment;
+  }
+}
+
+/** Function DDL. In quoted text it may or may not run, so for a called function it is refused. */
+const FUNCTION_DDL = /\b(?:create|drop|alter)\s+(?:or\s+replace\s+)?(?:function|routine)\b/i;
+
+/**
+ * The objects whose CASCADE drop removes functions without naming them. A
+ * table's or a view's rowtype, an enum or a domain can be a function's argument
+ * or return type, and a schema, an extension or a language holds functions.
+ * DROP OWNED removes every function a role owns, CASCADE or not.
+ */
+const CASCADING = String.raw`(?:foreign\s+table|table|materialized\s+view|view|type|domain|schema|extension|(?:procedural\s+)?language)`;
+const IMPLICIT_DROP = new RegExp(String.raw`^drop\s+${CASCADING}\b[\s\S]*\bcascade$|^drop\s+owned\b`, 'i');
+/** The same, anywhere in quoted text; `[^;]*` keeps the CASCADE inside the drop's own statement. */
+const IMPLICIT_DROP_IN_TEXT = new RegExp(
+  String.raw`\bdrop\s+${CASCADING}\b[^;]*\bcascade\b|\bdrop\s+owned\b`,
+  'i',
+);
+
 interface Chain {
   files: string[];
   live: Map<string, Definition>;
-  /** The body of every string or dollar quote that contains function DDL. */
+  /** The runnable text (see `runnableText`) of every quoted segment that holds function DDL. */
   quotedDdl: { file: string; text: string }[];
-  /** Drops that matched no live definition, with the overloads of that name then live. */
-  unmatchedDrops: { file: string; name: string; signature: string; liveThen: string[] }[];
+  /** Statements, top-level or in quoted text, that can remove a function without naming it. */
+  implicitDrops: { file: string; text: string }[];
+  /**
+   * Drops that matched no live definition. `liveThen` holds every overload of
+   * that name then live, and `suspects` the ones Postgres could still have
+   * dropped, which the replay may therefore have wrong. DROP FUNCTION matches
+   * input arguments only, so only an overload with as many input arguments as
+   * the drop names is a suspect. DROP ROUTINE on PG16 can also match OUT
+   * arguments, so every overload is.
+   */
+  unmatchedDrops: { file: string; name: string; signature: string; liveThen: string[]; suspects: string[] }[];
 }
+
+const EMPTY_CHAIN: Chain = {
+  files: [],
+  live: new Map(),
+  quotedDdl: [],
+  implicitDrops: [],
+  unmatchedDrops: [],
+};
 
 function replay(files: { file: string; sql: string }[]): Chain {
   const live = new Map<string, Definition>();
-  const chain: Chain = { files: files.map((f) => f.file), live, quotedDdl: [], unmatchedDrops: [] };
+  const chain: Chain = {
+    files: files.map((f) => f.file),
+    live,
+    quotedDdl: [],
+    implicitDrops: [],
+    unmatchedDrops: [],
+  };
   const overloadsOf = (schema: string, name: string) =>
     [...live.values()].filter((d) => d.schema === schema && d.name === name);
   for (const { file, sql } of files) {
@@ -358,34 +473,47 @@ function replay(files: { file: string; sql: string }[]): Chain {
     } catch (error) {
       throw new Error(`${file}: ${(error as Error).message}`);
     }
-    for (const text of scan.quoted) {
-      if (/\b(create|drop|alter)\s+(or\s+replace\s+)?(function|routine)\b/i.test(text)) {
-        chain.quotedDdl.push({ file, text });
-      }
+    for (const q of scan.quoted) {
+      if (COMMENT_VALUE.test(q.before)) continue;
+      const text = runnableText(q.body);
+      if (FUNCTION_DDL.test(text)) chain.quotedDdl.push({ file, text });
+      if (IMPLICIT_DROP_IN_TEXT.test(text)) chain.implicitDrops.push({ file, text });
     }
     for (const statement of scan.statements) {
       const fail = (why: string) => new Error(`${file}: ${why}: ${statement.slice(0, 160)}`);
       let m: RegExpExecArray | null;
-      if ((m = /^create\s+(?:or\s+replace\s+)?function\s+/i.exec(statement))) {
+      if (IMPLICIT_DROP.test(statement)) {
+        chain.implicitDrops.push({ file, text: statement });
+      } else if ((m = /^create\s+(?:or\s+replace\s+)?function\s+/i.exec(statement))) {
         const target = qualifiedName(statement.slice(m[0].length));
         const list = target && parenthesized(target.rest);
         if (!target || !list) throw fail('cannot read the function name and parameter list');
         const params = parseParams(list.inner);
         const signature = signatureOf(target.schema, target.name, params);
         live.set(signature, { ...target, params, file, signature });
-      } else if ((m = /^drop\s+(?:function|routine)\s+(?:if\s+exists\s+)?/i.exec(statement))) {
+      } else if ((m = /^drop\s+(function|routine)\s+(?:if\s+exists\s+)?/i.exec(statement))) {
+        const kind = m[1].toLowerCase();
         const items = statement.slice(m[0].length).replace(/\s+(cascade|restrict)\s*$/i, '');
         for (const item of splitTopLevel(items)) {
           const target = qualifiedName(item);
           if (!target) throw fail('cannot read the dropped function');
           const list = parenthesized(target.rest);
-          const matched = list
-            ? [signatureOf(target.schema, target.name, parseParams(list.inner))]
-            : overloadsOf(target.schema, target.name).map((d) => d.signature);
-          const liveThen = overloadsOf(target.schema, target.name).map((d) => d.signature);
-          if (!matched.some((s) => live.delete(s))) {
-            chain.unmatchedDrops.push({ file, name: target.name, signature: matched[0] ?? item, liveThen });
-          }
+          const named = list ? parseParams(list.inner) : null;
+          const overloads = overloadsOf(target.schema, target.name);
+          const matched = named
+            ? [signatureOf(target.schema, target.name, named)]
+            : overloads.map((d) => d.signature);
+          if (matched.some((s) => live.delete(s))) continue;
+          const suspects = overloads.filter(
+            (d) => kind === 'routine' || named === null || inputCount(d.params) === inputCount(named),
+          );
+          chain.unmatchedDrops.push({
+            file,
+            name: target.name,
+            signature: matched[0] ?? item,
+            liveThen: overloads.map((d) => d.signature),
+            suspects: suspects.map((d) => d.signature),
+          });
         }
       } else if ((m = /^alter\s+(?:function|routine)\s+/i.exec(statement))) {
         const target = qualifiedName(statement.slice(m[0].length));
@@ -555,6 +683,55 @@ function judge(call: Pick<RpcCall, 'fn' | 'keys'>, chain: Chain) {
   };
 }
 
+/** One line of at most 120 characters, for a failure message. */
+const brief = (sql: string) => {
+  const line = sql.replace(/\s+/g, ' ').trim();
+  return line.length > 120 ? `${line.slice(0, 117)}...` : line;
+};
+
+/**
+ * Everything the replay could not follow that could change a function a
+ * client calls, as failure messages. None of them is a skip:
+ *
+ *   - a statement that can remove functions without naming them. Postgres
+ *     picks what it takes from dependencies this reader cannot see, so it
+ *     fails whichever functions are called. Name what goes, and leave CASCADE
+ *     out, so that Postgres refuses rather than removes;
+ *   - function DDL in quoted text that mentions a called function. The replay
+ *     runs only top-level statements, and whether a DO block, a function body
+ *     or an EXECUTEd string runs its DDL cannot be told from source;
+ *   - a drop that matched no live definition while a live overload of a called
+ *     function is a suspect (see `Chain`): this reader may have normalised a
+ *     type differently from Postgres, or DROP ROUTINE matched an OUT argument.
+ *
+ * Any other unmatched drop is a no-op in Postgres too. It is the defensive
+ * `drop … if exists` before a first `create`, or a drop of a signature that
+ * never existed, which Postgres skips with a NOTICE.
+ */
+function cannotReplay(chain: Chain, called: ReadonlySet<string>): string[] {
+  const problems = chain.implicitDrops.map(
+    (d) =>
+      `${d.file}: "${brief(d.text)}" can remove functions it does not name, through a rowtype, a type, a schema or an owner, so the replay cannot tell which are left`,
+  );
+  for (const q of chain.quotedDdl) {
+    for (const fn of called) {
+      if (new RegExp(`\\b${escapeRegExp(fn)}\\b`).test(q.text)) {
+        problems.push(
+          `${q.file}: function DDL in quoted text (a DO block, a function body or a string) mentions ${fn}, and the replay runs only top-level statements`,
+        );
+      }
+    }
+  }
+  for (const d of chain.unmatchedDrops) {
+    if (called.has(d.name) && d.suspects.length > 0) {
+      problems.push(
+        `${d.file}: drops ${d.signature}, which matches no live definition, but Postgres may have dropped ${d.suspects.join(' or ')}`,
+      );
+    }
+  }
+  return problems;
+}
+
 /* ----------------------------------------------------------------- tests */
 
 describe('the SQL reader', () => {
@@ -634,16 +811,20 @@ describe('the SQL reader', () => {
     const chain = replay([
       {
         file: 'fixture.sql',
-        sql: `do $$ begin execute 'drop function public.f(uuid)'; end $$;
-              drop function if exists public.h(uuid);`,
+        sql: `do $$ begin execute 'drop function public.f(uuid)'; -- a comment
+              end $$;
+              drop function if exists public.h(uuid);
+              drop table public.t cascade;`,
       },
     ]);
-    // The DO body is opaque, so the string inside it is part of one quoted segment.
+    // A quoted segment is kept as the text that could run: re-scanned, so its
+    // comment is gone, with the string it EXECUTEs left in place.
     expect(chain.quotedDdl.map((q) => q.text)).toEqual([
-      " begin execute 'drop function public.f(uuid)'; end ",
+      "begin execute 'drop function public.f(uuid)';\nend",
     ]);
+    expect(chain.implicitDrops.map((d) => d.text)).toEqual(['drop table public.t cascade']);
     expect(chain.unmatchedDrops).toEqual([
-      { file: 'fixture.sql', name: 'h', signature: 'public.h(uuid)', liveThen: [] },
+      { file: 'fixture.sql', name: 'h', signature: 'public.h(uuid)', liveThen: [], suspects: [] },
     ]);
   });
 
@@ -659,8 +840,152 @@ describe('the SQL reader', () => {
       },
     ]);
     expect(chain.unmatchedDrops).toEqual([
-      { file: 'x.sql', name: 'f', signature: 'public.f(uuid)', liveThen: ['public.f(orders.id%type)'] },
+      {
+        file: 'x.sql',
+        name: 'f',
+        signature: 'public.f(uuid)',
+        liveThen: ['public.f(orders.id%type)'],
+        suspects: ['public.f(orders.id%type)'],
+      },
     ]);
+  });
+});
+
+describe('DDL the replay cannot follow', () => {
+  /** `base` then `fixture`, replayed in that order and checked for the functions in `called`. */
+  const check = (base: string, fixture: string, called: string[]) => {
+    const chain = replay([
+      { file: 'base.sql', sql: base },
+      { file: 'fixture.sql', sql: fixture },
+    ]);
+    return { live: [...chain.live.keys()], problems: cannotReplay(chain, new Set(called)) };
+  };
+  const VALIDATE_COUPON = `create function public.validate_coupon(p_code text, p_subtotal numeric)
+    returns jsonb language sql as $$ select null::jsonb $$;`;
+
+  it('refuses the push_devices rebuild, whose CASCADE takes the function returning that rowtype', () => {
+    // Verbatim from the 2026-11-12 review. On PG16 it applies with rc 0 and
+    // prints "NOTICE: drop cascades to function
+    // register_push_device(text,text,text,boolean,boolean)"; the customer app
+    // calls that function on every permission grant and sign-in claim.
+    const { live, problems } = check(
+      `create table public.push_devices (id bigserial primary key, expo_push_token text unique not null);
+       create function public.register_push_device(p_token text, p_platform text, p_lang text,
+         p_order_updates boolean, p_promos boolean)
+         returns public.push_devices language plpgsql as $$ declare v public.push_devices; begin return v; end $$;`,
+      `create table public.push_devices_new (like public.push_devices including all);
+       insert into public.push_devices_new select * from public.push_devices;
+       drop table public.push_devices cascade;
+       alter table public.push_devices_new rename to push_devices;`,
+      ['register_push_device'],
+    );
+    // The replay alone still counts the function live: only this refusal
+    // stands between the rebuild and a green run.
+    expect(live).toEqual(['public.register_push_device(text, text, text, boolean, boolean)']);
+    expect(problems).toEqual([
+      'fixture.sql: "drop table public.push_devices cascade" can remove functions it does not name, through a rowtype, a type, a schema or an owner, so the replay cannot tell which are left',
+    ]);
+  });
+
+  it.each([
+    'drop type public.order_type cascade',
+    'drop domain if exists public.phone_e164 cascade',
+    'drop view public.v, public.w cascade',
+    'DROP MATERIALIZED VIEW public.m CASCADE',
+    'drop schema private cascade',
+    'drop extension if exists pg_net cascade',
+    'drop owned by legacy_owner',
+    "do $$ begin execute format('drop table %I cascade', 'push_devices'); end $$",
+    "do $$ begin execute 'drop type public.' || 'order_type' || ' cascade'; end $$",
+  ])('refuses %s, whatever a client calls', (sql) => {
+    expect(check('', `${sql};`, []).problems).toHaveLength(1);
+  });
+
+  it('lets through a drop that cannot cascade into a function', () => {
+    const { problems } = check(
+      '',
+      `drop table if exists public.tmp_import;
+       drop view public.v restrict;
+       do $$ begin execute 'alter publication supabase_realtime drop table public.orders'; end $$;`,
+      [],
+    );
+    expect(problems).toEqual([]);
+  });
+
+  // The next three applied on PG16 with rc 0 and left the function's
+  // definition unchanged, yet each used to fail this check.
+
+  it('does not read the wording of a verification block: its comments and RAISE messages never run', () => {
+    const { problems } = check(
+      VALIDATE_COUPON,
+      `do $$ begin if to_regprocedure('public.validate_coupon(text, numeric)') is null then raise exception 'validate_coupon(text, numeric) is missing: the create function above did not land'; end if; end $$;
+       do $verify$
+       begin
+         -- A create or replace function validate_coupon that parses is not one that works.
+         perform public.validate_coupon('SAVE10', 100);
+       end
+       $verify$;`,
+      ['validate_coupon'],
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it('does not read the value of a COMMENT ON, which is stored and never run', () => {
+    const { problems } = check(
+      'create function public.export_my_data() returns jsonb language sql as $$ select null::jsonb $$;',
+      "comment on function public.export_my_data() is 'PDPL access export. Never alter function export_my_data to take an argument: zero arguments is the security model.';",
+      ['export_my_data'],
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it('lets through a defensive DROP FUNCTION IF EXISTS of a signature that never existed', () => {
+    // DROP FUNCTION matches input arguments only, so a one-argument drop cannot
+    // take the two-argument function: Postgres prints "function
+    // public.validate_coupon(text) does not exist, skipping".
+    const { live, problems } = check(
+      VALIDATE_COUPON,
+      'drop function if exists public.validate_coupon(text);',
+      ['validate_coupon'],
+    );
+    expect(problems).toEqual([]);
+    expect(live).toEqual(['public.validate_coupon(text, numeric)']);
+  });
+
+  it('still refuses function DDL that a DO block runs for a called function', () => {
+    const { problems } = check(
+      VALIDATE_COUPON,
+      `do $$ begin
+         if to_regprocedure('public.validate_coupon_v1(text, numeric)') is null then
+           alter function public.validate_coupon(text, numeric) rename to validate_coupon_v1;
+         end if;
+       end $$;
+       do $$ begin execute format('drop function public.%I(text, numeric)', 'validate_coupon'); end $$;`,
+      ['validate_coupon'],
+    );
+    const refusal =
+      'fixture.sql: function DDL in quoted text (a DO block, a function body or a string) mentions validate_coupon, and the replay runs only top-level statements';
+    expect(problems).toEqual([refusal, refusal]);
+  });
+
+  it('still refuses an unmatched drop that Postgres could have matched to a live overload', () => {
+    // f: the same number of input arguments, and this reader cannot resolve
+    // %TYPE. g: on PG16, DROP ROUTINE also matches OUT arguments, so this drop
+    // removes g(a text, out b integer), while the same DROP FUNCTION leaves it.
+    const { live, problems } = check(
+      `create function public.f(p_a public.orders.id%type) returns void language sql as $$ select $$;
+       create function public.g(a text, out b integer) language sql as $$ select 1 $$;
+       create function public.h(a text, out b integer) language sql as $$ select 1 $$;`,
+      `drop function public.f(uuid);
+       drop routine if exists public.g(text, integer);
+       drop function if exists public.h(text, integer);`,
+      ['f', 'g', 'h'],
+    );
+    expect(problems).toEqual([
+      'fixture.sql: drops public.f(uuid), which matches no live definition, but Postgres may have dropped public.f(orders.id%type)',
+      'fixture.sql: drops public.g(text, integer), which matches no live definition, but Postgres may have dropped public.g(text)',
+    ]);
+    expect(live).toEqual(['public.f(orders.id%type)', 'public.g(text)', 'public.h(text)']);
   });
 });
 
@@ -737,32 +1062,10 @@ describe('client RPC calls ↔ the migration chain', () => {
     expect(chain?.live.size).toBeGreaterThan(100);
   });
 
-  /**
-   * The replay only sees top-level statements. Function DDL inside a DO block
-   * or built as dynamic SQL may or may not run, so if it mentions a function a
-   * client calls, the honest answer is "cannot tell" — which is a failure.
-   *
-   * A drop that matches no live definition is normal when nothing of that name
-   * exists yet (the defensive `drop … if exists` before a first `create`). When
-   * definitions of that name ARE live, it means this reader normalised a type
-   * differently from Postgres, and the replay can no longer be trusted for it.
-   */
-  it('meets no DDL for a called function that it cannot replay', () => {
+  // What the replay cannot follow is "cannot tell", which is a failure; see cannotReplay.
+  it('meets no DDL it cannot replay that could reach a called function', () => {
     const called = new Set(trees.flatMap((t) => t.calls.map((c) => c.fn)));
-    const problems: string[] = [];
-    for (const q of chain?.quotedDdl ?? []) {
-      for (const fn of called) {
-        if (new RegExp(`\\b${escapeRegExp(fn)}\\b`).test(q.text)) {
-          problems.push(`${q.file}: function DDL inside a DO block or dynamic SQL mentions ${fn}`);
-        }
-      }
-    }
-    for (const d of chain?.unmatchedDrops ?? []) {
-      if (called.has(d.name) && d.liveThen.length > 0) {
-        problems.push(`${d.file}: drops ${d.signature}, matching none of ${d.liveThen.join('; ')}`);
-      }
-    }
-    expect(problems).toEqual([]);
+    expect(cannotReplay(chain ?? EMPTY_CHAIN, called)).toEqual([]);
   });
 
   describe.each(trees)('$label ($tree)', ({ calls, problems, anchor }) => {
@@ -772,7 +1075,7 @@ describe('client RPC calls ↔ the migration chain', () => {
     });
 
     it.each(calls.map((c) => [`${c.where} ${c.fn}(${c.keys.join(', ')})`, c] as const))('%s', (_, call) => {
-      const verdict = judge(call, chain ?? { files: [], live: new Map(), quotedDdl: [], unmatchedDrops: [] });
+      const verdict = judge(call, chain ?? EMPTY_CHAIN);
       expect(
         verdict.overloads,
         `public.${call.fn} is not defined by supabase/migrations, or a later migration drops it (PGRST202)`,
