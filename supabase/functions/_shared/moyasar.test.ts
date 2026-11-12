@@ -937,3 +937,39 @@ describe('resolveMoyasarConfig key namespacing', () => {
     expect(c.secretKey).toBe('sk_test_x');
   });
 });
+
+describe('payment-verify answer helpers (second-round review, 2026-11-12)', () => {
+  it('verifyAnswerStatus never answers refunded, and keeps every other outcome', async () => {
+    const { verifyAnswerStatus, SESSION_TERMINAL_STATUSES } = await import('./moyasar.ts');
+    expect(verifyAnswerStatus('refunded', false)).toBe('failed');
+    expect(verifyAnswerStatus('mismatch', false)).toBe('failed');
+    expect(verifyAnswerStatus('paid', true)).toBe('paid');
+    expect(verifyAnswerStatus('failed', true)).toBe('paid');
+    for (const o of ['pending', 'failed', 'cancelled', 'expired', 'unknown'] as const) {
+      expect(verifyAnswerStatus(o, false)).toBe(o);
+    }
+    // Every answer it can give is one the shipped builds understand.
+    expect([...SESSION_TERMINAL_STATUSES].sort()).toEqual(['cancelled', 'expired', 'failed']);
+  });
+
+  it('olderInvoiceVerdict: paid always; in flight only while the session can be paid; nothing otherwise', async () => {
+    const { olderInvoiceVerdict } = await import('./moyasar.ts');
+    expect(olderInvoiceVerdict({ outcome: 'paid', paid: true }, false)).toBe('paid');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false }, true)).toBe('pending');
+    expect(olderInvoiceVerdict({ outcome: 'unknown', paid: false }, true)).toBe('pending');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false }, false)).toBe('ignore');
+    expect(olderInvoiceVerdict({ outcome: 'pending', paid: false, reason: 'no_payment' }, true)).toBe('ignore');
+    for (const o of ['failed', 'cancelled', 'expired', 'refunded', 'mismatch'] as const) {
+      expect(olderInvoiceVerdict({ outcome: o, paid: false }, true)).toBe('ignore');
+    }
+  });
+
+  it('isSessionLive: pending_payment and not past expires_at', async () => {
+    const { isSessionLive } = await import('./moyasar.ts');
+    const now = Date.parse('2026-11-12T10:00:00Z');
+    expect(isSessionLive('pending_payment', '2026-11-12T10:30:00Z', now)).toBe(true);
+    expect(isSessionLive('pending_payment', '2026-11-12T10:00:00Z', now)).toBe(false);
+    expect(isSessionLive('expired', '2026-11-12T10:30:00Z', now)).toBe(false);
+    expect(isSessionLive('pending_payment', null, now)).toBe(true);
+  });
+});

@@ -26,6 +26,7 @@ import {
   DUPLICATE_PAYMENT_MESSAGE,
   MOYASAR_API_BASE,
   MOYASAR_IP_NOT_ALLOWED,
+  NOT_A_DUPLICATE_FILTER,
   basicAuthHeader,
   checkPaymentBinding,
   closedInvoiceOutcome,
@@ -152,14 +153,21 @@ async function stampPaymentRef(
  *    paid before this one was stamped, so a row of its own carries this
  *    payment id. It carries no invoice id, so the webhook's invoice lookup
  *    still finds the attempt, and every attempt lookup skips it
- *    (NOT_A_DUPLICATE_FILTER). A unique violation on (provider, provider_ref)
- *    means it is already recorded.
+ *    (NOT_A_DUPLICATE_FILTER).
+ *
+ * A UNIQUE VIOLATION ON (provider, provider_ref) IS NOT "ALREADY RECORDED". It
+ * says some row carries this payment id, and that row may be the attempt the
+ * payment was stamped on before its confirmation failed: an ordinary failed or
+ * expired attempt with nothing marking the money for a refund. So the row
+ * carrying this payment id becomes the record, unless it is paid or already a
+ * duplicate record; only then is it already recorded.
  *
  * Status 'failed' with failure_code DUPLICATE_PAYMENT, the precedent a binding
  * mismatch set: never 'paid', because the refund worker and the watchdog expect
- * one paid row per order. One integration_sync_logs row is written per new
- * record, so a replayed webhook does not count the same duplicate twice; if the
- * payment row itself could not be written, that log row is still written.
+ * one paid row per order. One integration_sync_logs row is written per row that
+ * BECOMES a duplicate record (the update answers with the rows it changed), so
+ * a replayed webhook does not count the same duplicate twice; if the payment row
+ * itself could not be written, that log row is still written.
  */
 async function recordDuplicatePayment(
   admin: SupabaseClient,
@@ -191,11 +199,27 @@ async function recordDuplicatePayment(
     last_verified_at: new Date().toISOString(),
   };
 
-  let fresh = !ctx.alreadyRecorded;
+  // Turn an existing row into the record. `fresh` follows the rows the update
+  // CHANGED: none means it was already recorded (or is paid, and never
+  // touched). An update that fails leaves the sync-log row as the record.
+  const markExisting = async (match: Record<string, string>): Promise<boolean> => {
+    let q = admin.from('payment_records').update(record);
+    for (const [col, val] of Object.entries(match)) q = q.eq(col, val);
+    const { data, error } = await q
+      .neq('status', 'paid').or(NOT_A_DUPLICATE_FILTER).select('id')
+      .then((r) => r, () => ({ data: null, error: { message: 'update threw' } }));
+    if (error) {
+      console.error(JSON.stringify({
+        event: 'moyasar_duplicate_not_recorded', attempt: String(attempt.id).slice(0, 36),
+      }));
+      return !ctx.alreadyRecorded;
+    }
+    return Array.isArray(data) && data.length > 0;
+  };
+
+  let fresh: boolean;
   if (how === 'stamped') {
-    await admin.from('payment_records').update(record)
-      .eq('id', attempt.id).neq('status', 'paid')
-      .then(() => {}, () => {});
+    fresh = await markExisting({ id: String(attempt.id) });
   } else {
     const { error } = await admin.from('payment_records').insert({
       ...record,
@@ -206,17 +230,18 @@ async function recordDuplicatePayment(
       // session is named even when the order is known, for whoever refunds it.
       checkout_session_id: attempt.checkout_session_id ?? null,
     });
-    if (error) {
-      // Only (provider, provider_ref) already taken means "already recorded".
+    if (!error) {
+      fresh = true;
+    } else if (String((error as { code?: unknown }).code ?? '') === '23505') {
+      // A row already carries this payment id: make IT the record (see above).
+      fresh = await markExisting({ provider: 'moyasar', provider_ref: paymentId });
+    } else {
       // Any other failure leaves the sync-log row below as the only record, so
       // it is still written.
-      if (String((error as { code?: unknown }).code ?? '') === '23505') {
-        fresh = false;
-      } else {
-        console.error(JSON.stringify({
-          event: 'moyasar_duplicate_not_recorded', attempt: String(attempt.id).slice(0, 36),
-        }));
-      }
+      console.error(JSON.stringify({
+        event: 'moyasar_duplicate_not_recorded', attempt: String(attempt.id).slice(0, 36),
+      }));
+      fresh = true;
     }
   }
 
@@ -394,7 +419,14 @@ export async function validateAndConfirmMoyasarPayment(
         (r: { provider?: unknown; provider_ref?: unknown }) =>
           !(String(r.provider ?? '') === 'moyasar' && String(r.provider_ref ?? '') === paymentId),
       );
-      if (paidByAnother) return await duplicate('insert', attempt.order_id);
+      if (paidByAnother) {
+        // An attempt that already carries THIS payment id (stamped by an earlier
+        // run whose confirm then failed) is itself the record; a new row beside
+        // it would only collide with it on (provider, provider_ref).
+        return await duplicate(
+          String(attempt.provider_ref ?? '') === paymentId ? 'stamped' : 'insert', attempt.order_id,
+        );
+      }
 
       // confirm_order_payment upserts on (provider, provider_ref); our attempt
       // row was opened with provider_ref NULL because Moyasar only issues a
@@ -544,11 +576,12 @@ export async function verifyMoyasarAttempt(
   // on the same invoice is a duplicate, and must not stand in front of it.
   const payment = selectInvoicePayment(invoice, attempt.provider_ref);
   if (!payment) {
-    // The invoice exists but nobody has attempted a payment on it yet.
+    // The invoice exists but nobody has attempted a payment on it yet. The
+    // reason lets payment-verify tell this from a payment in flight.
     await admin.from('payment_records')
       .update({ last_verified_at: new Date().toISOString(), raw: sanitizeMoyasarInvoice(invoice) })
       .eq('id', attempt.id).neq('status', 'paid').then(() => {}, () => {});
-    return { outcome: 'pending', paid: false, messageKey: 'payPending' };
+    return { outcome: 'pending', paid: false, messageKey: 'payPending', reason: 'no_payment' };
   }
 
   const result = await validateAndConfirmMoyasarPayment(admin, attempt, payment);

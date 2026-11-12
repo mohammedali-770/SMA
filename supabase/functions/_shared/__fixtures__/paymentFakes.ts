@@ -78,6 +78,8 @@ class Query implements PromiseLike<Result> {
   private sort: { col: string; asc: boolean } | null = null;
   private max: number | null = null;
   private mode: 'many' | 'maybe' | 'single' = 'many';
+  /** `.update(...).select(cols)`: answer with the rows the update changed, as PostgREST does. */
+  private returning = false;
 
   constructor(
     private db: FakePaymentDb,
@@ -86,6 +88,10 @@ class Query implements PromiseLike<Result> {
 
   select(cols = '*') {
     if (this.op === 'select') this.cols = cols;
+    if (this.op === 'update') {
+      this.cols = cols;
+      this.returning = true;
+    }
     return this;
   }
   update(patch: Row) {
@@ -108,6 +114,11 @@ class Query implements PromiseLike<Result> {
   }
   is(col: string, val: null | boolean) {
     this.filters.push((r) => (val === null ? r[col] == null : r[col] === val));
+    return this;
+  }
+  not(col: string, op: string, val: unknown) {
+    if (op !== 'is' || val !== null) throw new Error(`not(): ${op} ${String(val)} not modelled`);
+    this.filters.push((r) => r[col] != null);
     return this;
   }
   in(col: string, vals: unknown[]) {
@@ -169,7 +180,7 @@ class Query implements PromiseLike<Result> {
         this.db.writeRows(this.table, () => {
           for (const r of match) this.db.updateRow(this.table, r, this.patch);
         });
-        return { data: null, error: null };
+        return { data: this.returning ? match.map((r) => project(r, this.cols)) : null, error: null };
       }
       let out = match;
       if (this.sort) {

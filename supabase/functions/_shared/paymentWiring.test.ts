@@ -456,24 +456,34 @@ describe('payment-verify', () => {
   // Updated deliberately with the C3/C4 fix (2026-11-12): verifyMoyasarOrder
   // now also takes the user's client, and the session flow passes the attempt
   // it already read. The guard is still ahead of each call.
+  // Updated deliberately again (2026-11-12, second round): the session flow
+  // now composes an answer before asking the older invoices, so its guard is a
+  // conditional rather than an early return; the older-invoice pass has its
+  // own guard ahead of its loop.
   it('guards a missing payment row explicitly instead of asserting it away', () => {
     expect(src).not.toContain('cfg!');
     const orderFlow = fnBody(src, 'Deno.serve(');
+    const guard = orderFlow.indexOf("if (!cfg) return json({ status: 'pending' }, 200);");
+    expect(guard).toBeGreaterThan(-1);
+    expect(
+      orderFlow.indexOf('return await verifyMoyasarOrder(supaUser, admin, cfg, orderId);'),
+    ).toBeGreaterThan(guard);
+
     const sessionFlow = fnBody(src, 'async function verifySession(');
-    for (const [body, call] of [
-      [orderFlow, 'return await verifyMoyasarOrder(supaUser, admin, cfg, orderId);'],
-      [sessionFlow, 'return await verifyMoyasarSession(supaUser, admin, cfg, sessionId, latest.rec);'],
-    ]) {
-      const guard = body.indexOf("if (!cfg) return json({ status: 'pending' }, 200);");
-      expect(guard, call).toBeGreaterThan(-1);
-      expect(body.indexOf(call), call).toBeGreaterThan(guard);
-    }
+    expect(sessionFlow).toContain(
+      "primary = cfg\n      ? await verifyMoyasarSession(supaUser, admin, cfg, sessionId, latest.rec)\n      : { status: 'pending' };",
+    );
+    const older = fnBody(src, 'async function askOlderInvoices(');
+    const olderGuard = older.indexOf('if (!cfg) return null;');
+    expect(olderGuard).toBeGreaterThan(-1);
+    expect(older.indexOf('for (const rec of recs) {')).toBeGreaterThan(olderGuard);
   });
 
   it('verifies the newest MOYASAR attempt, with the key for its stored mode', () => {
     expect(src).not.toMatch(/attemptProvider|unverifiableProvider|provider_not_configured/);
     expect(src).toContain(".eq(column, value).eq('provider', 'moyasar')");
-    expect(count(src, "(rec.mode as 'test' | 'live') ?? undefined,")).toBe(2);
+    // Three: the order flow, the session's newest attempt, its older invoices.
+    expect(count(src, "(rec.mode as 'test' | 'live') ?? undefined,")).toBe(3);
   });
 });
 
@@ -789,7 +799,11 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
 
   it('order flow: an order paid by another payment is refused before the stamp and the confirm', () => {
     const order = paid.slice(paid.indexOf('} else {'));
-    const check = order.indexOf("if (paidByAnother) return await duplicate('insert', attempt.order_id);");
+    // Updated deliberately (2026-11-12, second round): an attempt already
+    // carrying this payment id is itself the record ('stamped').
+    const check = order.indexOf(
+      "String(attempt.provider_ref ?? '') === paymentId ? 'stamped' : 'insert', attempt.order_id,",
+    );
     expect(check).toBeGreaterThan(-1);
     expect(check).toBeLessThan(order.indexOf('await stampPaymentRef(admin, attempt.id, paymentId)'));
     expect(check).toBeLessThan(order.indexOf("admin.rpc('confirm_order_payment'"));
@@ -834,7 +848,8 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
   });
 
   it('every lookup of "the newest attempt" skips a recorded duplicate', () => {
-    expect(count(code('payment-verify'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(1);
+    // Two: the newest attempt, and the older invoices asked before a terminal answer.
+    expect(count(code('payment-verify'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(2);
     expect(code('payment-verify')).toContain('latestMoyasarAttempt(admin, ');
     expect(count(code('payment-test-config'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(1);
     expect(code('payment-webhook')).toContain(
@@ -844,7 +859,8 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
 
   it('payment-verify answers the session or order itself for a duplicate, never failed', () => {
     const src = code('payment-verify');
-    expect(count(src, 'if (result.reason === DUPLICATE_PAYMENT) {')).toBe(2);
+    // Three: the order flow, the session's newest attempt, its older invoices.
+    expect(count(src, 'if (result.reason === DUPLICATE_PAYMENT) {')).toBe(3);
   });
 
   it('the webhook asks Moyasar to retry an outcome it could not establish', () => {

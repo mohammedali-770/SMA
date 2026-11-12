@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LIVE_PUBLIC, SECRETS, type FakeMoyasar, type FakePaymentDb } from './__fixtures__/paymentFakes.ts';
-import { call, currentDb, freshRuntime } from './__fixtures__/paymentRuntime.ts';
+import { call, currentDb, freshRuntime, webhook } from './__fixtures__/paymentRuntime.ts';
 import {
   recoverPendingSession,
   type PendingSession,
@@ -270,5 +270,204 @@ describe('a refused start no longer locks the device out (old builds and new)', 
     expect(branch).toContain("if (rec.kind === 'receipt') {");
     expect(branch).toContain("if (rec.kind === 'resume') { await runOnlinePayment(rec.sessionId); return; }");
     expect(branch.match(/return;/g)).toHaveLength(2);
+  });
+});
+
+/** A device running the app, with the saved-session store recovery reads. */
+function phoneWith(sessionId: unknown) {
+  let stored: PendingSession | null = { sessionId: String(sessionId), at: Date.now() };
+  return {
+    deps: {
+      read: async () => stored,
+      clear: async () => {
+        stored = null;
+      },
+      verify: async (id: string) =>
+        (await call('payment-verify', { checkoutSessionId: id })).body as VerifyOutcome,
+    },
+    get stored() {
+      return stored;
+    },
+  };
+}
+
+/**
+ * Second-round review (2026-11-12): verify read only the NEWEST attempt. A
+ * session whose first invoice expired with a payment still settling (a slow
+ * 3-D Secure), and whose second attempt never got an invoice, was answered
+ * 'cancelled' while the first invoice held a captured payment. Both builds
+ * dropped the session and placed a cash order, then the late webhook made a
+ * second, paid order.
+ */
+describe('an older invoice is asked before the session is let go', () => {
+  /** inv_1 opened with pay_ONE in flight, its attempt expired, and a second attempt refused at Moyasar. */
+  async function olderInvoiceSession(pay: 'initiated' | 'failed' | null = 'initiated') {
+    const s = db.session();
+    const init = await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' });
+    const inv1 = String(init.body.invoiceId);
+    if (pay) moyasar.pay(inv1, 'pay_ONE', pay);
+    const [a1] = db.attempts({ checkout_session_id: s.id });
+    a1.expires_at = past();
+
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init2) =>
+      String((init2 as RequestInit | undefined)?.method ?? 'GET').toUpperCase() === 'POST'
+        ? new Response(JSON.stringify({ type: 'authentication_error', message: 'IP not allowed' }), {
+            status: 401,
+          })
+        : realFetch(input, init2);
+    const again = await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' });
+    globalThis.fetch = realFetch;
+    expect(again.status).toBe(502);
+    const rows = db.attempts({ checkout_session_id: s.id });
+    expect(rows.map((r) => [r.status, r.provider_checkout_ref ?? null, r.failure_code])).toEqual([
+      ['failed', inv1, 'expired'],
+      ['failed', null, 'create_401'],
+    ]);
+    return { s, inv1 };
+  }
+
+  it('the review scenario: the captured payment on the older invoice pays the session; no cash order', async () => {
+    const { s } = await olderInvoiceSession();
+    moyasar.settle('pay_ONE'); // captured; its webhook has not landed
+    const phone = phoneWith(s.id);
+
+    const answer = await phone.deps.verify(String(s.id));
+    const orderId = db.rows('checkout_sessions')[0].order_id;
+    expect(orderId).toBeTruthy();
+    expect(answer).toMatchObject({ status: 'paid', orderId });
+    expect(shippedDecidePendingAction(answer)).toEqual({ kind: 'receipt', orderId });
+    // The new build opens the receipt; CheckoutScreen places nothing.
+    const fresh = phoneWith(s.id);
+    expect(await recoverPendingSession(fresh.deps)).toEqual({ kind: 'receipt', orderId });
+
+    // The late webhook converges on the same order.
+    expect((await webhook(moyasar.payments.get('pay_ONE')!)).body.status).toBe('paid');
+    expect(db.rows('orders')).toHaveLength(1);
+    expect(db.attempts({ checkout_session_id: s.id, provider_ref: 'pay_ONE' })[0]).toMatchObject({
+      status: 'paid',
+      order_id: orderId,
+    });
+  });
+
+  it('a payment still in flight on it keeps the session while it can be paid, and only then', async () => {
+    const { s } = await olderInvoiceSession('initiated');
+    expect(await verify(s.id)).toEqual({ status: 'pending' });
+    // Past the session's life an abandoned 3-D Secure cannot keep the device locked.
+    db.rows('checkout_sessions')[0].expires_at = past();
+    expect(await verify(s.id)).toEqual(EXPIRED);
+  });
+
+  it.each([
+    ['a declined payment', 'failed' as const],
+    ['no payment at all', null],
+  ])("%s on it: the newest attempt's terminal answer stands", async (_label, pay) => {
+    const { s } = await olderInvoiceSession(pay);
+    expect(await verify(s.id)).toEqual(CANCELLED);
+  });
+
+  it('an invoice Moyasar has closed with nothing settled is not asked to keep the session', async () => {
+    const { s, inv1 } = await olderInvoiceSession(null);
+    moyasar.invoices.get(inv1)!.status = 'expired';
+    expect(await verify(s.id)).toEqual(CANCELLED);
+  });
+
+  it('with no payment configuration nothing can ask (or confirm) it, so the terminal answer stands', async () => {
+    const { s } = await olderInvoiceSession('initiated');
+    moyasar.settle('pay_ONE');
+    db.tables.integration_settings = [];
+    expect(await verify(s.id)).toEqual(CANCELLED);
+  });
+
+  it('a newest invoice closed at Moyasar does not hide a captured payment on an older one', async () => {
+    const s = db.session();
+    const init = await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' });
+    const inv1 = String(init.body.invoiceId);
+    moyasar.pay(inv1, 'pay_ONE', 'initiated');
+    db.attempts({ checkout_session_id: s.id })[0].expires_at = past();
+    const inv2 = String(
+      (await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' })).body.invoiceId,
+    );
+    expect(inv2).not.toBe(inv1);
+    moyasar.invoices.get(inv2)!.status = 'expired';
+    moyasar.settle('pay_ONE');
+
+    const realFetch = globalThis.fetch;
+    const gets: string[] = [];
+    globalThis.fetch = async (input, init2) => {
+      gets.push(new URL(String(input)).pathname);
+      return realFetch(input, init2);
+    };
+    const answer = await verify(s.id);
+    globalThis.fetch = realFetch;
+    expect(answer).toMatchObject({ status: 'paid', orderId: db.rows('checkout_sessions')[0].order_id });
+    // The newest invoice once, then the older one: the newest is not asked twice.
+    expect(gets).toEqual([`/v1/invoices/${inv2}`, `/v1/invoices/${inv1}`]);
+  });
+
+  it('while the newest attempt is open with no invoice yet, a captured older payment is answered paid', async () => {
+    const { s } = await olderInvoiceSession('initiated');
+    moyasar.settle('pay_ONE');
+    attempt(s.id, { status: 'initiated' }); // an initiate in flight, no invoice yet
+    expect(await verify(s.id)).toMatchObject({
+      status: 'paid',
+      orderId: db.rows('checkout_sessions')[0].order_id,
+    });
+  });
+
+  it('the newest attempt with an invoice still answering is asked alone: one invoice fetch', async () => {
+    const s = db.session();
+    const init = await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' });
+    moyasar.pay(String(init.body.invoiceId), 'pay_1', 'initiated');
+    const realFetch = globalThis.fetch;
+    const gets: string[] = [];
+    globalThis.fetch = async (input, init2) => {
+      gets.push(String(input));
+      return realFetch(input, init2);
+    };
+    expect(await verify(s.id)).toMatchObject({ status: 'pending' });
+    globalThis.fetch = realFetch;
+    expect(gets).toHaveLength(1);
+  });
+});
+
+/**
+ * Second-round review (2026-11-12): a payment refunded at Moyasar before
+ * anything confirmed it was answered 'refunded' on every verify. The builds in
+ * the stores treat only failed / cancelled / expired as terminal (the Tap
+ * server never sent 'refunded'), so they resumed the session for ever and,
+ * once it expired, refused every order on the device, cash included.
+ */
+describe('a refunded payment is never answered "refunded"', () => {
+  it.each(['paid', 'refunded'])(
+    'session flow (invoice status %s): failed / payUnknown, and both builds let the session go',
+    async (invoiceStatus) => {
+      const s = db.session();
+      const init = await call('payment-initiate', { checkoutSessionId: s.id, language: 'en' });
+      const inv = String(init.body.invoiceId);
+      moyasar.pay(inv, 'pay_1', 'refunded');
+      moyasar.invoices.get(inv)!.status = invoiceStatus;
+
+      const answer = await verify(s.id);
+      expect(answer).toEqual({ status: 'failed', messageKey: 'payUnknown', orderId: null });
+      expect(shippedDecidePendingAction(answer as VerifyOutcome)).toEqual({ kind: 'clear' });
+      const phone = phoneWith(s.id);
+      const rec = await recoverPendingSession(phone.deps);
+      expect(rec.kind).toBe('cleared');
+      expect(phone.stored).toBeNull();
+      expect(Object.keys(STRINGS.en)).toContain('payUnknown');
+      expect(Object.keys(STRINGS.ar)).toContain('payUnknown');
+    },
+  );
+
+  it('order flow: the same', async () => {
+    const order = db.order({ total: 64 });
+    const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    moyasar.pay(String(init.body.invoiceId), 'pay_1', 'refunded');
+    expect((await call('payment-verify', { orderId: order.id })).body).toEqual({
+      status: 'failed',
+      messageKey: 'payUnknown',
+      orderId: order.id,
+    });
   });
 });

@@ -577,3 +577,134 @@ describe('an unknown outcome is never reported paid or failed', () => {
     expect(verify.body).toEqual({ status: 'paid', orderId: db.rows('checkout_sessions')[0].order_id });
   });
 });
+
+/**
+ * Second-round review (2026-11-12): a payment stamped on its attempt whose
+ * confirm then FAILED, and which another payment later beat to the order, was
+ * never marked for a refund. Its record insert hit (provider, provider_ref)
+ * against its own attempt, and that unique violation was read as "already
+ * recorded", so the captured payment stayed an ordinary expired attempt.
+ */
+describe('a stamped payment beaten after its confirm failed is still recorded (C1, D3)', () => {
+  async function stampedThenBeaten() {
+    const order = db.order({ total: 64 });
+    const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    const inv1 = String(init.body.invoiceId);
+    db.failNext('rpc.confirm_order_payment');
+    const first = await webhook(moyasar.pay(inv1, 'pay_ONE', 'paid'));
+    expect(first.body).toEqual({ status: 'acknowledged', outcome: 'failed' });
+    const [a1] = db.attempts({ provider_checkout_ref: inv1 });
+    expect(a1).toMatchObject({ provider_ref: 'pay_ONE', status: 'initiated' });
+    // begin_payment_attempt closes it once it has expired; a second opens.
+    db.updateRow('payment_records', a1, {
+      status: 'failed',
+      failure_code: 'expired',
+      failure_message_safe: 'Payment session expired',
+    });
+    db.insertRow('payment_records', {
+      order_id: order.id,
+      provider: 'moyasar',
+      status: 'initiated',
+      amount: 64,
+      mode: 'live',
+      provider_checkout_ref: 'inv_2',
+      reference_transaction: 'sm_2',
+    });
+    moyasar.invoices.set('inv_2', {
+      id: 'inv_2',
+      status: 'initiated',
+      amount: 6400,
+      currency: 'SAR',
+      url: 'https://checkout.moyasar.com/invoices/inv_2',
+      metadata: {},
+      payments: [],
+    });
+    expect((await webhook(moyasar.pay('inv_2', 'pay_TWO', 'paid'))).body.status).toBe('paid');
+    return { order, a1 };
+  }
+
+  it('processing the beaten payment again turns its own attempt into the duplicate record, once', async () => {
+    const { order, a1 } = await stampedThenBeaten();
+    const inserts = vi.spyOn(db, 'insertRow');
+
+    const res = await webhook(moyasar.payments.get('pay_ONE')!);
+    expect(res.body).toEqual({ status: 'acknowledged', outcome: 'failed' });
+
+    const row = db.attempts({ id: a1.id })[0];
+    expect(row).toMatchObject({
+      status: 'failed',
+      failure_code: DUPLICATE_PAYMENT,
+      failure_message_safe: DUPLICATE_PAYMENT_MESSAGE,
+      provider_ref: 'pay_ONE',
+      order_id: order.id,
+      amount: 64,
+      currency: 'SAR',
+    });
+    expect(db.attempts({ provider_ref: 'pay_ONE' })).toHaveLength(1);
+    expect(duplicateLogs()).toEqual([
+      expect.objectContaining({ order_id: order.id, request: { payment_id: 'pay_ONE', order: order.id } }),
+    ]);
+    // The attempt already carries the payment, so no second row is tried.
+    expect(inserts.mock.calls.filter(([t]) => t === 'payment_records')).toHaveLength(0);
+
+    // Replays record nothing more, and the genuine payment is still paid.
+    await webhook(moyasar.payments.get('pay_ONE')!);
+    await webhook(moyasar.payments.get('pay_ONE')!);
+    expect(duplicateLogs()).toHaveLength(1);
+    expect((await webhook(moyasar.payments.get('pay_TWO')!)).body.status).toBe('paid');
+    expect(paidRowsOf(order.id)).toEqual([expect.objectContaining({ provider_ref: 'pay_TWO' })]);
+    expect((await call('payment-verify', { orderId: order.id })).body).toEqual({
+      status: 'paid',
+      orderId: order.id,
+    });
+  });
+
+  it('a unique violation makes the row carrying the payment the record, even for a stale attempt', async () => {
+    const { order, a1 } = await stampedThenBeaten();
+    // The caller's copy of the attempt predates the stamp: it takes the
+    // insert branch, collides, and must still mark the row that carries it.
+    const stale = { ...db.attempts({ id: a1.id })[0], provider_ref: null } as unknown as MoyasarAttempt;
+    const result = await validateAndConfirmMoyasarPayment(
+      db.client() as never,
+      stale,
+      moyasar.payments.get('pay_ONE')! as unknown as Record<string, unknown>,
+    );
+    expect(result).toEqual({ outcome: 'failed', paid: false, reason: DUPLICATE_PAYMENT, orderId: order.id });
+    expect(db.attempts({ id: a1.id })[0]).toMatchObject({
+      failure_code: DUPLICATE_PAYMENT,
+      order_id: order.id,
+    });
+    expect(db.attempts({ provider_ref: 'pay_ONE' })).toHaveLength(1);
+    expect(duplicateLogs()).toHaveLength(1);
+
+    // Already a record: a second collision changes nothing and logs nothing.
+    await validateAndConfirmMoyasarPayment(
+      db.client() as never,
+      stale,
+      moyasar.payments.get('pay_ONE')! as unknown as Record<string, unknown>,
+    );
+    expect(duplicateLogs()).toHaveLength(1);
+  });
+
+  it('a collision with a PAID row is never rewritten', async () => {
+    const { order } = await stampedThenBeaten();
+    const [paidRow] = paidRowsOf(order.id);
+    const stale = { ...paidRow, provider_ref: null, id: 'not-this-row' } as unknown as MoyasarAttempt;
+    // pay_TWO itself, seen through a stale attempt with an order paid "by
+    // another" because the stale copy does not carry it: still never touched.
+    db.insertRow('payment_records', {
+      order_id: order.id,
+      provider: 'moyasar',
+      status: 'paid',
+      amount: 64,
+      mode: 'live',
+      provider_ref: 'pay_X',
+    });
+    await validateAndConfirmMoyasarPayment(
+      db.client() as never,
+      stale,
+      moyasar.payments.get('pay_TWO')! as unknown as Record<string, unknown>,
+    );
+    expect(db.attempts({ id: paidRow.id })[0]).toMatchObject({ status: 'paid', failure_code: null });
+  });
+});

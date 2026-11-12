@@ -1080,3 +1080,61 @@ export function decideSessionVerify(input: {
     ? { kind: 'terminal', status: 'expired', messageKey: 'payExpired' }
     : { kind: 'terminal', status: 'cancelled', messageKey: 'payCancelled' };
 }
+
+/**
+ * The status payment-verify answers for a confirmation result.
+ *
+ * 'refunded' IS NEVER SENT. Every shipped build before the Moyasar change
+ * treats only 'failed', 'cancelled' and 'expired' as terminal for a saved
+ * checkout session (the Tap server never produced 'refunded'), so an answer of
+ * 'refunded' kept that build resuming the session, and once it expired,
+ * refusing every order on the device, cash included. A refunded payment paid
+ * for nothing, which is what 'failed' says; its key stays payUnknown, whose
+ * copy is true of it ("contact support if an amount was deducted"). A binding
+ * mismatch is 'failed' too, as it always was.
+ */
+export function verifyAnswerStatus(outcome: MoyasarOutcome | 'mismatch', paid: boolean): string {
+  if (paid) return 'paid';
+  if (outcome === 'mismatch' || outcome === 'refunded') return 'failed';
+  return outcome;
+}
+
+/** The answers every shipped build treats as terminal for a saved session. */
+export const SESSION_TERMINAL_STATUSES: ReadonlySet<string> = new Set(['failed', 'cancelled', 'expired']);
+
+/**
+ * What an OLDER invoice of a session says, when the newest attempt's answer
+ * would let the app drop the session (terminal) or has no invoice to ask.
+ *
+ * A session can hold several attempts: one expires, the next opens. A payment
+ * made in time on the first invoice can settle after that invoice expired
+ * (a slow 3-D Secure), and the webhook then finalizes the session from it. Read
+ * only the newest attempt, and a session whose newest attempt never got an
+ * invoice was answered 'cancelled' while the older invoice held the captured
+ * payment: the app dropped it, placed a cash order, and the late webhook made a
+ * second, paid order (review of 2026-11-12).
+ *
+ *   - 'paid': confirmed from the older invoice;
+ *   - 'pending': a payment on it is still in flight, or Moyasar could not be
+ *     asked. Only while the session can still be paid: an abandoned 3-D Secure
+ *     payment can stay 'initiated' at Moyasar indefinitely, and 'pending' for
+ *     ever is the lock-out this file exists to prevent. Past the session's
+ *     life the newest attempt's answer stands;
+ *   - 'ignore': nothing on it can still pay (no payment ever made, a decline,
+ *     a closed invoice, a refund, a mismatch).
+ */
+export function olderInvoiceVerdict(
+  result: { outcome: MoyasarOutcome | 'mismatch'; paid: boolean; reason?: string },
+  sessionLive: boolean,
+): 'paid' | 'pending' | 'ignore' {
+  if (result.paid) return 'paid';
+  if (result.reason === 'no_payment') return 'ignore';
+  if ((result.outcome === 'pending' || result.outcome === 'unknown') && sessionLive) return 'pending';
+  return 'ignore';
+}
+
+/** Is a checkout session still payable: pending_payment and not past its expires_at. */
+export function isSessionLive(status: unknown, expiresAt: unknown, nowMs: number): boolean {
+  const at = Date.parse(String(expiresAt ?? ''));
+  return String(status ?? '') === 'pending_payment' && !(Number.isFinite(at) && at <= nowMs);
+}
