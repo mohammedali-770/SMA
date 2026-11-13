@@ -37,13 +37,24 @@ Other documents:
 
 ## 1. Live state, read-only, 2026-11-11
 
+> **Updated 2026-11-13: the database and function half is DONE.** The three
+> payment migrations are applied (ledger rows 114-116) and the seven payment
+> functions are deployed and verified byte-identical (`OWNER_ACTIONS.md` §47.4).
+> So the rows below about July bundles and unapplied migrations are history.
+> **Card payments are still off:** the payment row is **disabled**. Its last write
+> is 2026-11-11 10:55:54 UTC, before the read below, so that read's "enabled" was
+> wrong. `online_payment_enabled` is false. `refund_trigger_secret` is present on the row (length 64). What remains
+> is `OWNER_ACTIONS.md` §47.7 onwards (`tap-admin-test-return` was deleted the same
+> evening, §47.6): keys and webhook, sandbox, proxy, live mode, the customer documents, the refund job,
+> the EAS build, then online payment on.
+
 Read-only reads of Production on 2026-11-11, also recorded in
 [CLAUDE.md §6](../CLAUDE.md). Re-read before acting on any of it.
 
 | What | State |
 | --- | --- |
 | `app_settings.online_payment_enabled` | **false** since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode; the owner switched it off. Cash is on. |
-| Payment integration row | provider `moyasar`, enabled, mode `test`, a test publishable key saved. Tap leftovers (`merchant_id`, `source_id`, `transaction_expiry_minutes`) are still in `public_config`. |
+| Payment integration row | provider `moyasar`, enabled (**wrong when written**: disabled at 10:55:54 UTC, before this read), mode `test`, a test publishable key saved. Tap leftovers (`merchant_id`, `source_id`, `transaction_expiry_minutes`) are still in `public_config`. |
 | Deployed payment functions | every one is a July Tap-era bundle |
 | `20260824100000_moyasar_payment_provider` | **not applied**, so `begin_payment_attempt`, `begin_session_attempt` and `payment_records.provider_checkout_ref` do not exist in Production |
 | `20261003120000`, `20261004120000` | not applied (new on this branch) |
@@ -332,6 +343,9 @@ money action and an owner approval (§5 of CLAUDE.md).
 4. The worker claims up to 5 refunds, one at a time, and sends
    `POST /v1/payments/{payment id}/refund` with the amount in halalas.
 
+**Settled 2026-11-13: `refund_trigger_secret` is present on the payment row**
+(read by length only: 64). The paragraph below is the 2026-11-11 position.
+
 **`refund_trigger_secret` may not exist.** It is not in Vault (read-only,
 2026-11-11). Whether the payment row's `secret_config` still holds one from July
 was not read. No migration creates it and no console field sets it. Checking for
@@ -384,7 +398,7 @@ Approval for one is not approval for the next. Nothing here has been done.
    functions first."
 4. **Apply `20261004120000_drop_tap_payment_rpcs`**, named by version, **only
    after** step 3. It refuses to apply before step 2. Detail: [Migrations §56](MIGRATIONS.md).
-5. **Delete the retired `tap-admin-test-return` function.**
+5. **Delete the retired `tap-admin-test-return` function.** Done 2026-11-13.
 6. **Sandbox test** (§9, part A), with test keys and the test webhook.
 7. **Choose the proxy service and set `MOYASAR_PROXY_URL`** (§8.1), after the
    sandbox test, so a bad value cannot be mistaken for a sandbox failure. An

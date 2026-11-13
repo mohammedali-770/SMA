@@ -81,9 +81,17 @@ Approval for one action is not blanket approval for later actions.
 - the web build (`/app`) never offers online payment;
 - payment history is data: the `tap` rows stay and are shown read-only.
 
-**Live state, read-only, 2026-11-11:**
+**Live state, read and done 2026-11-13 (§47.2-47.5 complete):**
+- the three payment migrations are APPLIED, each named by version: `20260824100000` (live `20261113171942`), `20261003120000` (`20261113172609`) and `20261004120000` (`20261113174500`). The two `tap_begin_*` functions are gone;
+- all seven payment functions are DEPLOYED from the default branch at `b17ee00` and read back byte-identical: `payment-initiate` v9, `-verify` v5, `-webhook` v7, `-return` v9, `-refund` v4, `-test-config` v6 (its AAL2 gate is now live), `-admin-test-return` v1;
+- the retired `tap-admin-test-return` is DELETED (§47.6): the owner deleted it in the dashboard, because the connector has no delete; it answered 404 at 18:01:54 UTC while `payment-admin-test-return` answered 200;
+- **card payments are still OFF**: the payment row is provider `moyasar`, mode `test`, **disabled**: its last write is 2026-11-11 10:55:54 UTC, before the 2026-11-11 read below that called it enabled, so that read was wrong on this point; and `online_payment_enabled` is false. An empty probe of `payment-refund` therefore answers 200 "disabled" before any secret check. `payment-webhook` answers an ordinary event 200 "ignored" for the same reason, **but checks a `webhook_verification` event's token even while the row is disabled, on purpose** (Moyasar sends that code once and never retries), so its 401 path is live now;
+- `refund_trigger_secret` is present on the payment row (checked by length, 64); the `payment-refund-worker` cron job is still inactive;
+- `payment_records` holds only the 9 `tap` history rows; `order_refunds` is empty.
+
+**Live state, read-only, 2026-11-11 (superseded above, kept as the before-picture):**
 - online payment is OFF since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode, which customers could not have completed; the owner switched it off;
-- the payment row is provider `moyasar`, enabled, mode `test`;
+- the payment row is provider `moyasar`, enabled, mode `test` (**wrong when written**: the row's last write, which disabled it, is 10:55:54 UTC, and this read came after 10:56);
 - every deployed payment function is still a July Tap-era bundle;
 - `20260824100000` is unapplied, so `begin_payment_attempt`, `begin_session_attempt` and `payment_records.provider_checkout_ref` do not exist in Production;
 - `payment_records` holds only `tap` rows, none paid, and `order_refunds` is empty.
@@ -273,9 +281,38 @@ The superseded statement was **112 repository files / 117 live rows / exactly ON
 
 Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
 
-**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
+**A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
-**Current position 2026-11-13 (night), read live AFTER one more apply: 155
+**Current position 2026-11-13 (late night), read live AFTER the Moyasar go-live
+chain: 155 repository files on the default branch / 161 live history rows /
+NOTHING unapplied.** On the owner's approval naming each by version:
+`20260824100000_moyasar_payment_provider` (17:19:42 UTC, live `20261113171942`,
+ledger row 114), `20261003120000_moyasar_only_payments` (17:26:09,
+`20261113172609`, row 115) and, after the seven payment functions were deployed
+and read back byte-identical, `20261004120000_drop_tap_payment_rpcs` (17:45:00,
+`20261113174500`, row 116). Reconciled **by name**: 153 applied, 2 superseded
+(rows 8-9), 0 unapplied. Money-path pair unchanged. **This changes no customer
+behaviour yet:** the payment row is disabled and online payment is off.
+
+**`20261003120000` IS NOT THE FIRST INLINE APPLY WHERE THE TRANSPORT DECODED `\u`
+ESCAPES (row 111 was), and it is the first where it decoded only SOME.** Of its 50 escapes,
+the 40 at or above U+0020 arrived as the characters they name; the ten
+control-character escapes (five code points, U+0009-U+000D, each used twice)
+arrived as written. The file's own whitespace-normalised assertion still matched, because
+it compared like with like. The proof that nothing else moved is a hash of the
+merged file with exactly those escapes decoded, which equals the stored statement
+and every body. **Before an inline apply, grep the file for `\u`; after it,
+expect the decoded form, and prove the equivalence rather than assume it.**
+
+**A RECORDED "EXPECTED" HASH CAN BE OLDER THAN THE FILE IT DESCRIBES.**
+`docs/MIGRATIONS.md` §55's `begin_session_attempt` hash was taken before the
+50-item line cap was added to the same file in #446, so a correct apply looked
+like a mismatch until the stale value was reproduced exactly from the file with
+the cap removed. **When a recorded hash and a live one disagree, reproduce both
+from the artifact before deciding which is wrong.**
+
+**Superseded, kept because the count is the point — the position read live
+AFTER one more apply (night): 155
 repository files on the default branch / 158 live history rows / THREE
 unapplied, and all three are the Moyasar go-live chain** —
 `20260824100000_moyasar_payment_provider`, `20261003120000_moyasar_only_payments`
@@ -285,10 +322,10 @@ its own approval, with the payment deploy between the second and the third
 (live `20261113165939`, ledger row 113). Reconciled **by name**: 150 applied,
 2 superseded (rows 8-9), 3 unapplied. Money-path pair unchanged.
 
-**"APPLY THE OUTSTANDING MIGRATIONS" NOW MEANS "START THE MOYASAR GO-LIVE".**
-Every file left is a payment file, so an unnamed instruction has only one
-possible referent, and it is a §5 payment action that needs its keys, its
-deploy and its sandbox steps around it. **Name the target by version.**
+**"APPLY THE OUTSTANDING MIGRATIONS" MEANT "START THE MOYASAR GO-LIVE"** while
+those three were the only files left. With none outstanding, the rule does not
+relax: the next file written is the next referent. **Name the target by
+version.**
 
 **Superseded, kept because the count is the point — the position read live
 AFTER two more applies (evening): 155 repository files on the default branch / 157 live history rows / FOUR
@@ -367,7 +404,7 @@ applied, and a later file drops `push_devices_admin_select` after that console
 deploys (`docs/OWNER_ACTIONS.md` §53). `20260824100000` still sorts first.
 **Name the target by version.** Detail: `docs/MIGRATIONS.md` §61 and §62.
 
-**Current position 2026-11-13, read live AFTER the loyalty-stats apply: 152
+**Superseded, kept because the count is the point — the position 2026-11-13, read live AFTER the loyalty-stats apply: 152
 repository files on the default branch / 150 live history rows / EIGHT
 unapplied** — `20260824100000_moyasar_payment_provider`,
 `20260929120000_db_advisor_hardening`, `20261002120000_staff_actor_fk_set_null`,
