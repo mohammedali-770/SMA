@@ -1041,6 +1041,19 @@ Admin → Settings → Integrations → **Lazywait Sync Monitor**: branch mappin
 / last-error, and a **Retry** button (failed/blocked/dead-letter; delivery
 excluded). Accountants can view but not edit. Secrets are never shown.
 
+**The monitor reads the 200 most recent orders and lists at most 50 of them**
+(since 2026-11-12, `LAZYWAIT_MONITOR_FETCH` in `LazywaitPanel.tsx`), the ones
+whose sync state is set and not `skipped`. It used to call
+`admin_list_orders(null)`, which returns EVERY order with customer names,
+phones, notes and addresses, only to keep 50: 63 MB and 2.7 s at 50 000 orders,
+against 254 KB and 9 ms with a limit of 200. **A failed or blocked order older
+than the 200 most recent is not listed here.** The order-integrity watchdog
+still reads it, and the Live Orders board keeps every unsettled order however
+old. A narrower monitor RPC — POS columns only, no customer PII, and filtered to
+the orders that need attention whatever their age — is a possible follow-up,
+not built. The mapping screen's read of `lazywait_catalog_items` no longer
+fetches the `raw` snapshot column, which it never displayed.
+
 ## Deployment
 ```bash
 # 1) DB migration

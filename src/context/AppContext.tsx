@@ -13,7 +13,7 @@ import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initia
 import { supabase } from '../lib/supabase';
 import {
   auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi,
-  admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi, integrations as integrationsApi,
+  admin as adminApi, integrations as integrationsApi,
   DbIntegrationSetting, UpsertIntegrationInput, ORDERS_POLL_LIMIT,
 } from '../lib/api';
 import {
@@ -28,6 +28,7 @@ import {
 } from '../lib/payment';
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 import { isOpsConsoleRole } from '../lib/roles';
+import { runStaffInitialLoad } from './staffInitialLoad';
 import { addSafeWebBreadcrumb } from '../lib/observability';
 
 // Patch keys whose write changes the trigger-computed expiry date. Listed
@@ -121,6 +122,12 @@ interface AppContextType {
   modifierGroups: ModifierGroup[];
   orders: Order[];
   addresses: SavedAddress[];
+  /**
+   * The signed-in user's own profile, for every role. Staff used to receive
+   * EVERY profile here; nothing in the console needs the full list any more
+   * (Settings → Loyalty reads its own totals and ledger page), so it is no
+   * longer downloaded. The dev-only data console therefore lists one row.
+   */
   profiles: UserProfile[];
 
   // Current session
@@ -231,7 +238,6 @@ interface AppContextType {
   loyaltyPointsRedeemed: number;
   setLoyaltyPointsRedeemed: (points: number) => void;
   loyaltyDiscountAmount: number;
-  updateCustomerPoints: (userId: string, points: number) => void;
 }
 
 /**
@@ -483,42 +489,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return c;
   }, []);
 
-  /** Full load after authentication: profile → role → catalog + orders + profiles + addresses. */
+  /** Full load after authentication: profile → role → catalog + orders (+ addresses for a customer). */
   const loadEverything = useCallback(async (user: UserProfile) => {
     setDataLoading(true);
     setDataError(null);
-    try {
-      const c = await refreshCatalog();
-
-      // Default the branch selection to the first open branch right away (don't
-      // make the storefront wait on orders/profiles to finish loading).
+    // Default the branch selection to the first open branch as soon as the
+    // catalog arrives (don't make the storefront wait on the orders).
+    const selectDefaultBranch = (c: Awaited<ReturnType<typeof catalog.all>>) => {
       const mappedBranches = c.branches.map(mapBranch);
       const firstActive = mappedBranches.find(b => b.isActive) ?? mappedBranches[0] ?? null;
       setSelectedBranch(prev => prev ?? firstActive);
-
-      // Branch-operations roles deliberately stop here. They are authorized for
-      // branch availability and delivery state only — `is_staff()` is false for
-      // them — so the admin order/profile reads below would either come back
-      // empty or fail on RLS. Loading the catalog is all their console needs.
+    };
+    try {
+      // Branch-operations roles deliberately stop at the catalog. They are
+      // authorized for branch availability and delivery state only —
+      // `is_staff()` is false for them — so the admin order read would either
+      // come back empty or fail on RLS. The catalog is all their console needs.
       if (isOpsConsoleRole(user.role)) {
+        selectDefaultBranch(await refreshCatalog());
         setAddresses([]);
         setProfiles([user]);
         return;
       }
 
-      await refreshOrders();
-
       if (user.role === 'customer') {
+        selectDefaultBranch(await refreshCatalog());
+        await refreshOrders();
         setAddresses((await addressesApi.listMine()).map(mapAddress));
         setProfiles([user]);
-      } else {
-        // Staff read all profiles (loyalty stats / DB console). Addresses are
-        // read via each order's snapshot, so no separate list is needed.
-        setAddresses([]);
-        setProfiles((await profilesApi.list()).map(mapProfile));
-        // Integration settings are admin-only (the RPC rejects accountants).
-        if (user.role === 'admin') void loadIntegrations();
+        return;
       }
+
+      // Staff. The catalog and the order window are independent, so both start
+      // at once, and one failing does not discard the other. Profiles are NOT
+      // read here any more: this used to download every profile on every staff
+      // sign-in so the Loyalty tiles could be summed in the browser. The Loyalty
+      // section now reads its totals and its ledger itself, when it is opened.
+      // Addresses are read via each order's snapshot, so no list is needed.
+      setAddresses([]);
+      setProfiles([user]);
+      const failure = await runStaffInitialLoad({
+        loadCatalog: refreshCatalog,
+        loadOrders: refreshOrders,
+        onCatalog: selectDefaultBranch,
+      });
+      if (failure !== null) setDataError(failure);
+      // Integration settings are admin-only (the RPC rejects accountants).
+      if (user.role === 'admin') void loadIntegrations();
     } catch (e) {
       setDataError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -1273,23 +1290,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPaymentSettings(mapPaymentMethodSettings(c.settings));
   }, []);
 
-  // Admin loyalty point adjustment. Callers pass the desired absolute balance
-  // (e.g. currentPoints + 50); we derive the delta and apply it through the
-  // admin-only adjust_loyalty_points RPC, then refresh the affected profile.
-  const updateCustomerPoints = (userId: string, points: number) => {
-    const current = profiles.find(p => p.id === userId)?.loyaltyPoints ?? 0;
-    const delta = Math.round(points - current);
-    if (delta === 0) return;
-    void (async () => {
-      try {
-        const updated = mapProfile(await loyaltyApi.adjustPoints(userId, delta));
-        setProfiles(prev => prev.map(p => (p.id === userId ? updated : p)));
-        setCurrentUser(prev => (prev.id === userId ? updated : prev));
-      } catch (e) {
-        setWriteError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-  };
+  // Admin loyalty point adjustments moved to LoyaltyLedgerSection, which holds
+  // the customer rows it adjusts. This used to derive the delta from the
+  // `profiles` list, which is no longer every customer (staff sign-in stopped
+  // downloading it), so a delta computed here would have been wrong.
 
   return (
     <AppContext.Provider value={{
@@ -1391,7 +1395,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       loyaltyPointsRedeemed,
       setLoyaltyPointsRedeemed,
       loyaltyDiscountAmount,
-      updateCustomerPoints,
     }}>
       {children}
     </AppContext.Provider>

@@ -65,12 +65,11 @@ describe('no console screen formats a time in the device locale or zone', () => 
     fileURLToPath(new URL('../../ops/', import.meta.url)),
   ];
 
-  // A NUMBER, not a time: the customers' loyalty-points total. Its digits do
-  // follow the browser locale, which is the same digits question in another
-  // place; it was not part of the timestamp change.
-  const ALLOWED = [
-    /SettingsPanel\.tsx: .*\.reduce\(\(sum, p\) => sum \+ \(p\.loyaltyPoints \|\| 0\), 0\)\.toLocaleString\(\)/,
-  ];
+  // Empty since 2026-11-12. It held the Settings loyalty-points total, a
+  // NUMBER summed in the browser with `toLocaleString()`; that total now comes
+  // from `admin_loyalty_stats` and is formatted by `formatCount`
+  // (src/lib/loyaltyStats.ts), with Western digits in every browser.
+  const ALLOWED: RegExp[] = [];
 
   const sources = (dir: string): string[] =>
     readdirSync(dir).flatMap((name) => {
