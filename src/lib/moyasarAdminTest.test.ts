@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { canRunMoyasarAdminTestCheckout, isMoyasarShapedStatus, moyasarBlockingReason } from './moyasarAdminTest';
+import { currencyExponent, toMinorUnits, MOYASAR_MIN_INVOICE_MINOR_UNITS } from '../../supabase/functions/_shared/moyasar';
+import {
+  canRunMoyasarAdminTestCheckout,
+  formatMoyasarMinorAmount,
+  isMoyasarShapedStatus,
+  moyasarBlockingReason,
+  moyasarCurrencyExponent,
+} from './moyasarAdminTest';
 
 const ready = {
   provider: 'moyasar',
@@ -135,5 +142,36 @@ describe('moyasarBlockingReason — the server that answers', () => {
     );
     expect(moyasarBlockingReason({ ...ready, config_ok: false, config_reason: null })).toBe('server_not_ready');
     expect(moyasarBlockingReason({ ...ready, config_ok: false, config_reason: 'toString' })).toBe('server_not_ready');
+  });
+});
+
+describe('formatMoyasarMinorAmount: Moyasar reports minor units', () => {
+  it('reads the 1.00 SAR sandbox invoice as 1.00 SAR, not 100 SAR', () => {
+    expect(formatMoyasarMinorAmount(MOYASAR_MIN_INVOICE_MINOR_UNITS, 'SAR')).toBe('1.00 SAR');
+    expect(formatMoyasarMinorAmount(100, 'SAR')).not.toContain('100');
+  });
+
+  it('round-trips the server conversion for ordinary totals', () => {
+    for (const sar of [1, 45.5, 45.55, 123.45, 0.01]) {
+      expect(formatMoyasarMinorAmount(toMinorUnits(sar, 'SAR'), 'SAR')).toBe(`${sar.toFixed(2)} SAR`);
+    }
+  });
+
+  it('scales three- and zero-decimal currencies', () => {
+    expect(formatMoyasarMinorAmount(1500, 'KWD')).toBe('1.500 KWD');
+    expect(formatMoyasarMinorAmount(1500, 'jpy')).toBe('1500 JPY');
+  });
+
+  it('defaults a missing currency to SAR, and shows a dash for no amount', () => {
+    expect(formatMoyasarMinorAmount(250, undefined)).toBe('2.50 SAR');
+    expect(formatMoyasarMinorAmount(undefined, 'SAR')).toBe('—');
+    expect(formatMoyasarMinorAmount('abc', 'SAR')).toBe('—');
+    expect(formatMoyasarMinorAmount('', 'SAR')).toBe('—');
+  });
+
+  it('agrees with the server exponent table for every currency either names', () => {
+    for (const c of ['SAR', 'AED', 'QAR', 'USD', 'EUR', 'GBP', 'EGP', 'KWD', 'BHD', 'OMR', 'JOD', 'TND', 'JPY', 'KRW', '', 'xyz']) {
+      expect(moyasarCurrencyExponent(c)).toBe(currencyExponent(c));
+    }
   });
 });

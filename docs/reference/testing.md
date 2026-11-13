@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**268 TypeScript test files declaring 3991 test blocks, plus 92 SQL suites.**
+**268 TypeScript test files declaring 3997 test blocks, plus 92 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -261,7 +261,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-131 files, 1773 declared test blocks.
+131 files, 1779 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -281,7 +281,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 20 | product price validation — the money contract |
-| `src/components/admin/MoyasarPaymentPanel.test.tsx` | 13 | against the payment-test-config deployed before Moyasar |
+| `src/components/admin/MoyasarPaymentPanel.test.tsx` | 14 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
@@ -365,7 +365,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/mirrorParity.test.ts` | 4 | cross-app lib mirrors stay identical |
-| `src/lib/moyasarAdminTest.test.ts` | 15 | canRunMoyasarAdminTestCheckout |
+| `src/lib/moyasarAdminTest.test.ts` | 20 | canRunMoyasarAdminTestCheckout |
 | `src/lib/moyasarWebhookVerification.test.ts` | 6 | webhookVerificationNotice |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |
 | `src/lib/observability/devTest.test.ts` | 3 | admin dev Sentry test facility |

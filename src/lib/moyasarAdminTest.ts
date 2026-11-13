@@ -100,3 +100,39 @@ export function moyasarBlockingReason(
   if (status.webhook_secret_set === false) return 'no_webhook_secret';
   return null;
 }
+
+/**
+ * Moyasar reports every amount in MINOR units (halalas for SAR), and the
+ * sandbox result passes Moyasar's own `amount` straight through. Printing it
+ * beside the currency code read "100 SAR" for the 1.00 SAR test invoice
+ * (2026-11-13), a hundredfold overstatement on the one screen an owner uses to
+ * check that payments work.
+ *
+ * The exponent table mirrors `currencyExponent` in
+ * supabase/functions/_shared/moyasar.ts, and moyasarAdminTest.test.ts holds the
+ * two to the same answer for every currency either names.
+ */
+export function moyasarCurrencyExponent(currency: string): number {
+  switch ((currency || '').toUpperCase()) {
+    case 'KWD':
+    case 'BHD':
+    case 'OMR':
+    case 'JOD':
+    case 'TND':
+      return 3;
+    case 'JPY':
+    case 'KRW':
+      return 0;
+    default:
+      return 2;
+  }
+}
+
+/** "1.00 SAR" from Moyasar's 100. Missing or non-numeric input reads "—". */
+export function formatMoyasarMinorAmount(minor: unknown, currency: string | null | undefined): string {
+  const n = typeof minor === 'number' ? minor : typeof minor === 'string' && minor.trim() !== '' ? Number(minor) : NaN;
+  if (!Number.isFinite(n)) return '—';
+  const code = (currency || 'SAR').toUpperCase();
+  const exp = moyasarCurrencyExponent(code);
+  return `${(n / 10 ** exp).toFixed(exp)} ${code}`;
+}
