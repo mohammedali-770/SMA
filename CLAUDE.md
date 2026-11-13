@@ -275,8 +275,23 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-11-13 (evening), read live AFTER two more applies:
-155 repository files on the default branch / 157 live history rows / FOUR
+**Current position 2026-11-13 (night), read live AFTER one more apply: 155
+repository files on the default branch / 158 live history rows / THREE
+unapplied, and all three are the Moyasar go-live chain** —
+`20260824100000_moyasar_payment_provider`, `20261003120000_moyasar_only_payments`
+and `20261004120000_drop_tap_payment_rpcs`, to be applied in that order, each on
+its own approval, with the payment deploy between the second and the third
+(§6, `docs/OWNER_ACTIONS.md` §47). `20261006120000` was applied at 16:59:39 UTC
+(live `20261113165939`, ledger row 113). Reconciled **by name**: 150 applied,
+2 superseded (rows 8-9), 3 unapplied. Money-path pair unchanged.
+
+**"APPLY THE OUTSTANDING MIGRATIONS" NOW MEANS "START THE MOYASAR GO-LIVE".**
+Every file left is a payment file, so an unnamed instruction has only one
+possible referent, and it is a §5 payment action that needs its keys, its
+deploy and its sandbox steps around it. **Name the target by version.**
+
+**Superseded, kept because the count is the point — the position read live
+AFTER two more applies (evening): 155 repository files on the default branch / 157 live history rows / FOUR
 unapplied** — `20260824100000_moyasar_payment_provider` (the first Moyasar
 go-live apply, awaiting its own approval under §6), `20261003120000`,
 `20261004120000` and `20261006120000`. Applied, one call each, each named by

@@ -4345,6 +4345,10 @@ recorded as a ledger row in `docs/MIGRATIONS.md`, and §57 marked APPLIED.
 
 ## 49. RLS init-plans, the live board and the order-number year — one apply
 
+**DONE 2026-11-13.** Applied at 16:59:39 UTC on your word naming it by version,
+and checked as step 2 asks (`docs/MIGRATIONS.md` ledger row 113). Nothing is
+left for you here.
+
 **Opened 2026-11-12.** `20261006120000_rls_initplan_live_board_order_year.sql`
 is written, validated and NOT applied. Detail: `docs/MIGRATIONS.md` §58.
 
