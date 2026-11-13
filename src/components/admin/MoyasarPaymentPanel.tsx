@@ -9,7 +9,7 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { paymentGateway, PaymentGatewayStatus } from '../../lib/api';
 import {
-  canRunMoyasarAdminTestCheckout, isMoyasarShapedStatus, moyasarBlockingReason,
+  canRunMoyasarAdminTestCheckout, formatMoyasarMinorAmount, isMoyasarShapedStatus, moyasarBlockingReason,
 } from '../../lib/moyasarAdminTest';
 import { webhookVerificationNotice, type WebhookVerificationNotice } from '../../lib/moyasarWebhookVerification';
 import { formatRiyadhTimeSeconds } from '../../utils/calculations';
@@ -334,7 +334,7 @@ export const MoyasarPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled 
                 <Text variant="caption" tone="secondary" as="p">
                   {isRTL ? 'الحالة' : 'Status'}: <span className="num">{coResult.status ?? '—'}</span>
                   {' · '}
-                  <span className="num">{coResult.amount ?? '—'} {coResult.currency ?? ''}</span>
+                  <span className="num">{formatMoyasarMinorAmount(coResult.amount, coResult.currency)}</span>
                   {' · '}
                   <span className="num">{coResult.mode ?? ''}</span>
                 </Text>

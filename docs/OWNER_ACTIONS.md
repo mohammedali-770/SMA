@@ -4084,6 +4084,12 @@ The sandbox is the console's admin test, **not** a customer order. Customer
 checkout is refused in TEST mode by design, so a test card can never pay for a
 real order.
 
+**It needs the payment row ENABLED**, which this list otherwise reaches only at
+47.14: with the row disabled, Run answers "Enable Moyasar first." Enable it here,
+in TEST mode. That lets no customer pay, because the Online Payment switch stays
+off and `payment-initiate` refuses customer checkout in TEST mode. (Found
+2026-11-13, when the row had been disabled since 2026-11-11.)
+
 1. Moyasar panel → run the sandbox checkout. It opens an isolated **1.00 SAR**
    TEST invoice, linked to no order, in a browser tab.
 2. Pay with Moyasar's test cards: mada `4201320111111010`; Visa
@@ -4092,7 +4098,9 @@ real order.
    `4201320000311101`.
 3. Read the result back in the panel.
 
-**Done looks like:** an approved card reads paid, the decline card reads failed,
+**Done looks like:** an approved card reads paid, at `1.00 SAR` (until the
+2026-11-13 console fix the line read "100 SAR", Moyasar's halalas printed as
+riyals; the charge was always 1.00), the decline card reads failed,
 and no order changed. Also check that the hosted page shows Arabic with
 `lang=ar`; that parameter is undocumented.
 

@@ -117,7 +117,12 @@ is chosen by the **attempt's** stored mode. Detail: API reference §7.
 ### Amounts
 
 - Moyasar takes **minor units**: 1.00 SAR is `100`. The conversion lives in one
-  place, `toMinorUnits()` in `supabase/functions/_shared/moyasar.ts`.
+  place, `toMinorUnits()` in `supabase/functions/_shared/moyasar.ts`. Moyasar
+  also REPORTS amounts in minor units, so anything that shows one of its amounts
+  must convert it back. The console's sandbox result does, with
+  `formatMoyasarMinorAmount()` (`src/lib/moyasarAdminTest.ts`), whose currency
+  table a test holds to the server's. Until 2026-11-13 it printed Moyasar's raw
+  `100` as "100 SAR" for the 1.00 SAR test invoice.
 - The smallest invoice Moyasar accepts is **1.00 SAR**. A total from 0.01 to
   0.99 SAR (points can leave one) is refused **before** any attempt opens:
   `payment-initiate` answers `{status:'disabled', reason:'amount_below_minimum'}`
@@ -195,8 +200,11 @@ real order paid.
 
 **The sandbox is the console's admin test.** Integrations → Payments → Moyasar
 panel → **Run** creates a 1.00 SAR test invoice that is linked to no order and
-opens it in a new browser tab. **Check** reads the result back. It needs the row
-enabled, provider `moyasar` and mode `test`. It never touches an order,
+opens it in a new browser tab. **Check** reads the result back and shows the
+amount in riyals (`1.00 SAR`). It needs the row **enabled**, provider `moyasar`
+and mode `test`; with the row disabled, Run answers "Enable Moyasar first."
+Enabling the row in TEST mode lets no customer pay: the Online Payment switch
+stays off, and `payment-initiate` refuses customer checkout in TEST mode. It never touches an order,
 `payment_records`, the POS or the app.
 
 **The console's Online Payment switch opens only for a live, enabled Moyasar

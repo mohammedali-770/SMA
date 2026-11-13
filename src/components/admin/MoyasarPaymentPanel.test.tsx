@@ -14,7 +14,14 @@
  *
  * The app context and the payment API are mocked: no Supabase, no network.
  */
-import { cleanup, render, screen, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  waitForElementToBeRemoved,
+} from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,13 +35,15 @@ vi.mock('../../context/AppContext', () => ({
 
 const status = vi.fn();
 const latestWebhookVerification = vi.fn();
+const testCheckout = vi.fn();
+const testCheckoutResult = vi.fn();
 vi.mock('../../lib/api', () => ({
   paymentGateway: {
     status: () => status(),
     latestWebhookVerification: () => latestWebhookVerification(),
     testConnection: vi.fn(),
-    testCheckout: vi.fn(),
-    testCheckoutResult: vi.fn(),
+    testCheckout: () => testCheckout(),
+    testCheckoutResult: (id: string) => testCheckoutResult(id),
   },
 }));
 
@@ -205,5 +214,36 @@ describe('the webhook verification code', () => {
     expect(await screen.findByText('Key for mode (test)')).toBeTruthy();
     expect(screen.queryByText(/verification code/i)).toBeNull();
     expect(screen.queryByText('permission denied')).toBeNull();
+  });
+});
+
+describe('the sandbox checkout result', () => {
+  it("shows Moyasar's minor units as riyals: 100 reads 1.00 SAR", async () => {
+    status.mockResolvedValue(moyasarStatus());
+    testCheckout.mockResolvedValue({
+      ok: true,
+      invoiceId: 'inv_1',
+      checkoutUrl: 'https://checkout.moyasar.example/inv_1',
+    });
+    // Moyasar's own invoice amount for the 1.00 SAR sandbox invoice (2026-11-13).
+    testCheckoutResult.mockResolvedValue({
+      ok: true,
+      invoiceId: 'inv_1',
+      status: 'paid',
+      amount: 100,
+      currency: 'SAR',
+      mode: 'test',
+    });
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    renderPanel();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(open).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+
+    expect(await screen.findByText('1.00 SAR')).toBeTruthy();
+    expect(screen.queryByText(/100 SAR/)).toBeNull();
+    expect(testCheckoutResult).toHaveBeenCalledWith('inv_1');
+    open.mockRestore();
   });
 });
