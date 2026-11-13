@@ -46,6 +46,16 @@ to Production.**
 > `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
 > target by version.**
 
+> **Updated 2026-11-13 (later) — two more files are written, validated and NOT
+> applied: `20261009120000_admin_lazywait_sync_monitor` (§61) and
+> `20261010120000_customer_push_device_counts` (§62).** On merge the outstanding
+> set is **TEN**: the eight in the note below and these two. Each adds one
+> read-only, staff- or admin-gated function and changes nothing else; the money
+> path is self-asserted. They are independent of each other and of every other
+> outstanding file. The console change that calls them merges only after both
+> are applied (`docs/OWNER_ACTIONS.md` §53). Moyasar's `20260824100000` still
+> sorts first. **Name the target by version.**
+
 > **Updated 2026-11-13 — `20261008120000_admin_loyalty_stats` is APPLIED**
 > (06:38:43 UTC, live version `20261113063843`, ledger row 105, §59), on the
 > owner's explicit approval naming it by version. Live history **149 → 150**.
@@ -8290,3 +8300,154 @@ The residue is a few identity values on the two audit tables.
    `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…`
    unchanged; then deploy `push-dispatch` and `staff-accounts`, each on its own
    approval (`docs/OWNER_ACTIONS.md` §51).
+
+## 61. Lazywait sync monitor without customer data — WRITTEN, NOT APPLIED (2026-11-13)
+
+`20261009120000_admin_lazywait_sync_monitor.sql`. **Written 2026-11-13,
+validated, awaiting owner approval.** Follow-up to checklist gap P04#1.
+
+sha256 `c4d789b3117181d0bbe3a38627270114a6c8112daf87f2616eccc5f5d18c3fcb`, 208 lines / 10 176 bytes. **Re-hash the MERGED copy before
+applying**, per §15.
+
+**It adds one function and changes nothing else.** No table, policy or existing
+function is altered, no row is written, and no deploy is implied.
+`admin_list_orders` stays. **MONEY PATH UNTOUCHED, and the file asserts it**
+(`12b6816d…` / `22e2d429…`).
+
+### Why
+
+The Lazywait monitor reads `admin_list_orders(200)`, the general staff order
+feed, and renders 50 rows. Each fetched row carries the customer's name, phone,
+delivery address snapshot, notes and coupon, none of which the table shows. The
+feed also omits `pos_sync_deadline_at`, which the console's requeue-eligibility
+mirror (`src/lib/lazywaitRequeue.ts`) reads, so an order past its deadline can
+show a Retry button the server then refuses.
+
+### What it does
+
+`admin_lazywait_sync_monitor(p_limit integer default 50)` returns the newest
+orders whose `lazywait_sync_state` is set and is not `skipped`, newest first
+(`created_at desc, id desc`). Each row has exactly twelve columns: `id`,
+`order_number`, `order_type`, `created_at`, `lazywait_sync_state`,
+`lazywait_ref`, `lazywait_order_number`, `sync_attempt_count`,
+`sync_last_error`, `sync_blocked_reason`, `pos_sync_deadline_at` and
+`pos_create_attempted_at`. `p_limit` is clamped to 1..200. The filter runs in
+SQL, so the monitor shows the newest 50 such orders, not whatever survives a
+200-row window.
+
+**Access is not widened.** The gate is `is_staff()`, as on
+`admin_list_orders`, and the projection is a subset of that function's plus
+`pos_sync_deadline_at`. EXECUTE is revoked from `public` **and** `anon`, and
+granted to `authenticated`.
+
+### What the file checks
+
+- One overload, one argument, `SECURITY DEFINER`, `search_path=public`;
+  cardinality first.
+- `anon` cannot execute it; `authenticated` can.
+- **The gate as an outcome:** a non-staff `authenticated` call refuses with
+  `42501`, read back as a value.
+- The projection is run read-only with the identical predicate, and its key
+  set must be exactly the twelve columns. The stored body must name no
+  customer field.
+- The money-path pair, one overload each first.
+
+### Validation
+
+- **Paired suite** `admin_lazywait_sync_monitor_test.sql`, 5 cases, over 230
+  orders dated 2099, every tenth one `skipped`, each carrying recognisable
+  customer values:
+  - case 1: the key set is exactly the twelve, and no customer value appears
+    anywhere in the response text;
+  - case 2: `skipped` excluded, strictly newest first, the default window is
+    exactly `LWMON-229` to `LWMON-175`, and `p_limit` 1 000, 0, -5 and 7 give
+    200, 1, 1 and 7;
+  - case 3: `pos_sync_deadline_at` is in the row;
+  - case 4: admin and accountant at AAL2 allowed; customer, admin at AAL1 and
+    accountant at AAL1 refused with `42501`;
+  - case 5: `anon` refused, `authenticated` granted.
+- **Fail-before:** the suite fails without the migration.
+- **Mutation testing:** 8 mutants, all killed. The suite fails on every one. The file's own block refuses three at apply: EXECUTE left to `anon` (revoked from `public` only), `customer_name` added to the projection, and the gate removed. The other five apply and are failed by the suite: the `skipped` filter dropped, the gate narrowed to `is_admin()` (which would lock accountants out), the clamp removed, oldest-first order, and `pos_sync_deadline_at` dropped.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261009120000` by name. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. It is independent of every other
+   outstanding file.
+2. Afterwards, read-only: one overload; `anon` false and `authenticated` true;
+   the money-path pair unchanged.
+3. **Then** the console change that calls it can merge (`docs/OWNER_ACTIONS.md`
+   §53).
+
+## 62. Customer push device counts for Push Tools — WRITTEN, NOT APPLIED (2026-11-13)
+
+`20261010120000_customer_push_device_counts.sql`. **Written 2026-11-13,
+validated, awaiting owner approval.** Follow-up to checklist gap S03#1
+(`docs/OWNER_ACTIONS.md` §52's optional follow-up).
+
+sha256 `938826a1082bcec77913eb737373ed929ce22a3c961029913cdfbff161fdbbfe`, 190 lines / 9 159 bytes. **Re-hash the MERGED copy before
+applying**, per §15.
+
+**It adds one function and changes nothing else.** No policy is dropped here.
+**MONEY PATH UNTOUCHED, and the file asserts it.** Nothing about who a
+broadcast reaches changes (CLAUDE.md §7).
+
+### Why
+
+Push Tools counts devices with two `head` selects on `push_devices`. They work
+only because `push_devices_admin_select` (`is_admin()`) lets an administrator
+read every row of that table, Expo push tokens included. The console never
+downloads a row, but the policy lets any administrator session read every
+token. Until Expo's Enhanced Security is on (`docs/OWNER_ACTIONS.md` §52), a
+token is a bearer credential.
+
+### What it does
+
+`customer_push_device_counts()` returns `{active_devices, promo_opt_ins}`:
+`is_active`, and `is_active and promos_enabled`, the audience `push-dispatch`
+selects for a broadcast. No row and no token. The gate is `is_admin()`, the
+policy's own predicate. EXECUTE is revoked from `public` **and** `anon`, and
+granted to `authenticated`.
+
+**The name is deliberate.** It counts the customer Expo channel, so it is not
+`admin_push_…`. That prefix belongs to the staff console's web-push feature,
+whose checks (`20260928120000` and `admin_push_closure_notifications_test.sql`
+case 13) fail if any `%admin_push%` function references `push_devices`
+(CLAUDE.md §7). The first draft used that name, and the local suite chain
+caught it. The file repeats that check.
+
+**It is the first of two steps.** The console switches to it in a later pull
+request, which also carries a migration dropping `push_devices_admin_select`.
+That drop is applied after the console deploys, so Push Tools never shows zero
+devices in between.
+
+### What the file checks
+
+- One overload, no arguments, `SECURITY DEFINER`, `search_path=public`;
+  cardinality first.
+- `anon` cannot execute it; `authenticated` can.
+- **The gate as an outcome:** a non-admin call refuses with `42501`.
+- The aggregate is run read-only with the identical predicate, and the stored
+  body names no token.
+- The money-path pair, one overload each first.
+
+### Validation
+
+- **Paired suite** `customer_push_device_counts_test.sql`, 4 cases, over 14 seeded
+  devices (7 active with offers on, 4 active with offers off, 3 inactive with
+  offers on):
+  - case 1: active +11 and opt-ins +7, and both equal a direct count;
+  - case 2: exactly two keys, and no token in the response text;
+  - case 3: admin at AAL1, accountant and customer refused with `42501`;
+  - case 4: `anon` refused, `authenticated` granted.
+- **Fail-before:** the suite fails without the migration.
+- **Mutation testing:** 6 mutants, all killed. The suite fails on every one. The file's own block refuses three at apply: EXECUTE left to `anon`, the gate removed, and a token list added to the response. The other three apply and are failed by the suite: the opt-in count ignoring `is_active`, the active count ignoring `is_active`, and the gate widened to `is_staff()` (which would let accountants in).
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261010120000` by name, never as part of "the outstanding
+   migrations". It is independent of `20261009120000`.
+2. Afterwards, read-only: one overload; `anon` false and `authenticated` true;
+   the money-path pair unchanged.
+3. **Then** the console change can merge, and after it deploys, the policy-drop
+   migration it carries is applied (`docs/OWNER_ACTIONS.md` §53).

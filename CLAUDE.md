@@ -275,6 +275,16 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-13 (later) — `20261009120000_admin_lazywait_sync_monitor`
+and `20261010120000_customer_push_device_counts` are written, validated and
+awaiting approval, so on merge the outstanding set is TEN:** the eight named
+below and these two. Each adds one read-only function, gated on `is_staff()`
+and `is_admin()` respectively, and changes nothing else; the money path is
+self-asserted. The console change that calls them merges only after both are
+applied, and a later file drops `push_devices_admin_select` after that console
+deploys (`docs/OWNER_ACTIONS.md` §53). `20260824100000` still sorts first.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §61 and §62.
+
 **Current position 2026-11-13, read live AFTER the loyalty-stats apply: 152
 repository files on the default branch / 150 live history rows / EIGHT
 unapplied** — `20260824100000_moyasar_payment_provider`,

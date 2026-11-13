@@ -4481,13 +4481,52 @@ refuse **every** push from this project, order updates included.
 5. **Only then enable Enhanced Security** in the Expo dashboard, and confirm a
    second order push still arrives.
 
-**Optional follow-up, not done here:** admins at AAL2 can still read raw token
+**Follow-up, now in progress (§53):** admins at AAL2 can still read raw token
 values through `push_devices_admin_select`, while the console only ever needs
-counts. Replacing that with an `is_admin()`-gated count RPC is a migration with
-its own apply-before-merge ordering (AGENTS.md change control).
+counts. `20261010120000` adds an `is_admin()`-gated count RPC; the console
+switch and the policy drop follow it, in that order.
 
 **Done looks like:** steps 2-5 recorded with dates and the `push-dispatch`
 version, and the readiness record's S03 row closed.
+
+## 53. Lazywait monitor and Push Tools counts — two applies, a merge, then one more apply
+
+**Opened 2026-11-13.** Two follow-ups, in one sequence because they reach the
+console together:
+
+- **The Lazywait sync monitor stops receiving customer data.** It reads the
+  general staff order feed today, so the 200 rows it fetches on each refresh
+  carry customer names, phones, addresses and notes it never shows.
+  `20261009120000` adds a sync-columns-only feed (`docs/MIGRATIONS.md` §61).
+  It also returns the POS deadline, so an expired order no longer shows a Retry
+  button.
+- **No admin session can read push tokens.** Push Tools needs two counts, and
+  gets them through a policy that also exposes every token. `20261010120000`
+  adds a count-only function (§62), and a later file drops the policy.
+
+**The ordering matters, and every step is its own approval (CLAUDE.md §5).**
+A merge deploys the console (CLAUDE.md §13), so each function must exist before
+the console calls it, and the policy must outlive the console's last use of it.
+
+### The steps
+
+1. **Merge the migration pull request.** Merging it changes nothing anyone
+   sees.
+2. **Apply `20261009120000` and `20261010120000`, each by name**, re-hashing
+   the merged copy first. They are independent; either order works. Never "the
+   outstanding migrations": `20260824100000` sorts first.
+3. **Check afterwards**, read-only: one overload of each; `anon` cannot execute
+   either and `authenticated` can; the money-path pair unchanged.
+4. **Merge the console pull request.** After it deploys, Settings →
+   Integrations shows the sync table and Push Tools shows its two counts.
+5. **Apply the policy-drop migration that pull request carries, by name**, only
+   after step 4's deploy is live. Then confirm Push Tools still shows its
+   counts, and that an admin session reading `push_devices` gets zero rows.
+
+There is no number to decide and no function to deploy.
+
+**Done looks like:** all three applies recorded as ledger rows in
+`docs/MIGRATIONS.md`, and §61 and §62 marked APPLIED.
 
 ## Owner-action closeout rule
 
