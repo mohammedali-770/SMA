@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **152**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261008120000_admin_loyalty_stats.sql`.
+Migration files in the repository: **154**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261010120000_customer_push_device_counts.sql`.
 
 ## Tables
 
@@ -102,6 +102,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_coupon_usage_counts` | 1 | `20260919120000_security_audit_db_hardening.sql` |
 | `admin_delete_branch_reference` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `admin_delete_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
+| `admin_lazywait_sync_monitor` | 1 | `20261009120000_admin_lazywait_sync_monitor.sql` |
 | `admin_list_comp_member_audit` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `admin_list_comp_members` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `admin_list_orders` | 1 | `20260724200000_order_read_contracts.sql` |
@@ -165,6 +166,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `customer_pos_resend_eligibility` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_limit` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_window` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
+| `customer_push_device_counts` | 1 | `20261010120000_customer_push_device_counts.sql` |
 | `deactivate_push_device` | 2 | `20260919120000_security_audit_db_hardening.sql` |
 | `delete_admin_push_subscription` | 1 | `20260927120000_admin_push_subscriptions.sql` |
 | `emit_branch_availability_event` | 1 | `20260820110000_branch_availability_snooze.sql` |
