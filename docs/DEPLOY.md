@@ -119,6 +119,27 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY
 
 Map-provider variables depend on the currently selected provider/configuration; use the checked-in `.env.example` files and `docs/MAPS.md` rather than copying a stale key list from this document.
 
+### A production console build without its Supabase settings fails (since 2026-11-12)
+
+`vite build` refuses to build when Vercel sets `VERCEL_ENV=production` and the
+console has no `VITE_SUPABASE_URL`, or neither `VITE_SUPABASE_PUBLISHABLE_KEY`
+nor `VITE_SUPABASE_ANON_KEY` (either key is enough, as at run time). The error
+names what is missing. `supabaseBuildGuard` in `src/lib/supabaseKey.ts` decides,
+and `vite.config.ts` calls it for every build.
+
+- **Why.** Before this, the build succeeded and the console sent every request
+  to a placeholder host, so nobody could sign in. Its startup warning also
+  claimed a demo-data fallback that no longer exists; it now says requests will
+  fail.
+- **What a failed build does.** A failed Vercel build is never promoted, so
+  production keeps serving the previous deployment. Fix the variables and
+  redeploy (§10).
+- **Preview builds only warn**, loudly, in the build log. A build outside Vercel
+  (CI, local) sets no `VERCEL_ENV` and is not checked.
+- **`/app` has no such gap.** `apps/mobile/scripts/export-web.js` falls back to
+  committed public values for `EXPO_PUBLIC_SUPABASE_URL` and the legacy anon key,
+  so the Expo web export always has a configuration. It is not checked here.
+
 ### Secret rule
 
 Never expose a server secret through a browser-prefixed variable:

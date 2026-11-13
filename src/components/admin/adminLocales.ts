@@ -68,6 +68,16 @@ export const ADMIN_LOCALES = {
     verify_reason_missing_ref: 'Missing POS reference',
     verify_reason_ambiguous_response: 'Ambiguous provider response',
     verify_reason_provider_5xx: 'Ambiguous provider response',
+    loyalty_stats_unavailable: 'Loyalty totals are not available.',
+    loyalty_stats_missing_migration:
+      'Loyalty totals need a database migration that has not been applied to this project yet (admin_loyalty_stats).',
+    loyalty_ledger_loading: 'Loading customers…',
+    loyalty_ledger_empty: 'No customers yet.',
+    loyalty_ledger_failed: 'Could not load the customer list.',
+    loyalty_ledger_more: 'Show more',
+    loyalty_ledger_shown: 'Showing',
+    loyalty_ledger_of: 'of',
+    loyalty_adjust_failed: 'Could not adjust points',
   },
   ar: {
     dashboard_title: 'لوحة تحكم سبايسي ميل الإدارية',
@@ -134,6 +144,16 @@ export const ADMIN_LOCALES = {
     verify_reason_missing_ref: 'مرجع الكاشير مفقود',
     verify_reason_ambiguous_response: 'استجابة غير واضحة من المزود',
     verify_reason_provider_5xx: 'استجابة غير واضحة من المزود',
+    loyalty_stats_unavailable: 'إجماليات الولاء غير متاحة.',
+    loyalty_stats_missing_migration:
+      'تتطلب إجماليات الولاء ترحيل قاعدة بيانات لم يُطبَّق بعد على هذا المشروع (admin_loyalty_stats).',
+    loyalty_ledger_loading: 'جارٍ تحميل العملاء…',
+    loyalty_ledger_empty: 'لا يوجد عملاء بعد.',
+    loyalty_ledger_failed: 'تعذّر تحميل قائمة العملاء.',
+    loyalty_ledger_more: 'عرض المزيد',
+    loyalty_ledger_shown: 'المعروض',
+    loyalty_ledger_of: 'من',
+    loyalty_adjust_failed: 'تعذّر تعديل النقاط',
   }
 };
 

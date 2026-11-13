@@ -731,6 +731,30 @@ Ideas raised and not adopted: tiers as *status* rather than currency, a welcome
 bonus on a first pickup order, a birthday bonus, an "expiring soon" nudge, and a
 per-order redemption cap.
 
+## 9a. The console's totals and ledger (2026-11-12)
+
+Admin → Settings → Loyalty Program shows four tiles (members, points held,
+their value, the average per customer) and a ledger of customers with the
+point-adjustment controls. Both are visible to admins and accountants at AAL2;
+only admins adjust.
+
+**The tiles come from `admin_loyalty_stats()`** (`20261008120000`, added by
+#457 and described in `docs/MIGRATIONS.md` there): the count of profiles with role `customer` and the sum
+of their points. Value and average are computed from those two and the
+configured value of a point, as before. They used to be summed in the browser
+over every profile, which each staff sign-in downloaded; past PostgREST's
+1 000-row cap that sum was silently wrong (196 136 points shown against
+1 000 079 at 5 000 customers). **The migration ships first:** #457 is merged
+and applied before this console change merges, because a merge deploys the
+console (CLAUDE.md §13). If the function is ever missing anyway, the tiles show
+"—" and a notice naming it, never a number.
+
+**The ledger is read 50 customers at a time**, ordered by name and then id, with
+"Show more" and an empty state, and only when the Loyalty section is opened
+(`LoyaltyLedgerSection.tsx`). An adjustment sends the delta from the row on
+screen through `adjust_loyalty_points`, then re-reads the totals. Staff sign-in
+no longer reads `profiles` at all.
+
 ---
 
 ## 10. Related

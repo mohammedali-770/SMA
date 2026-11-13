@@ -15,10 +15,13 @@ const anonKey = publicSupabaseKey({
 export const isSupabaseConfigured = Boolean(url && anonKey);
 
 if (!isSupabaseConfigured) {
-  // Surfaced once at startup; the app falls back to its bundled demo data.
+  // Surfaced once at startup. There is NO demo-data fallback — that prototype
+  // mode was removed long ago, and this message used to claim it still existed.
+  // Every request goes to a placeholder host and fails, so sign-in cannot work.
+  // A Vercel production build refuses to build in this state (vite.config.ts).
   console.warn(
     `[Spicy Meal] Supabase env not set (VITE_SUPABASE_URL / ${PUBLIC_KEY_ENV_NAMES}). ` +
-    'Running against bundled demo data only.'
+    'Every request will fail: set them and rebuild.'
   );
 }
 
