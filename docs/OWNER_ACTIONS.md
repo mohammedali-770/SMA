@@ -3849,8 +3849,9 @@ in the two documents above.
 **Opened 2026-11-12.** On 2026-11-11 the owner decided that Moyasar is the
 payment provider (CLAUDE.md §6). The branch `feat/moyasar-only-20261111` makes
 Moyasar the only provider in the code, the tests and the documents. **Merging it
-changes nothing a customer can do**: online payment is off, and every payment
-function in Production is still a July Tap-era bundle. (§46 is the admin-address guards,
+changed nothing a customer can do**: online payment was off, and every payment
+function in Production was then still a July Tap-era bundle (deployed since:
+47.4). (§46 is the admin-address guards,
 #442.)
 
 The runbook behind these steps, with the detail of each, is `PAYMENTS.md`; this
@@ -3859,13 +3860,24 @@ CLAUDE.md §5 approval**, named when it is due. Approval for one step is not
 approval for the next. **None of them had been done on 2026-11-12.** Where a step needs a secret, the value goes into the
 console or the Supabase dashboard, never into a chat.
 
-**Live state, read-only, 2026-11-11:**
+**Progress, 2026-11-13: 47.1-47.5 are DONE. The owner approved 47.2-47.5 together,
+each step named, in one multi-select, and 47.6 in a separate answer; 47.6 is the
+owner's own step, because the connector cannot delete a function.** Evidence: `MIGRATIONS.md` ledger rows 114-116 and CLAUDE.md
+§6. Card payments are still off: the payment row is **disabled** (its last write is
+2026-11-11 10:55:54 UTC, before the read below that called it enabled, so that
+read was wrong on this point), so 47.14
+must turn it back on, and `refund_trigger_secret` is already present on the row
+(length 64), so 47.16 generates nothing and only re-enables the job.
+
+**Live state, read-only, 2026-11-11 (the before-picture):**
 
 - `app_settings.online_payment_enabled` is **false** since 10:56 UTC. An admin
   had switched it on that morning with Moyasar in TEST mode; the owner switched
   it off;
 - the payment row (`integration_settings`, `provider_type = 'payment'`) is
-  provider `moyasar`, **enabled**, mode `test`, with a test publishable key.
+  provider `moyasar`, **enabled** (wrong when written: the row's last write, which
+  disabled it, is 10:55:54 UTC, before this read), mode `test`, with a test
+  publishable key.
   Tap's `merchant_id`, `source_id` and `transaction_expiry_minutes` are still in
   its `public_config`;
 - `20260824100000` is unapplied, so `begin_payment_attempt`,
@@ -3908,6 +3920,9 @@ What a merge does by itself, because the console and `/app` deploy on merge
 
 ### 47.2 Apply `20260824100000_moyasar_payment_provider`, by version
 
+**DONE 2026-11-13 17:19:42 UTC**, live `20261113171942` (ledger row 114). All
+three done-checks below read as expected.
+
 Its sha256 is
 `4c0123c91969ee10bc52b2f5221597bb516fc7fabe7f904d3e8b88215e93ef5e` (274 lines /
 14 529 bytes). Re-hash the merged copy before sending (CLAUDE.md §15).
@@ -3930,6 +3945,10 @@ select column_name from information_schema.columns
 ```
 
 ### 47.3 Apply `20261003120000_moyasar_only_payments`, by version
+
+**DONE 2026-11-13 17:26:09 UTC**, live `20261113172609` (ledger row 115). Five
+of the seven hashes in `MIGRATIONS.md` §55 read back exactly; the other two were
+stale records, corrected there, and the live bodies equal the merged file.
 
 Fingerprint and the expected post-apply hashes: `MIGRATIONS.md` §55. Re-hash the
 merged copy first. It refuses to apply before 47.2.
@@ -3957,6 +3976,19 @@ function hashes in `MIGRATIONS.md` §55 read back read-only.
 
 ### 47.4 Deploy the seven payment functions, as one set
 
+**DONE 2026-11-13, 17:29:50-17:38:54 UTC**, all seven from `b17ee00`:
+`payment-initiate` v9, `-verify` v5, `-webhook` v7, `-return` v9, `-refund` v4,
+`-test-config` v6, `-admin-test-return` v1, `verify_jwt` exactly as listed below.
+Every bundle was read back from Supabase and is byte-identical to the merged
+source (54 files). Probes sent nothing real: unauthenticated calls to the three
+JWT functions answer 401 (from the gateway, which proves `verify_jwt`, not the
+handler's own gate); `payment-refund` answers 200 "disabled" while the row is
+disabled, before any secret check, so repeat that probe after 47.14 and expect
+401. `payment-webhook` answers an ordinary event 200 "ignored" now, but checks a
+`webhook_verification` event's token even while disabled, by design. The deploy spanned nine
+minutes rather than one call; with the row disabled throughout, no payment could
+be opened against a mixed set.
+
 `payment-initiate`, `payment-verify`, `payment-webhook`, `payment-return`,
 `payment-refund`, `payment-test-config` and `payment-admin-test-return`, together
 (`DEPLOY.md` §12). **Only after 47.2 and 47.3.** Without 47.3 the session flow
@@ -3982,6 +4014,10 @@ refused while the row is in TEST mode: `payment-initiate` answers
 
 ### 47.5 Apply `20261004120000_drop_tap_payment_rpcs`, by version — after 47.4
 
+**DONE 2026-11-13 17:45:00 UTC**, live `20261113174500` (ledger row 116).
+`tap_begin_%` functions: 0. The first attempt expired at the connector's
+confirmation prompt and landed nothing.
+
 Fingerprint: `MIGRATIONS.md` §56. **Only after 47.4**: the July
 `payment-initiate` still calls both functions on its Tap branch. It refuses to
 apply before 47.3.
@@ -3990,6 +4026,11 @@ apply before 47.3.
 'tap_begin_%'` returns 0.
 
 ### 47.6 Delete the old `tap-admin-test-return` function
+
+**NEXT, and the owner's own step:** the Supabase connector cannot delete a
+function. Dashboard → Edge Functions → `tap-admin-test-return` → Delete. Approved
+2026-11-13 (the owner's answer "Yes, after the deploy"); nothing in the code calls it (only comments and tests that assert it
+is gone).
 
 A deletion is a destructive Production action. Do it only after 47.4, because
 the new `payment-test-config` points its sandbox return at
