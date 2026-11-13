@@ -4447,6 +4447,42 @@ changes, and the money path is asserted unchanged.
 **Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`
 and §60 marked APPLIED, then both deploys recorded with their versions.
 
+## 52. Expo push access token — set, deploy, confirm, then enable Enhanced Security
+
+**Opened 2026-11-12.** Checklist gap S03#1. Expo's "Enhanced Security for Push
+Notifications" is off, so an `ExponentPushToken` works as a bearer credential:
+anyone holding one can send any text to that customer's phone through Expo's
+public API, appearing as Spicy Meal, with no `notification_log` row and no
+offers opt-out filter. `push-dispatch` now sends `Authorization: Bearer
+<EXPO_ACCESS_TOKEN>` when that secret is set (`push-dispatch/expoHeaders.ts`).
+Until it is set, every request is byte-for-byte what it was.
+
+**The order is not optional.** Push is a live customer channel (CLAUDE.md §7).
+Enabling Enhanced Security before a deploy that sends the token makes Expo
+refuse **every** push from this project, order updates included.
+
+### The steps, each its own approval (CLAUDE.md §5)
+
+1. **Create an Expo access token** for the project (expo.dev → Account
+   settings → Access tokens), scoped as narrowly as Expo allows. Never paste it
+   into chat or a file in this repository.
+2. **Set `EXPO_ACCESS_TOKEN`** as a Supabase Edge Function secret.
+3. **Deploy `push-dispatch`** from the default branch. One deploy can carry this
+   and §51's broadcast log, once `20261007120000` is applied.
+4. **Confirm a real order-status push arrives** on an opted-in test device. If
+   it does not, unset the secret: the function then sends exactly what it did
+   before.
+5. **Only then enable Enhanced Security** in the Expo dashboard, and confirm a
+   second order push still arrives.
+
+**Optional follow-up, not done here:** admins at AAL2 can still read raw token
+values through `push_devices_admin_select`, while the console only ever needs
+counts. Replacing that with an `is_admin()`-gated count RPC is a migration with
+its own apply-before-merge ordering (AGENTS.md change control).
+
+**Done looks like:** steps 2-5 recorded with dates and the `push-dispatch`
+version, and the readiness record's S03 row closed.
+
 ## Owner-action closeout rule
 
 When an item is completed:
