@@ -46,6 +46,14 @@ to Production.**
 > `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
 > target by version.**
 
+> **Updated 2026-11-13 (latest) — `20261011120000_drop_push_devices_admin_select`
+> is written, validated and NOT applied (§63).** On merge the outstanding set is
+> **ELEVEN**: the ten in the note below and this file. It drops one policy so no
+> administrator session can read a push token. It refuses to apply before
+> `20261010120000`, and must be applied only after the console change that
+> carries it has deployed (`docs/OWNER_ACTIONS.md` §53). Moyasar's
+> `20260824100000` still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-13 (later) — two more files are written, validated and NOT
 > applied: `20261009120000_admin_lazywait_sync_monitor` (§61) and
 > `20261010120000_customer_push_device_counts` (§62).** On merge the outstanding
@@ -8451,3 +8459,53 @@ devices in between.
    the money-path pair unchanged.
 3. **Then** the console change can merge, and after it deploys, the policy-drop
    migration it carries is applied (`docs/OWNER_ACTIONS.md` §53).
+
+## 63. `push_devices_admin_select` dropped — WRITTEN, NOT APPLIED (2026-11-13)
+
+`20261011120000_drop_push_devices_admin_select.sql`. **Written 2026-11-13,
+validated, awaiting owner approval.** The second step of §62.
+
+sha256 `866f24b1c54613a2d847e0cbbe696a8851fe4747540322886646f35e6b2d85fe`, 121 lines / 6 014 bytes. **Re-hash the MERGED copy before
+applying**, per §15.
+
+**It drops one policy and changes nothing else.** After it, an administrator
+session reads no `push_devices` row, a customer still reads their own through
+`push_devices_select_own`, and `push-dispatch` still reads every row with the
+service role, which bypasses RLS. Who a push or broadcast reaches does not
+change (CLAUDE.md §7). **MONEY PATH UNTOUCHED, and the file asserts it.**
+
+### Ordering, half enforced
+
+- **Enforced:** the file refuses to apply unless `customer_push_device_counts()`
+  exists, because the console reads its counts there.
+- **Not enforceable, so the approver holds it:** apply it only after the console
+  change that stops counting through this policy has deployed. Applied earlier,
+  Push Tools shows zero devices beside the broadcast button until that deploy.
+  No SQL can see a deploy.
+
+### What the file checks
+
+- The policy is gone.
+- Every SELECT-capable policy left on `push_devices` is keyed to `customer_id`
+  and names no staff predicate.
+- `push_devices_select_own` is still there, and RLS is still on.
+- The money-path pair, one overload each first.
+
+### Validation
+
+- **Paired suite** `drop_push_devices_admin_select_test.sql`, 4 cases:
+  - case 1: an administrator at AAL2 reading `push_devices` sees no row
+    (without the migration it sees every row, so the suite fails);
+  - case 2: each customer reads exactly their own row;
+  - case 3: `customer_push_device_counts()` still returns counts equal to a
+    direct count;
+  - case 4: no staff-keyed SELECT policy remains.
+- **Mutation testing:** 5 mutants, all killed, each twice: refused at apply by the file's own block, and failed by the suite with the block stripped. They are the drop omitted, a staff-keyed replacement policy, an open `using (true)` policy, `push_devices_select_own` dropped too, and RLS disabled. Separately, applying the file onto a chain without `20261010120000` is refused by its precondition and leaves the policy in place.
+
+### Applying it (owner, §5, named by version)
+
+1. Only after `20261010120000` is applied **and** the console change that
+   carries this file has deployed.
+2. Apply `20261011120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the policy is absent; Push Tools still shows its two
+   counts. Rollback is the one-line `create policy` at the foot of the file.

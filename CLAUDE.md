@@ -275,6 +275,15 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**AMENDED 2026-11-13 (latest) — `20261011120000_drop_push_devices_admin_select`
+is written, validated and awaiting approval, so on merge the outstanding set is
+ELEVEN:** the ten named below and this file. It drops `push_devices_admin_select`
+so no administrator session can read a customer's Expo token; customers keep
+their own read and `push-dispatch` its service-role read. It refuses to apply
+before `20261010120000`, and must be applied only after the console change that
+carries it has deployed, because Push Tools would otherwise show zero devices.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §63.
+
 **AMENDED 2026-11-13 (later) — `20261009120000_admin_lazywait_sync_monitor`
 and `20261010120000_customer_push_device_counts` are written, validated and
 awaiting approval, so on merge the outstanding set is TEN:** the eight named

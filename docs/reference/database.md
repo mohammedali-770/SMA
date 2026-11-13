@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **154**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261010120000_customer_push_device_counts.sql`.
+Migration files in the repository: **155**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261011120000_drop_push_devices_admin_select.sql`.
 
 ## Tables
 
@@ -83,7 +83,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `product_variants` | `20260824120000_product_variants.sql` | 0 | 4 |
 | `products` | `20260707120200_catalog.sql` | 3 | 3 |
 | `profiles` | `20260707120100_profiles.sql` | 2 | 2 |
-| `push_devices` | `20260714090000_push_notifications.sql` | 0 | 3 |
+| `push_devices` | `20260714090000_push_notifications.sql` | 0 | 4 |
 | `role_change_audit` | `20260810140000_staff_role_administration.sql` | 0 | 1 |
 | `staff_branch_assignments` | `20260820100500_ops_branch_scoping.sql` | 0 | 1 |
 | `whatsapp_message_logs` | `20260710140000_whatsapp_otp.sql` | 0 | 1 |

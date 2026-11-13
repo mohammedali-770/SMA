@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**266 TypeScript test files declaring 3979 test blocks, plus 91 SQL suites.**
+**268 TypeScript test files declaring 3991 test blocks, plus 92 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -62,6 +62,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/customer_push_device_counts_test.sql`
 - `supabase/tests/db_advisor_hardening_test.sql`
 - `supabase/tests/discounts_campaigns_test.sql`
+- `supabase/tests/drop_push_devices_admin_select_test.sql`
 - `supabase/tests/drop_tap_payment_rpcs_test.sql`
 - `supabase/tests/erasure_phone_normalization_test.sql`
 - `supabase/tests/export_my_data_test.sql`
@@ -260,7 +261,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-129 files, 1761 declared test blocks.
+131 files, 1773 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -274,6 +275,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
+| `src/components/admin/LazywaitPanel.test.tsx` | 5 | LazywaitPanel |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
@@ -283,6 +285,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
+| `src/components/admin/PushToolsPanel.test.tsx` | 2 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 5 | StaffAccessPanel |
@@ -323,7 +326,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
 | `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
-| `src/context/consoleLoadWiring.test.ts` | 8 | Lazywait monitor |
+| `src/context/consoleLoadWiring.test.ts` | 9 | Lazywait monitor |
 | `src/context/staffInitialLoad.test.ts` | 5 | runStaffInitialLoad |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
 | `src/design-system/contrastContract.test.ts` | 12 | muted ink clears WCAG AA for normal text |
@@ -344,7 +347,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
-| `src/lib/consoleLoadApi.test.ts` | 11 | orders.list |
+| `src/lib/consoleLoadApi.test.ts` | 15 | orders.lazywaitMonitor |
 | `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/documentLang.test.ts` | 6 | applyDocumentLang |
 | `src/lib/e2eServeDist.test.ts` | 3 | e2e/serve-dist.mjs source patterns |

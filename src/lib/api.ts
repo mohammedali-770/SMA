@@ -132,6 +132,22 @@ export interface DbAddress {
   is_default: boolean;
 }
 export type DbSyncStatus = 'not_synced' | 'syncing' | 'synced' | 'failed';
+/** One row of `admin_lazywait_sync_monitor`: sync columns, nothing about the customer. */
+export interface LazywaitMonitorRow {
+  id: string;
+  order_number: string;
+  order_type: string;
+  created_at: string;
+  lazywait_sync_state: string | null;
+  lazywait_ref: string | null;
+  lazywait_order_number: string | null;
+  sync_attempt_count: number | null;
+  sync_last_error: string | null;
+  sync_blocked_reason: string | null;
+  pos_sync_deadline_at: string | null;
+  pos_create_attempted_at: string | null;
+}
+
 export interface DbOrder {
   id: string; order_number: string; customer_id: string | null;
   customer_name: string | null; customer_phone: string | null;
@@ -805,22 +821,24 @@ export const orders = {
       p_payment_method: input.paymentMethod ?? null,
     }));
   },
-  /**
-   * STAFF flat order feed (no line items) — the Lazywait operations panel. Goes
-   * through the SECURITY DEFINER `admin_list_orders` RPC, which enforces
-   * `is_staff()` server-side and returns the staff column set (including
-   * order_number and the POS diagnostics staff need). Staff hold NO direct SELECT
-   * privilege on `public.orders` any more, so this RPC — not a table read — is
-   * the staff contract. It runs with the staff member's own JWT; no service-role
-   * key is involved.
+  /*
+   * There is deliberately no `list()` here any more. It read `admin_list_orders`,
+   * the general staff feed, whose every row carries the customer's name, phone,
+   * address and notes, and without a limit it returned every order (63 MB at
+   * 50 000 orders). Its last caller was the Lazywait monitor, which now reads
+   * `lazywaitMonitor()` below. Staff hold no direct SELECT on `public.orders`;
+   * the SECURITY DEFINER RPCs in this object are the staff contract.
    */
   /**
-   * Pass a limit. Without one the RPC returns EVERY order, with customer names,
-   * phones, notes and addresses: at 50 000 orders that was 63 MB and 2.7 s, to
-   * show the Lazywait monitor's 50 rows. With 200 it was 254 KB and 9 ms.
+   * The Lazywait sync monitor's feed: `admin_lazywait_sync_monitor`
+   * (20261009120000, `is_staff()`). The newest orders whose sync state is set
+   * and not 'skipped', filtered in SQL, with the twelve sync columns only: no
+   * customer name, phone, address, notes or coupon. It also carries
+   * `pos_sync_deadline_at`, which the requeue-eligibility mirror reads and
+   * `admin_list_orders` never returned. The server clamps `limit` to 1..200.
    */
-  list: async (limit?: number) =>
-    ok<DbOrder[]>(await supabase.rpc('admin_list_orders', { p_limit: limit ?? null })),
+  lazywaitMonitor: async (limit = 50) =>
+    ok<LazywaitMonitorRow[]>(await supabase.rpc('admin_lazywait_sync_monitor', { p_limit: limit })),
   /**
    * CUSTOMER order feed with items. `public.orders` no longer grants table-wide
    * SELECT to `authenticated`; a customer holds column privileges for exactly the
@@ -1285,13 +1303,18 @@ export const pushAdmin = {
   async broadcast(input: { titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }): Promise<PushSendResult> {
     return invokePush({ action: 'broadcast', ...input });
   },
-  /** Device / opt-in counts for the panel (admin-only RLS select). */
+  /**
+   * Device / opt-in counts for the panel, from `customer_push_device_counts`
+   * (20261010120000, `is_admin()`). It returns two numbers and no row, so the
+   * console needs no read of `push_devices`, whose rows hold Expo tokens. A
+   * failure throws rather than reporting 0: a zero beside the broadcast button
+   * would misstate who a broadcast reaches.
+   */
   async deviceCounts(): Promise<{ activeDevices: number; promoOptIns: number }> {
-    const [{ count: active }, { count: promos }] = await Promise.all([
-      supabase.from('push_devices').select('id', { count: 'exact', head: true }).eq('is_active', true),
-      supabase.from('push_devices').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('promos_enabled', true),
-    ]);
-    return { activeDevices: active ?? 0, promoOptIns: promos ?? 0 };
+    const r = ok<{ active_devices: number; promo_opt_ins: number }>(
+      await supabase.rpc('customer_push_device_counts'),
+    );
+    return { activeDevices: Number(r.active_devices), promoOptIns: Number(r.promo_opt_ins) };
   },
 };
 

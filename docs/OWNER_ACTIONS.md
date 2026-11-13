@@ -4519,8 +4519,9 @@ the console calls it, and the policy must outlive the console's last use of it.
    either and `authenticated` can; the money-path pair unchanged.
 4. **Merge the console pull request.** After it deploys, Settings →
    Integrations shows the sync table and Push Tools shows its two counts.
-5. **Apply the policy-drop migration that pull request carries, by name**, only
-   after step 4's deploy is live. Then confirm Push Tools still shows its
+5. **Apply `20261011120000` (the policy drop that pull request carries) by
+   name**, only after step 4's deploy is live. The file itself refuses to apply
+   before `20261010120000`. Then confirm Push Tools still shows its
    counts, and that an admin session reading `push_devices` gets zero rows.
 
 There is no number to decide and no function to deploy.

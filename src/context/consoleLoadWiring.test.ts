@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { LAZYWAIT_MONITOR_FETCH, LAZYWAIT_MONITOR_ROWS } from '../components/admin/LazywaitPanel';
+import { LAZYWAIT_MONITOR_ROWS } from '../components/admin/LazywaitPanel';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -57,23 +57,35 @@ function callbackBody(src: string, name: string): string {
 }
 
 describe('Lazywait monitor', () => {
-  it('reads the 200 most recent orders and shows at most 50', () => {
-    expect(LAZYWAIT_MONITOR_FETCH).toBe(200);
+  it('reads the server-filtered sync feed, 50 rows, with no client-side filter', () => {
     expect(LAZYWAIT_MONITOR_ROWS).toBe(50);
     const src = stripComments(read('src/components/admin/LazywaitPanel.tsx'));
-    expect(src).toContain('ordersApi.list(LAZYWAIT_MONITOR_FETCH)');
-    expect(src).not.toMatch(/ordersApi\.list\(\s*\)/);
-    expect(src).toContain('.slice(0, LAZYWAIT_MONITOR_ROWS)');
+    expect(src).toContain('ordersApi.lazywaitMonitor(LAZYWAIT_MONITOR_ROWS)');
+    expect(src).not.toMatch(/ordersApi\.list\(/);
+    expect(src).not.toMatch(/\.filter\(/);
+    expect(src).not.toMatch(/\bDbOrder\b/);
   });
 
-  it('is the only caller of orders.list, so no other surface changed behaviour', () => {
+  it('no console source reads the general staff feed', () => {
     const files = [
+      'src/lib/api.ts',
       'src/context/AppContext.tsx',
+      'src/components/admin/LazywaitPanel.tsx',
       'src/components/admin/StatsPanel.tsx',
       'src/components/admin/ReportsPanel.tsx',
       'src/components/admin/view/orders/OrdersRequiringVerificationCard.tsx',
     ];
-    for (const f of files) expect(stripComments(read(f)), f).not.toMatch(/ordersApi\.list\(/);
+    for (const f of files) {
+      const src = stripComments(read(f));
+      expect(src, f).not.toMatch(/ordersApi\.list\(/);
+      expect(src, f).not.toMatch(/['"]admin_list_orders['"]/);
+    }
+  });
+
+  it('Push Tools counts through the RPC, not a push_devices read', () => {
+    const api = stripComments(read('src/lib/api.ts'));
+    expect(api).not.toMatch(/from\(\s*['"]push_devices['"]\s*\)/);
+    expect(api).toContain("rpc('customer_push_device_counts')");
   });
 });
 
