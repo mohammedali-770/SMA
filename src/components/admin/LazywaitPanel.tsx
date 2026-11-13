@@ -5,7 +5,7 @@ import { Card } from '../../design-system/ui/Card';
 import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
-import { orders as ordersApi, DbOrder } from '../../lib/api';
+import { orders as ordersApi, LazywaitMonitorRow } from '../../lib/api';
 import { lazywaitRequeueEligibility, requeueEligibilityMessage, isUsablePosRef } from '../../lib/lazywaitRequeue';
 import { LazywaitCatalogMapping } from './LazywaitCatalogMapping';
 
@@ -30,22 +30,19 @@ const STATE_TONE: Record<string, PillTone> = {
 const RETRYABLE = new Set(['failed', 'blocked', 'dead_letter', 'skipped']);
 
 /**
- * How many of the most recent orders the monitor reads. It shows at most 50
- * after dropping the ones that never needed a POS sync; it used to fetch EVERY
- * order (with customer names, phones and addresses) to do that, 63 MB at 50 000
- * orders. A failed order older than this window is not listed here. The
- * order-integrity watchdog still reads it, and the Live Orders board keeps
- * every unsettled order however old.
+ * Rows the monitor renders: the newest orders that needed a POS sync. The
+ * server filters them (`admin_lazywait_sync_monitor`), so this is the whole
+ * request, not a window to filter down. It used to read 200 orders of the
+ * general staff feed, customer names, phones and addresses included, to show
+ * 50 of them.
  */
-export const LAZYWAIT_MONITOR_FETCH = 200;
-/** Rows the monitor renders. */
 export const LAZYWAIT_MONITOR_ROWS = 50;
 
 const TH = 'py-1 pe-2 text-start';
 const TD = 'py-1.5 pe-2 align-top';
 
 export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
-  const [orderRows, setOrderRows] = useState<DbOrder[]>([]);
+  const [orderRows, setOrderRows] = useState<LazywaitMonitorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -55,10 +52,7 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
     setLoading(true);
     setError(null);
     try {
-      const o = await ordersApi.list(LAZYWAIT_MONITOR_FETCH);
-      setOrderRows(
-        o.filter((x) => x.lazywait_sync_state && x.lazywait_sync_state !== 'skipped').slice(0, LAZYWAIT_MONITOR_ROWS),
-      );
+      setOrderRows(await ordersApi.lazywaitMonitor(LAZYWAIT_MONITOR_ROWS));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load Lazywait status');
     } finally {

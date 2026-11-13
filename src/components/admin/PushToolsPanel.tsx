@@ -11,7 +11,7 @@ import { pushAdmin, type PushSendResult } from '../../lib/api';
 
 /**
  * Admin push tools (below the push credentials card):
- *  - device / promo-opt-in counts (admin-only RLS reads),
+ *  - device / promo-opt-in counts (`customer_push_device_counts`, admin-only; no token is read),
  *  - "Send test" → the calling admin's OWN devices,
  *  - immediate promotional broadcast (EN+AR title/body) to every device with
  *    promotions ON, with delivery result counts.

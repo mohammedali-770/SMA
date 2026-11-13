@@ -1,8 +1,10 @@
 /**
  * The console's data-access calls that the 2026-11-12 load assessment bounded.
  *
- *   - `orders.list(limit)` passes its limit to `admin_list_orders`; without one
- *     the RPC returns every order with customer PII (63 MB at 50 000 orders);
+ *   - the Lazywait monitor reads `admin_lazywait_sync_monitor`, and there is no
+ *     `orders.list()` left to read the general feed with customer PII;
+ *   - Push Tools counts devices through `customer_push_device_counts`, never by
+ *     reading `push_devices`, whose rows hold Expo tokens;
  *   - `profiles.loyaltyLedgerPage` reads one page of customers, a fixed column
  *     list, ordered by name AND id, with an exact count — never `select('*')`;
  *   - `loyalty.stats()` calls `admin_loyalty_stats` with no arguments;
@@ -32,17 +34,40 @@ import { supabase } from './supabase';
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('orders.list', () => {
-  it('passes the limit it is given to admin_list_orders', async () => {
+describe('orders.lazywaitMonitor', () => {
+  it('reads admin_lazywait_sync_monitor with 50 by default', async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null } as never);
-    await orders.list(200);
-    expect(supabase.rpc).toHaveBeenCalledWith('admin_list_orders', { p_limit: 200 });
+    await orders.lazywaitMonitor();
+    expect(supabase.rpc).toHaveBeenCalledWith('admin_lazywait_sync_monitor', { p_limit: 50 });
   });
 
-  it('still sends null (the unbounded arm) only when no limit is given', async () => {
+  it('passes the limit it is given', async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: [], error: null } as never);
-    await orders.list();
-    expect(supabase.rpc).toHaveBeenCalledWith('admin_list_orders', { p_limit: null });
+    await orders.lazywaitMonitor(7);
+    expect(supabase.rpc).toHaveBeenCalledWith('admin_lazywait_sync_monitor', { p_limit: 7 });
+  });
+
+  it('throws the server error instead of showing an empty monitor', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: 'Only staff may read the Lazywait sync monitor' } } as never);
+    await expect(orders.lazywaitMonitor()).rejects.toThrow(/Only staff/);
+  });
+
+  it('leaves no orders.list() that reads the general feed', () => {
+    expect((orders as Record<string, unknown>).list).toBeUndefined();
+  });
+});
+
+describe('pushAdmin.deviceCounts', () => {
+  it('reads both numbers from customer_push_device_counts and never touches push_devices', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: { active_devices: 11, promo_opt_ins: 7 }, error: null } as never);
+    await expect(pushAdmin.deviceCounts()).resolves.toEqual({ activeDevices: 11, promoOptIns: 7 });
+    expect(supabase.rpc).toHaveBeenCalledWith('customer_push_device_counts');
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it('throws on a server error rather than reporting zero devices', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: 'Only admins may read push device counts' } } as never);
+    await expect(pushAdmin.deviceCounts()).rejects.toThrow(/Only admins/);
   });
 });
 

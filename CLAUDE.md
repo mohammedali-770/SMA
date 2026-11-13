@@ -275,10 +275,32 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**Current position 2026-11-13, read live AFTER the two RPC applies: 154
+repository files on the default branch / 152 live history rows / EIGHT
+unapplied** — the same eight as the loyalty-stats position below.
+`20261009120000_admin_lazywait_sync_monitor` (live `20261113090236`, ledger row
+106) and `20261010120000_customer_push_device_counts` (live `20261113090320`,
+row 107) were applied at 09:02 and 09:03 UTC on the owner's approval of the two
+files the preceding message named by version, one call each, each verified
+before the next. Reconciled **by name**: 144 applied, 2 superseded (rows 8-9),
+8 unapplied. Money-path pair unchanged; both stored statements hash to their
+merged files. **`20260824100000` still sorts first. Name the target by
+version.** This supersedes the loyalty-stats position below and the TEN in the
+amendment beneath this one.
+
+**AMENDED 2026-11-13 (latest) — `20261011120000_drop_push_devices_admin_select`
+is written, validated and awaiting approval, so on merge the outstanding set is
+NINE:** the eight just named and this file. It drops `push_devices_admin_select`
+so no administrator session can read a customer's Expo token; customers keep
+their own read and `push-dispatch` its service-role read. It refuses to apply
+before `20261010120000`, and must be applied only after the console change that
+carries it has deployed, because Push Tools would otherwise show zero devices.
+**Name the target by version.** Detail: `docs/MIGRATIONS.md` §63.
+
 **AMENDED 2026-11-13 (later) — `20261009120000_admin_lazywait_sync_monitor`
 and `20261010120000_customer_push_device_counts` are written, validated and
-awaiting approval, so on merge the outstanding set is TEN:** the eight named
-below and these two. Each adds one read-only function, gated on `is_staff()`
+awaiting approval, so on merge the outstanding set was TEN:** the eight named
+below and these two. *Both are now applied (rows 106-107).* Each adds one read-only function, gated on `is_staff()`
 and `is_admin()` respectively, and changes nothing else; the money path is
 self-asserted. The console change that calls them merges only after both are
 applied, and a later file drops `push_devices_admin_select` after that console

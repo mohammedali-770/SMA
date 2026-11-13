@@ -4491,6 +4491,11 @@ version, and the readiness record's S03 row closed.
 
 ## 53. Lazywait monitor and Push Tools counts — two applies, a merge, then one more apply
 
+**Steps 1-3 DONE 2026-11-13.** #461 merged as `d27916d`; `20261009120000` and
+`20261010120000` were applied at 09:02 and 09:03 UTC and checked as step 3
+asks (`docs/MIGRATIONS.md` ledger rows 106-107). **Step 4, merging #462, and
+step 5, applying `20261011120000` after it deploys, remain.**
+
 **Opened 2026-11-13.** Two follow-ups, in one sequence because they reach the
 console together:
 
@@ -4519,8 +4524,9 @@ the console calls it, and the policy must outlive the console's last use of it.
    either and `authenticated` can; the money-path pair unchanged.
 4. **Merge the console pull request.** After it deploys, Settings →
    Integrations shows the sync table and Push Tools shows its two counts.
-5. **Apply the policy-drop migration that pull request carries, by name**, only
-   after step 4's deploy is live. Then confirm Push Tools still shows its
+5. **Apply `20261011120000` (the policy drop that pull request carries) by
+   name**, only after step 4's deploy is live. The file itself refuses to apply
+   before `20261010120000`. Then confirm Push Tools still shows its
    counts, and that an admin session reading `push_devices` gets zero rows.
 
 There is no number to decide and no function to deploy.
