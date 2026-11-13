@@ -3860,7 +3860,18 @@ CLAUDE.md §5 approval**, named when it is due. Approval for one step is not
 approval for the next. **None of them had been done on 2026-11-12.** Where a step needs a secret, the value goes into the
 console or the Supabase dashboard, never into a chat.
 
-**Progress, 2026-11-13: 47.1-47.6 are DONE. The owner approved 47.2-47.5 together,
+**Progress, 2026-11-13, evening: 47.7-47.9 are DONE, and 47.10 is next.** The
+owner saved the TEST keys and webhook token (Test connection: "Connection OK"),
+registered the TEST webhook and entered its code (the verification event was
+recorded at 18:21:57 UTC), and ran the sandbox: an approved card read paid at
+1.00 SAR, and the decline card left its invoice `initiated`, which is correct
+(47.9 now says why). A read-only check at 22:37 UTC found no order, payment
+record or refund changed. **The payment row is enabled, in TEST mode, since
+18:17:02 UTC**, because the sandbox refuses a disabled row, so 47.14 is now a
+check rather than a switch. Online Payment is still off. Evidence: CLAUDE.md §6.
+
+**Progress, 2026-11-13 (afternoon; superseded above on what is next and on the
+row's state): 47.1-47.6 are DONE. The owner approved 47.2-47.5 together,
 each step named, in one multi-select, and 47.6 in a separate answer, then did
 47.6 in the dashboard, because the connector cannot delete a function. 47.7 is
 next.** Evidence: `MIGRATIONS.md` ledger rows 114-116 and CLAUDE.md
@@ -4100,9 +4111,36 @@ off and `payment-initiate` refuses customer checkout in TEST mode. (Found
 
 **Done looks like:** an approved card reads paid, at `1.00 SAR` (until the
 2026-11-13 console fix the line read "100 SAR", Moyasar's halalas printed as
-riyals; the charge was always 1.00), the decline card reads failed,
-and no order changed. Also check that the hosted page shows Arabic with
-`lang=ar`; that parameter is undocumented.
+riyals; the charge was always 1.00), the decline card leaves its invoice
+`initiated`, and no order changed.
+
+**A decline does not read failed.** Check reads the Moyasar **invoice**, and a
+declined payment does not close it: the invoice stays `initiated`, still
+payable, so a customer can try another card on the same page (`PAYMENTS.md` §2,
+"An attempt stays open after a declined card"). The failed payment itself shows
+in Moyasar's dashboard, under Payments. Until 2026-11-13 this line said the
+decline card reads failed; that was wrong.
+
+**Two things the sandbox page may show:**
+
+- Moyasar's 3-D Secure test page (an "ACS emulator"). For the decline card,
+  choose **(Y)**: the check passes, and the test bank then declines the card,
+  which is the decline being tested. **(N)** fails earlier, at 3-D Secure.
+- "Previous payment is in process": that invoice already has an attempt open,
+  and Moyasar allows one at a time. Close the tab and press Run again for a
+  fresh invoice.
+
+**The Arabic page cannot be checked here.** The admin test adds no `lang`
+(only customer checkout does, from the app's language), so its page is English.
+Check Arabic at 47.18, on a phone set to Arabic; `lang=ar` is undocumented
+(47.19).
+
+**Done 2026-11-13, 18:17-18:58 UTC.** The approved mada test card read paid; the
+decline card, through the 3-D Secure test page with (Y), left its invoice
+`initiated`; Moyasar's eight payment events were each logged as
+`unknown payment`, as designed for an invoice with no attempt. 82 orders (the
+newest from 17:43, before the test), the 9 `tap` payment records and an empty
+`order_refunds` were unchanged.
 
 **What this does NOT test:** the app's payment WebView, Apple Pay, or the return
 to the app. Apple Pay in Moyasar's sandbox succeeds only for 200.00-300.00 SAR,
@@ -4148,6 +4186,11 @@ Moyasar Dashboard → Settings → API Keys → Allowed IPs. Live needs at least
 address, and the live key stays hidden until one is listed. Saving asks for a
 6-digit code.
 
+**Ask Moyasar first.** Once a live list is saved, Moyasar's page says live
+"cannot be set back to any IP address": addresses can be changed, but the list
+can never be emptied again. So get Moyasar's written answer to the
+shared-address question in 47.19 before saving it.
+
 **Done looks like:** every outbound IP from 47.10 is listed. Proven only by
 47.13.
 
@@ -4166,26 +4209,42 @@ address was refused.
 
 ### 47.14 Make sure the payment row is enabled
 
-It was already enabled on 2026-11-11. The console's Online Payment switch opens
+It is enabled, in TEST mode, since 2026-11-13 18:17:02 UTC, for the sandbox
+(47.9); before that it had been disabled since 2026-11-11 10:55:54 UTC. Keep it
+enabled: this step is a check that it still is. The console's Online Payment switch opens
 only when the row is enabled, names Moyasar and is in live mode. It does not
 check that the live keys are saved; 47.13's Test connection is that check.
 
 ### 47.15 Update the customer documents, before customers can pay by card
 
-Each is a live write, and each must land **before** 47.18:
+Each is a live write, and each must land **before** 47.18. **Drafts of all of
+them were written and fact-checked on 2026-11-13**: the exact text in both
+languages, and the evidence for every change. Publishing is then a copy into
+the console, one approval per document:
 
 - **`privacy_policy`**: name Moyasar as the payment processor
-  (`RECORD_OF_PROCESSING.md` activity 15);
+  (`RECORD_OF_PROCESSING.md` activity 15). Draft:
+  `legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`;
 - **`payment_policy`** and **`cancellation_refund_policy`**: on 2026-09-03 both
   said payment is cash, that no online provider is selected, and that refunds are
   settled in cash at the branch (`GO_LIVE_READINESS.md` G5). Both promise to be
   updated before an online option appears. This was not in the brief that
-  produced this section; it is here because the documents say so;
+  produced this section; it is here because the documents say so. Drafts:
+  `legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md` and
+  `legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md`;
+- **`terms_conditions`**: v2.0 (2026-08-18) says "Orders are paid in cash at
+  pickup or on delivery. See the Payment Policy." (read live 2026-11-13). This
+  list missed it until 2026-11-13. Draft:
+  `legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md`;
 - the store answers: App Store "Financial Info" (`APP_STORE_SUBMISSION.md` §4)
   and Play "Payment info" (`PLAY_STORE_SUBMISSION.md` §6) need your re-decision;
   the cash-only listing claim C-CASH (`store/LISTING_COPY.md`) must change; and
   the App Review notes must stop saying card payment is off
-  (`APP_STORE_SUBMISSION.md` §11).
+  (`APP_STORE_SUBMISSION.md` §11). Draft answers:
+  `store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md`.
+
+The Arabic of every draft is engineering-drafted and needs the native read in
+§35 before it is published.
 
 ### 47.16 Make sure `refund_trigger_secret` exists, and re-enable the refund job
 
@@ -4232,6 +4291,13 @@ again" payment run.
 
 ### 47.18 Turn on online payment, then the small live payment and its refund
 
+**Read `readiness/20261113-card-payments-gaps.md` before this step.** On
+2026-11-13 it listed 29 verified gaps: 11 must be fixed before card payments go
+live (among them refunds that fail or stick without anyone seeing, double
+charges nobody is told about, and a cancelled order that can still be resent to
+the kitchen), and 8 need your decision. Several are code or migration work,
+each with its own pull request and approval.
+
 **Online payment is one global setting.** There is no per-customer switch in the
 code, so the live test happens with online payment offered to every customer.
 Pick a quiet hour.
@@ -4270,6 +4336,22 @@ still be resumed and paid until it expires.
 - Could the hosted page ever be served from a domain other than `moyasar.com`?
   The server hands the app only `https` on `moyasar.com` or a subdomain, so any
   other domain fails closed.
+
+Added 2026-11-13, from the proxy comparison and the card-payment gaps:
+
+- **Before 47.12:** do you accept Allowed IPs addresses that a proxy service
+  shares with its other customers? How do platforms such as Salla meet the list
+  for their merchants, and do you recommend a provider? The live list cannot be
+  emptied once saved.
+- **A gate, not just a question:** which payment methods does the hosted invoice
+  page offer on our account? Do not publish a method list, and do not reach
+  47.18, without the written answer (gap PG-11).
+- What prints on a customer's card statement, and can we set it? Our
+  `statement descriptor` setting is read but never sent (gap PG-29).
+- Must our account hold a balance to cover a refund?
+- May we cancel an invoice through the API when a customer leaves the payment
+  page? An open invoice blocks that phone's next order, cash included, until it
+  expires (gap PG-04).
 
 ### 47.20 Decisions the code leaves to you
 

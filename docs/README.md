@@ -79,7 +79,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
 | WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
 | Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
-| Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) |
+| Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) · [static-IP proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) · [how Saudi apps get fixed addresses](integrations/Saudi_Apps_Static_Egress_20261113.md) · [card-payment gaps](readiness/20261113-card-payments-gaps.md) |
 | Maps | [Maps](MAPS.md) |
 | Sentry | [Mobile](SENTRY_OBSERVABILITY.md) · [Web and admin](SENTRY_WEB_OBSERVABILITY.md) |
 | Account deletion | [Deletion scheduler](account-deletion-scheduler.md) |
@@ -94,6 +94,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | [Loyalty](LOYALTY.md) | How points are earned and spent, the four rules that shape it, and the corrected customer terms |
 | [Legal documents audit](LEGAL_DOCUMENTS_AUDIT.md) | Every live legal document read against the code: what was false, what was corrected, and what was verified accurate |
 | [Offers & loyalty terms draft](legal/OFFERS_LOYALTY_TERMS_DRAFT.md) | The factual description counsel needs, and the switches that must not be flipped before it is published |
+| Card-payment document drafts: [privacy](legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md) · [payment](legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md) · [cancellation and refund](legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md) · [terms](legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md) · [store answers](store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md) | The exact text to publish before customers can pay by card, with the evidence for each change ([Owner actions §47.15](OWNER_ACTIONS.md)) |
 | [Security review](SECURITY_REVIEW.md) | Security posture and findings |
 | [Security policy](../SECURITY.md) | How to report a vulnerability |
 
@@ -123,6 +124,7 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 | [Health center baseline](OPERATIONS_HEALTH_CENTER_BASELINE.md) · [rollback](OPERATIONS_HEALTH_CENTER_ROLLBACK.md) | Point-in-time operational evidence |
 | [Readiness reviews](readiness/) | Dated pull-request review evidence |
 | [App-hardening checklist, 11–12 Nov 2026](readiness/20261111-app-hardening-checklist.md) | Evidence table for all 43 checklist IDs, with the prioritized action list as it stood on 2026-11-12 |
+| [Card-payment gaps, 13 Nov 2026](readiness/20261113-card-payments-gaps.md) | 29 verified product, code and configuration gaps found while drafting the card-payment documents: what must be fixed, and what needs a decision, before card payments go live |
 | [Development visual review](DEV_VISUAL_REVIEW.md) | Fixture-based review workflow |
 
 ## Where things live

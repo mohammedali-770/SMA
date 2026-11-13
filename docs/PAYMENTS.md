@@ -18,10 +18,10 @@ The owner's answers the same day:
 - Moyasar's live Allowed IPs list is met with a static-IP outbound proxy
   service.
 
-**Nothing is switched on.** The decision covers repository code, tests and
-documents. Every step that reaches Production is a separate owner approval
-under [CLAUDE.md §5](../CLAUDE.md), named when it is due (§7 below). None of
-them has been done.
+**Card payments are not switched on.** The decision covers repository code,
+tests and documents. Every step that reaches Production is a separate owner
+approval under [CLAUDE.md §5](../CLAUDE.md), named when it is due (§7 below).
+The steps up to and including the sandbox test are done (§1); the rest are not.
 
 Other documents:
 
@@ -37,6 +37,14 @@ Other documents:
 
 ## 1. Live state, read-only, 2026-11-11
 
+> **Updated 2026-11-13, evening: the sandbox test is DONE** (§7 step 6,
+> `OWNER_ACTIONS.md` §47.7-47.9). The payment row is now **enabled, in TEST
+> mode**, since 18:17:02 UTC, because the sandbox refuses a disabled row; this
+> supersedes the row state in the note below. **Card payments are still off:**
+> `online_payment_enabled` is false, and customer checkout is refused in TEST
+> mode. What remains is `OWNER_ACTIONS.md` §47.10 onwards: the proxy, live mode,
+> the customer documents, the refund job, the EAS build, then online payment on.
+>
 > **Updated 2026-11-13: the database and function half is DONE.** The three
 > payment migrations are applied (ledger rows 114-116) and the seven payment
 > functions are deployed and verified byte-identical (`OWNER_ACTIONS.md` §47.4).
@@ -151,6 +159,10 @@ invoice is still payable, so the customer can try another card, or Apple Pay, on
 the same page, and a resumed session reuses the same invoice. Only an
 **invoice** that Moyasar has closed (`expired` or `canceled`) ends an attempt,
 or the attempt's own expiry.
+
+So after a decline the invoice still reads `initiated`; only the payment inside
+it reads `failed`. The sandbox showed exactly this on 2026-11-13: the decline
+card left its invoice `initiated` (`OWNER_ACTIONS.md` §47.9).
 
 ### The checkout URL handed to the app
 
@@ -407,7 +419,8 @@ Approval for one is not approval for the next. Nothing here has been done.
 4. **Apply `20261004120000_drop_tap_payment_rpcs`**, named by version, **only
    after** step 3. It refuses to apply before step 2. Detail: [Migrations §56](MIGRATIONS.md).
 5. **Delete the retired `tap-admin-test-return` function.** Done 2026-11-13.
-6. **Sandbox test** (§9, part A), with test keys and the test webhook.
+6. **Sandbox test** (§9, part A), with test keys and the test webhook. Done
+   2026-11-13 (`OWNER_ACTIONS.md` §47.7-47.9).
 7. **Choose the proxy service and set `MOYASAR_PROXY_URL`** (§8.1), after the
    sandbox test, so a bad value cannot be mistaken for a sandbox failure. An
    **invalid** value refuses every Moyasar call, TEST included.
@@ -420,7 +433,8 @@ Approval for one is not approval for the next. Nothing here has been done.
 11. **Update the customer documents, before customers can pay by card:** name
     Moyasar in `privacy_policy`; update `payment_policy` and
     `cancellation_refund_policy`, which both still say payment is cash only and
-    promise to change before an online option appears; re-decide the App Store
+    promise to change before an online option appears; correct
+    `terms_conditions`, whose payment clause also says cash only; re-decide the App Store
     "Financial Info" and Play "Payment info" answers; change the cash-only
     listing claim C-CASH; and stop the App Review notes saying card payment is
     off ([Owner actions §47.15](OWNER_ACTIONS.md)).
@@ -528,16 +542,24 @@ including Moyasar's own spelling `payment_faild`.
 Done in the console, with the payment row enabled, provider `moyasar`, mode
 `test`, Online Payment **off**.
 
-- [ ] Steps 1 to 4 of §7 are done.
-- [ ] Moyasar panel: "Key for mode (test)", "Key prefix (sk_test_)" and "Webhook
+**Run 2026-11-13, 18:17-18:58 UTC** (`OWNER_ACTIONS.md` §47.9). Every box is
+ticked except the 3-D Secure one: Moyasar's challenge page was completed with
+the decline card, not with an approving challenge card. That path is exercised
+again on real phones at go-live (part B).
+
+- [x] Steps 1 to 4 of §7 are done.
+- [x] Moyasar panel: "Key for mode (test)", "Key prefix (sk_test_)" and "Webhook
       secret (test)" all read Yes.
-- [ ] Test connection: "Moyasar accepted the test key. Connection OK."
-- [ ] Test webhook registered and its verification code entered (§8.2).
-- [ ] Run a sandbox invoice and pay it with the success card; Check reads it
+- [x] Test connection: "Moyasar accepted the test key. Connection OK."
+- [x] Test webhook registered and its verification code entered (§8.2).
+- [x] Run a sandbox invoice and pay it with the success card; Check reads it
       paid.
-- [ ] Run another and pay it with the decline card; Check reads it failed.
+- [x] Run another and pay it with the decline card; Check still reads
+      `initiated`, because a decline leaves the invoice payable (§2). The failed
+      payment shows in Moyasar's dashboard. (Until 2026-11-13 this line said
+      "Check reads it failed", which was wrong.)
 - [ ] Run one with the 3-D Secure challenge card and complete the challenge.
-- [ ] The test webhook events arrive. A sandbox invoice has no attempt row, so
+- [x] The test webhook events arrive. A sandbox invoice has no attempt row, so
       each is acknowledged and logged in `integration_sync_logs` as
       `unknown payment` (or `admin_test payment ignored`). The console does not
       show these rows; read them with a read-only query.

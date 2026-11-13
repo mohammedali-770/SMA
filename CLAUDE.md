@@ -72,7 +72,7 @@ Approval for one action is not blanket approval for later actions.
 - generating `refund_trigger_secret` (read from the payment row's secret config by both the refund driver and `payment-refund`; no migration creates it) and re-enabling the `payment-refund-worker` cron job;
 - the EAS build that ships the app half;
 - any live payment or refund, including the planned small live payment with its automatic refund;
-- the customer documents and store answers that must change before customers can pay by card: naming Moyasar in the live privacy policy, updating the payment and cancellation/refund policies (both still say payment is cash only), the App Store and Play payment answers, the cash-only listing claim, and the App Review notes.
+- the customer documents and store answers that must change before customers can pay by card: naming Moyasar in the live privacy policy, updating the payment and cancellation/refund policies (both still say payment is cash only) and the terms' payment clause (also cash only), the App Store and Play payment answers, the cash-only listing claim, and the App Review notes.
 
 **What keeps it safe while it is off.** Each is code in this repository, with tests:
 - customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
@@ -81,7 +81,14 @@ Approval for one action is not blanket approval for later actions.
 - the web build (`/app`) never offers online payment;
 - payment history is data: the `tap` rows stay and are shown read-only.
 
-**Live state, read and done 2026-11-13 (§47.2-47.5 complete):**
+**Live state, read-only 2026-11-13 22:37 UTC, after the sandbox (§47.7-47.9 done):**
+- the payment row is provider `moyasar`, mode `test`, **enabled** since 18:17:02 UTC. The owner enabled it for the sandbox, which refuses to run on a disabled row. **Card payments are still OFF**: `online_payment_enabled` is false, and customer checkout is refused in TEST mode. With the row enabled, `payment-webhook` processes ordinary events and `payment-refund` checks its secret (401 without it) instead of answering "disabled";
+- the TEST keys and the TEST webhook token are saved, and Test connection answered "Connection OK". The TEST webhook is verified: its one `webhook_verification` event was recorded at 18:21:57 UTC, and the owner entered the code in Moyasar;
+- the sandbox ran. An approved test card read paid at 1.00 SAR. The decline card left its invoice `initiated`, because Moyasar keeps an invoice payable after a declined payment (the runbook said "failed"; corrected). Eight payment events, 18:24-18:58 UTC, were each acknowledged and logged as `unknown payment`, as designed for an invoice with no attempt;
+- nothing else moved: 82 orders, the newest at 17:43 UTC, before the sandbox; `payment_records` still only the 9 `tap` rows; `order_refunds` empty; the refund job inactive;
+- **next is §47.10, choosing the static-IP proxy**, then the live steps. Each remains its own §5 approval.
+
+**Live state, read and done 2026-11-13 (§47.2-47.5 complete; the row state below is superseded by the read above):**
 - the three payment migrations are APPLIED, each named by version: `20260824100000` (live `20261113171942`), `20261003120000` (`20261113172609`) and `20261004120000` (`20261113174500`). The two `tap_begin_*` functions are gone;
 - all seven payment functions are DEPLOYED from the default branch at `b17ee00` and read back byte-identical: `payment-initiate` v9, `-verify` v5, `-webhook` v7, `-return` v9, `-refund` v4, `-test-config` v6 (its AAL2 gate is now live), `-admin-test-return` v1;
 - the retired `tap-admin-test-return` is DELETED (§47.6): the owner deleted it in the dashboard, because the connector has no delete; it answered 404 at 18:01:54 UTC while `payment-admin-test-return` answered 200;
