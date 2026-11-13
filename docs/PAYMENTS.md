@@ -478,12 +478,16 @@ tunnels and never sees the secret key. Unset, calls are direct.
 - The proxy URL is never logged or returned. Prefer an `https://` proxy URL:
   the proxy's own credentials travel as `Proxy-Authorization`, in clear to an
   `http://` proxy.
-- **Unknown:** Supabase does not document `createHttpClient` on hosted
-  functions. Support was read from the edge-runtime source (released in 1.68.0).
-  Which version hosted Supabase runs is not known. The proof is the admin **Test
-  connection** in LIVE mode with the proxy set: "Connection OK" proves the
-  route; an Allowed-IPs message names whether the proxy or the server's own
-  address was refused.
+- **Not yet proven:** Supabase does not document `createHttpClient` on hosted
+  functions. The edge-runtime source has it from 1.69.0 (the comment in
+  `moyasarHttp.ts` says 1.68.0, one release early). On 2026-11-13 every Edge
+  Function log line of the previous 24 hours, across five regions, came from
+  runtime 1.77.9. The proof is **Test connection** with the proxy set, first in
+  TEST while Moyasar's TEST list still accepts any address, with a
+  wrong-password check that shows the proxy carried the call
+  ([Moyasar static-IP proxy](integrations/Moyasar_Static_IP_Proxy.md) §3-§4).
+  An Allowed-IPs message says which route our code took (proxy, or direct
+  because no proxy is set), not which address Moyasar saw.
 
 **Owner steps** (each an approval):
 
@@ -699,8 +703,9 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the
   console show a fake code.
-- **Proxy support is unproven on hosted Supabase** until the live Test
-  connection (§8.1). If it is missing, every Moyasar call fails closed with
+- **Proxy support is unproven on hosted Supabase** until Test connection runs
+  with the proxy set (§8.1), although the runtime measured on 2026-11-13 (1.77.9)
+  has it in its source. If it is missing, every Moyasar call fails closed with
   `moyasar_proxy_unsupported`.
 - **Apple Pay in the WebView is unconfirmed** (§11 Q1).
 - **The WebView allows any `https` page** (§5).

@@ -241,8 +241,9 @@ From Moyasar's public documentation, read 2026-11-11 (not tested):
 - refunds carry fees; a **void** within about two hours is fee-free. Voiding is
   not implemented;
 - an aggregation account needs balance to refund;
-- the money reaches a mada card in about 1 to 3 days, a credit card in about 7
-  to 14.
+- the money reaches a mada card in 24 hours to 3 business days, a credit card
+  in 7 to 14 business days, weekends not included (Moyasar's FAQ, re-read
+  2026-11-13).
 
 How our worker handles responses: a 429, a 5xx or a network error is
 `pending` (released, retried later); a definitive 4xx is `failed`. A 401 from

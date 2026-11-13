@@ -4159,11 +4159,21 @@ Prefer an `https://` proxy URL where the service offers one: the proxy's own
 credentials travel in clear to an `http://` proxy. With an `https://` target the
 proxy only tunnels, so it never sees the Moyasar key.
 
-**Unknown, and it matters:** the code uses `Deno.createHttpClient` with a proxy.
-Supabase's documentation does not mention it. Support comes from the
-edge-runtime source (1.68.0 and later). If the hosted runtime lacks it, every
-Moyasar call is refused with `moyasar_proxy_unsupported` once the secret is set,
-TEST included. The live Test connection in 47.13 is the proof.
+**Not yet proven, and it matters:** the code uses `Deno.createHttpClient` with a
+proxy. Supabase's documentation does not mention it. The edge-runtime source has
+it from 1.69.0 (the code comment says 1.68.0, one release early), and on
+2026-11-13 every Edge Function log line of the previous 24 hours, across five
+regions, came from runtime **1.77.9**. If the hosted runtime lacked it anyway,
+every Moyasar call would be refused with `moyasar_proxy_unsupported` once the
+secret is set, TEST included.
+
+**Prove it in TEST before paying, and before touching any Allowed IPs list.**
+The comparison (`integrations/Moyasar_Static_IP_Proxy.md` §3 and §4) gives the
+order: set the secret while Moyasar's TEST list still accepts any address, run
+Test connection, then a wrong-password check that shows the proxy really carried
+the call. It recommends QuotaGuard Shield in Frankfurt and has two emails to send
+first (§7), to QuotaGuard and to Moyasar. Restricting the TEST list is optional,
+comes last, and may not be reversible (47.19).
 
 ### 47.11 Set `MOYASAR_PROXY_URL` as an Edge Function secret
 
@@ -4204,8 +4214,10 @@ shared-address question in 47.19 before saving it.
 4. Run **Test connection** in LIVE mode.
 
 **Done looks like:** "Connection OK". That proves the proxy route (47.11) and the
-Allowed IPs list (47.12). A refusal names whether the proxy or the server's own
-address was refused.
+Allowed IPs list (47.12). A refusal's wording says which route our code took
+(through the proxy, or direct because no proxy is set), not which address
+Moyasar saw. "Connection OK" means any Moyasar answer other than 401 or 403, so
+the small live payment at 47.18 is the firmer proof.
 
 ### 47.14 Make sure the payment row is enabled
 
@@ -4318,8 +4330,9 @@ Pick a quiet hour.
    paid. Note it by hand.
 
 **Done looks like:** the order reads paid, the order reaches the kitchen, the
-refund reads refunded in Moyasar, and the card statement shows it (mada 1-3
-days, credit cards 7-14 days).
+refund reads refunded in Moyasar, and the card statement shows it. Moyasar's
+FAQ gives mada 24 hours to 3 business days and credit cards 7 to 14 business
+days, weekends not included.
 
 If anything fails, switch Online Payment off. Switching off is always allowed.
 It stops new checkout sessions only: a session opened before the switch can
@@ -4343,6 +4356,8 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   shares with its other customers? How do platforms such as Salla meet the list
   for their merchants, and do you recommend a provider? The live list cannot be
   emptied once saved.
+- Once the TEST list is restricted to specific addresses, can it be put back to
+  "any address"? Moyasar's page does not say.
 - **A gate, not just a question:** which payment methods does the hosted invoice
   page offer on our account? Do not publish a method list, and do not reach
   47.18, without the written answer (gap PG-11).
