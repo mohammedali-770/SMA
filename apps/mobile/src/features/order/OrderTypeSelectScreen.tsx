@@ -19,6 +19,7 @@ import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { radius, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
+import { selectedButtonState } from '../../design-system/ui/a11yState';
 import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Field } from '../../design-system/ui/Field';
@@ -242,7 +243,8 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
                   onPress={() => choosePickup(b)}
                   disabled={!open}
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: !open, selected: selectedBranch }}
+                  aria-disabled={!open}
+                  {...selectedButtonState(selectedBranch, Platform.OS)}
                   style={[styles.card, selectedBranch && styles.cardSelected, !open && styles.cardDisabled]}
                 >
                   <View style={[styles.cardTop, rtlRow]}>

@@ -18,6 +18,7 @@
       "number": "+966500000001",
       "used_in": [
         "src/components/admin/StaffAccessPanel.test.tsx",
+        "supabase/tests/audit_trail_test.sql",
         "supabase/tests/checkout_session_address_fk_test.sql",
         "supabase/tests/comp_members_test.sql"
       ]
@@ -27,6 +28,7 @@
       "used_in": [
         "src/components/admin/CompMembersPanel.test.tsx",
         "src/components/admin/StaffAccessPanel.test.tsx",
+        "supabase/tests/audit_trail_test.sql",
         "supabase/tests/checkout_session_address_fk_test.sql"
       ]
     },
@@ -34,6 +36,7 @@
       "number": "+966500000003",
       "used_in": [
         "src/components/admin/CompMembersPanel.test.tsx",
+        "supabase/tests/audit_trail_test.sql",
         "supabase/tests/comp_members_test.sql",
         "supabase/tests/discounts_campaigns_test.sql"
       ]
@@ -154,7 +157,23 @@
     },
     {
       "number": "+966500000301",
-      "used_in": ["supabase/tests/lazywait_delivery_sync_test.sql", "supabase/tests/server_input_bounds_test.sql"]
+      "used_in": [
+        ".github/sql-ci/existing-data.sql",
+        "supabase/tests/lazywait_delivery_sync_test.sql",
+        "supabase/tests/server_input_bounds_test.sql"
+      ]
+    },
+    {
+      "number": "+966500000302",
+      "used_in": [".github/sql-ci/existing-data.sql"]
+    },
+    {
+      "number": "+966500000303",
+      "used_in": [".github/sql-ci/existing-data.sql"]
+    },
+    {
+      "number": "+966500000304",
+      "used_in": [".github/sql-ci/existing-data.sql"]
     },
     {
       "number": "+966500000777",

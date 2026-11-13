@@ -58,6 +58,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/alertDispatchWiring.test.ts`
 - `_shared/apiKeys.test.ts`
 - `_shared/apiKeys.ts`
+- `_shared/auditTrailWiring.test.ts`
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
 - `_shared/cors.ts`

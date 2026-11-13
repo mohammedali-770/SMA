@@ -37,6 +37,25 @@ to Production.**
 > before the first, and the fourth before the second. `20260824100000` still
 > sorts ahead of everything. **Name the target by version.**
 
+> **Updated 2026-11-12 (later) — `20261007120000_audit_trail` is written,
+> validated and NOT applied (§60).** On merge it joins the unapplied set, which
+> is the eight listed in the note below, so NINE. It adds
+> append-only audit tables for order status changes and admin edits, and the
+> sender and content of a broadcast; it changes no customer-visible behaviour
+> and the money path is self-asserted. Apply it BEFORE deploying
+> `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
+> target by version.**
+
+> **Updated 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
+> written, validated and NOT applied, so on merge the outstanding set is
+> EIGHT:** the seven below and this file (§59). It adds one `is_staff()`-gated
+> read-only function for the console's Loyalty tiles and changes nothing else.
+> The money path is self-asserted unchanged. **This pull request carries the
+> migration alone**, so merging it changes nothing anyone sees. The console
+> change that reads it (#456) merges only AFTER this file is applied, because a
+> merge deploys the console (CLAUDE.md §13, AGENTS.md change control). Moyasar's `20260824100000` still sorts first. **Name the target by
+> version.**
+
 > **Updated 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
 > is written, validated and NOT applied, so on merge the outstanding set is
 > SEVEN:** `20260824100000`, `20260929120000` (§51), `20261002120000` (§54),
@@ -2087,6 +2106,23 @@ functions by name, so that Postgres refuses rather than removes.
 still breaks every installed build, which keeps sending the old name. Keep the
 old name accepted, as a parameter with a DEFAULT, until no supported build
 sends it.
+
+**A-note — CI now applies a change's migrations to a database that holds rows,
+and reports what they did (report-only since 2026-11-12).** Every other SQL stage
+replays the chain onto an EMPTY database, so no backfill had ever met a row in
+CI: with `20260801120000`'s normalization mutated to demote every default
+address, the whole run stayed green. `.github/sql-ci/existing-data.sh`, called
+from `run.sh`, builds the schema from the migrations that predate the change,
+writes a small production-shaped fixture through the real RPCs
+(`.github/sql-ci/existing-data.sql`), applies the change's files one transaction
+each, asserts a handful of invariants (no NOT VALID constraint added, no
+business row lost, one default address kept, balance equals ledger, one `earn`
+per order, an order can still be placed and settled) and prints a fingerprint
+diff of every table whose existing rows changed. That mutant now fails it.
+**It does not replace step B below**: synthetic rows prove only the shapes they
+contain, and Production holds shapes this fixture does not. It is report-only
+until it has run clean on real pull requests; making it blocking is one line
+(`SQL_CI_EXISTING_DATA_BLOCKING: '1'` in `sql-suites.yml`) and an owner decision.
 
 **B. Pre-live gate** (all read-only)
 1. Verify the repository base commit.
@@ -7979,3 +8015,263 @@ order either way.
    is_staff))`; `checkout_sessions_select_own` is unchanged; `place_order`
    `12b6816d…` and `compute_order_snapshot` `22e2d429…` are unchanged; and the
    Moyasar file is still unapplied unless it was applied on its own approval.
+
+## 59. Admin loyalty stats — WRITTEN, NOT APPLIED (2026-11-12)
+
+`20261008120000_admin_loyalty_stats.sql`. **Written 2026-11-12, validated,
+awaiting owner approval.** Assessment finding P04#2. Owner step:
+`docs/OWNER_ACTIONS.md` §50.
+
+sha256 `97cef0ec765cae6d004ba5f7518851d721aff655a2ce1d64383178a8f48c8007`,
+176 lines / 8 400 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It adds one function and changes nothing else.** No table, policy or
+existing function is altered, no row is written, and no deploy is implied.
+**MONEY PATH UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`).
+
+### Why
+
+Every staff sign-in read `profiles` with `select('*')` and no bound, so that
+Settings → Loyalty could count customers and sum their points in the browser.
+PostgREST caps a response at 1 000 rows, so past that the tiles were wrong and
+looked right: measured at 5 000 customers, 196 136 points shown against
+1 000 079 held. Every customer's name, phone and email also reached every
+staff browser on every sign-in.
+
+### What it does
+
+`admin_loyalty_stats()` returns `{member_count, points_total}`: the number of
+profiles with role `customer`, and the sum of their `loyalty_points`. Staff
+balances are excluded, as the client's filter excluded them. `SECURITY
+DEFINER`, `STABLE`, `search_path = public`, no arguments.
+
+**Access is not widened.** It is gated on `is_staff()` (admin or accountant at
+AAL2), the predicate `profiles_select_own_or_staff` applies, so exactly the
+callers who could compute the figures before can read them now. It follows
+`admin_order_stats()` (`20260806130000`). EXECUTE is revoked from `public`
+**and** `anon` explicitly, because `pg_default_acl` grants `anon` directly
+(CLAUDE.md §8), and granted to `authenticated`.
+
+The console derives the value and the per-customer average from the two
+figures and the configured rate, as before. The ledger below the tiles is an
+ordinary RLS-scoped select, 50 rows a page, ordered by `full_name` and then
+`id` so that paging is total.
+
+### What the file checks
+
+- One overload, no arguments, `SECURITY DEFINER`, `search_path=public`.
+  Cardinality is checked first.
+- `anon` cannot execute it; `authenticated` can.
+- **The gate as an outcome:** called as `authenticated` with no identity, it
+  refuses with `42501`, read back as a value.
+- The aggregate is run read-only with the identical predicate, because the gate
+  raises before the function's own select and a `plpgsql` body is not
+  name-resolved at creation.
+- The money-path pair, one overload each first.
+
+No block in the file contains function DDL, so `rpcContractParity.test.ts` has
+nothing to refuse.
+
+### Validation
+
+- **Local chain harness:** all 151 migrations apply. 88 suites run: 86 pass,
+  the 2 quarantined fail as before, 0 new failures. The idempotence replay
+  (report-only) lists the 5 known scheduler and seed files; this file
+  re-applies cleanly.
+- **Production-shaped chain:** the chain without the eight files Production
+  lacks (the seven outstanding and this one), then this file applied onto it,
+  twice. Both applies pass their own verification.
+- **Paired suite** `admin_loyalty_stats_test.sql`, 4 cases, with the
+  production `jwt_has_aal2()` restored inside the transaction: exact totals over
+  1 200 seeded customers, staff balances excluded, checked against a direct
+  count (case 1); a customer, an admin at AAL1 and an accountant at AAL1 refused
+  with `42501` (case 2); `anon` refused, `authenticated` granted (case 3); the
+  `(full_name, id)` page order visits every customer exactly once with seven
+  distinct names among 1 201 rows, and a customer or an AAL1 admin paging it
+  sees only their own row or nothing (case 4).
+- **Mutation testing, 7 mutants:**
+  - EXECUTE granted to `anon`, refused by the file's own check;
+  - revoked from `public` only, the default-ACL trap, refused by the file;
+  - the gate removed, refused by the file;
+  - the gate reduced to the role without AAL2, refused by the file, and failed
+    by suite case 2 with the file's check stripped out;
+  - staff balances counted (role filter dropped), failed by suite case 1;
+  - the gate narrowed to `is_admin()`, which would lock accountants out, failed
+    by suite case 1;
+  - the grant to `authenticated` removed: **survives, and is equivalent.**
+    `pg_default_acl` grants `authenticated` EXECUTE on new functions directly,
+    on the harness and in Production, so the explicit grant states the
+    intent but is not what carries it.
+
+### Applying it (owner, §5, named by version)
+
+1. Apply `20261008120000` by name. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first. It is independent of every other
+   outstanding file.
+2. Afterwards, read-only: one overload; `has_function_privilege('anon', …)`
+   false and `('authenticated', …)` true; `place_order` `12b6816d…` and
+   `compute_order_snapshot` `22e2d429…` unchanged; and the Moyasar file still
+   unapplied unless it was applied on its own approval.
+
+## 60. Audit trail — WRITTEN, NOT APPLIED (2026-11-12)
+
+`20261007120000_audit_trail.sql`. **Written 2026-11-12, validated, awaiting
+owner approval.** App-hardening checklist gaps S09#1, S09#2 and S09#3.
+
+sha256 `3da6dbe786b7910a493935b1418130477ffd61e5c03b531f576cdba0e1d532f8`,
+760 lines / 36 823 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**MONEY PATH UNTOUCHED, and the file asserts it** (`12b6816d…` / `22e2d429…`,
+one overload each, checked before the hash is read). It redefines no existing
+function: `admin_set_order_status`, `place_order` and `compute_order_snapshot`
+are as they were. It adds no trigger to `orders` other than its own, nothing on
+a payment table and nothing on `integration_settings`. It writes no row.
+
+**It implies two deploys, each AFTER the apply and each its own approval:**
+`push-dispatch` and `staff-accounts` (`docs/OWNER_ACTIONS.md` §51). Both
+handlers survive being deployed first, by design, but lose the new record until
+the apply lands.
+
+### What it does
+
+| Gap | Change | Before, measured on the local chain |
+| --- | --- | --- |
+| S09#1 | `order_status_audit` (append-only), written by `audit_order_status_change`, an AFTER UPDATE OF `status` row trigger on `orders` with `WHEN (old.status IS DISTINCT FROM new.status)`. Records old/new status, `changed_by = auth.uid()`, the actor's `profiles.role`, and `source` `manual`, or `automatic` when there is no `auth.uid()` | `order_change_events` held id, order_id, event and created_at; a POS `lazywait_status` write and a human status change wrote the same `update` row |
+| S09#2 | `notification_log.sent_by uuid` and `.content jsonb`, both nullable, no foreign key; `push-dispatch` writes them for a broadcast | the broadcast row carried `kind` and the counts; the handler's verified admin id was unused |
+| S09#3 | `admin_action_audit` (append-only). Written by `record_admin_action(p_actor, p_action, p_target_table, p_target_id, p_detail)`, SECURITY DEFINER, EXECUTE for `service_role` only, two actions accepted, a password-, secret- or token-like detail key refused at any depth; and by `audit_admin_table_change`, an AFTER INSERT/UPDATE/DELETE row trigger on `products`, `product_variants`, `coupons`, `categories` and `app_settings` | `staff-accounts` reset and deleted accounts with no row anywhere, and the five tables had no trigger but `set_updated_at` |
+
+**The table triggers record column NAMES always and VALUES only for an
+allowlist** passed as the trigger's first argument: prices, flags, limits and
+ordering. Names, descriptions, image URLs, support contact text, the VAPID
+public key and anything added later are name-only. The file refuses to apply if
+an allowlist names anything matching `key|secret|token|password|vapid`. An
+UPDATE that changes only `created_at`/`updated_at` writes nothing, and so does
+one that changes only a column passed as the second argument:
+`coupons.usage_count` (moved by `place_order` and by cancellation on every
+order with a coupon), and `app_settings.payment_updated_at`,
+`payment_updated_by` and `loyalty_expiry_next_run_on`. On the CI chain the
+migration runs before `supabase/seed.sql`, so the seed's rows appear as system
+inserts with a null actor; that is the behaviour, not noise.
+
+**Append-only is enforced:** a BEFORE UPDATE OR DELETE row trigger and a BEFORE
+TRUNCATE statement trigger on each table raise `42501` for every role, the
+owner included. Neither table has a foreign key, so no cascade reaches it.
+Nothing prunes either table.
+
+**Reads.** `order_status_audit_staff_read`: SELECT, `authenticated`,
+`(select public.is_staff())`. `admin_action_audit_admin_read`: SELECT,
+`authenticated`, `(select public.is_admin())`. Grants revoked from `public`,
+`anon` and `authenticated`, then SELECT granted to `authenticated`.
+`notification_log` keeps its single admin SELECT policy and no write policy.
+
+### The trigger-failure policy
+
+A trigger that can block a kitchen or POS status change is worse than an audit
+that drops a row, so there is **no exception handler**; instead the insert is
+made unable to fail. No foreign keys (a key to `profiles` would block a staff
+deletion, the defect `20261002120000` fixed, or with SET NULL erase the actor);
+no unique constraint but an identity key; every NOT NULL column filled from an
+already-NOT-NULL value or a constant; the one CHECK (`source`) satisfied by
+construction; `actor_role` as text, not the enum. `auth.uid()` and the profile
+read are the calls `is_admin()` already made earlier in the same statement.
+What remains is out of disk or memory, which fails the status update anyway.
+The file asserts that neither table carries a foreign-key, unique or exclusion
+constraint.
+
+### The deploy-ordering behaviour
+
+- **`push-dispatch` before the apply:** the insert names two missing columns and
+  PostgREST answers PGRST204. `broadcastLog.ts` then writes the old row shape
+  (PGRST204 and 42703 only; any other error is not retried, so a row cannot be
+  written twice), logs one line, and the response is the unchanged
+  `{status: 'ok', …counts}`. Before this change the insert's error was ignored,
+  so a deploy-first would have lost the counts row too; and an exception from
+  the insert would have become a 500 after a successful send, inviting a second
+  unrecallable broadcast. The helper now never throws.
+- **`staff-accounts` before the apply:** the RPC is missing (PGRST202); the
+  reset or delete has already succeeded and is still reported as such, with a
+  log line. The audit is written only after the Admin API call succeeds, so a
+  failed reset or delete is never recorded as done.
+
+### Preconditions and self-verification
+
+Eleven assertions, all outcomes: both tables exist with RLS on; exactly one
+policy each, with role, command and predicate compared exactly; `anon` and
+`authenticated` hold no INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER on
+either table and `anon` no SELECT (`has_table_privilege`); `record_admin_action`
+has one overload, is not executable by `anon` or `authenticated` and is by
+`service_role` (`has_function_privilege`); the `orders` trigger is enabled,
+AFTER UPDATE OF status, per row, with the WHEN clause; exactly five enabled
+table triggers on exactly the five tables and nowhere else; no allowlist names
+a credential-like column; four append-only triggers; no FK/unique/exclusion
+constraint on either table; `notification_log`'s columns, single policy and no
+FK on `sent_by`; and the money-path pair.
+
+Then a probe **fires** both trigger functions and **calls**
+`record_admin_action` (a `plpgsql` body is not name-resolved at creation), reads
+each outcome back as a value, and raises a sentinel so every write rolls back.
+It touches **no real row**: the trigger functions are attached to two temporary
+tables, so no order, product or setting is locked or written in Production.
+The residue is a few identity values on the two audit tables.
+
+### Validation
+
+- **Local chain harness:** 150 migrations apply; 87 suites run, 85 pass, the 2
+  quarantined fail as before, **0 new failures**; the 5 known files fail the
+  idempotency re-run as before (report only). This file re-applies cleanly.
+- **Paired suite** `audit_trail_test.sql`, 12 cases: placement writes no row;
+  an AAL2 admin's `admin_set_order_status` writes old/new, the admin,
+  `admin`, `manual`; a second transition is its own row; a service-role change
+  is `automatic` with no actor; a `lazywait_status` write and a same-status
+  write record nothing; `anon` and `authenticated` cannot write either table
+  (42501) and `anon` cannot read them; a customer reads no status row; an
+  accountant reads the status trail and no `admin_action_audit` row; a price
+  change records `{price}` with old and new; an `app_settings` change records
+  the value, the VAPID key change by name only, an `updated_at`-only write and a
+  `usage_count`-only write nothing; `record_admin_action` refused for `anon` and
+  `authenticated`, working for `service_role`, refusing three credential-like
+  details and an unknown action; `notification_log` sender/content readable by
+  an admin and not by a customer, not writable by a client; both tables
+  append-only for the owner. **Without this file the suite fails at CASE 1**
+  (`relation "public.order_status_audit" does not exist`).
+- **Mutation testing, 12 SQL mutants**, each applied with the file's own check
+  and separately with the check stripped and the suite run. Every one is
+  killed by at least one of the two. The file's own check kills ten: the WHEN
+  clause dropped, `source` inverted, INSERT granted to `authenticated`, the
+  VAPID key allowlisted, `revoke … from public` only (the default-ACL trap),
+  the staff policy unwrapped, an append-only trigger dropped, values recorded
+  for every changed column, the credential-key refusal disabled, and the admin
+  policy widened to `is_staff()`. The suite kills ten, including the two the
+  file cannot see at apply time: `changed_by` written as null (the apply runs
+  with no `auth.uid()`) and `usage_count` no longer ignored. The suite does not
+  kill two, by nature: INSERT granted to `authenticated` (RLS has no INSERT
+  policy, so the write is still refused with 42501) and the unwrapped policy
+  (same rows, slower plan). **8 TypeScript mutants**, all killed by
+  `broadcastLog.test.ts`, `audit.test.ts` or `auditTrailWiring.test.ts`: no
+  fallback, retry on any error, an error response after a failed log write,
+  targeting widened to drop `promos_enabled`, the sender not passed, the
+  password passed to the audit, a password-like detail key, and an audit
+  failure returned as a 500.
+
+### What it does not cover
+
+- **No console screen reads either table yet.** The record exists; showing it is
+  later work.
+- **Staff account creation** is not written here: it was already audited, in
+  `role_change_audit`, by `admin_set_user_role` under the caller's JWT.
+- **Retention.** Nothing prunes the new tables. At four status rows per order
+  and a handful of admin edits a day, that is small; it is a decision for later,
+  and the append-only trigger would have to be dropped to prune.
+- **`test` and `broadcast` rows still stay at `send_status = 'processing'`**
+  (`docs/OWNER_ACTIONS.md`, the known cosmetic issue); this change does not
+  touch that.
+
+### Applying it (owner, §5, named by version)
+
+1. Re-hash the merged copy and compare with the value above.
+2. Apply `20261007120000` by name. Never "the outstanding migrations": the
+   Moyasar file `20260824100000` sorts first.
+3. Afterwards, read-only: both tables exist with RLS on and one policy each;
+   `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…`
+   unchanged; then deploy `push-dispatch` and `staff-accounts`, each on its own
+   approval (`docs/OWNER_ACTIONS.md` §51).

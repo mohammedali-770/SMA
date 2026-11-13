@@ -48,6 +48,7 @@ Read by Edge Functions from the Deno environment. These are secrets. They live i
 - `ADMIN_PUSH_VAPID_PRIVATE_KEY`
 - `ADMIN_PUSH_VAPID_PUBLIC_KEY`
 - `ADMIN_PUSH_VAPID_SUBJECT`
+- `EXPO_ACCESS_TOKEN`
 - `SEND_SMS_HOOK_SECRET`
 - `SMTP_ALLOWED_HOSTS`
 - `SUPABASE_ANON_KEY`

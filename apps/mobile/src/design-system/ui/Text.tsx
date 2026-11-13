@@ -43,13 +43,16 @@ export function Text({
   const colors = useThemeColors();
   const { lang, isRTL } = useI18n();
   const scale = typeScale[variant];
+  // Every tone resolves to an INK. `ember`, `mint` and `danger` are fills: as
+  // label- and caption-size text they measured 3.37-4.29:1 (R07#2), and
+  // `emberText` / `mintInk` / `dangerInk` exist for exactly this job.
   const toneColor =
     tone === 'primary' ? colors.appText
     : tone === 'secondary' ? colors.appText2
     : tone === 'tertiary' ? colors.appText3
-    : tone === 'ember' ? colors.ember
-    : tone === 'success' ? colors.mint
-    : tone === 'danger' ? colors.danger
+    : tone === 'ember' ? colors.emberText
+    : tone === 'success' ? colors.mintInk
+    : tone === 'danger' ? colors.dangerInk
     : colors.onEmber;
 
   return (
