@@ -44,8 +44,8 @@ Other documents:
 > **Card payments are still off:** the payment row is **disabled**. Its last write
 > is 2026-11-11 10:55:54 UTC, before the read below, so that read's "enabled" was
 > wrong. `online_payment_enabled` is false. `refund_trigger_secret` is present on the row (length 64). What remains
-> is `OWNER_ACTIONS.md` §47.6 onwards: delete `tap-admin-test-return`, keys and
-> webhook, sandbox, proxy, live mode, the customer documents, the refund job,
+> is `OWNER_ACTIONS.md` §47.7 onwards (`tap-admin-test-return` was deleted the same
+> evening, §47.6): keys and webhook, sandbox, proxy, live mode, the customer documents, the refund job,
 > the EAS build, then online payment on.
 
 Read-only reads of Production on 2026-11-11, also recorded in
@@ -398,7 +398,7 @@ Approval for one is not approval for the next. Nothing here has been done.
    functions first."
 4. **Apply `20261004120000_drop_tap_payment_rpcs`**, named by version, **only
    after** step 3. It refuses to apply before step 2. Detail: [Migrations §56](MIGRATIONS.md).
-5. **Delete the retired `tap-admin-test-return` function.**
+5. **Delete the retired `tap-admin-test-return` function.** Done 2026-11-13.
 6. **Sandbox test** (§9, part A), with test keys and the test webhook.
 7. **Choose the proxy service and set `MOYASAR_PROXY_URL`** (§8.1), after the
    sandbox test, so a bad value cannot be mistaken for a sandbox failure. An

@@ -3860,9 +3860,10 @@ CLAUDE.md §5 approval**, named when it is due. Approval for one step is not
 approval for the next. **None of them had been done on 2026-11-12.** Where a step needs a secret, the value goes into the
 console or the Supabase dashboard, never into a chat.
 
-**Progress, 2026-11-13: 47.1-47.5 are DONE. The owner approved 47.2-47.5 together,
-each step named, in one multi-select, and 47.6 in a separate answer; 47.6 is the
-owner's own step, because the connector cannot delete a function.** Evidence: `MIGRATIONS.md` ledger rows 114-116 and CLAUDE.md
+**Progress, 2026-11-13: 47.1-47.6 are DONE. The owner approved 47.2-47.5 together,
+each step named, in one multi-select, and 47.6 in a separate answer, then did
+47.6 in the dashboard, because the connector cannot delete a function. 47.7 is
+next.** Evidence: `MIGRATIONS.md` ledger rows 114-116 and CLAUDE.md
 §6. Card payments are still off: the payment row is **disabled** (its last write is
 2026-11-11 10:55:54 UTC, before the read below that called it enabled, so that
 read was wrong on this point), so 47.14
@@ -4027,9 +4028,9 @@ apply before 47.3.
 
 ### 47.6 Delete the old `tap-admin-test-return` function
 
-**NEXT, and the owner's own step:** the Supabase connector cannot delete a
-function. Dashboard → Edge Functions → `tap-admin-test-return` → Delete. Approved
-2026-11-13 (the owner's answer "Yes, after the deploy"); nothing in the code calls it (only comments and tests that assert it
+**DONE 2026-11-13 by the owner**, in the dashboard (the Supabase connector cannot
+delete a function): at 18:01:54 UTC `tap-admin-test-return` answered 404 and
+`payment-admin-test-return` 200. Approved 2026-11-13 (the owner's answer "Yes, after the deploy"); nothing in the code calls it (only comments and tests that assert it
 is gone).
 
 A deletion is a destructive Production action. Do it only after 47.4, because
