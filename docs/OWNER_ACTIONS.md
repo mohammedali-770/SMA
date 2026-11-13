@@ -4363,6 +4363,12 @@ and §58 marked APPLIED.
 
 ## 50. Loyalty totals in the console — merge, apply, then merge #456
 
+**DONE 2026-11-13.** #457 merged as `51a652f`; `20261008120000` was applied at
+06:38:43 UTC (live version `20261113063843`) and checked as step 2 asks
+(`docs/MIGRATIONS.md` ledger row 105); #456 merged as `2974cac`. What is left
+of step 3 is the look: open Settings → Loyalty as an admin at AAL2 and confirm
+the tiles show numbers and no notice.
+
 **Opened 2026-11-12.** `20261008120000_admin_loyalty_stats.sql` is written,
 validated and NOT applied. Detail: `docs/MIGRATIONS.md` §59. *This number may
 need renumbering: a parallel pull request also adds an owner-action section.*

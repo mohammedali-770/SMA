@@ -275,6 +275,25 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**Current position 2026-11-13, read live AFTER the loyalty-stats apply: 152
+repository files on the default branch / 150 live history rows / EIGHT
+unapplied** — `20260824100000_moyasar_payment_provider`,
+`20260929120000_db_advisor_hardening`, `20261002120000_staff_actor_fk_set_null`,
+`20261003120000_moyasar_only_payments`, `20261004120000_drop_tap_payment_rpcs`,
+`20261005120000_server_input_bounds`,
+`20261006120000_rls_initplan_live_board_order_year` and
+`20261007120000_audit_trail`. Latest live version `20261113063843`; the most
+recent apply is `20261008120000_admin_loyalty_stats` (ledger row 105,
+`docs/MIGRATIONS.md` §59), on explicit owner approval naming it by version.
+Reconciled **by name** against the default branch at `36cbdb4`: 142 files
+applied, 2 superseded (ledger rows 8-9), and these 8. It added one
+`is_staff()`-gated read-only function and changed nothing else; the money-path
+pair is unchanged (`12b6816d…` / `22e2d429…`), and the stored statement hashes
+to the merged file (§8's "hash what the database stored"). #456, the console
+half that reads it, merged afterwards as `2974cac`. **`20260824100000` still sorts first. Name
+the target by version.** This supersedes the 2026-11-11 current position below
+and the "on merge … EIGHT/NINE" counts in the 2026-11-12 amendments.
+
 **AMENDED 2026-11-11, the Moyasar decision (§6) — `20260824100000` is no
 longer frozen.** It is step 1 of the Moyasar apply order, not a file kept
 unapplied on purpose:
@@ -356,6 +375,8 @@ approval, and `20260824100000` still sorts first. **Name the target by
 version.** Detail: `docs/MIGRATIONS.md` §54.
 
 **Superseded on the count by the note above, kept for its record of the prune apply:** with #436 merged, the default branch holds 146 repository files and THREE unapplied (Moyasar, `20260929120000`, `20261002120000`). The live read below stays true for its date.
+
+**Superseded 2026-11-13 by the current position at the top of this block.**
 
 **Current position 2026-11-11, read live AFTER the run-history prune apply: 145
 repository files on the default branch / 149 live history rows / TWO unapplied
