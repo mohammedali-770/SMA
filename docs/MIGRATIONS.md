@@ -46,6 +46,21 @@ to Production.**
 > `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
 > target by version.**
 
+> **Updated 2026-11-13 (afternoon) — three more files are APPLIED:
+> `20261011120000` (12:54:40 UTC, live `20261113125440`, ledger row 108, §63),
+> `20260929120000` (12:57:02, live `20261113125702`, row 109, §51) and
+> `20261002120000` (12:58:10, live `20261113125810`, row 110, §54)**, each on
+> the owner's approval naming it by version, one call each, each verified before
+> the next. Live history **152 → 155**. **The outstanding set is SIX:**
+> `20260824100000`, `20261003120000` (§55), `20261004120000` (§56),
+> `20261005120000` (§57), `20261006120000` (§58) and `20261007120000` (§60).
+> `20261005120000` was attempted three times the same afternoon and landed
+> nothing: one timed out at the connector's confirmation question, two were
+> refused by the connector ("Service Unavailable") before reaching the database,
+> and the connector then dropped out of the session. A read through PostgREST
+> settled each outcome (`app_settings.order_limit_open` still `42703`). Moyasar's
+> `20260824100000` still sorts first. **Name the target by version.**
+
 > **Updated 2026-11-13 (applied) — `20261009120000` and `20261010120000` are
 > APPLIED** (09:02:36 and 09:03:20 UTC, live versions `20261113090236` and
 > `20261113090320`, ledger rows 106 and 107, §61 and §62), on the owner's
@@ -1615,8 +1630,11 @@ production.
 | 105 | 20261008120000 | admin_loyalty_stats | `97cef0ec765c` | 20261113063843 | admin_loyalty_stats | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 06:38:43 UTC** on explicit owner approval ("apply 20261008120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Adds `admin_loyalty_stats()`, an `is_staff()`-gated read-only function returning `{member_count, points_total}` over profiles with role `customer`, for the console's Settings → Loyalty tiles (finding P04#2). §9-B.7: the merged copy was re-hashed from the default branch at `36cbdb4` (sha256 `97cef0ec765cae6d004ba5f7518851d721aff655a2ce1d64383178a8f48c8007`, 176 lines / 8 400 bytes) before anything was sent and matched. **Pre-checks, read-only:** 149 history rows, no row or function named `admin_loyalty_stats`, `is_staff()` one overload, `profiles.role` and `profiles.loyalty_points` present, Moyasar absent. **THE TEXT THAT LANDED IS THE FILE, PROVEN FROM THE LIVE SIDE:** the row's single `statements` element hashes md5 `f85db7a5f18194026ec61ff6ff9d4550` over 8 381 characters, which is the merged file without its final newline. The body also matched a hash pre-computed from the file before sending: `prosrc` `ecfbc513a8b3e7d9d5804e186e0fd158`, 406 characters, one overload. **Grants measured as outcomes:** `anon` **NO**, `authenticated` **YES**, `service_role` **YES**. A separate call as `authenticated` with no identity raised `42501 :: Only staff may read loyalty stats`, read back as the error value. **Writes nothing and widens nothing:** no table, policy or existing function changed; the figures are visible only to callers `profiles_select_own_or_staff` already lets read every profile. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d…` and `compute_order_snapshot` `22e2d429…`, one overload each, identical before and after; the file also asserts both. Moyasar absent (0 functions, 0 history rows). No deploy implied. Live history **149 → 150**. **Version NOT aligned** — live carries the apply-time stamp `20261113063843` (§9-D). Reconciled by name against the default branch: 152 files = 142 applied + 2 superseded (rows 8-9) + 8 unapplied. **THE OUTSTANDING SET IS EIGHT** (`20260824100000`, `20260929120000`, `20261002120000`, `20261003120000`, `20261004120000`, `20261005120000`, `20261006120000`, `20261007120000`). `20260824100000` still sorts first. Name the target by version. |
 | 106 | 20261009120000 | admin_lazywait_sync_monitor | `c4d789b31171` | 20261113090236 | admin_lazywait_sync_monitor | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 09:02:36 UTC** on explicit owner approval ("Apply them", answering a message that named exactly `20261009120000` and `20261010120000` by version), via MCP `apply_migration`, **one call for this file**. Adds `admin_lazywait_sync_monitor(p_limit)`, `is_staff()`-gated: the newest orders needing a POS sync, twelve sync columns, no customer field, plus `pos_sync_deadline_at`. sha256 `c4d789b3117181d0bbe3a38627270114a6c8112daf87f2616eccc5f5d18c3fcb`, 208 lines / 10 176 bytes. §9-B.7: the merged copy was re-hashed from the default branch at `d27916d` before anything was sent and matched. **Pre-checks, read-only:** 150 history rows, no row or function under either name, Moyasar absent, the money-path pair `12b6816d…` / `22e2d429…`, no `%admin_push%` function touching the customer push channel, `push_devices_admin_select` present. **The text that landed is the file, proven from the live side:** `statements` hashes md5 `1b00c120668ddd37fb697775d36f29b3` over 10 171 characters, the merged file without its final newline; `prosrc` `798937b02f4537132765449281d57b67`, 814 characters, one overload, both computed from the file before sending. **Grants as outcomes:** `anon` NO, `authenticated` YES; a separate call as `authenticated` with no identity raised `42501 :: Only staff may read the Lazywait sync monitor`. **Writes nothing:** 81 orders unchanged. **MONEY PATH UNTOUCHED.** Moyasar absent. No deploy implied; the console half is #462. Live history **150 → 151**. **Version NOT aligned** (§9-D). |
 | 107 | 20261010120000 | customer_push_device_counts | `938826a1082b` | 20261113090320 | customer_push_device_counts | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 09:03:20 UTC**, the second file of the same approval, **one call for this file**, sent after row 106 was verified. Adds `customer_push_device_counts()`, `is_admin()`-gated: active devices and active devices with offers on; no row, no token. sha256 `938826a1082bcec77913eb737373ed929ce22a3c961029913cdfbff161fdbbfe`, 190 lines / 9 159 bytes. **Stored text proven from the live side:** `statements` md5 `d1f77ede13822dd7703c53be2687cd1d` over 9 152 characters; `prosrc` `03cd847775676db32160732cd5152cc1`, 444 characters, one overload, both pre-computed. **Grants as outcomes:** `anon` NO, `authenticated` YES; a call as `authenticated` with no identity raised `42501 :: Only admins may read push device counts`. **Writes nothing and changes no audience:** 5 push devices unchanged, `push_devices_admin_select` still present (dropped later by `20261011120000`, after #462 deploys). **MONEY PATH UNTOUCHED.** Moyasar absent. No deploy implied. Live history **151 → 152**. **Version NOT aligned** (§9-D). **THE OUTSTANDING SET IS EIGHT** again (`20260824100000`, `20260929120000`, `20261002120000`, `20261003120000`, `20261004120000`, `20261005120000`, `20261006120000`, `20261007120000`). Name the target by version. |
+| 108 | 20261011120000 | drop_push_devices_admin_select | `866f24b1c546` | 20261113125440 | drop_push_devices_admin_select | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 12:54:40 UTC** on explicit owner approval ("apply 20261011120000" — the target named by version), via MCP `apply_migration`, **one call landed, target named explicitly**. Drops `push_devices_admin_select`, so no administrator session can read a customer's Expo push token; Push Tools reads its two counts through `customer_push_device_counts()` (row 107). §9-B.7: the merged copy was re-hashed from the default branch at `7a79841` (sha256 `866f24b1c54613a2d847e0cbbe696a8851fe4747540322886646f35e6b2d85fe`, 121 lines / 6 014 bytes) and matched. **§53's ordering held, verified rather than assumed:** the console bundle production serves carries release `7a79841` (#462's merge) and calls both new RPCs. **SEVEN EARLIER ATTEMPTS LANDED NOTHING:** each timed out after 230 s with the connector's confirmation question unanswered, and a read-only check after each found 152 rows and the policy present. **Pre-checks, read-only:** 152 rows, the policy present, `customer_push_device_counts` one overload, money-path pair `12b6816d…` / `22e2d429…`, Moyasar 0 rows. **The text that landed is the file, proven from the live side:** `statements` hashes md5 `3810ae2cd9db30a6c0a7c3b5d6d7d539` over 6 010 characters, computed from the merged file before sending. **THE OUTCOME, measured as the role:** inside a transaction, as `authenticated` with an AAL2 administrator's claims (`is_admin()` true), `push_devices` returned **0** rows while `customer_push_device_counts()` returned `{active_devices: 5, promo_opt_ins: 2}`, equal to a direct count. Only `push_devices_select_own` remains; RLS on. **Writes nothing:** 5 devices, 5 active, 2 with offers on, unchanged. **MONEY PATH UNTOUCHED.** Moyasar absent. No deploy implied. Live history **152 → 153**. **Version NOT aligned** (§9-D). |
+| 109 | 20260929120000 | db_advisor_hardening | `24ed77fdce59` | 20261113125702 | db_advisor_hardening | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 12:57:02 UTC** on explicit owner approval (the owner chose "Apply 20260929120000", an option naming the file by version), via MCP `apply_migration`, **one call, target named explicitly**. Pins `search_path` on the two admin-push duration helpers, revokes client EXECUTE on the two closure-notification trigger functions, revokes TRUNCATE, TRIGGER and REFERENCES from `anon` and `authenticated` on eleven tables, and scopes `push_devices_select_own` to `authenticated`. §9-B.7: the merged copy was re-hashed (sha256 `24ed77fdce599d45c9507d0bfc864122d54b1411a0fb7b145d9c9b4a33664cf8`, 232 lines / 13 093 bytes) and matched. **Pre-checks, read-only, because the file's assertion (4) covers the WHOLE schema:** exactly the eleven tables it names held client TRUNCATE/TRIGGER/REFERENCES and no other; all four functions one overload each; both triggers enabled; the policy on `{public}`. **The text that landed is the file:** `statements` hashes md5 `eb1da1278915f7dbda7e8a1895c32bb7` over 13 067 characters, the merged file without its final newline (13 092 bytes; the difference is multi-byte characters). **Outcomes:** client TRUNCATE/TRIGGER/REFERENCES grants in `public` **0**; `anon` and `authenticated` cannot execute either trigger function; the policy is `{authenticated}`. **A guest can still read the menu, measured through PostgREST:** `products`, `product_variants`, `categories` and `modifiers` returned `206` and `branches` `200`; `push_devices` returned `[]` to `anon`. **The advisor counts §51 predicts (0011 → 0, 0028 → 1, 0029 → 85) were NOT re-read**: the connector failed before that read was made. **MONEY PATH UNTOUCHED** — the file also asserts it. Moyasar absent. No deploy implied. Live history **153 → 154**. **Version NOT aligned** (§9-D). |
+| 110 | 20261002120000 | staff_actor_fk_set_null | `2fb83cfd710b` | 20261113125810 | staff_actor_fk_set_null | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 12:58:10 UTC** on explicit owner approval (the owner chose "Apply 20261002120000", naming it by version), via MCP `apply_migration`, **one call, target named explicitly**. Changes four actor foreign keys into `profiles` to `ON DELETE SET NULL` and drops NOT NULL on `branch_delivery_requests.requested_by`, so a staff account with history can be deleted (finding D01#1). §9-B.7: the merged copy was re-hashed (sha256 `2fb83cfd710bf6b38418f0648a8d3d375bb86f460617b6f9f080fbc76fbe5577`, 120 lines / 6 370 bytes) and matched. **Pre-check, read-only, because the file asserts that NO key in `public` blocks deleting a profile:** exactly the four keys it changes were NO ACTION, and no other. **The text that landed is the file:** `statements` hashes md5 `5ccebe79c50bba9494deeb3028ce4e47`, computed from the merged file before sending. **Outcomes:** blocking keys into `profiles` or `auth.users` **0**; `requested_by` nullable. **Writes nothing:** 1 delivery request and 0 reference entries, unchanged. **What is NOT yet shown:** the closing evidence D01 asks for, a console staff **Delete** of an account with history succeeding. **MONEY PATH UNTOUCHED.** Moyasar absent. No deploy implied. Live history **154 → 155**. **Version NOT aligned** (§9-D). Reconciled by name against the default branch: 155 files = 147 applied + 2 superseded (rows 8-9) + 6 unapplied. **THE OUTSTANDING SET IS SIX** (`20260824100000`, `20261003120000`, `20261004120000`, `20261005120000`, `20261006120000`, `20261007120000`). `20260824100000` still sorts first. Name the target by version. |
 
-Reconciliation check: the rows above detail **104 repository rows, 102 of which
+Reconciliation check: the rows above detail **110 repository rows, 108 of which
 carry a live version** — rows 8 and 9 are the two that do not, and both are
 class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
@@ -1636,7 +1654,7 @@ carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
 from the artifact, never adopt from a working note — applied to this file's own
 summary line.
 
-Rows **89–104** are not described in the narrative below, which stops at 88.
+Rows **89–110** are not described in the narrative below, which stops at 88.
 Each is recorded in its own row and in the section it names; the live totals for
 the whole repository are in `CLAUDE.md` §8, not here.
 
@@ -6878,7 +6896,14 @@ migration creates its own trigger secret at apply time, generated inside
 Postgres so the value never crosses the wire, so the chain needs it now. Both
 vault shims moved to `bootstrap.sql`.
 
-## 51. Database advisor hardening — WRITTEN, NOT APPLIED (2026-11-09)
+## 51. Database advisor hardening — APPLIED 2026-11-13 (ledger row 109)
+
+
+**APPLIED 2026-11-13 12:57:02 UTC**, live version `20261113125702`, on the
+owner's approval naming it by version. Client TRUNCATE/TRIGGER/REFERENCES
+grants in `public` measured 0 afterwards, and a guest still reads the menu.
+The advisor counts predicted below were not re-read. Ledger row 109 has the
+evidence.
 
 `20260929120000_db_advisor_hardening.sql`. **Written 2026-11-09, validated,
 awaiting owner approval.** Workstream S2 of the 2026-11-09 compliance plan.
@@ -7363,7 +7388,13 @@ over about three days.
    run it at a quiet time. Without it the database stops growing but does not
    shrink.
 
-## 54. Staff accounts can be deleted after ordinary work — WRITTEN, NOT APPLIED (2026-11-11)
+## 54. Staff accounts can be deleted after ordinary work — APPLIED 2026-11-13 (ledger row 110)
+
+
+**APPLIED 2026-11-13 12:58:10 UTC**, live version `20261113125810`, on the
+owner's approval naming it by version. No key in `public` blocks deleting a
+profile any more. A console staff **Delete** of an account with history has not
+yet been tried. Ledger row 110 has the evidence.
 
 `20261002120000_staff_actor_fk_set_null.sql`. **Written 2026-11-11, validated,
 awaiting owner approval.** App-hardening checklist, finding D01.
@@ -8473,7 +8504,13 @@ devices in between.
 3. **Then** the console change can merge, and after it deploys, the policy-drop
    migration it carries is applied (`docs/OWNER_ACTIONS.md` §53).
 
-## 63. `push_devices_admin_select` dropped — WRITTEN, NOT APPLIED (2026-11-13)
+## 63. `push_devices_admin_select` dropped — APPLIED 2026-11-13 (ledger row 108)
+
+
+**APPLIED 2026-11-13 12:54:40 UTC**, live version `20261113125440`, on the
+owner's approval naming it by version, after #462's console was confirmed
+live. An AAL2 administrator now reads 0 `push_devices` rows, and Push Tools'
+counts still match a direct count. Ledger row 108 has the evidence.
 
 `20261011120000_drop_push_devices_admin_select.sql`. **Written 2026-11-13,
 validated, awaiting owner approval.** The second step of §62.
