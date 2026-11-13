@@ -53,7 +53,7 @@ to Production.**
 > `20261002120000` (§54), `20261003120000` (§55), `20261004120000` (§56),
 > `20261005120000` (§57), `20261006120000` (§58) and `20261007120000` (§60).
 > Moyasar's `20260824100000` still sorts first. **Name the target by version.**
-> #456, the console half that reads the function, may now merge.
+> #456, the console half that reads the function, merged afterwards as `2974cac`.
 
 > **Updated 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
 > written, validated and NOT applied, so on merge the outstanding set is
@@ -8033,7 +8033,7 @@ live version `20261113063843`, on explicit owner approval naming it by version.
 The merged copy matched the sha256 below; the stored statement and body were
 checked against hashes computed from the file; `anon` cannot execute it,
 `authenticated` can, and a non-staff call refuses with `42501`. Money path
-unchanged. Ledger row 105 has the evidence. **#456 may now merge.** Written
+unchanged. Ledger row 105 has the evidence. **#456 merged afterwards as `2974cac`.** Written
 2026-11-12. Assessment finding P04#2. Owner step:
 `docs/OWNER_ACTIONS.md` §50.
 

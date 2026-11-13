@@ -290,7 +290,7 @@ applied, 2 superseded (ledger rows 8-9), and these 8. It added one
 `is_staff()`-gated read-only function and changed nothing else; the money-path
 pair is unchanged (`12b6816d…` / `22e2d429…`), and the stored statement hashes
 to the merged file (§8's "hash what the database stored"). #456, the console
-half that reads it, may now merge. **`20260824100000` still sorts first. Name
+half that reads it, merged afterwards as `2974cac`. **`20260824100000` still sorts first. Name
 the target by version.** This supersedes the 2026-11-11 current position below
 and the "on merge … EIGHT/NINE" counts in the 2026-11-12 amendments.
 
