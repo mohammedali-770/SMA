@@ -4261,6 +4261,12 @@ evidence, `GO_LIVE_READINESS.md` G1 and G2 updated, and §2 closed.
 
 ## 48. Server input bounds and customer order limits — three numbers, then one apply
 
+**DONE 2026-11-13.** Applied at 16:43:01 UTC with 50 / 5 / 10, on your word
+naming it by version (`docs/MIGRATIONS.md` ledger row 111). `app_settings` reads
+5 and 10, and the 5 profiles that are not phone-verified are now refused at
+checkout. **Left for you:** delete an old banner or product image in the console
+once, and confirm it is gone from storage.
+
 **Opened 2026-11-12.** `20261005120000_server_input_bounds.sql` is written,
 validated and NOT applied. Detail: `docs/MIGRATIONS.md` §57. Section 46 is #442's
 and 47 is the Moyasar go-live.
@@ -4405,6 +4411,12 @@ There is no number to decide and no function to deploy.
 and §59 marked APPLIED.
 
 ## 51. Audit trail — one apply, then two deploys, in that order
+
+**DONE 2026-11-13, all three steps.** `20261007120000` applied at 16:46:26 UTC
+(ledger row 112), then `push-dispatch` v9 (16:50:07) and `staff-accounts` v5
+(16:52:11), each read back byte-identical to the merged source. **Left for
+you:** the next manual status change, broadcast and staff password reset will
+each write their first audit row; look at them once, signed in at AAL2.
 
 **Opened 2026-11-12.** `20261007120000_audit_trail.sql` is written, validated
 and NOT applied. Detail: `docs/MIGRATIONS.md` §60.

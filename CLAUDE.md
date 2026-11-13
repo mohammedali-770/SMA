@@ -275,8 +275,29 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-11-13 (afternoon), read live AFTER three more applies:
-155 repository files on the default branch / 155 live history rows / SIX
+**Current position 2026-11-13 (evening), read live AFTER two more applies:
+155 repository files on the default branch / 157 live history rows / FOUR
+unapplied** — `20260824100000_moyasar_payment_provider` (the first Moyasar
+go-live apply, awaiting its own approval under §6), `20261003120000`,
+`20261004120000` and `20261006120000`. Applied, one call each, each named by
+version and verified before the next: `20261005120000_server_input_bounds`
+(live `20261113164301`, ledger row 111) and `20261007120000_audit_trail`
+(`20261113164626`, row 112), followed by the two deploys the second implies,
+`push-dispatch` v9 and `staff-accounts` v5. Reconciled **by name**: 149 applied,
+2 superseded (rows 8-9), 4 unapplied. Money-path pair unchanged; Moyasar absent.
+
+**AN INLINE APPLY CAN REWRITE ESCAPES, so hash what landed, not what was sent.**
+`20261005120000` writes its bidi character set as `\uXXXX` regex escapes, on
+purpose, so no invisible character sits in the file. The transport decoded all
+14 into the literal characters, and the stored bodies differ from the file by
+exactly that. It is harmless here — in a PostgreSQL regex the two forms are the
+same character, and the live rule was measured identical — but only a hash of
+the stored text against one pre-computed from the file showed it at all. Check
+a file for `\u` before an inline apply, and say so in the record when it has
+any.
+
+**Superseded, kept because the count is the point — the position read live
+AFTER three more applies (afternoon): 155 repository files on the default branch / 155 live history rows / SIX
 unapplied** — `20260824100000_moyasar_payment_provider` (the first Moyasar
 go-live apply, awaiting its own approval under §6),
 `20261003120000`, `20261004120000`, `20261005120000`, `20261006120000` and
