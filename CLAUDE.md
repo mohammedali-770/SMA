@@ -277,7 +277,8 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **Current position 2026-11-13 (afternoon), read live AFTER three more applies:
 155 repository files on the default branch / 155 live history rows / SIX
-unapplied** — `20260824100000_moyasar_payment_provider` (frozen, §6),
+unapplied** — `20260824100000_moyasar_payment_provider` (the first Moyasar
+go-live apply, awaiting its own approval under §6),
 `20261003120000`, `20261004120000`, `20261005120000`, `20261006120000` and
 `20261007120000`. Applied, one call each, each on the owner's approval naming it
 by version and each verified before the next:
