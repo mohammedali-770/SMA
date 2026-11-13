@@ -4491,6 +4491,11 @@ version, and the readiness record's S03 row closed.
 
 ## 53. Lazywait monitor and Push Tools counts — two applies, a merge, then one more apply
 
+**Steps 1-3 DONE 2026-11-13.** #461 merged as `d27916d`; `20261009120000` and
+`20261010120000` were applied at 09:02 and 09:03 UTC and checked as step 3
+asks (`docs/MIGRATIONS.md` ledger rows 106-107). **Step 4, merging #462, and
+step 5, applying `20261011120000` after it deploys, remain.**
+
 **Opened 2026-11-13.** Two follow-ups, in one sequence because they reach the
 console together:
 
