@@ -275,7 +275,30 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-11-13, read live AFTER the two RPC applies: 154
+**Current position 2026-11-13 (afternoon), read live AFTER three more applies:
+155 repository files on the default branch / 155 live history rows / SIX
+unapplied** — `20260824100000_moyasar_payment_provider` (frozen, §6),
+`20261003120000`, `20261004120000`, `20261005120000`, `20261006120000` and
+`20261007120000`. Applied, one call each, each on the owner's approval naming it
+by version and each verified before the next:
+`20261011120000_drop_push_devices_admin_select` (live `20261113125440`, ledger
+row 108), `20260929120000_db_advisor_hardening` (`20261113125702`, row 109) and
+`20261002120000_staff_actor_fk_set_null` (`20261113125810`, row 110). Reconciled
+**by name**: 147 applied, 2 superseded (rows 8-9), 6 unapplied. Every stored
+statement hashes to its merged file; money-path pair unchanged; Moyasar absent.
+
+**A CONNECTOR OUTAGE IS NOT A FAILED APPLY, AND IT IS NOT A SUCCESSFUL ONE.**
+`20261005120000` was sent three times that afternoon: once it timed out at the
+connector's confirmation question, twice the connector refused the request
+before it reached the database, and the connector then dropped out of the
+session altogether. Each outcome was settled by a read the connector does not
+mediate — PostgREST still answered `42703` for `app_settings.order_limit_open`,
+so nothing landed. **When the tool that applies is down, settle the outcome by
+another path before saying anything about it.** `20260824100000` still sorts
+first. **Name the target by version.** This supersedes the position below.
+
+**Superseded, kept because the count is the point — the position read live
+AFTER the two RPC applies: 154
 repository files on the default branch / 152 live history rows / EIGHT
 unapplied** — the same eight as the loyalty-stats position below.
 `20261009120000_admin_lazywait_sync_monitor` (live `20261113090236`, ledger row

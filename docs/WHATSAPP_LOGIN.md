@@ -456,6 +456,10 @@ a loss of login.
 > document records no deploy of `auth-send-sms-whatsapp` after v2, so whether
 > Production fails open or closed is not established here. The 2026-11-11 section
 > says what a redeploy now carries.
+>
+> **Settled 2026-11-13:** Production ran v4, deployed 2026-09-02, so it failed
+> OPEN until `auth-send-sms-whatsapp` v5 was deployed that day. It fails CLOSED
+> now (see the redeploy list in the 2026-11-11 section).
 
 | | |
 | --- | --- |
@@ -847,6 +851,22 @@ The hook demonstration in the table above is not in CI: it needs Deno, sockets
 and a stub server.
 
 ### Redeploy list
+
+**DONE 2026-11-13, on the owner's approval, in the order below.** Each bundle was
+built from the default branch at `7a79841`; `verify_jwt` as `supabase/config.toml`
+sets it.
+
+| function | before | after | checked afterwards, without sending a code |
+| --- | --- | --- | --- |
+| `whatsapp-test-config` | v5, 2026-08-23 | **v6**, 12:07:18 UTC | refuses `GET` and an unauthenticated call |
+| `auth-send-sms-whatsapp` | v4, 2026-09-02 | **v5**, 12:32:27 UTC | `GET` 405, unsigned `POST` refused |
+| `account-delete-request` | v3, 2026-07-16 | **v4**, 12:36:56 UTC | `GET` 405 from the handler; an anon `POST` 401 `Authentication required`; no header 401 from the gateway |
+
+**The login limiter in Production now fails CLOSED.** The previous
+`auth-send-sms-whatsapp` was deployed on 2026-09-02, before the 2026-09-14
+change, so Production failed OPEN until v5. The 3-second send deadline and #419's
+key code are live in all three. The first real login after the deploy is still
+the only proof of the success path.
 
 Supabase bundles a function's imports when it is deployed, so the fix is live
 only in a function redeployed after the merge. Each redeploy is a separate
