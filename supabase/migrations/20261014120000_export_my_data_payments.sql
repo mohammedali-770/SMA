@@ -83,7 +83,8 @@
 --          out (below), and its currency and invoice id are the record's own.
 --          For a declined try `raw` is the only place we keep the card details
 --          (PG-24), so leaving `tries` out would leave out data we hold. A Tap
---          record (history only) gives the same facts from Tap's shape.
+--          record (history only) gives the same facts from Tap's shape, except
+--          the time of the try, which it exports as null.
 --     OUT  raw itself: the provider payload. Its shape varies (one payment, an
 --          invoice, or Tap's charge), and it carries Moyasar's `fee` (its
 --          charge to us, not data about the customer) and amounts in halalas,

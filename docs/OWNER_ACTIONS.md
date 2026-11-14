@@ -4933,10 +4933,10 @@ deploy.
 
 ### The steps
 
-1. **Merge the pull request.** Merging changes nothing a customer sees. The web
-   app at `/app` ships on merge (CLAUDE.md §13), and its new summary line counts
-   payment records only when the server sends them, so it stays silent until
-   step 3.
+1. **Merge the pull request.** Merging changes only the format of the copy
+   shared from `/app`, which becomes compact JSON (below). The web app ships on
+   merge (CLAUDE.md §13), and its new summary line counts payment records only
+   when the server sends them, so it stays silent until step 3.
 2. **Before applying, read-only, as the role that will apply the file:**
    `select has_table_privilege('auth.users', 'insert');` must be **true**. The
    file's own check creates two throwaway sign-in identities, and takes them
@@ -4959,7 +4959,11 @@ same data, without line breaks. That lets more history fit in one share. Once
 the file is applied, each card order also carries its payment record, so a
 card customer with more than about **132** orders is asked to contact us for
 their copy, where before it was about **199**. A cash customer's limit rises to
-about **301**. Method and figures: `docs/MIGRATIONS.md` §66. Live there were
+about **301**. Those figures are for compact JSON: `/app` from the merge, and
+phones from the §47.17 EAS build. Phones on the installed build still share
+indented JSON, so until that build reaches them, once the file is applied a card
+customer there is asked at about **93** orders. If that ceiling matters, apply
+after the build. Method and figures: `docs/MIGRATIONS.md` §66. Live there were
 82 orders in all on 2026-11-14 (read-only count), so nobody is near either
 figure. If someone reaches one, sending the copy by hand is the answer until
 the app can attach a file, which needs a native build.

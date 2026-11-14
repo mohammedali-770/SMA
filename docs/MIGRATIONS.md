@@ -8670,8 +8670,8 @@ change (CLAUDE.md §7). **MONEY PATH UNTOUCHED, and the file asserts it.**
 Gap PG-26 in `docs/readiness/20261113-card-payments-gaps.md`. Revised the same
 day after review (below, "What review changed").
 
-sha256 `082d7760a38bbb0e98199003f9b4375d53403372b59c5ad32d068b1d6d34be51`,
-919 lines / 49 174 bytes. **Re-hash the MERGED copy before applying**, per §15.
+sha256 `3eb020d2837a48ec4655de5d86d1947345aa024329e1a94b671bd3ab52bb8a8d`,
+920 lines / 49 240 bytes. **Re-hash the MERGED copy before applying**, per §15.
 
 **It redefines `export_my_data()` and nothing else.** No data, no deploy: the
 app calls the function by name with no arguments, so the existing call binds to
@@ -8765,13 +8765,17 @@ this file exported side by side; bytes counted with Node's `JSON.stringify`.
 | This file's first version, shared indented | about 3 634 | about 72 |
 | This file's first version, shared compact | about 2 466 | about 106 |
 | **This file, shared compact (this change)** | **about 1 980** | **about 132** |
+| This file, shared indented (phones on the installed build, until the §47.17 EAS build) | about 2 817 | about 93 |
 | A cash order, shared compact (this change) | about 868 | about 301 |
 
 So **a card customer with more than about 132 orders is told to contact us,
 where before it was about 199**; a cash customer's ceiling rises from about 199
 to about 301. The app shares compact JSON from this change on
 (`exportShareText`, `apps/mobile/src/features/profile/dataExport.ts`); that
-ships at `/app` on merge and on phones with the next EAS build. The real fix,
+ships at `/app` on merge and on phones with the next EAS build. Until that
+build reaches them, phones still share indented JSON, so once this file is
+applied a card customer on the installed build is told to contact us at about
+93 orders; apply after the build if that ceiling matters. The real fix,
 a file attachment, still needs a native build. Real orders vary (add-ons,
 delivery addresses, several tries), so read these as estimates.
 
