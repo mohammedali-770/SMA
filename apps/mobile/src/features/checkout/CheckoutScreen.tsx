@@ -821,7 +821,8 @@ export function CheckoutScreen() {
         if (refusalDropsSession(init)) {
           // Moyasar will not invoice a total under 1.00 SAR, so nothing can ever
           // be paid on this session (payment-initiate retires it as well). Drop
-          // it, and say what to change: fewer points, or cash.
+          // it, and say what to change: points off for this order, or cash.
+          // Not "fewer points": the switch is all or nothing (PG-05).
           await clearPendingSession();
           setPayFlow(null);
           setError(t('payBelowMinimum'));
