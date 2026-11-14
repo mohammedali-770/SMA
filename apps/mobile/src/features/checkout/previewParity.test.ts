@@ -94,6 +94,12 @@ describe('checkout preview matches compute_order_snapshot (PG-31)', () => {
     const pg31 = fixture.cases.find((c) => c.n === 2);
     expect(pg31?.server).toMatchObject({ subtotal: 8, loyaltyPointsRedeemed: 0, total: 8 });
     expect(pg31?.requestedPoints).toBeGreaterThanOrEqual(pg31?.settings.minPointsToRedeem ?? Infinity);
+    // And the PG-05 shape: a percentage coupon leaves 0.05 after 212 whole
+    // points. Trimming it from the case table and regenerating would otherwise
+    // keep every check green with the remainder case gone.
+    const pg05 = fixture.cases.find((c) => c.n === 12);
+    expect(pg05?.coupon).not.toBeNull();
+    expect(pg05?.server).toMatchObject({ loyaltyPointsRedeemed: 212, total: 0.05 });
   });
 
   it.each(fixture.cases.map((c) => [`${c.n}. ${c.name}`, c] as const))('%s', (_label, c) => {
@@ -146,6 +152,21 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
     expect(call).toContain('minPointsToRedeem: loyalty?.minPointsToRedeem ?? Infinity,');
   });
 
+  it('gives the summary the same pickup-only answer as the switch and the submission', () => {
+    // The fresher value read during checkout, not the launch-time snapshot.
+    // With `loyalty?.pickupOnly` here, an administrator relaxing the rule
+    // mid-checkout would leave the summary withholding a delivery redemption
+    // the server grants.
+    expect(screen).toContain(
+      'const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;',
+    );
+    expect(screen).toContain("const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';");
+    expect(call).toMatch(/^\s+loyaltyPickupOnly,$/m);
+    expect(call).not.toContain('loyalty?.pickupOnly');
+    const deps = screen.slice(screen.indexOf('}), [cart.items, orderType'));
+    expect(deps.slice(0, deps.indexOf(']);'))).toContain('loyaltyPickupOnly');
+  });
+
   it('asks for the whole balance or nothing, which is what the parity carts assume', () => {
     expect(call).toContain('loyaltyPoints: redeemingPoints,');
     expect(screen).toContain(
@@ -159,5 +180,13 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
     expect(toggle).toContain(
       "t('loyaltyOrderTooSmall').replace('{amount}', totals.loyaltyMinimumOrder.toFixed(2))",
     );
+  });
+
+  it('lets a screen reader hear that note too', () => {
+    // LoyaltyToggle's accessibilityLabel replaces the text inside it, so the
+    // caption carrying the note must be part of the label.
+    const toggle = readFileSync(new URL('./view/LoyaltyToggle.tsx', import.meta.url), 'utf8');
+    expect(toggle).toContain('accessibilityLabel={`${label}. ${pointsLabel}`}');
+    expect(toggle).not.toMatch(/accessibilityLabel=\{label\}/);
   });
 });

@@ -309,8 +309,9 @@ fit the order, and none when fewer than `min_points_to_redeem` fit (100 points
 at 0.10 on 2026-11-14, so an order under SAR 10.00 before points uses none).
 Until 2026-11-14 it took the balance times the point value, so a SAR 8.00
 pickup order read 0.00 and Moyasar's page then asked for 8.00 (gap PG-31). The
-switch now also says "Points can be used on orders of 10.00 SAR or more." when
-that is why no points are used. `previewParity.test.ts` checks the summary
+switch now also says "Points can be used when the total before points is
+10.00 SAR or more." when that is why no points are used, and a screen reader
+reads it as part of the switch. `previewParity.test.ts` checks the summary
 against the real `compute_order_snapshot` for 23 carts; detail in
 [`LOYALTY.md`](LOYALTY.md) §1. Same branch. App customers get it with the same
 build; the web checkout at `/app` gets it as soon as the branch is merged,
@@ -835,7 +836,7 @@ All engineering-drafted.
 Customer-facing:
 
 - `payBelowMinimum`: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.» Rewritten 2026-11-14 (gap PG-05); it said «استخدم نقاطاً أقل» before. «استبدال» is the points switch's own word (`useLoyalty`).
-- `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط في الطلبات التي تبلغ قيمتها {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00.
+- `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00. It names the total before points, not the order, because the minimum is judged after any coupon.
 - payment screen footer: «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.»
 - web stand-in: «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.»
 

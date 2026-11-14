@@ -279,16 +279,19 @@ end $$;
 
 -- ---- Sanity: the carts that state the PG-31 and PG-05 shapes really do ------
 -- If one of these fails, the case table no longer tests what its name says.
+-- A missing case must fail too: `<>` against a row that is not there is NULL,
+-- and NULL raises nothing, so each check names `not found` and uses
+-- `is distinct from`.
 do $$
 declare r parity_result;
 begin
   select * into r from parity_result where n = 2;
-  if r.loyalty_points_redeemed <> 0 or r.total <> 8.00 then
+  if not found or r.loyalty_points_redeemed is distinct from 0 or r.total is distinct from 8.00 then
     raise exception 'FAIL: case 2 (PG-31) used % points and totals %, expected 0 and 8.00',
       r.loyalty_points_redeemed, r.total;
   end if;
   select * into r from parity_result where n = 12;
-  if r.loyalty_points_redeemed <> 212 or r.total <> 0.05 then
+  if not found or r.loyalty_points_redeemed is distinct from 212 or r.total is distinct from 0.05 then
     raise exception 'FAIL: case 12 (PG-05) used % points and totals %, expected 212 and 0.05',
       r.loyalty_points_redeemed, r.total;
   end if;

@@ -106,4 +106,15 @@ describe('the points note when an order is too small for the minimum (gap PG-31)
     expect(STRINGS.en.loyaltyOrderTooSmall).toContain('{amount}');
     expect(STRINGS.ar.loyaltyOrderTooSmall).toContain('{amount}');
   });
+
+  it('names the total before points, not the order', () => {
+    // The server judges the minimum on the amount after any coupon, with any
+    // delivery fee: the Total line while no points are used. "Orders of 10.00
+    // SAR or more" read wrong beside an 11.00 subtotal that the 15% coupon had
+    // taken to 9.35.
+    expect(STRINGS.en.loyaltyOrderTooSmall).toMatch(/total before points is \{amount\} SAR or more/);
+    expect(STRINGS.en.loyaltyOrderTooSmall).not.toMatch(/orders of/i);
+    expect(STRINGS.ar.loyaltyOrderTooSmall).toContain('الإجمالي قبل خصم النقاط {amount}');
+    expect(STRINGS.ar.loyaltyOrderTooSmall).not.toContain('قيمتها');
+  });
 });

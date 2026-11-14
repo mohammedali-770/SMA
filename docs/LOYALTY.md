@@ -58,8 +58,12 @@ charged 8.00 (gap PG-31). It now runs the server's steps in whole halalas.
 `supabase/tests/checkout_preview_parity_test.sql` fails in CI if the server's
 answers for those carts ever change, so the two cannot drift apart unnoticed.
 When the switch is on and the order is too small for the minimum, the line
-under the switch adds "Points can be used on orders of 10.00 SAR or more." (the
-Arabic is engineering-drafted, `docs/OWNER_ACTIONS.md` §35). This is on branch
+under the switch adds "Points can be used when the total before points is
+10.00 SAR or more." It names the total, not the order: the server judges the
+minimum after any coupon and with any delivery fee, and while no points are
+used that is the Total line. Screen readers hear it too, because it is part of
+the switch's accessible name. The Arabic is engineering-drafted
+(`docs/OWNER_ACTIONS.md` §35). This is on branch
 `fix/checkout-points-preview-20261114`. App customers get it only with the
 `OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
 branch is merged, because a merge deploys the web build (CLAUDE.md §13).

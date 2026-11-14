@@ -35,7 +35,13 @@ export function LoyaltyToggle({
       onPress={onToggle}
       accessibilityRole="switch"
       aria-checked={on}
-      accessibilityLabel={label}
+      // The caption joins the name. A label replaces its children's text for
+      // screen readers, so with `{label}` alone VoiceOver and TalkBack never
+      // heard the balance, nor the note that this order is too small for any
+      // points (PG-31): the switch said "on" and nothing explained why no
+      // points were used. A hint would not do: the web build drops it, and
+      // users can turn hints off.
+      accessibilityLabel={`${label}. ${pointsLabel}`}
     >
       <View style={[styles.track, on && styles.trackOn]}>
         <View style={[styles.knob, on && styles.knobOn]} />

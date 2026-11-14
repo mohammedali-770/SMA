@@ -179,9 +179,13 @@ export const STRINGS = {
     loyaltyPickupOnly: 'Points are earned and redeemed on pickup orders only.',
     loyaltyPickupOnlyBalance: 'Your points are safe — switch to pickup to spend them.',
     // Under the points switch when it is on and the server will use no points:
-    // fewer than the minimum fit this order. {amount} is the order value from
-    // which they do (minimum x point value), e.g. 10.00.
-    loyaltyOrderTooSmall: 'Points can be used on orders of {amount} SAR or more.',
+    // fewer than the minimum fit this order. {amount} is the total before
+    // points from which they do (minimum x point value), e.g. 10.00. It names
+    // the TOTAL, not the order: the server judges it after any coupon and with
+    // any delivery fee, and while no points are used that is the Total line.
+    // "Orders of 10.00 SAR or more" read wrong beside an 11.00 subtotal that a
+    // coupon had taken to 9.35.
+    loyaltyOrderTooSmall: 'Points can be used when the total before points is {amount} SAR or more.',
     loyaltyChannelChanged: 'Points can no longer be redeemed on delivery orders. Your points are safe — check the new total and confirm again.',
     pointsEarnedNote: "You'll earn {points} points with this order.",
     pointsExpireOn: 'Your points expire on {date}.',
@@ -547,7 +551,7 @@ export const STRINGS = {
     pointsAvailable: 'نقطة متاحة',
     loyaltyPickupOnly: 'تُكتسب النقاط وتُستبدل في طلبات الاستلام فقط.',
     loyaltyPickupOnlyBalance: 'نقاطك محفوظة — اختر الاستلام لاستخدامها.',
-    loyaltyOrderTooSmall: 'يمكن استخدام النقاط في الطلبات التي تبلغ قيمتها {amount} ريال أو أكثر.',
+    loyaltyOrderTooSmall: 'يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.',
     loyaltyChannelChanged: 'لم يعد استبدال النقاط متاحاً في طلبات التوصيل. نقاطك محفوظة — راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
     pointsEarnedNote: 'ستحصل على {points} نقطة مع هذا الطلب.',
     pointsExpireOn: 'تنتهي صلاحية نقاطك في {date}.',

@@ -2909,10 +2909,15 @@ before that merge:
   draft's own sentence;
 - `loyaltyOrderTooSmall`, new. Added after the balance under the points switch,
   when the switch is on and the order is too small for any points to be used:
-  «يمكن استخدام النقاط في الطلبات التي تبلغ قيمتها {amount} ريال أو أكثر.» —
-  English: *"Points can be used on orders of {amount} SAR or more."* The app
-  replaces `{amount}` with a figure such as 10.00. Check that «تبلغ قيمتها»
-  reads naturally after «الطلبات التي».
+  «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو
+  أكثر.» — English: *"Points can be used when the total before points is
+  {amount} SAR or more."* The app replaces `{amount}` with a figure such as
+  10.00. It names the total, not the order, because the server judges the
+  minimum after any coupon: with the 15% coupon, an 11.00 order comes to 9.35
+  and uses no points. An earlier draft on the same branch said «في الطلبات التي
+  تبلغ قيمتها» ("on orders of"), which read wrong beside that 11.00 subtotal.
+  Check that «الإجمالي قبل خصم النقاط» reads naturally, and that a screen
+  reader reading the switch's name and this note together sounds right.
 
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
