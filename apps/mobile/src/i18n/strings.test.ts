@@ -97,3 +97,13 @@ describe('the below-minimum online payment message (gap PG-05)', () => {
     expect(STRINGS.ar.payBelowMinimum).toContain('1.00 ريال');
   });
 });
+
+describe('the points note when an order is too small for the minimum (gap PG-31)', () => {
+  // Shown under the points switch when it is on and the server will use no
+  // points, because fewer than the minimum fit the order. Without it the switch
+  // reads "on" while the summary shows no points at all.
+  it('carries the amount placeholder the screen fills in, in both languages', () => {
+    expect(STRINGS.en.loyaltyOrderTooSmall).toContain('{amount}');
+    expect(STRINGS.ar.loyaltyOrderTooSmall).toContain('{amount}');
+  });
+});

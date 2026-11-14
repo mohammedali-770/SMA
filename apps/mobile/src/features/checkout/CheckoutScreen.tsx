@@ -423,9 +423,15 @@ export function CheckoutScreen() {
     couponDiscount,
     loyaltyPoints: redeemingPoints,
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
-    loyaltyPickupOnly: loyalty?.pickupOnly ?? true,
+    // The server uses no points when fewer than this many fit the order, so the
+    // preview needs it to show what will really be charged (PG-31). Unknown
+    // withholds the discount, the same direction as `loyaltyEnabled` above.
+    minPointsToRedeem: loyalty?.minPointsToRedeem ?? Infinity,
+    // The same answer the switch and the submission use, the fresher one
+    // included, so the three cannot disagree about the channel.
+    loyaltyPickupOnly,
     comped,
-  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, comped]);
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, loyaltyPickupOnly, comped]);
 
   // WHAT THIS ORDER WILL EARN — fetched, never computed here.
   //
@@ -1044,7 +1050,13 @@ export function CheckoutScreen() {
                   on={redeemPoints}
                   onToggle={() => setRedeemPoints((v) => !v)}
                   label={t('useLoyalty')}
-                  pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
+                  // Switched on with an order too small for the minimum, the
+                  // server uses no points and the summary shows none. Say why,
+                  // the way LoyaltyChannelNote does for delivery, rather than
+                  // leave a switch that is on and does nothing (PG-31).
+                  pointsLabel={totals.loyaltyOrderTooSmall
+                    ? `${availablePoints} ${t('pointsAvailable')} — ${t('loyaltyOrderTooSmall').replace('{amount}', totals.loyaltyMinimumOrder.toFixed(2))}`
+                    : `${availablePoints} ${t('pointsAvailable')}`}
                 />
               ) : (
                 // A customer holding a redeemable balance who is shown nothing
