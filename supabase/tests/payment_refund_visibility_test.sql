@@ -313,8 +313,8 @@ end $$;
 -- ---- 4. PG-01: R14 REFUND_FAILED, and the feed's two refund lists -----------------
 do $$
 declare
-  v_of uuid; v_os uuid; v_or uuid; v_ot uuid;
-  v_rf uuid; v_rt uuid; v_feed jsonb; v_inc record;
+  v_of uuid; v_os uuid; v_or uuid; v_ot uuid; v_od uuid; v_ou uuid;
+  v_rf uuid; v_rt uuid; v_rd1 uuid; v_rd2 uuid; v_ru uuid; v_feed jsonb; v_inc record;
 begin
   perform pg_temp.prv_reset();
   v_of := pg_temp.prv_order('PRV-4F', 30, 'failed');
@@ -331,6 +331,17 @@ begin
   v_ot := pg_temp.prv_order('PRV-4T', 40);
   v_rt := pg_temp.prv_refund(v_ot, '4t', 'pending', 2, now() - interval '50 minutes', now() - interval '4 minutes',
                              'provider_no_answer', 'No answer from Moyasar.', 'pay_prv_4t');
+  -- The worst case: a refund that failed, was re-enrolled and failed again. Two
+  -- failed rows and nothing active, so the other failed row must not count as a
+  -- replacement: one incident, and the newest row on the card.
+  v_od := pg_temp.prv_order('PRV-4D', 35, 'failed');
+  v_rd1 := pg_temp.prv_refund(v_od, '4d1', 'failed', 3, now() - interval '5 hours', now() - interval '4 hours',
+                              'http_400', null, 'pay_prv_4d');
+  v_rd2 := pg_temp.prv_refund(v_od, '4d2', 'failed', 3, now() - interval '2 hours', now() - interval '90 minutes',
+                              'http_400', null, 'pay_prv_4d');
+  -- Enrolled and never tried: not "still being retried", so not listed.
+  v_ou := pg_temp.prv_order('PRV-4U', 15);
+  v_ru := pg_temp.prv_refund(v_ou, '4u', 'pending', 0);
 
   if pg_temp.prv_scan(1) <> 'success' then raise exception 'CASE 4 FAILED: watchdog run failed'; end if;
   select * into v_inc from public.order_integrity_incidents where fingerprint = 'REFUND_FAILED:' || v_of;
@@ -349,13 +360,26 @@ begin
   if exists (select 1 from public.order_integrity_incidents where order_id = v_ot) then
     raise exception 'CASE 4 FAILED: a retrying refund raised an incident (the "stuck after" age is the owner''s)';
   end if;
+  if not pg_temp.prv_open('REFUND_FAILED:' || v_od)
+     or (select count(*) from public.order_integrity_incidents
+          where order_id = v_od and rule_code = 'REFUND_FAILED') <> 1 then
+    raise exception 'CASE 4 FAILED: a refund that failed twice did not raise exactly one open incident';
+  end if;
 
   v_feed := public.payments_needing_attention_internal(50);
-  if (v_feed -> 'failed_refunds' ->> 'total')::integer <> 1
-     or (v_feed -> 'failed_refunds' -> 'items' -> 0 ->> 'id')::uuid <> v_rf
-     or (v_feed -> 'failed_refunds' -> 'items' -> 0 ->> 'payment_ref') <> 'pay_prv_4f'
-     or (v_feed -> 'failed_refunds' -> 'items' -> 0 ->> 'order_number') <> 'PRV-4F' then
+  if (v_feed -> 'failed_refunds' ->> 'total')::integer <> 2
+     or not exists (select 1 from jsonb_array_elements(v_feed -> 'failed_refunds' -> 'items') e
+                     where (e ->> 'id')::uuid = v_rf and e ->> 'payment_ref' = 'pay_prv_4f'
+                       and e ->> 'order_number' = 'PRV-4F')
+     or not exists (select 1 from jsonb_array_elements(v_feed -> 'failed_refunds' -> 'items') e
+                     where (e ->> 'id')::uuid = v_rd2 and e ->> 'order_number' = 'PRV-4D')
+     or exists (select 1 from jsonb_array_elements(v_feed -> 'failed_refunds' -> 'items') e
+                 where (e ->> 'id')::uuid = v_rd1) then
     raise exception 'CASE 4 FAILED: failed_refunds is %', v_feed -> 'failed_refunds';
+  end if;
+  if exists (select 1 from jsonb_array_elements(v_feed -> 'retrying_refunds' -> 'items') e
+              where (e ->> 'id')::uuid = v_ru) then
+    raise exception 'CASE 4 FAILED: a refund never tried is listed as still being retried';
   end if;
   if (v_feed -> 'retrying_refunds' ->> 'total')::integer <> 1
      or (v_feed -> 'retrying_refunds' -> 'items' -> 0 ->> 'id')::uuid <> v_rt
@@ -371,8 +395,14 @@ begin
   if pg_temp.prv_open('REFUND_FAILED:' || v_of) then
     raise exception 'CASE 4 FAILED: a refund that a retry settled is still an open incident';
   end if;
-  if (public.payments_needing_attention_internal(50) -> 'failed_refunds' ->> 'total')::integer <> 0 then
+  v_feed := public.payments_needing_attention_internal(50);
+  if (v_feed -> 'failed_refunds' ->> 'total')::integer <> 1
+     or exists (select 1 from jsonb_array_elements(v_feed -> 'failed_refunds' -> 'items') e
+                 where (e ->> 'id')::uuid = v_rf) then
     raise exception 'CASE 4 FAILED: a refund that a retry settled is still on the card';
+  end if;
+  if not pg_temp.prv_open('REFUND_FAILED:' || v_od) then
+    raise exception 'CASE 4 FAILED: settling one order''s refund closed another order''s incident';
   end if;
   raise notice 'CASE 4 ok: R14 fires on a failed refund, ends on a successful retry, and the feed lists both refund kinds';
 end $$;
