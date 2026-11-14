@@ -2816,7 +2816,9 @@ Customer-facing, in the app (ships with the EAS build in §47.17):
   web build a trial version;
 - `payBelowMinimum` (`apps/mobile/src/i18n/strings.ts`), shown when points leave
   a total under 1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال.
-  استخدم نقاطاً أقل، أو ادفع نقداً.»
+  استخدم نقاطاً أقل، أو ادفع نقداً.» **Superseded 2026-11-14: rewritten on
+  branch `fix/checkout-points-preview-20261114` (gap PG-05). Read the new text
+  in the 2026-11-14 entry at the end of this section, not this one.**
 
 Admin-facing, in the console (live on merge):
 
@@ -2887,6 +2889,35 @@ is customer legal text, so rank it with the consent copy above. Read the Arabic
 12). Each draft lists its points for the reader. All of it must be read before
 the publishing session in §47.15: until then, nothing is published in either
 language.
+
+**Widened 2026-11-14 — the checkout points fix (gaps PG-05 and PG-31).** Two
+customer-facing strings in `apps/mobile/src/i18n/strings.ts`, both
+engineering-drafted, on branch `fix/checkout-points-preview-20261114`.
+`payBelowMinimum` reaches customers only with the §47.17 build, because the web
+build takes no card payment. `loyaltyOrderTooSmall` also appears in the web
+checkout at `/app` as soon as the branch is merged, because a merge deploys the
+web build (CLAUDE.md §13); if you want it read before anyone sees it, read it
+before that merge:
+
+- `payBelowMinimum`, rewritten. Shown when a card payment would be under
+  1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال
+  النقاط في هذا الطلب، أو ادفع نقداً.» — English: *"Online payment needs a total
+  of at least 1.00 SAR. Turn off points for this order, or pay in cash."* It
+  used to say «استخدم نقاطاً أقل» ("use fewer points"), which the app cannot do.
+  «أوقف استبدال النقاط» deliberately reuses «استبدال», the word on the switch
+  itself (`useLoyalty`, «استبدال نقاط الولاء»), and matches the payment policy
+  draft's own sentence;
+- `loyaltyOrderTooSmall`, new. Added after the balance under the points switch,
+  when the switch is on and the order is too small for any points to be used:
+  «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو
+  أكثر.» — English: *"Points can be used when the total before points is
+  {amount} SAR or more."* The app replaces `{amount}` with a figure such as
+  10.00. It names the total, not the order, because the server judges the
+  minimum after any coupon: with the 15% coupon, an 11.00 order comes to 9.35
+  and uses no points. An earlier draft on the same branch said «في الطلبات التي
+  تبلغ قيمتها» ("on orders of"), which read wrong beside that 11.00 subtotal.
+  Check that «الإجمالي قبل خصم النقاط» reads naturally, and that a screen
+  reader reading the switch's name and this note together sounds right.
 
 **Widened 2026-11-14 — a cancelled order** (gap PG-03, branch
 `fix/cancelled-orders-guard-20261114`; `apps/mobile/src/i18n/strings.ts`, ships
@@ -4475,7 +4506,11 @@ guard that makes Place order do nothing while a payment run is in flight, and th
 
 **The app-side gap fixes must be in this build** (the gaps list, top of §47):
 PG-03, PG-04, PG-05, PG-20 if you choose the code fix, and PG-31. A fix that
-misses it needs another build and another store review. PG-03's app half (a
+misses it needs another build and another store review. PG-05 and PG-31 are
+fixed on branch `fix/checkout-points-preview-20261114` (2026-11-14): this build
+carries them only if that pull request is merged before it starts. Their device
+checks are in `RELEASE_CHECKLIST.md` §7 ("A total under 1.00 SAR" and "Points
+on an order under SAR 10.00"). PG-03's app half (a
 cancelled order reads "Order cancelled" and offers no Resend) is on branch
 `fix/cancelled-orders-guard-20261114`, with its server half (§54).
 

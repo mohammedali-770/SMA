@@ -178,6 +178,14 @@ export const STRINGS = {
     pointsAvailable: 'points available',
     loyaltyPickupOnly: 'Points are earned and redeemed on pickup orders only.',
     loyaltyPickupOnlyBalance: 'Your points are safe — switch to pickup to spend them.',
+    // Under the points switch when it is on and the server will use no points:
+    // fewer than the minimum fit this order. {amount} is the total before
+    // points from which they do (minimum x point value), e.g. 10.00. It names
+    // the TOTAL, not the order: the server judges it after any coupon and with
+    // any delivery fee, and while no points are used that is the Total line.
+    // "Orders of 10.00 SAR or more" read wrong beside an 11.00 subtotal that a
+    // coupon had taken to 9.35.
+    loyaltyOrderTooSmall: 'Points can be used when the total before points is {amount} SAR or more.',
     loyaltyChannelChanged: 'Points can no longer be redeemed on delivery orders. Your points are safe — check the new total and confirm again.',
     pointsEarnedNote: "You'll earn {points} points with this order.",
     pointsExpireOn: 'Your points expire on {date}.',
@@ -205,7 +213,9 @@ export const STRINGS = {
     payUnavailable: 'Online payment is unavailable right now.',
     // Moyasar will not take an online payment under 1.00 SAR, which redeeming
     // points can leave. Shown in place of payUnavailable for that refusal.
-    payBelowMinimum: 'Online payment needs a total of at least 1.00 SAR. Use fewer points, or pay in cash.',
+    // Points are all or nothing (the switch is on or off), so the choices are
+    // the switch and cash. It said "Use fewer points" until 2026-11-14 (PG-05).
+    payBelowMinimum: 'Online payment needs a total of at least 1.00 SAR. Turn off points for this order, or pay in cash.',
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
     // One-word state for the payment status pill. The sentence underneath
@@ -550,6 +560,7 @@ export const STRINGS = {
     pointsAvailable: 'نقطة متاحة',
     loyaltyPickupOnly: 'تُكتسب النقاط وتُستبدل في طلبات الاستلام فقط.',
     loyaltyPickupOnlyBalance: 'نقاطك محفوظة — اختر الاستلام لاستخدامها.',
+    loyaltyOrderTooSmall: 'يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.',
     loyaltyChannelChanged: 'لم يعد استبدال النقاط متاحاً في طلبات التوصيل. نقاطك محفوظة — راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
     pointsEarnedNote: 'ستحصل على {points} نقطة مع هذا الطلب.',
     pointsExpireOn: 'تنتهي صلاحية نقاطك في {date}.',
@@ -575,7 +586,7 @@ export const STRINGS = {
     payPending: 'الدفع قيد المعالجة.',
     payUnknown: 'تعذّر تأكيد الدفع. يرجى التواصل مع الدعم إذا تم خصم مبلغ.',
     payUnavailable: 'الدفع الإلكتروني غير متاح حالياً.',
-    payBelowMinimum: 'يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. استخدم نقاطاً أقل، أو ادفع نقداً.',
+    payBelowMinimum: 'يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
     payStatusPending: 'قيد المعالجة',

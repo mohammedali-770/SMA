@@ -31,6 +31,7 @@ against the Data Safety form and the privacy policy it links.
 | **C-PICKUP** | short ar/en · full ar/en · release notes | points are earned on **pickup** orders | `app_settings.loyalty_pickup_only` is true | `place_order` / `compute_order_snapshot`; [`../LOYALTY.md`](../LOYALTY.md) §2 |
 | **C-CASH** | full ar/en · release notes | payment is **cash**, on pickup or delivery | `app_settings.online_payment_enabled` is false. *Changed 2026-11-11: this column said "no payment provider is selected; the freeze holds". The owner chose Moyasar that day, so only the switch keeps this claim true* | CLAUDE.md §6 · PR #377 · [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) §47 |
 | **C-VAT** | full ar/en | displayed prices **include VAT** | prices are VAT-inclusive as rendered | `previewTotals.ts` · `TotalsCard.tsx` |
+| **C-REDEEM** | full ar/en · release notes | points are redeemed **as a discount at checkout** | checkout offers the points switch on pickup, and the server uses points once at least `min_points_to_redeem` whole points fit the order (100 at 0.10 on 2026-11-14, so SAR 10.00 or more before points) | `place_order` / `compute_order_snapshot`; `previewTotals.ts`; [`../LOYALTY.md`](../LOYALTY.md) §1 |
 | **C-DELIVERY** | short ar/en · full ar/en | delivery is offered | delivery orders reach the POS | [`../LAZYWAIT.md`](../LAZYWAIT.md); live since 2026-08-27 |
 | **C-EXPORT** | full ar/en | you can request a copy of your data | the export screen ships in the installed build | `export_my_data()` is applied; the **screen** needs the next EAS build |
 | **C-NOPROMO** | *(absent by design)* | **no promo-code claim is made** | campaigns have no customer-facing UI | [`../DISCOUNTS_CAMPAIGNS.md`](../DISCOUNTS_CAMPAIGNS.md) · `GO_LIVE_READINESS.md` G6 |
@@ -43,6 +44,14 @@ switch was off on 2026-11-11 (read-only), so the copy below is still true and is
 **not changed here**. Before online payment is switched on
 (`OWNER_ACTIONS.md` §47.15 and §47.18), rewrite the "Payment" lines in both
 languages and in the release notes, and publish the new listing.
+
+**C-REDEEM was added on 2026-11-14 and the copy is not changed.** The sentence
+is true: points come off at checkout on any pickup order large enough for the
+minimum. It was recorded when the checkout summary was corrected to show the
+server's points figure (gap PG-31). Builds before that fix can show a points
+discount on an order too small for the minimum, which the server then does not
+give. The fix reaches customers with the `OWNER_ACTIONS.md` §47.17 build. If
+the minimum or the point value changes, re-read the "What must be true" column.
 
 **C-EXPORT is the one to watch before publishing.** `export_my_data()` is applied
 in Production, but the *Get a copy of my data* screen reaches customers only in

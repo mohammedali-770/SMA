@@ -317,9 +317,42 @@ older invoice-carrying attempts, newest first:
 It then reads the session once more, and answers `paid` if an order now exists.
 
 **A total under 1.00 SAR.** The new build clears the saved session and says
-"Online payment needs a total of at least 1.00 SAR. Use fewer points, or pay in
-cash." Older builds show "Online payment is unavailable right now."; the server
-retires the session, so `payment-verify` then answers it terminal.
+"Online payment needs a total of at least 1.00 SAR. Turn off points for this
+order, or pay in cash." Older builds show "Online payment is unavailable right
+now."; the server retires the session, so `payment-verify` then answers it
+terminal. Until 2026-11-14 the new build's message said "Use fewer points",
+which the app cannot do: points are all or nothing, because the switch sends
+the whole balance (gap PG-05). The change is on branch
+`fix/checkout-points-preview-20261114` and reaches customers with the
+`OWNER_ACTIONS.md` §47.17 build. Points that cover the whole order are fine:
+it is settled at once, with nothing to charge. Points are the usual cause of a
+total under 1.00 SAR, but not the only possible one: a fixed-amount coupon, or
+an order of a single item priced near 1.00 SAR, could leave one with points
+off, and then the first half of the message does not apply. Whether any live
+coupon or item can do that was not measured for this change.
+
+**The summary shows what the card page will ask for.** With points on, the
+checkout summary now uses the server's own points rule: only whole points that
+fit the order, and none when fewer than `min_points_to_redeem` fit (100 points
+at 0.10 on 2026-11-14, so an order under SAR 10.00 before points uses none).
+Until 2026-11-14 it took the balance times the point value, so a SAR 8.00
+pickup order read 0.00 and Moyasar's page then asked for 8.00 (gap PG-31). The
+switch now also says "Points can be used when the total before points is
+10.00 SAR or more." when that is why no points are used, and a screen reader
+reads it as part of the switch. `previewParity.test.ts` checks the summary
+against the real `compute_order_snapshot` for 23 carts; detail in
+[`LOYALTY.md`](LOYALTY.md) §1. Same branch. App customers get it with the same
+build; the web checkout at `/app` gets it as soon as the branch is merged,
+because a merge deploys the web build (CLAUDE.md §13).
+
+What it matches is the server's rule for the settings and balance the app last
+loaded. `min_points_to_redeem` and `discount_per_point` come from the settings
+row the app reads once at launch, and the balance from the cached profile, so an
+administrator changing either setting while a customer has the app open, or a
+balance that moved elsewhere, can still make the summary differ from the card
+page until the app reloads. Only `loyalty_pickup_only` is re-read at submission.
+This was already true of `discount_per_point` before the change; re-reading the
+other two at submission is a possible follow-up, not part of this one.
 
 **Place order waits for a payment run.** In the new build, Place order does
 nothing while an online payment run (for example "Try again" from the status
@@ -870,7 +903,8 @@ All engineering-drafted.
 
 Customer-facing:
 
-- `payBelowMinimum`: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. استخدم نقاطاً أقل، أو ادفع نقداً.»
+- `payBelowMinimum`: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.» Rewritten 2026-11-14 (gap PG-05); it said «استخدم نقاطاً أقل» before. «استبدال» is the points switch's own word (`useLoyalty`).
+- `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00. It names the total before points, not the order, because the minimum is judged after any coupon.
 - payment screen footer: «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.»
 - web stand-in: «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.»
 
