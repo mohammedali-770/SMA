@@ -193,12 +193,16 @@ devices only; the console's sandbox test does not open the app.
       Choose online payment. The app shows "Online payment needs a total of at
       least 1.00 SAR. Turn off points for this order, or pay in cash." and opens
       no payment page. Check the Arabic too: «أوقف استبدال النقاط في هذا الطلب،
-      أو ادفع نقداً». Builds before 2026-11-14 said "Use fewer points", which the
-      app cannot do (gap PG-05).
+      أو ادفع نقداً». Released builds show "Online payment is unavailable
+      right now." here instead (`PAYMENTS.md` §4). The message was written on
+      2026-11-12 for the §47.17 build and said "Use fewer points", which the
+      app cannot do, until 2026-11-14 (gap PG-05).
 - [ ] **Points on an order under SAR 10.00 (gap PG-31).** With a balance of 100
       points or more, switch points on for a pickup order under SAR 10.00. The
       summary shows the full amount and no points line, and the line under the
-      switch adds "Points can be used on orders of 10.00 SAR or more." Choose
+      switch adds "Points can be used when the total before points is 10.00
+      SAR or more." With VoiceOver or TalkBack on, the switch reads that note
+      too. Choose
       online payment: Moyasar's page asks for the same full amount. Close it
       without paying; until PG-04 is fixed, that phone then cannot place
       another order until the invoice expires (the live setting was 30 minutes

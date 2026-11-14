@@ -1336,8 +1336,12 @@ On the order-first path this is decided under the order's row lock
 (`confirm_order_payment`, `20261003120000`).
 
 **A total under 1.00 SAR is refused before payment.** Moyasar will not invoice
-it. The new build says "Online payment needs a total of at least 1.00 SAR. Use
-fewer points, or pay in cash."
+it. The new build says "Online payment needs a total of at least 1.00 SAR. Turn
+off points for this order, or pay in cash." Until 2026-11-14 that code said
+"Use fewer points", which the app cannot do: points are all or nothing (gap
+PG-05). The fix is on branch `fix/checkout-points-preview-20261114` and ships
+with the `OWNER_ACTIONS.md` §47.17 build. Older builds show "Online payment is
+unavailable right now." (`PAYMENTS.md` §4).
 
 **The web build never offers online payment.** `/app` hides the online option
 (`apps/mobile/src/lib/payment.ts`, platform `web`). If online were the only
