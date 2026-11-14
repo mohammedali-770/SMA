@@ -1255,15 +1255,20 @@ reason, below, and it discloses only what the customer can already see.
 **A cancelled order is never resent** (`20261012120000`, gap PG-03, written
 2026-11-14 and not applied). The check sits after the order lock and the
 ownership test and before the eligibility predicate, so no other state can let
-a cancelled order through. The answer is `{outcome: 'unavailable', reason:
+a cancelled order through, and a customer who does not own the order still gets
+"not found" and writes no log row. The file's own check and suite case 15 pin
+that order. The answer is `{outcome: 'unavailable', reason:
 'order_cancelled', message, state}`: the English message is *This order was
 cancelled, so it was not sent to the branch.*, `state` is `order_cancelled`
 (or the refund state when a refund exists), and the refusal is logged as
 `resend_rejected_order_cancelled`. Nothing about the order moves and no resend
-is spent. The new build shows `oc_resend_cancelled` («تم إلغاء هذا الطلب، لذلك
-لم يُرسل إلى الفرع.») if Resend was pressed on a receipt loaded before the
-cancellation; its re-read then shows the order as cancelled. Older builds
-ignore the answer and re-read, so the button does nothing.
+is spent. If Resend is pressed on a receipt loaded before the cancellation, the
+new build re-reads the order, and the receipt then shows it as cancelled with
+no Resend button: that state is what the customer sees. The refusal's own line,
+`oc_resend_cancelled` («تم إلغاء هذا الطلب، لذلك لم يُرسل إلى الفرع.»), stays
+on screen only when that re-read fails and the old receipt is left up, because
+it is drawn beside the Resend button. Older builds ignore the answer and
+re-read, so the button does nothing.
 
 **The ownership test is NULL-safe since the same file.** An order whose
 customer deleted their account has `customer_id = NULL` (ON DELETE SET NULL),
@@ -2467,6 +2472,16 @@ will not submit until a method is chosen.
   Lazywait panel can put a cancelled order back in the queue the same way: the
   worker no longer sends it, but the panel does not refuse it either. Both are
   customer-messaging and console changes for their own pull request.
+- **An order cancelled after the worker has claimed it is still sent to the
+  kitchen** (found 2026-11-14 in review of `20261012120000`, not fixed). The
+  claim moves the order to `syncing`, and the last check before the POST,
+  `begin_lazywait_create_attempt`, reads the sync state, the attempt marker and
+  the deadline, never `status`. Measured on a local chain with the migration
+  applied: an order claimed while `received` and then cancelled got
+  `ready_to_send`. The window is the time between the claim and the POST,
+  usually seconds and up to tens of seconds in a batch run. A status check in
+  that gate belongs with the admin-Retry follow-up above, once its live
+  definition has been read.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Moyasar sandbox** (until
   2026-11-11 this said Tap). The pure

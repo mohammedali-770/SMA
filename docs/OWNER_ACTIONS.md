@@ -4323,15 +4323,18 @@ status. Three cancelled online orders from 2026-07-12, all on one account, are
 still unpaid (read 2026-11-14). So from step 1, a direct API call signed in as
 that account could open a LIVE invoice for one of them, and paying it would mark
 that cancelled order paid and queue it for the kitchen. The app never makes that
-call: it pays only through checkout sessions. Gap PG-27 is the same older path.
+call: it pays only through checkout sessions. Close it before step 1 (a code fix,
+or a live write to those orders, each its own approval), or accept it. Gap PG-27
+is the same older path.
 
-**The code fix is written: `20261012120000_cancelled_orders_guard`** (branch
+**The code fix is now written: `20261012120000_cancelled_orders_guard`** (branch
 `fix/cancelled-orders-guard-20261114`, 2026-11-14, **not applied**).
-`begin_payment_attempt` then refuses a cancelled order, so `payment-initiate`
-answers a 400 and opens no invoice, and `place_customer_order` creates no new
-online order. It needs no deploy. **Apply it (§54) before step 1**, and this
-warning is closed. Until it is applied, the TEST-mode refusal is what keeps the
-three orders unpayable, so do not start step 1 first.
+Once applied, `begin_payment_attempt` refuses a cancelled order, so
+`payment-initiate` answers a 400 and opens no invoice, and
+`place_customer_order` creates no new online order. It needs no deploy.
+Applying it (§54) before step 1 closes this warning. The other choices above
+still stand; which one to take, and when, is yours. Until something is done,
+the TEST-mode refusal is what keeps the three orders unpayable.
 
 ### 47.14 Make sure the payment row is enabled
 
@@ -4938,8 +4941,9 @@ already answers the new refusal with a 400 and opens no invoice.
    cancelled order as "Order cancelled" with no Resend. That reads only the
    order's status, so it is right whether or not step 2 has happened. The
    phone apps get it only in the §47.17 build.
-2. **Apply `20261012120000_cancelled_orders_guard` by name, before §47.13
-   step 1.** Re-hash the merged copy first (`docs/MIGRATIONS.md` §64 has the
+2. **Apply `20261012120000_cancelled_orders_guard` by name.** Recommended
+   before §47.13 step 1, which is what closes that section's warning; the
+   warning's other choices are still yours (§47.13). Re-hash the merged copy first (`docs/MIGRATIONS.md` §64 has the
    sha256). Never "the outstanding migrations". The file refuses to apply if
    any of the six functions it replaces is not the definition it was written
    against, or if the money-path pair has moved; if it refuses, nothing has

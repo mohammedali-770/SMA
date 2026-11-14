@@ -853,6 +853,12 @@ applied):
 - **A cancelled order left in the POS queue gets a "could not send" push** when
   its deadline passes, and an admin Retry can put one back in the queue
   (`ORDER_CONFIRMATION_FLOW.md` §11). Neither sends anything to the kitchen.
+- **An order cancelled in the few seconds after the worker claims it is still
+  sent to the kitchen.** The worker's last check before it sends reads the sync
+  state, not the order's status (`LAZYWAIT.md`, *Retry / backoff /
+  dead-letter*). Measured on a local chain on 2026-11-14; not fixed here. A
+  paid order sent this way is still refunded by hand if the customer is owed
+  one.
 
 ---
 

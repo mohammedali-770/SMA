@@ -843,14 +843,24 @@ by a printed ticket rather than by the vendor.
 - The queue index `orders_lazywait_queue_idx` pulls due `pending`/`failed` rows
   oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
   **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
-- **A cancelled order is never sent, and never resent by the customer**
+- **A cancelled order is never claimed, and never resent by the customer**
   (`20261012120000`, gap PG-03; written 2026-11-14, not applied). Both claims
   skip it and `request_customer_pos_resend` refuses it with reason
-  `order_cancelled`. Two things are left as they were, on purpose, and are
-  recorded in `ORDER_CONFIRMATION_FLOW.md` §11: an admin **Retry** on a cancelled
-  order still moves it to `pending` (the worker then leaves it there), and a
-  cancelled order left in `pending` or `failed` is swept to `dead_letter` at its
-  deadline, which queues the customer's `pos_failed` push.
+  `order_cancelled`. Three things are left as they were, and are recorded in
+  `ORDER_CONFIRMATION_FLOW.md` §11:
+  - an admin **Retry** on a cancelled order still moves it to `pending` (the
+    worker then leaves it there);
+  - a cancelled order left in `pending` or `failed` is swept to `dead_letter`
+    at its deadline, which queues the customer's `pos_failed` push;
+  - **an order cancelled after the worker has claimed it is still sent.** The
+    claim moves it to `syncing`, and the pre-send gate
+    `begin_lazywait_create_attempt` reads the sync state, the marker and the
+    deadline, never `status`. So a cancel that lands in the seconds between
+    the claim and the POST still prints a ticket. Measured 2026-11-14 on a
+    local chain with this file applied: an order claimed while `received`,
+    then cancelled, got `ready_to_send` from the gate. A status check there is
+    left for the same follow-up as the admin Retry, because that function's
+    live hash has not been read.
 - **There are currently TWO of that index, and this line named only one.** The
   2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
   (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition

@@ -307,8 +307,8 @@ file merged unapplied since the read above). Six function bodies: a cancelled
 order is never resent, claimed for the POS, enrolled for an automatic refund or
 invoiced, and `place_customer_order` places no online order (gaps PG-03 and
 PG-27). No signature, table or row; no deploy; money path self-asserted
-(`12b6816d…` / `22e2d429…`). Apply it before `docs/OWNER_ACTIONS.md` §47.13
-step 1 (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
+(`12b6816d…` / `22e2d429…`). Applying it before `docs/OWNER_ACTIONS.md` §47.13
+step 1 closes that section's warning (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
 
 **`20261003120000` IS NOT THE FIRST INLINE APPLY WHERE THE TRANSPORT DECODED `\u`
 ESCAPES (row 111 was), and it is the first where it decoded only SOME.** Of its 50 escapes,

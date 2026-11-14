@@ -87,14 +87,17 @@
 -- sub-transaction that is then aborted, it writes a probe branch and probe
 -- orders (explicit order numbers, so no SM- number is drawn) and drives the two
 -- claims, the refund trigger and begin_payment_attempt, each for a cancelled
--- order and for an otherwise identical one that is not, and
+-- order and for orders that are not (in every other status for the claims,
+-- and in received, ready and delivered for the refund trigger), and
 -- place_customer_order for 'online' (three spellings) and for cash, then
 -- proves the rollback. Two things cannot be driven that far here, because they
 -- need a signed-in customer who owns the order, and building one would mean
 -- writing to auth.users in Production, which no migration in this repository
 -- does: request_customer_pos_resend, and place_customer_order's backstop for a
--- call with no method. The first is called as far as its sign-in gate and its
--- new statements are checked in the comment-stripped body. Both outcomes are
+-- call with no method. The first is called as far as its sign-in gate, and its
+-- new statements are checked in the comment-stripped body: present, and placed
+-- after the lock and the ownership test and before the eligibility check, so a
+-- caller who does not own the order still gets "not found". Both outcomes are
 -- proven by supabase/tests/cancelled_orders_guard_test.sql. That is said
 -- rather than glossed.
 --
@@ -600,10 +603,14 @@ declare
   v_tag     constant text := 'VERIFY-20261012120000-';
   v_branch  uuid := gen_random_uuid();
   v_c1      uuid := gen_random_uuid();   -- claims: cancelled, sorts first
-  v_r1      uuid := gen_random_uuid();   -- claims: received, sorts second
+  v_r1      uuid := gen_random_uuid();   -- claims: ready, sorts second
   v_r2      uuid := gen_random_uuid();   -- claim_one: received
+  v_r3      uuid := gen_random_uuid();   -- claim_one: out_for_delivery
+  v_r4      uuid := gen_random_uuid();   -- claim_one: delivered
   v_e1      uuid := gen_random_uuid();   -- refund: cancelled, paid
   v_e2      uuid := gen_random_uuid();   -- refund: received, paid
+  v_e3      uuid := gen_random_uuid();   -- refund: ready, paid
+  v_e4      uuid := gen_random_uuid();   -- refund: delivered, paid
   v_p1      uuid := gen_random_uuid();   -- attempt: cancelled, online unpaid
   v_p2      uuid := gen_random_uuid();   -- attempt: received, online unpaid
   v_p3      uuid := gen_random_uuid();   -- attempt: cancelled, with a live attempt to reuse
@@ -629,19 +636,25 @@ begin
                                payment_method, payment_status, created_at)
     values
       (v_c1, v_tag || 'c1', v_branch, 'pickup', 'cancelled', 10, 10, 'cash',   'pending', '2000-01-01 00:00:00+00'),
-      (v_r1, v_tag || 'r1', v_branch, 'pickup', 'received',  10, 10, 'cash',   'pending', '2000-01-01 00:00:01+00'),
+      (v_r1, v_tag || 'r1', v_branch, 'pickup', 'ready',     10, 10, 'cash',   'pending', '2000-01-01 00:00:01+00'),
       (v_r2, v_tag || 'r2', v_branch, 'pickup', 'received',  10, 10, 'cash',   'pending', now()),
+      (v_r3, v_tag || 'r3', v_branch, 'delivery', 'out_for_delivery', 10, 10, 'cash', 'pending', now()),
+      (v_r4, v_tag || 'r4', v_branch, 'pickup', 'delivered', 10, 10, 'cash',   'pending', now()),
       (v_e1, v_tag || 'e1', v_branch, 'pickup', 'cancelled', 10, 10, 'online', 'paid',    now()),
       (v_e2, v_tag || 'e2', v_branch, 'pickup', 'received',  10, 10, 'online', 'paid',    now()),
+      (v_e3, v_tag || 'e3', v_branch, 'pickup', 'ready',     10, 10, 'online', 'paid',    now()),
+      (v_e4, v_tag || 'e4', v_branch, 'pickup', 'delivered', 10, 10, 'online', 'paid',    now()),
       (v_p1, v_tag || 'p1', v_branch, 'pickup', 'cancelled', 10, 10, 'online', 'pending', now()),
       (v_p2, v_tag || 'p2', v_branch, 'pickup', 'received',  10, 10, 'online', 'pending', now()),
       (v_p3, v_tag || 'p3', v_branch, 'pickup', 'cancelled', 10, 10, 'online', 'pending', now());
 
     -- (a) The claims. c1 and r1 are due now and sort ahead of any real order
     -- (no next-attempt time, created in 2000), c1 first. So claim_batch(1)
-    -- takes c1 if the status filter is missing, and r1 if it is there.
-    update public.orders set sync_next_attempt_at = null where id in (v_c1, v_r1);
-    if (select count(*) from public.orders where id in (v_c1, v_r1) and lazywait_sync_state = 'pending') <> 2 then
+    -- takes c1 if the status filter is missing, and r1 if it is there. r1 is
+    -- 'ready', and r2-r4 cover received, out_for_delivery and delivered, so a
+    -- filter narrowed to the first statuses of an order fails here too.
+    update public.orders set sync_next_attempt_at = null where id in (v_c1, v_r1, v_r2, v_r3, v_r4);
+    if (select count(*) from public.orders where id in (v_c1, v_r1, v_r2, v_r3, v_r4) and lazywait_sync_state = 'pending') <> 5 then
       raise exception 'VERIFY: the claim probes did not start in the queue';
     end if;
 
@@ -650,21 +663,26 @@ begin
 
     select array_agg(id)::text into v_msg from public.claim_lazywait_sync_batch(1);
     if v_msg is distinct from format('{%s}', v_r1) then
-      raise exception 'VERIFY: claim_lazywait_sync_batch(1) claimed %, expected only the received probe', coalesce(v_msg, '<nothing>');
+      raise exception 'VERIFY: claim_lazywait_sync_batch(1) claimed %, expected only the ready probe r1', coalesce(v_msg, '<nothing>');
     end if;
     select lazywait_sync_state into v_state from public.orders where id = v_c1;
     if v_state is distinct from 'pending' then
       raise exception 'VERIFY: the cancelled probe left the queue as %', coalesce(v_state, '<null>');
     end if;
 
-    select count(*) into v_n from public.claim_lazywait_sync_one(v_r2);
-    if v_n <> 1 then raise exception 'VERIFY: claim_lazywait_sync_one no longer claims a received order'; end if;
+    foreach v_id in array array[v_r2, v_r3, v_r4] loop
+      select count(*) into v_n from public.claim_lazywait_sync_one(v_id);
+      if v_n <> 1 then
+        raise exception 'VERIFY: claim_lazywait_sync_one no longer claims a % order',
+          (select status from public.orders where id = v_id);
+      end if;
+    end loop;
 
     -- (b) The refund trigger. Both orders are driven into the shape
     -- order_refund_due accepts: paid, proven not sent, three resends spent.
     update public.orders
        set lazywait_sync_state = 'dead_letter', pos_customer_retry_count = 3
-     where id in (v_e1, v_e2);
+     where id in (v_e1, v_e2, v_e3, v_e4);
     select refund_state into v_state from public.orders where id = v_e1;
     if v_state is distinct from 'none' then
       raise exception 'VERIFY: a cancelled paid order was enrolled for an automatic refund (%)', coalesce(v_state, '<null>');
@@ -672,13 +690,16 @@ begin
     if exists (select 1 from public.order_refunds where order_id = v_e1) then
       raise exception 'VERIFY: a refund record was opened for a cancelled order';
     end if;
-    select refund_state into v_state from public.orders where id = v_e2;
-    if v_state is distinct from 'pending' then
-      raise exception 'VERIFY: an eligible paid order was not enrolled (%)', coalesce(v_state, '<null>');
-    end if;
-    if (select count(*) from public.order_refunds where order_id = v_e2) <> 1 then
-      raise exception 'VERIFY: an eligible paid order did not get exactly one refund record';
-    end if;
+    foreach v_id in array array[v_e2, v_e3, v_e4] loop
+      select refund_state into v_state from public.orders where id = v_id;
+      if v_state is distinct from 'pending' then
+        raise exception 'VERIFY: an eligible paid % order was not enrolled (%)',
+          (select status from public.orders where id = v_id), coalesce(v_state, '<null>');
+      end if;
+      if (select count(*) from public.order_refunds where order_id = v_id) <> 1 then
+        raise exception 'VERIFY: an eligible paid order did not get exactly one refund record';
+      end if;
+    end loop;
 
     -- (c) begin_payment_attempt: no new attempt (p1), and no reuse of one
     -- that was already live (p3), for a cancelled order.
@@ -754,7 +775,7 @@ begin
   if exists (select 1 from public.orders where order_number like v_tag || '%')
      or exists (select 1 from public.branches where id = v_branch)
      or exists (select 1 from public.payment_records where order_id in (v_p1, v_p2, v_p3))
-     or exists (select 1 from public.order_refunds where order_id in (v_e1, v_e2)) then
+     or exists (select 1 from public.order_refunds where order_id in (v_e1, v_e2, v_e3, v_e4)) then
     raise exception 'VERIFY: a probe row survived the sub-transaction';
   end if;
 
@@ -770,8 +791,11 @@ begin
   end if;
   if position('if v_order.status = ''cancelled'' then' in v_src) > position('customer_manual_pos_resend_eligibility(' in v_src)
      or position('if v_order.status = ''cancelled'' then' in v_src) > position('update public.orders set' in v_src)
-     or position('if v_order.status = ''cancelled'' then' in v_src) < position('for update;' in v_src) then
-    raise exception 'VERIFY: the cancelled refusal is not between the order lock and the eligibility check';
+     or position('if v_order.status = ''cancelled'' then' in v_src) < position('for update;' in v_src)
+     or position('if v_order.status = ''cancelled'' then' in v_src) < position('is distinct from auth.uid()' in v_src) then
+    -- After the ownership test, so a caller who does not own the order learns
+    -- nothing about it and causes no sync-log row: they get P0002, as before.
+    raise exception 'VERIFY: the cancelled refusal is not between the ownership test and the eligibility check';
   end if;
   if position('''reason'',''order_cancelled''' in v_src) = 0 or position('''message'',' in v_src) = 0 then
     raise exception 'VERIFY: the cancelled refusal carries no reason or message';

@@ -8643,7 +8643,7 @@ ledger row yet: rows are added at apply time. Gaps PG-03 and PG-27
 (`docs/readiness/20261113-card-payments-gaps.md`) and the
 `docs/OWNER_ACTIONS.md` §47.13 warning.
 
-sha256 `118368900317795d708760b2ae04333374d4bf0a5f8b88efb2d3c26798f65303`, 818 lines / 45 453 bytes. **Re-hash the MERGED copy before
+sha256 `77e4e3a7386af77fecf3a7ef206501a76f80c056e4b41b07c77a60c74e40eba7`, 842 lines / 47 152 bytes. **Re-hash the MERGED copy before
 applying**, per §15. The file has no `\u` escape, so an inline apply cannot
 decode one.
 
@@ -8699,6 +8699,15 @@ sequences are pinned by `orderConfirmationSqlParity.test.ts`);
 read; `begin_session_attempt`; and PG-13, the owner's decision on refunding a
 cancelled paid order.
 
+**What it does not close.** An order cancelled **after** the worker has claimed
+it is still sent. The claim moves it to `syncing`, and the pre-send gate
+`begin_lazywait_create_attempt` does not read `status`; measured on the local
+chain with this file applied, a claimed-then-cancelled order got
+`ready_to_send`. The window is the seconds between claim and POST. A check
+there is left for the admin-Retry follow-up, because that function's live hash
+was not part of the 2026-11-14 read (`docs/LAZYWAIT.md`,
+`docs/ORDER_CONFIRMATION_FLOW.md` §11).
+
 ### What the file checks
 
 All inside a sub-transaction that a final raise aborts, then the rollback is
@@ -8706,12 +8715,13 @@ proven (no probe order, branch, attempt or refund left). Probe orders carry
 explicit order numbers, so no SM- number is drawn.
 
 - **The claims, as outcomes:** `claim_lazywait_sync_one` takes no cancelled
-  order and still takes a received one; `claim_lazywait_sync_batch(1)` takes the
-  received probe, where without the filter it would take the cancelled one,
-  which sorts first.
-- **The refund trigger, as an outcome:** a cancelled and a received paid order
-  driven into the refund-due shape; only the received one is enrolled, with one
-  refund record.
+  order and still takes a received, an out-for-delivery and a delivered one;
+  `claim_lazywait_sync_batch(1)` takes a `ready` probe, where without the
+  filter it would take the cancelled one, which sorts first. So a filter
+  narrowed to the early statuses (`received`, `preparing`) is refused too.
+- **The refund trigger, as an outcome:** a cancelled paid order and paid
+  orders in `received`, `ready` and `delivered`, all driven into the refund-due
+  shape; every one but the cancelled one is enrolled, with one refund record.
 - **`begin_payment_attempt`, as outcomes:** a cancelled order with no attempt,
   and one with a live attempt, both answer `P0001 Order is cancelled`; a
   received unpaid online order still opens one.
@@ -8720,8 +8730,13 @@ explicit order numbers, so no SM- number is drawn.
 - **`request_customer_pos_resend`** is called only as far as its sign-in gate,
   because the rest needs a signed-in customer, and building one would mean
   writing to `auth.users` in Production. Its new statements are checked in the
-  comment-stripped body, in position. The same holds for `place_customer_order`'s
-  backstop. Both are proven by the paired suite. That is said rather than glossed.
+  comment-stripped body, in position: after the row lock **and after the
+  ownership test**, and before the eligibility check, so a customer who does not
+  own the order still gets "not found" and no log row. (Until review on
+  2026-11-14 the position was compared against the lock only, so moving the
+  refusal ahead of the ownership test applied cleanly; it is now refused.) The
+  same holds for `place_customer_order`'s backstop. Both are proven by the
+  paired suite. That is said rather than glossed.
 - **Grants:** `anon` executes none of the six (nor `order_refund_due`);
   `authenticated` keeps `request_customer_pos_resend` and
   `place_customer_order`; `service_role` keeps the claims and
@@ -8730,13 +8745,15 @@ explicit order numbers, so no SM- number is drawn.
 
 ### Validation
 
-- **Paired suite** `cancelled_orders_guard_test.sql`, 14 cases. **Fail-before:**
+- **Paired suite** `cancelled_orders_guard_test.sql`, 15 cases. **Fail-before:**
   on the chain at `52a3976`, cases 1, 3-9, 11, 13 and 14 fail and the honest
-  cases 2, 10 and 12 pass. With the file, all 14 pass.
+  cases 2, 10, 12 and 15 pass. With the file, all 15 pass.
   - guard: a cancelled order's resend is refused with its reason and message
     and nothing moves (1); an ownerless order is not found (3); a cancelled
     order with a refund keeps the refund as its state (4); neither claim takes a
-    cancelled order (5, 6); no path enrols a cancelled order: the third failed
+    cancelled order, and each still takes an order in every other status (5,
+    6); no path enrols a cancelled order, while an eligible paid order is still
+    enrolled in every other status: the third failed
     resend, the deadline sweep, a direct write, a later edit (7); `online` in
     three spellings is refused and draws no SM- number (8); a method-less call
     that resolves to online is refused (9); a cancelled order gets no new or
@@ -8744,14 +8761,25 @@ explicit order numbers, so no SM- number is drawn.
     cancellation then three resends (13); grants and the money path (14);
   - honest: an eligible received order is re-queued (2); cash and a cash
     default still place (10); `begin_payment_attempt` still serves an unpaid
-    online order and `begin_session_attempt` is unaffected (12).
+    online order and `begin_session_attempt` is unaffected (12); a customer who
+    does not own a cancelled order gets "not found" and writes no log row (15).
+- **`payment-initiate`, in the vitest fakes.** `paymentFakes.ts` now models the
+  new refusal, and `paymentInitiateGuards.test.ts` checks that a cancelled
+  order gets a 400 with no attempt and no invoice, while the same order not
+  cancelled still gets both. The first case fails with the fake as it was at
+  `52a3976`.
 - **Full private chain** (copy of `.github/sql-ci`, databases prefixed `gca_`):
   156 migrations applied, 93 suites, 91 passed, 2 quarantined
   (`lazywait_mapping`, `lazywait_sync_scheduler`), 0 new failures. The file
   re-applies cleanly. Existing-data stage: applied onto existing rows, no row
   changed, smoke passed.
-- **Mutation testing:** 14 mutants, all killed by the suite with the file's own
-  block stripped; 13 also refused at apply by that block. They are the resend
+- **Mutation testing:** 18 mutants, all killed by the suite with the file's own
+  block stripped; 17 also refused at apply by that block. Four were added after
+  review on 2026-11-14, because the first version of both the file and the
+  suite let them through: the cancelled refusal moved ahead of the ownership
+  test, both claims narrowed to `received`/`preparing`, the batch claim alone
+  narrowed the same way, and the refund trigger narrowed to `received`. The
+  other fourteen are the resend
   refusal removed, refusing `delivered` instead, the ownership test made
   NULL-unsafe again, each claim's filter removed, the batch filter on the wrong
   column (`lazywait_status`), the refund status test removed, `and` turned into
@@ -8762,9 +8790,11 @@ explicit order numbers, so no SM- number is drawn.
 
 ### Applying it (owner, §5, named by version)
 
-1. Merge first (`docs/OWNER_ACTIONS.md` §54). Apply **before**
-   `docs/OWNER_ACTIONS.md` §47.13 step 1: until then the TEST-mode refusal is
-   what keeps the three cancelled July online orders unpayable.
+1. Merge first (`docs/OWNER_ACTIONS.md` §54). Applying it **before**
+   `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended: it closes that
+   section's warning. Until something closes it, the TEST-mode refusal is what
+   keeps the three cancelled July online orders unpayable. The warning's other
+   choices are still the owner's.
 2. Apply `20261012120000` by name, re-hashing the merged copy first. Never "the
    outstanding migrations". If the pre-image check refuses, nothing changed: a
    function moved since 2026-11-14, so re-derive the file, do not force it.

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**269 TypeScript test files declaring 4009 test blocks, plus 93 SQL suites.**
+**269 TypeScript test files declaring 4011 test blocks, plus 93 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -401,7 +401,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-39 files, 924 declared test blocks.
+39 files, 926 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -426,7 +426,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 38 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
-| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 9 | no invoice outlives its attempt (C1 part 4) |
+| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 11 | no invoice outlives its attempt (C1 part 4) |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
 | `supabase/functions/_shared/paymentWiring.test.ts` | 69 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |

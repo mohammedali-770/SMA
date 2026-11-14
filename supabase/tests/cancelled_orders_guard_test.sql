@@ -15,12 +15,13 @@
 --                           (the NULL-safe ownership test)
 --   CASE 4   guard   PG-03  Resend: a cancelled order whose refund exists keeps the
 --                           refund as its state
---   CASE 5   g+h     PG-03  claim_lazywait_sync_one: never a cancelled order, still a
---                           received one
+--   CASE 5   g+h     PG-03  claim_lazywait_sync_one: never a cancelled order, still an
+--                           order in every other status
 --   CASE 6   g+h     PG-03  claim_lazywait_sync_batch: never a cancelled order, still
---                           received ones, in queue order
+--                           orders in every other status, in queue order
 --   CASE 7   g+h     PG-03  the refund trigger: a cancelled order is enrolled by no
---                           path; an eligible never-cancelled order still is
+--                           path; an eligible never-cancelled order still is, in
+--                           every other status
 --   CASE 8   guard   PG-27  place_customer_order refuses 'online' however written,
 --                           and creates nothing
 --   CASE 9   guard   PG-27  place_customer_order refuses a call with no method that
@@ -38,6 +39,9 @@
 --                           trigger acts on it
 --   CASE 14  g+h            the money-path pair, and grants: anon executes none of
 --                           the six, the app keeps what it calls
+--   CASE 15  honest  PG-03  Resend: a customer who does not own a cancelled order
+--                           learns nothing about it ("not found", no log row), so
+--                           the cancelled refusal stays behind the ownership test
 -- ============================================================================
 begin;
 
@@ -281,6 +285,8 @@ do $$
 declare
   v_cancelled uuid := pg_temp.new_order(null, 'cancelled', 'cash', 'pending', 'pending', 0, now() - interval '1 minute');
   v_received  uuid := pg_temp.new_order(null, 'received',  'cash', 'pending', 'pending', 0, now() - interval '1 minute');
+  v_status    public.order_status;
+  v_other     uuid;
   v_n int;
 begin
   select count(*) into v_n from public.claim_lazywait_sync_one(v_cancelled);
@@ -294,7 +300,15 @@ begin
   if (select lazywait_sync_state from public.orders where id = v_received) <> 'syncing' then
     raise exception 'CASE 5 FAILED: the claimed order is not syncing';
   end if;
-  raise notice 'CASE 5 ok: the targeted claim skips a cancelled order and takes a received one';
+
+  -- Every other status still reaches the POS: the filter is "not cancelled",
+  -- not "received or preparing".
+  foreach v_status in array array['preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_other := pg_temp.new_order(null, v_status, 'cash', 'pending', 'pending', 0, now() - interval '1 minute');
+    select count(*) into v_n from public.claim_lazywait_sync_one(v_other);
+    if v_n <> 1 then raise exception 'CASE 5 FAILED: a due % order was not claimed', v_status; end if;
+  end loop;
+  raise notice 'CASE 5 ok: the targeted claim skips a cancelled order and takes one in every other status';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -308,16 +322,19 @@ declare
   v_cancelled uuid := pg_temp.new_order(null, 'cancelled', 'cash',   'pending', 'pending', 0, '2000-01-01 00:00:00+00');
   v_first     uuid := pg_temp.new_order(null, 'received',  'cash',   'pending', 'pending', 0, '2000-01-01 00:01:00+00');
   v_second    uuid := pg_temp.new_order(null, 'preparing', 'online', 'paid',    'pending', 0, '2000-01-01 00:02:00+00');
+  v_ready     uuid := pg_temp.new_order(null, 'ready',            'cash', 'pending', 'pending', 0, '2000-01-01 00:03:00+00');
+  v_out       uuid := pg_temp.new_order(null, 'out_for_delivery', 'cash', 'pending', 'pending', 0, '2000-01-01 00:04:00+00');
+  v_delivered uuid := pg_temp.new_order(null, 'delivered',        'cash', 'pending', 'pending', 0, '2000-01-01 00:05:00+00');
   v_ids uuid[];
 begin
   select array_agg(id) into v_ids from public.claim_lazywait_sync_batch(1);
   if v_ids is distinct from array[v_first] then
     raise exception 'CASE 6 FAILED: claim_lazywait_sync_batch(1) took %, expected the oldest received order', v_ids;
   end if;
-  select array_agg(id) into v_ids from public.claim_lazywait_sync_batch(100)
-   where id in (v_cancelled, v_first, v_second);
-  if v_ids is distinct from array[v_second] then
-    raise exception 'CASE 6 FAILED: the second batch took %, expected only the remaining non-cancelled order', v_ids;
+  select array_agg(id order by sync_next_attempt_at) into v_ids from public.claim_lazywait_sync_batch(100)
+   where id in (v_cancelled, v_first, v_second, v_ready, v_out, v_delivered);
+  if v_ids is distinct from array[v_second, v_ready, v_out, v_delivered] then
+    raise exception 'CASE 6 FAILED: the second batch took %, expected the four remaining non-cancelled orders', v_ids;
   end if;
   if (select lazywait_sync_state from public.orders where id = v_cancelled) <> 'pending' then
     raise exception 'CASE 6 FAILED: the cancelled order changed state';
@@ -334,6 +351,7 @@ declare
   v_by_sweep    uuid;
   v_direct      uuid := pg_temp.new_order(null, 'cancelled', 'online', 'paid', 'pending', 3);
   v_eligible    uuid := pg_temp.new_order(null, 'received',  'online', 'paid', 'syncing', 3);
+  v_status      public.order_status;
   v_id          uuid;
   o             public.orders;
 begin
@@ -377,7 +395,17 @@ begin
        where order_id = v_eligible and reason = 'pos_delivery_failed_after_customer_retries') <> 1 then
     raise exception 'CASE 7 FAILED: an eligible paid order did not get exactly one refund record';
   end if;
-  raise notice 'CASE 7 ok: no path enrols a cancelled order, and an eligible one is still enrolled';
+
+  -- And in every other status: the trigger skips "cancelled", nothing more.
+  foreach v_status in array array['preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_id := pg_temp.new_order(null, v_status, 'online', 'paid', 'pending', 3);
+    update public.orders set lazywait_sync_state = 'dead_letter' where id = v_id;
+    if (select refund_state from public.orders where id = v_id) <> 'pending'
+       or (select count(*) from public.order_refunds where order_id = v_id) <> 1 then
+      raise exception 'CASE 7 FAILED: an eligible paid % order was not enrolled', v_status;
+    end if;
+  end loop;
+  raise notice 'CASE 7 ok: no path enrols a cancelled order, and an eligible one is still enrolled in every other status';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -614,6 +642,31 @@ begin
     end if;
   end loop;
   raise notice 'CASE 14 ok: money path unchanged; anon executes none of the six; the app keeps its two';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- CASE 15 — honest: a cancelled order is "not found" to a customer who does
+-- not own it
+-- ---------------------------------------------------------------------------
+-- Passes before and after the migration. It pins the ORDER of the new
+-- refusal: placed ahead of the ownership test, it would tell another customer
+-- that this order exists and was cancelled, and write a log row against it.
+do $$
+declare
+  v_owner uuid := pg_temp.new_customer();
+  v_other uuid := pg_temp.new_customer();
+  v_id    uuid;
+  v_res   jsonb;
+begin
+  v_id := pg_temp.new_order(v_owner, 'cancelled', 'cash', 'pending', 'failed');
+  v_res := pg_temp.resend_as(v_other, v_id);
+  if v_res->>'error' is distinct from 'P0002' or v_res->>'message' is distinct from 'Order not found' then
+    raise exception 'CASE 15 FAILED: another customer was told more than "not found": %', v_res;
+  end if;
+  if exists (select 1 from public.integration_sync_logs where order_id = v_id) then
+    raise exception 'CASE 15 FAILED: another customer''s call wrote a sync log row on this order';
+  end if;
+  raise notice 'CASE 15 ok: a cancelled order is "not found" to a customer who does not own it';
 end $$;
 
 rollback;
