@@ -660,6 +660,14 @@ is **pickup only**, so a delivery order is shown no redemption
 `loyaltyBlockedByChannel: false` even on delivery — it already says why it costs
 nothing, and two explanations for one absent discount is worse than one.
 
+Since 2026-11-14 it also carries the redemption rule itself, exactly: only whole
+points that fit the order, none when fewer than `min_points_to_redeem` fit, and
+the delivery fee counted in what points may cover (gap PG-31,
+[`LOYALTY.md`](LOYALTY.md) §1). It used to take the balance times the point
+value, capped at the goods. The comp is unaffected: a comped order uses no
+points either way, and `previewParity.test.ts` includes a comped cart that
+checks this against the server.
+
 The **earning** estimate added by `20260908120000` is not computed in the client
 at all — `preview_loyalty_points` asks the server, which runs the same
 `compute_order_snapshot` that will grant the points, so a comped customer is

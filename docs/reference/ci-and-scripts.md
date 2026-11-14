@@ -73,6 +73,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/check-recorded-hashes.mjs` — Every sha256 recorded in prose must still describe a file in the tree
 - `scripts/check-test-phone-numbers.mjs` — @license SPDX-License-Identifier: Apache-2.0
 - `scripts/check-workflow-pins.mjs` — Every GitHub Action a workflow runs is pinned to a full commit SHA, and every tool a workflow downloads at run time is pinned to an exact version
+- `scripts/checkout-preview-parity.sh`
 - `scripts/docs-check-ownership.mjs` — Enforces the documentation ownership map in docs/ownership.json
 - `scripts/docs-generate.mjs` — Generates the machine-derived half of the documentation set
 - `scripts/format-check.mjs` — Two formatting rules, deliberately narrow, both scoped to this branch's diff
