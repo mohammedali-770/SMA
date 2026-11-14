@@ -15,6 +15,9 @@ vi.mock('./supabaseClient.ts', () => ({
  *  - C1 part 4: no invoice may outlive its attempt.
  *  - C2: a total under Moyasar's 1.00 SAR invoice minimum is refused before any
  *    attempt is opened.
+ *  - PG-03 / OWNER_ACTIONS §47.13: a cancelled order gets a clean 400, with no
+ *    attempt and no invoice (begin_payment_attempt refuses it since
+ *    20261012120000).
  */
 
 let db: FakePaymentDb;
@@ -154,5 +157,23 @@ describe('a total under 1.00 SAR is refused before any attempt (C2)', () => {
     expect(db.attempts({ order_id: order.id })).toHaveLength(0);
     // An order is not retired: it has its own lifecycle.
     expect(db.rows('orders')[0]).toMatchObject({ payment_status: 'pending' });
+  });
+});
+
+describe('a cancelled order cannot be paid through the order-first flow (PG-03, §47.13)', () => {
+  it('answers 400 with the generic message, and opens no attempt and no invoice', async () => {
+    const order = db.order({ total: 64, status: 'cancelled' });
+    const res = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    expect(res).toEqual({ status: 400, body: { error: 'Could not start the payment. Please try again.' } });
+    expect(db.attempts({ order_id: order.id })).toHaveLength(0);
+    expect(moyasar.posts).toHaveLength(0);
+  });
+
+  it('still opens an attempt and an invoice for the same order before it is cancelled', async () => {
+    const order = db.order({ total: 64 });
+    const res = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    expect(res.status).toBe(200);
+    expect(db.attempts({ order_id: order.id })).toHaveLength(1);
+    expect(moyasar.posts).toHaveLength(1);
   });
 });

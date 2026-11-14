@@ -71,3 +71,50 @@ describe('profile address management copy', () => {
     expect(STRINGS.ar.noSavedAddress).not.toMatch(/الويب/);
   });
 });
+
+describe('the below-minimum online payment message (gap PG-05)', () => {
+  // Moyasar will not invoice under 1.00 SAR, and points can leave 0.01 to 0.99.
+  // Points are all or nothing: LoyaltyToggle is on or off, and CheckoutScreen
+  // sends the whole balance. So "use fewer points" asked the customer for
+  // something the app cannot do. Their real choices are these two.
+  it('no longer tells the customer to use fewer points', () => {
+    expect(STRINGS.en.payBelowMinimum).not.toMatch(/fewer/i);
+    expect(STRINGS.ar.payBelowMinimum).not.toMatch(/نقاطاً أقل/);
+  });
+
+  it('says to turn points off for this order, or pay in cash, in both languages', () => {
+    expect(STRINGS.en.payBelowMinimum).toMatch(/turn off points for this order/i);
+    expect(STRINGS.en.payBelowMinimum).toMatch(/pay in cash/i);
+    // «استبدال» is the switch's own word (`useLoyalty`), so the customer can
+    // find the control the sentence names.
+    expect(STRINGS.ar.payBelowMinimum).toContain('أوقف استبدال النقاط في هذا الطلب');
+    expect(STRINGS.ar.useLoyalty).toContain('استبدال');
+    expect(STRINGS.ar.payBelowMinimum).toContain('ادفع نقداً');
+  });
+
+  it('still states the minimum it is about', () => {
+    expect(STRINGS.en.payBelowMinimum).toContain('1.00 SAR');
+    expect(STRINGS.ar.payBelowMinimum).toContain('1.00 ريال');
+  });
+});
+
+describe('the points note when an order is too small for the minimum (gap PG-31)', () => {
+  // Shown under the points switch when it is on and the server will use no
+  // points, because fewer than the minimum fit the order. Without it the switch
+  // reads "on" while the summary shows no points at all.
+  it('carries the amount placeholder the screen fills in, in both languages', () => {
+    expect(STRINGS.en.loyaltyOrderTooSmall).toContain('{amount}');
+    expect(STRINGS.ar.loyaltyOrderTooSmall).toContain('{amount}');
+  });
+
+  it('names the total before points, not the order', () => {
+    // The server judges the minimum on the amount after any coupon, with any
+    // delivery fee: the Total line while no points are used. "Orders of 10.00
+    // SAR or more" read wrong beside an 11.00 subtotal that the 15% coupon had
+    // taken to 9.35.
+    expect(STRINGS.en.loyaltyOrderTooSmall).toMatch(/total before points is \{amount\} SAR or more/);
+    expect(STRINGS.en.loyaltyOrderTooSmall).not.toMatch(/orders of/i);
+    expect(STRINGS.ar.loyaltyOrderTooSmall).toContain('الإجمالي قبل خصم النقاط {amount}');
+    expect(STRINGS.ar.loyaltyOrderTooSmall).not.toContain('قيمتها');
+  });
+});

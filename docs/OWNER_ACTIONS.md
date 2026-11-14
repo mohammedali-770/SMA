@@ -2816,7 +2816,9 @@ Customer-facing, in the app (ships with the EAS build in §47.17):
   web build a trial version;
 - `payBelowMinimum` (`apps/mobile/src/i18n/strings.ts`), shown when points leave
   a total under 1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال.
-  استخدم نقاطاً أقل، أو ادفع نقداً.»
+  استخدم نقاطاً أقل، أو ادفع نقداً.» **Superseded 2026-11-14: rewritten on
+  branch `fix/checkout-points-preview-20261114` (gap PG-05). Read the new text
+  in the 2026-11-14 entry at the end of this section, not this one.**
 
 Admin-facing, in the console (live on merge):
 
@@ -2887,6 +2889,52 @@ is customer legal text, so rank it with the consent copy above. Read the Arabic
 12). Each draft lists its points for the reader. All of it must be read before
 the publishing session in §47.15: until then, nothing is published in either
 language.
+
+**Widened 2026-11-14 — the checkout points fix (gaps PG-05 and PG-31).** Two
+customer-facing strings in `apps/mobile/src/i18n/strings.ts`, both
+engineering-drafted, on branch `fix/checkout-points-preview-20261114`.
+`payBelowMinimum` reaches customers only with the §47.17 build, because the web
+build takes no card payment. `loyaltyOrderTooSmall` also appears in the web
+checkout at `/app` as soon as the branch is merged, because a merge deploys the
+web build (CLAUDE.md §13); if you want it read before anyone sees it, read it
+before that merge:
+
+- `payBelowMinimum`, rewritten. Shown when a card payment would be under
+  1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال
+  النقاط في هذا الطلب، أو ادفع نقداً.» — English: *"Online payment needs a total
+  of at least 1.00 SAR. Turn off points for this order, or pay in cash."* It
+  used to say «استخدم نقاطاً أقل» ("use fewer points"), which the app cannot do.
+  «أوقف استبدال النقاط» deliberately reuses «استبدال», the word on the switch
+  itself (`useLoyalty`, «استبدال نقاط الولاء»), and matches the payment policy
+  draft's own sentence;
+- `loyaltyOrderTooSmall`, new. Added after the balance under the points switch,
+  when the switch is on and the order is too small for any points to be used:
+  «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو
+  أكثر.» — English: *"Points can be used when the total before points is
+  {amount} SAR or more."* The app replaces `{amount}` with a figure such as
+  10.00. It names the total, not the order, because the server judges the
+  minimum after any coupon: with the 15% coupon, an 11.00 order comes to 9.35
+  and uses no points. An earlier draft on the same branch said «في الطلبات التي
+  تبلغ قيمتها» ("on orders of"), which read wrong beside that 11.00 subtotal.
+  Check that «الإجمالي قبل خصم النقاط» reads naturally, and that a screen
+  reader reading the switch's name and this note together sounds right.
+
+**Widened 2026-11-14 — a cancelled order** (gap PG-03, branch
+`fix/cancelled-orders-guard-20261114`; `apps/mobile/src/i18n/strings.ts`, ships
+with the §47.17 build). Customer-facing:
+
+- `oc_cancelled` — «تم إلغاء الطلب» — *"Order cancelled"*, the receipt title;
+- `oc_cancelled_body` — «تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع.» —
+  *"Your order was cancelled. Contact support if this is unexpected."*;
+- `oc_resend_cancelled` — «تم إلغاء هذا الطلب، لذلك لم يُرسل إلى الفرع.» — *"This
+  order was cancelled, so it was not sent to the branch."*, shown under Resend
+  when the order was cancelled after the receipt opened.
+
+The first two are not new wording: they are the Arabic of the "cancelled" status
+push (`push-dispatch` `STATUS_COPY`, in the deployed function), and a test keeps
+the two identical, so a correction made here must be made in the push too.
+Whether that push copy ever had a native read is not recorded. The third is new
+and engineering-drafted. Check «لذلك» reads naturally there.
 
 **Widened 2026-11-14 — "Refunds and payments needing attention" (§55).**
 Staff-facing, in the console's Live Orders. All engineering-drafted, none read
@@ -4383,6 +4431,15 @@ call: it pays only through checkout sessions. Close it before step 1 (a code fix
 or a live write to those orders, each its own approval), or accept it. Gap PG-27
 is the same older path.
 
+**The code fix is now written: `20261012120000_cancelled_orders_guard`** (branch
+`fix/cancelled-orders-guard-20261114`, 2026-11-14, **not applied**).
+Once applied, `begin_payment_attempt` refuses a cancelled order, so
+`payment-initiate` answers a 400 and opens no invoice, and
+`place_customer_order` creates no new online order. It needs no deploy.
+Applying it (§54) before step 1 closes this warning. The other choices above
+still stand; which one to take, and when, is yours. Until something is done,
+the TEST-mode refusal is what keeps the three orders unpayable.
+
 ### 47.14 Make sure the payment row is enabled
 
 It is enabled, in TEST mode, since 2026-11-13 18:17:02 UTC, for the sandbox
@@ -4522,7 +4579,13 @@ guard that makes Place order do nothing while a payment run is in flight, and th
 
 **The app-side gap fixes must be in this build** (the gaps list, top of §47):
 PG-03, PG-04, PG-05, PG-20 if you choose the code fix, and PG-31. A fix that
-misses it needs another build and another store review.
+misses it needs another build and another store review. PG-05 and PG-31 are
+fixed on branch `fix/checkout-points-preview-20261114` (2026-11-14): this build
+carries them only if that pull request is merged before it starts. Their device
+checks are in `RELEASE_CHECKLIST.md` §7 ("A total under 1.00 SAR" and "Points
+on an order under SAR 10.00"). PG-03's app half (a
+cancelled order reads "Order cancelled" and offers no Resend) is on branch
+`fix/cancelled-orders-guard-20261114`, with its server half (§54).
 
 **Builds already in customers' hands keep their old behaviour.** In LIVE mode
 they open Moyasar's page in the system browser, which works but offers no Apple
@@ -4636,7 +4699,10 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   An admin cancelling a paid online order reverses loyalty points and refunds no
   money. Until that changes, refund a cancelled paid order by hand in the Moyasar
   dashboard. Making cancellation refund automatically is a code and migration
-  change.
+  change. Once `20261012120000` is applied (§54), the POS-failure rule also skips
+  a cancelled order, so the hand refund cannot be followed by an automatic one
+  after failed resends (gap PG-03). A refund enrolled before the cancellation
+  still runs: check the order's refund status before refunding by hand.
 - **A duplicate payment is recorded, not refunded.** If a customer pays twice for
   one order or checkout session, the second payment is recorded as a `failed`
   `payment_records` row with `failure_code = 'duplicate_payment'` and the message
@@ -4959,6 +5025,48 @@ There is no number to decide and no function to deploy.
 
 **Done looks like:** all three applies recorded as ledger rows in
 `docs/MIGRATIONS.md`, and §61 and §62 marked APPLIED.
+
+## 54. A cancelled order is never resent, sent, refunded automatically or paid — one apply
+
+**Opened 2026-11-14.** Gaps PG-03 and PG-27
+(`readiness/20261113-card-payments-gaps.md`), and the §47.13 warning. Branch
+`fix/cancelled-orders-guard-20261114`. Nothing about it is a decision: the gaps
+list says "Approve" for both.
+
+**What it stops, in one line each.** Resend on a cancelled order (it printed a
+ticket); the worker sending a cancelled order that was still queued; an
+automatic refund on top of a hand refund; a direct API call creating an unpaid
+online order; and an invoice being opened for one of the three cancelled July
+online orders once the gateway is live. Detail: `docs/MIGRATIONS.md` §64.
+
+**There is no number to decide and no function to deploy.** `payment-initiate`
+already answers the new refusal with a 400 and opens no invoice.
+
+### The steps, each its own approval (CLAUDE.md §5)
+
+1. **Merge the pull request.** The console is not touched. A merge does ship
+   the web build `/app` (CLAUDE.md §13), so from then on `/app` shows a
+   cancelled order as "Order cancelled" with no Resend. That reads only the
+   order's status, so it is right whether or not step 2 has happened. The
+   phone apps get it only in the §47.17 build.
+2. **Apply `20261012120000_cancelled_orders_guard` by name.** Recommended
+   before §47.13 step 1, which is what closes that section's warning; the
+   warning's other choices are still yours (§47.13). Re-hash the merged copy first (`docs/MIGRATIONS.md` §64 has the
+   sha256). Never "the outstanding migrations". The file refuses to apply if
+   any of the six functions it replaces is not the definition it was written
+   against, or if the money-path pair has moved; if it refuses, nothing has
+   changed, and the file must be re-derived, not forced.
+3. **Check afterwards, read-only:** one overload of each of the six functions;
+   `anon` executes none of them; `authenticated` still executes
+   `request_customer_pos_resend` and `place_customer_order`; the money-path pair
+   unchanged (`12b6816d…` / `22e2d429…`); no order or branch whose name starts
+   `VERIFY-20261012120000-` exists (the file's own probe rows, which it rolls
+   back).
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
+§64 marked APPLIED, the §47.13 warning marked closed, and rows PG-03 and PG-27
+of the gaps list marked live for their server half. PG-03's app half is live
+only when the §47.17 build is in customers' hands.
 
 ## 55. Refunds and payments needing attention — one apply, then one deploy
 

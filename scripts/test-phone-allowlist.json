@@ -228,6 +228,18 @@
       "used_in": ["supabase/tests/account_deletion_resolution_note_privacy_test.sql"]
     },
     {
+      "number": "+966500009108",
+      "used_in": ["supabase/tests/cancelled_orders_guard_test.sql"]
+    },
+    {
+      "number": "+966500009109",
+      "used_in": ["supabase/tests/cancelled_orders_guard_test.sql"]
+    },
+    {
+      "number": "+966500009110",
+      "used_in": ["supabase/tests/cancelled_orders_guard_test.sql"]
+    },
+    {
       "number": "+966500009901",
       "used_in": ["supabase/tests/order_cancellation_integrity_test.sql", "supabase/tests/server_input_bounds_test.sql"]
     },
