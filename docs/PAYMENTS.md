@@ -364,7 +364,8 @@ After it:
   `REFUND_FAILED`, unless a newer refund for the order is pending, processing
   or succeeded, or the order reads refunded. The incident reaches the alert
   inbox through the Order Integrity card, and turns the payment card in
-  Operations Health to failing;
+  Operations Health to failing while the payment row is enabled and
+  configured;
 - Live Orders shows the card "Refunds and payments needing attention" to an
   admin at AAL2. It lists those refunds under "Automatic refunds that stopped",
   and every refund tried at least once and still pending under "Refunds still
@@ -754,8 +755,9 @@ rule counts `paid` rows, and a duplicate is `failed`).
 
 **Written 2026-11-14, not live until `20261013120000` is applied** (gap PG-02,
 `MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
-`DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and turns the
-payment card to failing. The Live Orders card "Refunds and payments needing
+`DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and, while the
+payment row is enabled and configured, turns the payment card to failing. The
+Live Orders card "Refunds and payments needing
 attention" lists it under "Payments to refund", with the Moyasar payment id to
 search for.
 

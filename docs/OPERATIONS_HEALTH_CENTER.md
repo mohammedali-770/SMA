@@ -141,7 +141,8 @@ configuration error has the highest precedence.
 
   The same file adds the four refund and payment rules R14-R17
   (`ORDER_INTEGRITY_WATCHDOG.md` §3) to the payment-related incident count, so
-  the card reads `failing` for them as it does for R2-R6.
+  the card reads `failing` for them as it does for R2-R6, while the payment
+  row is enabled and configured.
 
   *Changed 2026-11-12.* The card was **Payment / Tap**. On the branch
   `feat/moyasar-only-20261111` the console labels it **Payment / Moyasar**
@@ -258,8 +259,9 @@ automatic needs an owner decision (`OWNER_ACTIONS.md` §47.20).
 
 **Changed 2026-11-14, not live until `20261013120000` is applied** (gap PG-02).
 Each duplicate raises the critical watchdog rule R15, which turns the Order
-Integrity and payment cards here to failing and opens the critical
-`order_integrity:incidents` alert. A payment that matched nothing (R16) and a
+Integrity card here to failing (and the payment card, while the payment row is
+enabled and configured) and opens the critical `order_integrity:incidents`
+alert. A payment that matched nothing (R16) and a
 payment whose order was not confirmed (R17) do the same. Live Orders lists all
 three in the admin-only card "Refunds and payments needing attention".
 

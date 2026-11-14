@@ -207,7 +207,7 @@ owner decision), so after one the incident stays open until that is decided.
 Operations Health to failing and raises the critical
 `order_integrity:incidents` alert in the console's inbox. The payment card
 counts its own list of rule codes, and R14-R17 are added to it, so it reads
-failing too. Outside the console they reach nobody until external alert email
+failing too while the payment row is enabled and configured. Outside the console they reach nobody until external alert email
 is turned on (gap PG-10). The same records are listed on Live Orders, in the
 admin-only card "Refunds and payments needing attention".
 

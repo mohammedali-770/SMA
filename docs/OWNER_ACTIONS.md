@@ -4966,7 +4966,8 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
 - **Refund and payment problems reach staff.** A refund that gave up, a
   customer charged twice, a payment that matched nothing, and a payment whose
   order was not confirmed each raise a critical incident. The incident reaches
-  the alert inbox and turns the payment card in Operations Health to failing.
+  the alert inbox, and turns the payment card in Operations Health to failing
+  while the payment row is enabled and configured.
   They are also listed on a new Live Orders card, "Refunds and payments needing
   attention", with what to do: refund by hand in Moyasar's dashboard
   ([`PAYMENTS.md`](PAYMENTS.md) §10). The card has no refund button.
