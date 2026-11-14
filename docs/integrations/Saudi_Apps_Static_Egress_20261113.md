@@ -351,14 +351,16 @@ relay's reach in every column.
 plan "For compliance dev and test environments". It labels the $59 Production
 plan "For production healthcare and fintech applications", and says both use
 shared address pairs
-([QuotaGuard](https://www.quotaguard.com/products/pricing/)). Start the free
-trial on Starter as planned. Before keeping it, ask QuotaGuard in writing
-whether Starter is acceptable for live card payments. If it is not, budget $59
-a month. The same page says "Upgrading or downgrading your plan does not change
+([QuotaGuard](https://www.quotaguard.com/products/pricing/)). Before starting
+the free trial, ask QuotaGuard in writing whether Starter is acceptable for live
+card payments (question 1 of the QuotaGuard email in the
+[draft](Moyasar_Static_IP_Proxy.md) §7), and start the trial on the plan its
+answer allows. If Starter is not acceptable, budget $59 a month. The same page says "Upgrading or downgrading your plan does not change
 your assigned IP addresses", so starting on Starter costs nothing if we later
 move to Production.
 
-**Ask Moyasar early, and in any case before saving the live list,** because once
+**Ask Moyasar before starting the trial, and in any case before any Allowed IPs
+list is changed, TEST or live,** because once
 it is saved, live "cannot be set back to any IP address" (§3). Three questions:
 does it accept addresses that a relay shares with its other customers; how do
 platforms such as Salla meet the list for their merchants; and does it

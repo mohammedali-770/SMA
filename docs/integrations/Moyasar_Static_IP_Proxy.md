@@ -8,9 +8,13 @@
 > corrected below, and the Review log at the end lists each one. A second
 > check, of compatibility and security, found that the TEST-mode proof in §3
 > could leave the working TEST setup broken, with no known way back. The steps
-> now run in a safer order, and the Review log lists that change too.
+> now run in a safer order, and the Review log lists that change too. A final
+> review on 2026-11-14 corrected what this draft said about cash orders during
+> an outage, the load a stuck refund adds, QuotaGuard's soft limits and which
+> Allowed IPs list to change. The Review log lists each correction.
 >
-> **Before buying:** send the two emails in §7, to QuotaGuard and to Moyasar.
+> **First, before starting any trial:** send the two emails in §7, to QuotaGuard
+> and to Moyasar, and wait for the replies (§3 step 1).
 >
 > **Your decision:** which service to use (§2). This is `OWNER_ACTIONS.md` §47.10.
 > The steps after it (§47.11 to §47.13) each need their own approval under
@@ -41,7 +45,7 @@ Two terms used below:
 | Cost a month | **$29**: 20,000 requests and 10 GB of data. 3-day free trial (card details needed) | **$19**: 25,000 requests and 10 GB. A free plan covers 500 requests and 100 MB | **$19**: 20,000 requests and 10 GB | **$4 to $8** per server (DigitalOcean $4, AWS Lightsail $5, AWS EC2 about $8), about double with a standby |
 | Fixed addresses | 2, used in turn | 2, used in turn | 2, used in turn | 1 per server |
 | Addresses ours alone? | **No.** The price page says "Shared static IP pair". A private pair needs Enterprise ($269) | **Unclear.** Fixie says "a dedicated static IP"; QuotaGuard, a competitor, says Fixie's are shared. Ask | **No**, as for Shield | Yes |
-| Over the monthly limit | Calls keep working ("soft limits"). QuotaGuard gets in touch if it lasts | **Every call fails** until you upgrade or the month resets | As for Shield | No request limit |
+| Over the monthly limit | Calls keep working through a brief spike ("soft limits"). Sustained use above the plan means an upgrade, and QuotaGuard gets in touch | **Every call fails** until you upgrade or the month resets | As for Shield | No request limit |
 | Uptime guarantee (SLA) | None. QuotaGuard's covers Enterprise only | None. Its terms disclaim one | None, as for Shield | AWS: 99.5% for one EC2 server. Others not checked |
 | Encrypted link to the proxy | Yes (port 9294) | Yes (port 443) | **No**: `http://` only (port 9293) | Yes, once we install a free certificate, which needs a domain name |
 | Tunnel, so the proxy cannot read our key | Yes, in writing | Yes, in writing | Yes, in writing | Yes, if we set it up that way |
@@ -68,6 +72,20 @@ because Fixie says calls fail once its limit is reached (§2). The 10 GB of data
 is not a constraint: each call moves a few kilobytes, so even 20,000 calls come
 to well under 1 GB (an estimate).
 
+**Until gap PG-01 is fixed, one stuck refund can use more than the whole plan.**
+A refund that gets no clear answer from Moyasar (Moyasar refusing our address,
+a proxy or network error, or an error on Moyasar's side) stays pending and is
+tried again 5 times in every run of the refund job. The job runs every 5
+minutes once §47.16 turns it on. Each try is at least one call to Moyasar: at
+least 1,440 calls a day, about 43,000 a month, more than twice the Starter
+plan's 20,000. Neither vendor says whether calls that share one connection
+count as one request, so the vendor's count may be lower; plan for the higher
+figure. With Fixie, reaching the limit stops every card payment, payment check
+and refund until the month resets or you upgrade. With QuotaGuard, this is
+sustained use, which its soft limits do not cover (§2), so expect QuotaGuard to
+ask you to upgrade. Whichever you choose, send the vendor's usage alerts to an
+inbox someone reads (gap PG-19).
+
 **Location.** Neither QuotaGuard (12 AWS regions, none in the Middle East) nor
 Fixie (its pages point to the US) offers a Gulf location. Some scraping-proxy
 sellers do sell Saudi and UAE addresses (Oxylabs lists both), but they are ruled
@@ -86,7 +104,14 @@ region has an outage. It is not needed to start.
 
 **Whatever you choose:** if the proxy is down, card checkout cannot start, and
 payment checks and refunds wait until it is back. With Fixie, the same happens
-when the month's limit is used up. Cash orders are not affected.
+when the month's limit is used up. **Cash orders are affected on some phones**
+(gap PG-04). A phone whose card payment page was opened and left unpaid cannot
+place any order, cash included, until that payment expires, 30 minutes after it
+was opened. If the proxy or Moyasar cannot be reached when that time is up, the
+lock lasts until our server can reach Moyasar again. A phone that tries to pay
+by card while the proxy or Moyasar cannot be reached (or, with Fixie, while it
+is over its limit) cannot place a cash order either, for up to 30 minutes,
+until its checkout session expires. Other phones can still order in cash.
 
 **Ruled out** (sources in §6):
 
@@ -125,17 +150,20 @@ Why:
    encrypts all the way to Moyasar and checks Moyasar's certificate, so the proxy
    only passes along traffic it cannot decrypt. It also has two fixed addresses
    and a Frankfurt location.
-2. **A busy month does not cut card payments off.** QuotaGuard uses "soft limits
-   so a brief spike does not automatically break production traffic", and gets
-   in touch if usage stays well above the plan. Fixie, the fallback, says calls
-   fail once its limit is reached.
+2. **A brief spike does not cut card payments off.** QuotaGuard uses "soft
+   limits so a brief spike does not automatically break production traffic",
+   and contacts you about upgrading if usage "materially exceeds the plan
+   limits". It adds that soft limits are "a courtesy for unexpected spikes, not
+   a way to run sustained traffic above the paid plan", so choose the plan for
+   the volume you expect to sustain. Fixie, the fallback, says calls fail once
+   its limit is reached.
 3. **Its Supabase guide is the closest to our code.** It uses the same code shape
    our server already has, and says it was "verified on v1.73.x with HTTP,
    SOCKS5, and HTTPS proxies". That is a vendor claim, made under a
    troubleshooting heading, and the same page warns that local runs "do not
    confirm behavior on the hosted runtime" (§4). Fixie publishes a Supabase
    guide too, without a version claim.
-4. **Its 20,000 requests a month cover roughly 2,000 to 3,300 card orders a month** (see Sizing in §1); check that against the volume you expect at launch.
+4. **Its 20,000 requests a month cover roughly 2,000 to 3,300 card orders a month** (see Sizing in §1), as long as no refund is stuck (gap PG-01); check that against the volume you expect at launch.
 5. **You can prove it before you pay**, during the 3-day free trial (§4). Sign-up
    asks for card details before the trial starts, and QuotaGuard's support will
    extend the trial if you ask.
@@ -233,7 +261,8 @@ outbound traffic is IPv4-only, and list any IPv6 outbound addresses it has as
 well. List every address, because any call that leaves from an unlisted address
 is refused.
 
-**3. Answers in writing**, worth an email before you keep the paid plan:
+**3. Answers in writing, before starting the trial.** The QuotaGuard email in §7
+asks these. If you move to Fixie, ask Fixie the same before buying:
 
 - What happens to the addresses if we cancel, or when the trial turns into a
   paid plan? (Both vendors already say the addresses never change otherwise,
@@ -255,11 +284,18 @@ First finish §47.7 to §47.9 (the TEST keys, the TEST webhook and the sandbox
 test) **without** a proxy. That way a proxy problem cannot be mistaken for a
 sandbox problem. Then:
 
-1. **§47.10, choose.** Start the QuotaGuard Shield trial on the Starter plan, in
-   the Frankfurt region, and collect the URL and both addresses. Sign-up asks for
-   card details before the trial starts. The trial lasts 3 days, so start it on a
-   day you can also do step 2. If you need longer, email QuotaGuard's support and
-   ask them to extend it.
+1. **§47.10, ask, then choose.**
+   - **Send the two emails in §7 first, before starting any trial,** and wait
+     for the replies. QuotaGuard's answer to its question 1 decides the plan
+     (Starter or Production). Moyasar's answer to its question 1 decides whether
+     shared addresses are acceptable at all. If they are not, the choice is a
+     private pair (Shield Enterprise, $269 a month), Fixie if it confirms in
+     writing that its addresses are ours alone, or our own server (§1).
+   - **Then start the QuotaGuard Shield trial** on that plan, in the Frankfurt
+     region, and collect the URL and both addresses. Sign-up asks for card
+     details before the trial starts. The trial lasts 3 days, so start it on a
+     day you can also do step 2. If you need longer, email QuotaGuard's support
+     and ask them to extend it.
 2. **§47.11, set the secret, and leave Moyasar's TEST list as it is.** In the
    Supabase dashboard, open Edge Functions → Secrets. Add the name
    `MOYASAR_PROXY_URL` (exactly that; `HTTPS_PROXY` does nothing) with the URL as
@@ -269,15 +305,21 @@ sandbox problem. Then:
    from Moyasar. It does not show which address Moyasar saw, because TEST still
    accepts any address.
    - **Then check that the proxy really carried the call** (recommended; it
-     changes nothing at Moyasar). Edit the secret, change one character of the
-     password (the part between `USERNAME:` and `@`), and run Test connection.
-     It must now say "Could not reach Moyasar", because the proxy turned the
-     wrong password down. Put the correct value back and run Test connection
-     once more: "Connection OK" again. Together, the two results show that the
-     call goes through the proxy, that the proxy can be reached, that its
-     certificate is accepted and that it accepted our sign-in. If the wrong
-     password still gives "Connection OK", the call is going around the proxy:
-     put the correct value back and tell engineering.
+     changes nothing at Moyasar). Supabase cannot show the secret's value, so
+     paste the URL from the vendor's dashboard into the secret's value
+     again, change one letter or digit of the password there (the part between
+     `USERNAME:` and `@`, but not a `%` or the two characters after one), and
+     save. Run Test connection. It must now say "Could not reach Moyasar",
+     because the proxy turned the wrong password down. If it says "…is not an
+     http:// or https:// URL…" instead, the change hit a `%` code: start again
+     with another character. Then save the correct value, pasted unchanged from
+     the vendor's dashboard, and run Test connection once more: "Connection OK"
+     again. Together, the two results show that the call goes through the
+     proxy, that the proxy can be reached, that its certificate is accepted and
+     that it accepted our sign-in. If the wrong password still gives
+     "Connection OK", the call is going around the proxy: put the correct value
+     back and tell engineering (describe the message; never paste the URL or
+     its password).
    - **If both results are right, keep the subscription.** If not, see §4. To
      stop, delete the secret and cancel before the trial ends. The TEST list
      was never changed, so TEST works exactly as before.
@@ -286,22 +328,33 @@ sandbox problem. Then:
    be reversible.
    - **First, know what it commits you to.** Moyasar's page does not say whether
      a restricted TEST list can be put back to "any address" (Not verified #6).
-     Ask Moyasar support before doing this (add it to §47.19), or treat it as
-     permanent. From then on, every TEST call must leave from a listed address:
+     That is question 3 of the email in §7 (also in §47.19). Do not change this
+     list, or any Allowed IPs list, before Moyasar has answered questions 1 and
+     3 in writing. If the answer to question 3 is not a clear yes, treat the
+     change as permanent. From then on, every TEST call must leave from a
+     listed address:
      Test connection, the sandbox checkout and its result, payment checks, and
      the payment lookup made for each Moyasar notification. A later change of
      vendor then means changing the TEST list too, and dropping the proxy would
      leave TEST refused unless the list can go back to "any address".
    - **Then do it.** In the Moyasar dashboard, in TEST mode, open Settings → API
-     Keys → Allowed IPs. Choose *Specific addresses*, add both addresses and
-     save. Run Test connection again. "Connection OK" now proves that Moyasar
+     Keys and the Allowed IPs list under the test keys (read the heading above
+     it). Choose *Specific addresses*, add both addresses and save. Run Test connection again. "Connection OK" now proves that Moyasar
      saw one of the listed addresses, and a sandbox checkout confirms it (see
      the note under the table in §4). "Moyasar refused the test key from the
      proxy…" means an address is missing (§4).
    - **Skipping it is fine.** The addresses are then proven at §47.13.
-4. **§47.12, Moyasar's LIVE list.** In LIVE mode, open Allowed IPs, add both
-   addresses and save with the 6-digit code. The live secret key becomes visible
-   only after this.
+4. **§47.12, Moyasar's LIVE list, only after Moyasar's written answers to
+   questions 1 and 3 in §7.** In Moyasar's dashboard, switch to **LIVE** mode
+   first: §47.8 left it in test mode. Then open Settings → API Keys, where each
+   environment has its own Allowed IPs list under its keys, and change only the
+   list under the live keys: add both addresses, read the heading above the
+   list, and save. Saving the
+   LIVE list asks for a 6-digit code. If no code is asked for, you are on the
+   TEST list: do not save anything more. Moyasar saves a TEST change at once,
+   without a code, so that list may now be restricted: tell engineering, and
+   see step 3 and Not verified #6. Once saved, the live list can never be
+   emptied again. The live secret key becomes visible only after this.
 5. **§47.13, go live in the console.**
    - Switch the Moyasar card to live.
    - Save the live secret key, the live publishable key and the live webhook
@@ -311,8 +364,11 @@ sandbox problem. Then:
    - Run **Test connection** (LIVE). "Connection OK" proves the whole route,
      with the caveat in the note under the table in §4.
 
-Then carry on at §47.14. Card payments stay off throughout these steps, because
-the Online Payment switch is turned on only at §47.18.
+Then carry on at §47.14. No customer can start a card payment in the app during
+these steps, because the Online Payment switch is turned on only at §47.18. From
+§47.13 step 1, though, TEST mode no longer blocks the older order-first path,
+which a direct API call can still use for three cancelled July orders
+(`OWNER_ACTIONS.md` §47.13).
 
 ---
 
@@ -329,9 +385,9 @@ runs in TEST mode settle it (§3 step 2).
 - **The source code of that version supports exactly what our code sends.** It
   gives functions `Deno.createHttpClient`. It handles an `http://` or `https://`
   proxy with a username and password, and it opens a tunnel to Moyasar. Our code
-  comment and our documents say the feature arrived in version 1.68.0. The source
-  shows it arrived in 1.69.0. That small correction can wait, and it changes
-  nothing, because we run 1.77.9.
+  comment says the feature arrived in version 1.68.0; the source shows 1.69.0,
+  which is what our runbooks now say. Correcting the comment can wait, and it
+  changes nothing, because we run 1.77.9.
 - **QuotaGuard's claim.** Under a troubleshooting heading, QuotaGuard says it
   verified the same code "on v1.73.x with HTTP, SOCKS5, and HTTPS proxies". That
   is a vendor claim, and the same page warns that local runs "do not confirm
@@ -359,13 +415,15 @@ checked. Leave the TEST list open while you do that, because step 3 belongs to
 the service you keep. You would then repeat step 2 with the paid service's URL,
 and do step 3, if you choose to, with the paid service's addresses.
 
-**What each Test connection result means:**
+**What each Test connection result means.** Where a row says to tell
+engineering, describe the message you saw. Never paste the URL or its password
+into a chat or an email.
 
 | Result | Meaning | What to do |
 |---|---|---|
-| "Moyasar accepted the test key. Connection OK." | **With the TEST list restricted (§3 step 3): proven.** Only the proxy's addresses are listed, so the call came through the proxy, on Supabase's real runtime. **With the TEST list still open (§3 step 2):** Supabase accepted the proxy setting and Moyasar answered. Whether the proxy carried the call is shown by the wrong-password check in step 2; which address Moyasar saw is not shown at all. | Keep the plan. Do step 3 if you choose to, then go on to §47.12. |
+| "Moyasar accepted the test key. Connection OK." | **With the TEST list restricted (§3 step 3): proven.** Only the proxy's addresses are listed, so the call came through the proxy, on Supabase's real runtime. **With the TEST list still open (§3 step 2):** Supabase accepted the proxy setting and Moyasar answered. Whether the proxy carried the call is shown by the wrong-password check in step 2; which address Moyasar saw is not shown at all. | Keep the plan. Once Moyasar has answered questions 1 and 3 of §7 in writing, do step 3 if you choose to, then go on to §47.12. |
 | "MOYASAR_PROXY_URL is set, but this runtime cannot route a request through a proxy…" | Supabase lacks the feature. Nothing was sent. | Delete the secret, cancel the trial and tell engineering. If you had already restricted the TEST list (step 3), also put it back to "any address", if Moyasar allows it: with no working proxy, every TEST call is refused. |
-| "…is not an http:// or https:// URL…" or "…could not be used as a proxy…" | The value is mistyped, or starts with something other than `https://` or `http://`. | Copy it again from the vendor's dashboard. |
+| "…is not an http:// or https:// URL…" or "…could not be used as a proxy…" | The value is mistyped, or starts with something other than `https://` or `http://`. During the wrong-password check, it means the changed character was a `%` or one of the two after it. | Copy it again from the vendor's dashboard. |
 | "Could not reach Moyasar. Please try again." | No answer came back from Moyasar. For example: the proxy cannot be reached, or its host name does not resolve; its password is wrong; its certificate failed; it turned the tunnel down for another reason; (with Fixie) the month's limit is used up, which Fixie reports the same way as a wrong password; the connection to Moyasar inside the tunnel failed; or no answer came within the 12-second limit. Our code cannot tell which. | Copy the URL again. If the result persists, look in the vendor's dashboard: its usage figures, and its request log if it shows status codes. Our own logs will not help: Test connection does not record this failure. The most engineering can tell is that a run lasting about 12 seconds hit the time limit. Recording the cause would be a code change, with its own approval. Trying Fixie's free plan tells a vendor problem from a Supabase one. If you give up on this proxy after restricting the TEST list (step 3), also swap in the next proxy's addresses, or put the list back to "any address" if Moyasar allows it. |
 | "Moyasar refused the test key from the proxy…" | Moyasar received a call from an address that is not on the TEST list. Usually an address is missing. | Add every address. If both are already listed, tell engineering: the proxy may not be in use. |
 | "Moyasar refused the test key from this server's IP address…" | The TEST list is restricted and the call went direct, because the secret is not set. In the order of §3 this should not appear. | Set the secret again (§3 step 2). If you have dropped the proxy for good, put the TEST list back to "any address", if Moyasar allows it (Not verified #6). |
@@ -419,7 +477,11 @@ These come from Moyasar's page, which was last updated on 11 November 2026.
 
 In practice:
 
-- **List both addresses of the pair, in both lists.**
+- **List both addresses of the pair in the LIVE list** (§47.12). Put them in
+  the TEST list only if you choose §3 step 3, which is optional, comes after the
+  proxy is proven, after you have decided to keep the service and after
+  Moyasar's written answers to questions 1 and 3 in §7, and may not be
+  reversible (Not verified #6).
 - **IPv4 is what counts today.** On 2026-11-13, Google's and Cloudflare's
   resolvers both gave `api.moyasar.com` two IPv4 addresses and no IPv6 record.
   That can change without notice: the name is served by Cloudflare, where IPv6
@@ -454,7 +516,9 @@ now redirects, the address given is where it lands.
   - Shield Starter's label, "For compliance dev and test environments";
   - "We use soft limits so a brief spike does not automatically break production
     traffic. If usage materially exceeds the plan limits, we will contact you
-    about upgrading or right-sizing the account";
+    about upgrading or right-sizing the account. Soft limits are a courtesy for
+    unexpected spikes, not a way to run sustained traffic above the paid plan"
+    (re-read 2026-11-14; the plan cards say the same);
   - "Will my static IPs ever change? … No, unless you ask us to", and "Upgrading
     or downgrading your plan does not change your assigned IP addresses";
   - the 3-day trial (7 days on Enterprise);
@@ -698,8 +762,9 @@ now redirects, the address given is where it lands.
    restricted, or what removing every address from it does. The page says LIVE
    cannot, and says nothing about TEST or about webhooks. That is why §3 sets
    the secret while TEST is still open, and leaves restricting TEST to an
-   optional last step, after you have decided to keep the service. Ask Moyasar
-   support before that step (§47.19).
+   optional last step, after you have decided to keep the service and Moyasar
+   has answered questions 1 and 3 of the email in §7. Question 3 is this one
+   (also in §47.19).
 7. **Where Moyasar's servers are.** Its API sits behind Cloudflare, so the best
    location for the proxy is a judgement. "About a second" for the detour is an
    estimate.
@@ -718,12 +783,13 @@ now redirects, the address given is where it lands.
 
 ---
 
-## 7. Two emails to send before buying
+## 7. Two emails to send before starting the trial
 
 Added 2026-11-13, after the research into how Saudi apps meet allow-lists
-(`Saudi_Apps_Static_Egress_20261113.md`). Send both before starting the trial:
-the answers decide the plan (Starter or Production) and whether shared addresses
-are acceptable at all. Fill in the bracketed parts and send from the business
+(`Saudi_Apps_Static_Egress_20261113.md`). Send both before starting the trial,
+and wait for the replies before choosing (§3 step 1): the answers decide the
+plan (Starter or Production) and whether shared addresses are acceptable at
+all. Fill in the bracketed parts and send from the business
 mailbox. Neither email contains a key, a password or one of our addresses, and
 neither needs one. Keep the replies with this document: they are the written
 answers §3 asks for.
@@ -779,9 +845,10 @@ answers §3 asks for.
 >    the list for their merchants?
 > 3. If we restrict the TEST list to specific addresses, can it be put back to
 >    "any address" later?
-> 4. Which payment methods does the hosted invoice page offer on our account?
->    We expect mada, Visa, Mastercard and Apple Pay only. Please confirm that
->    SADAD and STC Pay are off.
+> 4. Which payment methods and card schemes does the hosted invoice page offer
+>    on our account? We expect mada, Visa, Mastercard and Apple Pay only.
+>    Please confirm in writing that every other method and card scheme is off,
+>    including SADAD, STC Pay, Samsung Pay and American Express.
 > 5. What appears on a customer's card statement for our payments, and can we
 >    change it?
 > 6. Must our account hold a balance to cover a refund?
@@ -793,14 +860,18 @@ answers §3 asks for.
 > 10. Can a 3-D Secure payment that is still in progress complete after its
 >     invoice has expired?
 > 11. Could the hosted page ever be served from a domain other than moyasar.com?
+> 12. Is an unpaid invoice marked expired exactly at its expiry time, or can it
+>     still be paid for a while after?
 >
 > Thank you,
 > [Name], Spicy Meal
 
-All eleven are the questions in `OWNER_ACTIONS.md` §47.19, asked in one message.
-Questions 1 and 3 must be answered before any Allowed IPs list is changed
-(§47.12). Question 4's answer is a gate: no method list is published, and §47.18
-is not reached, without it.
+All twelve are the questions in `OWNER_ACTIONS.md` §47.19, asked in one message.
+Questions 1 and 3 must be answered in writing before any Allowed IPs list is
+changed, TEST or LIVE (§3 steps 3 and 4, §47.12). Question 4's answer is a gate
+(gap PG-11): no method list is published, and §47.18 is not reached, until
+Moyasar confirms in writing that only mada, Visa, Mastercard and Apple Pay are
+on.
 
 ---
 
@@ -867,3 +938,29 @@ re-checked before anything changed.
 The review's "checked and confirmed" list needed no change. Its log count, 6,145
 lines, is a separate reading of a rolling 24-hour window from §4's 6,144; both
 show only runtime 1.77.9.
+
+### Final review, 2026-11-14
+
+An independent review of the whole pull request raised nine findings against
+this file, and a second reader checked each one. None was refuted.
+
+| Finding | Outcome |
+|---|---|
+| **R1** (blocking). §5 said to list the pair "in both lists", which restricts TEST with no condition. | **Applied.** §5 now says the LIVE list (§47.12), and the TEST list only through §3 step 3: optional, after the proxy is proven, after deciding to keep the service and after Moyasar's written answers to questions 1 and 3, and possibly permanent. Moyasar's page, re-read 2026-11-14 and still dated 11 November, says a TEST change needs no code. |
+| **C3.** "Cash orders are not affected" was false, and Sizing ignored the stuck-refund loop. | **Applied, together with R8, in the second reader's corrected form.** The cash sentence names both locked cases (gap PG-04). A new paragraph after Sizing counts the loop: 5 tries a run, a run every 5 minutes once §47.16 turns the job on (live schedule `*/5 * * * *`, inactive today), so at least 1,440 Moyasar calls a day. It says the vendor may count calls sharing a connection as one, and to send usage alerts to an inbox someone reads (PG-19). It says "at least", not "up to": a try whose lookup works but whose refund call gets no clear answer makes three calls (`payment-refund/index.ts:210-261`). §2 reason 4 now holds only while no refund is stuck. |
+| **R8.** The same sentence missed a phone that tries card during an outage. | **Applied** in the same rewrite. Re-checked: the app saves the checkout session before asking for an invoice (`CheckoutScreen.tsx:816`), and an attempt with no invoice reads pending while its session is open (`_shared/moyasar.ts:1065-1078`). The session lasts 30 minutes (live column default). |
+| **X1.** "A busy month" promised more than QuotaGuard's visible text. | **Applied** in §2 reason 2, the §1 table and the §6 quote, as the second reader corrected it: soft limits are "a courtesy for unexpected spikes, not a way to run sustained traffic above the paid plan". |
+| **R11.** Moyasar question 4 could be answered without meeting the drafts' gate. | **Applied, merged with X5.** Question 4 asks which methods and card schemes the page offers, and for written confirmation that every other one is off. The note after the emails names the gate (gap PG-11). The matching `OWNER_ACTIONS.md` §47.19 bullets were widened the same way. |
+| **X5.** Question 4 did not name American Express or Samsung Pay. | **Applied** in the same question, which now names SADAD, STC Pay, Samsung Pay and American Express as examples. |
+| **R16.** §3 step 1 started the 3-day trial before the emails were answered. | **Applied.** Step 1 now sends both emails first and waits for the replies, which decide the plan and whether shared addresses are acceptable, then starts the trial. |
+| **C16.** Three timings for the emails, a stale version line and a stale "(add it to §47.19)". | **Applied.** This file now says one thing: send both before starting the trial (status, §3 item 3 and step 1, §7). The version line says only the code comment still reads 1.68.0. "(add it to §47.19)" is gone. `Saudi_Apps_Static_Egress_20261113.md` §5 was aligned the same day. |
+| **R13.** The wrong-password check assumed the secret could be read back, and could hit a `%` code. | **Applied.** Step 2 says to paste the URL from the vendor again, change a letter or digit that is not a `%` or one of the two after it, and what the other message means; row 3 of the §4 table says the same. **Applied differently** for "tell engineering": one note above the §4 table, and the words in step 2, instead of repeating them in every row. |
+
+**Beyond the findings.** §3 step 4 now follows the go-live order the other
+documents share: switch Moyasar's dashboard to LIVE first (§47.8 left it in test
+mode), change only the LIVE list, and change no list before Moyasar's written
+answers to questions 1 and 3. Saving the LIVE list asks for a 6-digit code, and
+if none is asked for, the list was the TEST one. Moyasar saves a TEST change at
+once, so the step says to stop there and tell engineering rather than only "do
+not save". Step 3, row 1 of the §4 table, Not verified #6 and the note after the
+emails say the same.

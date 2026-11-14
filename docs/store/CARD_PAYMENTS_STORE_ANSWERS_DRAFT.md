@@ -8,7 +8,7 @@
 > Console, and nothing is published.** Entering these answers, publishing the
 > listing and sending the review notes are owner steps.
 >
-> **Publishing plan (decided).** `privacy_policy`, `payment_policy`,
+> **Publishing plan (proposed; the owner decides).** `privacy_policy`, `payment_policy`,
 > `cancellation_refund_policy` and `terms_conditions` are published
 > **together**, in **both languages**, in **one** owner-approved session, before
 > `docs/OWNER_ACTIONS.md` §47.18 (online payment on). No document goes out on
@@ -17,10 +17,12 @@
 > four documents are live and the public legal page has been rebuilt, still
 > before §47.18; every text that tells customers card payment is available (the
 > listing, the release notes, the TestFlight description, the App Store lines)
-> once §47.18 has ended with card payment still on: its step 1 switched it on
-> and its step 2 device checks, the check of which methods the page offers among
-> them, have passed (C-CARD needs that check, and it cannot run before the
-> switch). The App Review notes follow the switch's state when a build is
+> once §47.18 has ended with card payment still on: its step 1 switched it on,
+> its step 2 device checks have passed, and so has a check of which methods the
+> page offers (C-CARD needs it, and it cannot run before the switch). That check
+> is not yet one of §47.18 step 2's checks, nor in `RELEASE_CHECKLIST.md` §7, so
+> it has to be added there first ("Knock-on edits in other records"). The App
+> Review notes follow the switch's state when a build is
 > submitted (3.5). The order inside the window is
 > "Open owner decisions", item 6. Until all four documents change, each live one
 > says card payment is not available (quoted under "Current (live) text").
@@ -89,11 +91,11 @@ All four still tell customers that card payment is not available (read live
 `payment_outage_mode_enabled` false. The payment row is provider `moyasar`,
 **enabled**, mode **`test`**, invoice expiry (`public_config.invoice_expiry_minutes`)
 **30** minutes, last written 2026-11-13 18:17:02 UTC; re-read at 22:08 UTC and
-at 22:44 UTC, unchanged. *Note:*
-`PAYMENTS.md` §1 and `GO_LIVE_READINESS.md` G1 record that row as disabled; it was
-enabled at 18:17 UTC today, still in TEST mode, so customer checkout is still
-refused (`supabase/functions/payment-initiate/index.ts:418`, `:495`). Every
-"current" text below is therefore still true today.
+at 22:44 UTC, unchanged, and again on 2026-11-14. *Note:* the row was enabled
+at 18:17 UTC on 2026-11-13, still in TEST mode, for the sandbox (`PAYMENTS.md`
+§1 and `GO_LIVE_READINESS.md` G1 now say so). Customer checkout is still refused
+in TEST mode (`supabase/functions/payment-initiate/index.ts:418`, `:495`), so
+every "current" text below is still true today.
 
 ### A. Play listing: `docs/store/LISTING_COPY.md`
 
@@ -423,8 +425,9 @@ together, in both languages, in one session before `OWNER_ACTIONS.md` §47.18,
 with the public legal page rebuilt to serve them. **Publish in this order,
 inside that one window: the four documents and the rebuild, then §47.18 step 1
 switches card payment on, then, once §47.18 has ended with it still on (its
-step 2 device checks passed, the check of which methods the page offers among
-them), submit this listing** [OWNER DECISION]. Not straight after step 1:
+step 2 device checks passed, and a check of which methods the page offers,
+which must first be added to §47.18 step 2 and `RELEASE_CHECKLIST.md` §7, gap
+PG-11), submit this listing** [OWNER DECISION]. Not straight after step 1:
 C-CARD needs that device check, which cannot run before the switch, and a
 listing already submitted when step 2 or 3 fails would advertise a switched-off
 option for as long as Play takes to publish the correction. If Play
@@ -801,7 +804,8 @@ The note between the two descriptions:
 *Both descriptions describe card payment. That is true only while online payment
 is on and in live mode, and they name the card brands, so they go in once
 `OWNER_ACTIONS.md` §47.18 has ended with online payment still on (its step 2
-device checks, the methods check among them, passed). A beta app description
+device checks passed, and the methods check, once it has been added there,
+gap PG-11). A beta app description
 applies to every build in TestFlight, and builds older than the one with the
 in-app payment screen
 (`OWNER_ACTIONS.md` §47.17) open Moyasar's page in the system browser,
@@ -1067,7 +1071,7 @@ repository root. Line numbers are from the default branch at `04eb351` read on
 | # | Change | Code fact (file:line) | Why |
 | --- | --- | --- | --- |
 | 1 | Listing: C-CASH now means "cash is offered", and C-CARD is added with six conditions (1.1) | `apps/mobile/src/lib/payment.ts:50-54`: `availableMethods` offers `online` only when `onlineEnabled` is set and the platform is not web, and `cash` only when `cashEnabled` is set. `apps/mobile/src/lib/mappers.ts:407` reads `online_payment_enabled`. `supabase/functions/payment-initiate/index.ts:418`, `:432`, `:495`, `:509` refuse customer checkout unless both the payment row and the attempt are `live`, and `:414-416`, `:491-493` answer "Online payment is not available" when the live secret key or webhook token is missing (`supabase/functions/_shared/moyasar.ts:264-269`). Live `legal_documents`: all four payment-related documents say card payment is not available ("Current (live) text"). The card brands rest on the owner's answer alone (`docs/PAYMENTS.md:15`), and the invoice request cannot restrict methods (`moyasar.ts:336-354`) | The old claim was exclusive ("payment is cash") and held only while card was off. With both methods on, each needs its own condition, or the table cannot say when the listing goes false. The switch alone is not enough: without the live keys, the published documents and a method list seen on a device, the claim is still false |
-| 2 | Listing: publication order inside the decided window, and the switch-off rule (1.2) | `docs/OWNER_ACTIONS.md` §47.18: "Online payment is one global setting", and "If anything fails, switch Online Payment off. Switching off is always allowed." The publishing plan in the header: four documents together, both languages, one session, before §47.18 | A listing claim has to follow a switch that can be turned back the same day, and the documents it points to must already say the same thing. Release notes already published stay with their release, so a switch-off changes the next release's notes |
+| 2 | Listing: publication order inside the proposed window, and the switch-off rule (1.2) | `docs/OWNER_ACTIONS.md` §47.18: "Online payment is one global setting", and "If anything fails, switch Online Payment off. Switching off is always allowed." The publishing plan in the header: four documents together, both languages, one session, before §47.18 | A listing claim has to follow a switch that can be turned back the same day, and the documents it points to must already say the same thing. Release notes already published stay with their release, so a switch-off changes the next release's notes |
 | 3 | Full description: one Payment bullet, EN and AR (1.3, 1.4) | The app's own words: the option is "Online Payment" / «الدفع الإلكتروني» (`apps/mobile/src/i18n/strings.ts:138`, `:504`); the hosted page opens inside the app (`apps/mobile/src/app/payment/checkout.tsx:1-5`); the screen's footer says "Your card details are entered on Moyasar’s secure page." / «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.» (`checkout.tsx:221`). The account has mada, Visa / Mastercard and Apple Pay enabled (owner's answer, `docs/PAYMENTS.md:15`); no device check yet confirms which methods the live page shows (`docs/RELEASE_CHECKLIST.md` §7), and §47.19 still asks Moyasar to confirm SADAD and STC Pay are off. Apple Pay is iPhone-only (`checkout.tsx:179`, "iOS only (a no-op on Android)") | Name only what a Play customer, on Android, can use, in the words the app shows. "Secure page" is a claim the app already makes. The brand list waits for the device check and Moyasar's written confirmation (C-CARD) |
 | 4 | Release notes: the payment line, or a note for a later release (1.5) | As row 3 | Release notes belong to a release; card payment is a server switch, so the note must match the switch's state when that release reaches users |
 | 5 | Play: Moyasar added to Purchase history's recipients (2.1) | `buildInvoicePayload` sends `amount`, `currency`, `description`, `success_url`, `back_url`, `expired_at` and `metadata` holding `reference_transaction` and `reference_order` (`supabase/functions/_shared/moyasar.ts:336-354`). The description is the literal "Spicy Meal order" (`payment-initiate/index.ts:456`, `:529`). The return addresses carry the order or checkout-session id (`:265-266`, `:457`, `:530`). The references are `sm_` plus a random uuid, and `ORD-` or `CS-` plus 12 hex digits of the order or session id (`supabase/migrations/20261003120000_moyasar_only_payments.sql:306-313`, `:405-406`). The app's language reaches Moyasar only as `lang` on the page address the app opens (`moyasar.ts:384`). Nothing else is sent: no customer name, phone, email or address. The POS also receives the paid amount and Moyasar's payment id (`supabase/functions/_shared/paymentSync.ts:62-74`, called at `moyasarVerify.ts:485-487`) | Transaction data now goes to a new recipient. No contact data does |
@@ -1235,26 +1239,29 @@ Not store-facing, but they go stale the day these answers change (CLAUDE.md §14
   argued answers.
 - `docs/OWNER_ACTIONS.md` §47.15: date the store-answers bullet when the forms,
   the listing and the notes are entered.
-- `docs/OWNER_ACTIONS.md` §47.15 also lists only privacy, payment and
-  cancellation. Add `terms_conditions`, whose PAYMENT clause still says cash
-  only; record the decided publishing plan (the four documents together, both
-  languages, one session, before §47.18); add the rebuild of the public legal
-  page and the no-JavaScript check of https://app.spicymeal.com.sa/privacy (§34)
-  as the step that makes them visible to Apple and Google; and give the order
-  inside the window from "Open owner decisions", item 6 (product gap PG-08).
+- *Done:* `docs/OWNER_ACTIONS.md` §47.15 has listed `terms_conditions` since
+  2026-11-13, and the final review of 2026-11-14 added there the proposed
+  publishing plan (the four documents together, both languages, one session,
+  before §47.18), the rebuild of the public legal page with the no-JavaScript
+  check of https://app.spicymeal.com.sa/privacy (§34), which makes them visible
+  to Apple and Google, and the order of these answers inside the window ("Open
+  owner decisions", item 6) (product gap PG-08). What stays open is the owner's
+  decision on the plan.
 - `docs/RELEASE_CHECKLIST.md` §7, "Online payment (Moyasar)": add a device check
-  that the live hosted page offers mada, Visa and Mastercard, and no other method
-  (product gap PG-11). Until it passes, the brand list in every text here rests
-  on the owner's word alone.
+  that the live hosted page offers mada, Visa and Mastercard (Apple Pay on
+  iPhone only if that is decided), and no other method (product gap PG-11), and
+  name it among `docs/OWNER_ACTIONS.md` §47.18 step 2's device checks. Neither
+  has it yet. Until it passes, the brand list in every text here rests on the
+  owner's word alone.
 - `export_my_data()` must return the customer's payment records (card network,
   last four, issuer, status, amount) before card payment is switched on. Its own
   `about` text tells the customer "Everything Spicy Meal holds about you that is
   personal to you" (`supabase/migrations/20260912120000_export_my_data.sql:73-76`),
   and its live body reads `payment_records` 0 times (product gap PG-26). That is a
   migration, so a CLAUDE.md §5 apply.
-- `docs/PAYMENTS.md` §1 and `docs/GO_LIVE_READINESS.md` G1 record the payment row
-  as disabled. The live read at the top of this draft found it enabled, in TEST
-  mode, since 2026-11-13 18:17:02 UTC.
+- *Done 2026-11-13:* `docs/PAYMENTS.md` §1 and `docs/GO_LIVE_READINESS.md` G1
+  now record the payment row as enabled, in TEST mode, since 2026-11-13 18:17:02
+  UTC, as the live read at the top of this draft found it.
 - `docs/APP_STORE_SUBMISSION.md` §11, the paragraph above the switches table,
   says "**card payment is compiled in and switched off**, which is the case the
   guideline describes". It goes stale when a build is submitted with the ON
@@ -1296,15 +1303,16 @@ Not store-facing, but they go stale the day these answers change (CLAUDE.md §14
    the payment policy draft's "Apple Pay" decision, option (a) ("name Apple Pay
    in a later version once that check has passed"), and product gap PG-12.
    Apple Pay never appears in a Play text. [OWNER DECISION]
-6. **Timing, inside the decided window.** The four documents (`privacy_policy`,
+6. **Timing, inside the proposed window.** The four documents (`privacy_policy`,
    `payment_policy`, `cancellation_refund_policy`, `terms_conditions`) are
    published together, in both languages, in one owner-approved session before
    §47.18, and the public legal page is rebuilt and checked without JavaScript
    (3.3). In the same window, in this order: enter the two privacy forms once
    that check passes, still before §47.18 (until the switch they over-disclose,
    the safe direction for a form); then, once §47.18 has ended with card payment
-   still on (step 1 switched it on and the step 2 device checks passed, the
-   check of which methods the page offers among them), submit the listing, the
+   still on (step 1 switched it on, the step 2 device checks passed, and so did
+   the methods check, once it has been added there: "Knock-on edits in other
+   records"), submit the listing, the
    release notes that apply, the TestFlight description and any App Store text
    that says card payment is available (until then they understate, the safe
    direction for a claim). Not straight after step 1: C-CARD needs the methods
@@ -1391,7 +1399,7 @@ proposed fix.
 | **PG-24**: a declined card attempt keeps card network, last four, issuer and the decline message on its payment record indefinitely, tied to the account through the checkout session; nothing cleans up abandoned checkouts either | Neither form can say the data is kept "with the order" | "Kept on the payment record, linked to the order or to the checkout session" (2.1, 3.1) | Unchanged wording; add the retention period to the privacy text once one is set |
 | **PG-06**: deleting the account deletes the customer's card payment records | The record is not kept for a financial-records duty, so the Play purpose cannot claim compliance | Purpose: **App functionality** only (2.3) | Add *Fraud prevention, security, and compliance* once payment records survive account deletion |
 | **PG-26**: "Get a copy of my data" returns no payment records, while its own text says "Everything Spicy Meal holds about you that is personal to you" | The listing's "Request a copy of your data" stays true as a statement that the request exists, but the copy is incomplete once card payment is on | Listing bullet unchanged; the export fix is a knock-on edit, recommended before §47.18 | Nothing to change in the store texts |
-| **PG-08**: §47.15's publish set leaves out the Terms & Conditions, which say cash only, and the rebuild of the public legal page | The listing sends readers to "terms" that contradict it | C-CARD requires all four documents published and the page rebuilt (1.1, 1.2, 3.3) | Nothing to change once §47.15 is corrected |
+| **PG-08**: §47.15's publish set left out the Terms & Conditions, which say cash only (added 2026-11-13), and the rebuild of the public legal page | The listing sends readers to "terms" that contradict it | C-CARD requires all four documents published and the page rebuilt (1.1, 1.2, 3.3) | Nothing to change once §47.15 is corrected |
 | **PG-11**: which methods the live page offers is set in Moyasar's dashboard and is unconfirmed | The brand list rests on the owner's word | C-CARD and decision 14 require a device check and Moyasar's written confirmation | Nothing to change once both are done |
 | **PG-12**: card payment cannot be tried live with staff only, so the Apple Pay device check needs online payment on | Nothing entered before §47.18 can know Apple Pay works | No Apple Pay in any text until the check passes (decision 5) | Add the Apple Pay sentences after the check; in customer-facing texts, with the policy versions that name it |
 | **PG-21, PG-22** (not card-specific): order status moves on only when an administrator moves it in the console, and pending loyalty points become spendable only when an administrator marks the order Delivered | Unchanged lines about status notifications and earning points describe what happens when staff move an order on, which they almost never do (live: 75 of 82 orders `received`) | Unchanged and byte-identical, outside this change ("Left unchanged on purpose") | Nothing to change once orders reliably move on; otherwise take those lines out when the card lines go in [OWNER DECISION] |
@@ -1415,9 +1423,11 @@ proposed fix.
    payer IP; the sanitizer drops all four, so nothing beyond what it keeps is
    stored (`moyasar.ts:726-740`; `moyasar.test.ts:647-676`). Whether the live
    object carries each of those fields was not seen either: the test models it.
-4. **Where Moyasar stores the data, and for how long.** "Unknown from here"
-   (`docs/RECORD_OF_PROCESSING.md`, recipients table). The store forms do not ask
-   this; the privacy policy does.
+4. **Where Moyasar stores the data, and for how long.** Moyasar's public
+   privacy policy (last revised 8 December 2025) says inside the Kingdom, and
+   gives no retention period; neither is confirmed from the Moyasar agreement
+   (`docs/RECORD_OF_PROCESSING.md`, recipients table). The store forms do not
+   ask this; the privacy policy does.
 5. **Whether Moyasar is a "service provider" in Google's sense.** That is the
    Moyasar agreement (decision 3).
 6. **The consoles' current state.** Not readable from here. Everything about it in
@@ -1447,10 +1457,11 @@ proposed fix.
     Moyasar marks an invoice expired exactly at its `expired_at`, and whether a
     3-D Secure payment in flight can still complete after it, are not known
     (`PAYMENTS.md` §11, question 6).
-13. **Refund timings** (mada about 1 to 3 days, credit cards about 7 to 14) come
-    from Moyasar's public documentation as recorded in
-    `docs/integrations/Moyasar_API_Reference.md` §3.2, and were not re-read. No
-    store text here uses them.
+13. **Refund timings** (mada 24 hours to 3 business days, credit cards 7 to 14
+    business days, weekends not included) come from Moyasar's FAQ
+    (`moyasar.com/en/resources/faqs`, re-read 2026-11-13), as recorded in
+    `docs/integrations/Moyasar_API_Reference.md` §3.2. No store text here uses
+    them.
 14. **How App Review treats a payment it cannot complete without a real charge.**
     Not knowable from here; the attachment in decision 8 is the mitigation.
 
@@ -1490,7 +1501,7 @@ was rejected.
 - **S1 → fixed.** Re-verified `moyasar.ts:264-269`, `payment-initiate/index.ts:414-416`, `:491-493` and §47.14. C-CARD and 1.2 require the LIVE Test connection to read "Connection OK".
 - **S2 → fixed, with an owner decision.** The only source is `PAYMENTS.md:15`, and `RELEASE_CHECKLIST.md` §7 has no methods check. C-CARD requires a device check and Moyasar's written confirmation; knock-on edit for §7; decision 14 (PG-11).
 - **S3 → fixed.** Apple's Payment Info row says "Yes (only when the customer pays online)".
-- **S4 → fixed.** 3.3 requires the rebuild and the no-JavaScript check of https://app.spicymeal.com.sa/privacy (`OWNER_ACTIONS.md` §34), inside the decided window.
+- **S4 → fixed.** 3.3 requires the rebuild and the no-JavaScript check of https://app.spicymeal.com.sa/privacy (`OWNER_ACTIONS.md` §34), inside the proposed window.
 - **S5 → fixed, with an owner decision.** Re-verified live: `begin_checkout_session` has no `phone_verified` or `order_limit_*` check, `place_customer_order` has both; Google's rule re-fetched from answer 10787469. Play's answer is now Required, with Optional as the wording if PG-17 is fixed first.
 - **S6 → fixed.** Re-verified `moyasarVerify.ts:306-310` and `:524` (every check writes `raw`) and the live foreign keys (both `ON DELETE CASCADE`). 2.1, 2.3 and 3.1 say "payment record, linked to the order or to the checkout session" (PG-24).
 - **S7 → fixed.** Variant OFF is now paste-ready in full. Its Payment paragraph keeps the first sentence, true either way, and conditions the rest on "When card payment is switched on"; the Card payment paragraph is titled "(switched off at the time of this submission)" and begins "when card payment is switched on".
@@ -1510,7 +1521,7 @@ was rejected.
 - **N11 → fixed.** The TestFlight descriptions no longer say "inside the app"; the Apple Pay sentence names the builds it applies to and waits for the device check.
 
 Not from a finding, from the publishing plan and the sibling drafts: the header
-records the decided plan; nothing entered before the Apple Pay device check names
+records the proposed plan; nothing entered before the Apple Pay device check names
 Apple Pay, the same choice as the payment policy draft (decision 5); the App
 Store lines and Promotional Text gain versions without Apple Pay (3.6); and
 "Product gaps found" is new.
@@ -1600,3 +1611,39 @@ check's; none came from the earlier review.
   payment fields as the privacy draft, whose list starts with "the payment
   method". The sanitizer keeps it (`source.type`, `moyasar.ts:757`), but 2.1 and
   3.1 did not name it; both now list the payment type (card or Apple Pay).
+
+### Final review, 2026-11-14
+
+One line per review finding on this file. Each was checked against the
+repository at `ebdec3a`, Moyasar's own pages and read-only SQL (the payment row
+re-read on 2026-11-14: `moyasar`, enabled, `test`, last written 2026-11-13
+18:17:02 UTC) before it was applied. No customer-facing text changed: the
+listing descriptions, release notes, TestFlight descriptions, review notes, App
+Store lines and Promotional Texts are byte-identical, so the ten character
+counts stand. Only two record texts changed, the 1.2 paragraph and the 3.4
+note.
+
+- **K6 → applied.** No owner decision on the publishing plan is recorded
+  anywhere. The header now reads "Publishing plan (proposed; the owner
+  decides)", and "decided window" and "decided plan" became "proposed" in row
+  2, decision 6, the S4 line, the "Not from a finding" paragraph and the
+  knock-on list.
+- **K12, L3, C2 → applied.** The note on the payment row said `PAYMENTS.md` §1
+  and G1 record it as disabled; both have said enabled since 2026-11-13, and
+  the note now says so. In "Knock-on edits in other records", the row-state
+  item is marked done (2026-11-13). The §47.15 item is marked done too:
+  `terms_conditions` was added on 2026-11-13, and the plan, the rebuild with
+  its no-JavaScript check, and the order of these answers were added in this
+  review. The PG-08 row says the terms were added.
+- **C12 → applied, by rewording.** The finding allows either adding the
+  methods check to `RELEASE_CHECKLIST.md` §7 and §47.18 step 2, or rewording
+  this file; both of those are outside this file. The header, 1.2, the 3.4 note
+  and decision 6 no longer say the methods check is one of §47.18 step 2's
+  checks. They say it must first be added there and to the checklist, and the
+  knock-on item now asks for both.
+- **X3 → applied (claim 4).** Moyasar's public privacy policy (last revised 8
+  December 2025) says it keeps personal data inside the Kingdom and gives no
+  retention period; neither is confirmed from the Moyasar agreement.
+- **X2, K11 → applied (claim 13).** The timings are now Moyasar's FAQ figures
+  in business days, as recorded in `Moyasar_API_Reference.md` §3.2, and "were
+  not re-read" is gone.

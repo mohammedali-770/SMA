@@ -16,6 +16,9 @@
 > answers, and from the implementation on `feat/moyasar-only-20261111`. Still
 > not validated against the account: no request has been sent to Moyasar with
 > this code.
+>
+> **Updated 2026-11-13:** the TEST sandbox ran with this code
+> (`docs/OWNER_ACTIONS.md` §47.7-47.9). LIVE has not been exercised.
 
 > **MOYASAR IS THE PROVIDER (owner decision, 2026-11-11).** The owner said: "our
 > payment is confirmed it will be through moyasar / make the required edits and
@@ -88,7 +91,9 @@ make secret-key calls
 - a wrong or revoked key gets the same status and type, so only the message
   tells them apart. `isMoyasarIpNotAllowed()` requires the message to name the
   IP and the allow-list;
-- saving the list asks for a 6-digit code.
+- live and test keep separate lists, each under its keys on the API Keys tab.
+  Saving the **live** list asks for a 6-digit code; changes to the test list
+  ask for none (Moyasar's page, re-read 2026-11-14).
 
 Supabase Edge Functions have no static outbound IP (Supabase knowledge base,
 read 2026-11-11), so the owner chose a static-IP proxy service. When the Edge
@@ -98,11 +103,14 @@ tunnelled, so the proxy never sees the secret key. `HTTPS_PROXY` as a function
 secret would route nothing. A value that cannot be used refuses every call,
 test included. Whether hosted Supabase supports `createHttpClient` is read from
 the edge-runtime source, not from Supabase's documentation; it is unproven until
-a live Test connection. Detail and owner steps: `docs/PAYMENTS.md` §8.1.
+Test connection runs with the proxy set, first in TEST with the wrong-password
+check (`docs/PAYMENTS.md` §8.1). Detail and owner steps: `docs/PAYMENTS.md`
+§8.1.
 
 What each caller does with the refusal: it is logged as
 `moyasar_request_refused` / `moyasar_ip_not_allowed` with the remedy; the admin
-actions say whether the proxy or the server's own address was refused;
+actions name the route our code took (the proxy when `MOYASAR_PROXY_URL` is
+set, the server's own address otherwise), not the address Moyasar saw;
 `payment-verify` answers `pending`; the refund worker releases the refund
 (§3.2).
 
@@ -367,8 +375,9 @@ closed invoice, or the attempt's own expiry, ends an attempt.
 (`verifyAnswerStatus`). Builds already in the field treat only `failed`,
 `cancelled` and `expired` as terminal.
 
-**SADAD.** A SADAD bill leaves the invoice `on_hold` for days and cannot be
-refunded. It must be off for this account; whether it is, is unknown (§11).
+**SADAD.** On an invoice, a SADAD bill stays payable for as long as the invoice
+does (Moyasar's SADAD guide, read 2026-11-14: "On an invoice, matches the
+invoice"), reads as pending meanwhile, and cannot be refunded. It must be off for this account; whether it is, is unknown (§11).
 
 ---
 
@@ -679,10 +688,13 @@ their evidence; the rest are still open. New questions are at the end.
 
 - That any of this works. As of 2026-11-11 nothing here has been run against the
   Moyasar account, test or live. A test publishable key is saved in the payment
-  row; no key is in this repository.
+  row; no key is in this repository. **Updated 2026-11-13:** the TEST sandbox
+  ran (`docs/OWNER_ACTIONS.md` §47.7-47.9); nothing has run in LIVE.
 - That the code is deployed. As of 2026-11-11 every deployed payment function is
   a July Tap-era bundle, and `20260824100000`, `20261003120000` and
-  `20261004120000` are **not** applied (`docs/PAYMENTS.md` §1, §7).
+  `20261004120000` are **not** applied (`docs/PAYMENTS.md` §1, §7). **Updated
+  2026-11-13:** all three are applied and the seven payment functions are
+  deployed (`docs/OWNER_ACTIONS.md` §47.2-47.5).
 - Anything about fees, settlement or contracts.
 
 *History:* until 2026-11-11 the first line here said Moyasar was not the chosen

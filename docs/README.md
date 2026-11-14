@@ -56,6 +56,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Restore data | [Backup and recovery](BACKUP_RECOVERY.md) |
 | See what needs a decision from the owner | [Owner actions](OWNER_ACTIONS.md) |
 | Judge whether the product can launch at all | [Go-live readiness](GO_LIVE_READINESS.md) |
+| Know what must be fixed or decided before card payments go live | [Card-payment gaps](readiness/20261113-card-payments-gaps.md): 31 verified product, code and configuration gaps, 12 to fix and 9 to decide, read before [Owner actions §47.15 and §47.17](OWNER_ACTIONS.md) |
 
 ### I am releasing
 
@@ -124,7 +125,6 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 | [Health center baseline](OPERATIONS_HEALTH_CENTER_BASELINE.md) · [rollback](OPERATIONS_HEALTH_CENTER_ROLLBACK.md) | Point-in-time operational evidence |
 | [Readiness reviews](readiness/) | Dated pull-request review evidence |
 | [App-hardening checklist, 11–12 Nov 2026](readiness/20261111-app-hardening-checklist.md) | Evidence table for all 43 checklist IDs, with the prioritized action list as it stood on 2026-11-12 |
-| [Card-payment gaps, 13 Nov 2026](readiness/20261113-card-payments-gaps.md) | 29 verified product, code and configuration gaps found while drafting the card-payment documents: what must be fixed, and what needs a decision, before card payments go live |
 | [Development visual review](DEV_VISUAL_REVIEW.md) | Fixture-based review workflow |
 
 ## Where things live

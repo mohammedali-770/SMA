@@ -2877,6 +2877,17 @@ one new spoken composition, both engineering-drafted:
   and the order read naturally, or whether «،» belongs there
   (`apps/mobile/src/design-system/ui/productCardA11y.ts`).
 
+**Widened 2026-11-14 — the card-payment drafts of 2026-11-13 (§47.15).** This
+is customer legal text, so rank it with the consent copy above. Read the Arabic
+"Proposed text" of `legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`,
+`legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md`,
+`legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md` and
+`legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md`, and the Arabic strings in
+`store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md` (its Open owner decisions, item
+12). Each draft lists its points for the reader. All of it must be read before
+the publishing session in §47.15: until then, nothing is published in either
+language.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -3663,8 +3674,23 @@ the admin console, bump to **v2.4**, set the effective date.
 A correct English disclosure beside an unchanged Arabic one is better than both
 incomplete.
 
-**Done looks like:** v2.4 active in both languages, the public `/privacy` page
-showing the new line, and this section marked closed with the date.
+**Read with the card-payment privacy draft (added 2026-11-14).** The proposed
+card-payment publishing plan (§47.15; you decide it) publishes `privacy_policy`
+once, in both languages, in one session before §47.18, and carries this
+location line in that same version, as a separate replacement: not on its own,
+and not English first. The v2.4 and "The English can go first" above were
+written on 2026-11-10, before that plan, and the two cannot both hold. Decide
+which applies before publishing either
+(`legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`, Open owner decisions, item 1).
+Publishing this line first is still possible, and this gap applies today, while
+the card session waits on the gaps listed at the top of §47. But then the
+card-payment version moves on (2.5 or 3.0), and every anchor and hash in that
+draft must be re-checked before its session.
+
+**Done looks like:** this line active in both languages, in v2.4 or in the
+card-payment version (above); the public `/privacy` page showing it, checked
+with scripts stripped after the rebuild (§34); and this section marked closed
+with the date.
 
 ## 44. PDPL — what the law requires, read against SDAIA's texts, and what only you or counsel can settle
 
@@ -3870,6 +3896,21 @@ record or refund changed. **The payment row is enabled, in TEST mode, since
 18:17:02 UTC**, because the sandbox refuses a disabled row, so 47.14 is now a
 check rather than a switch. Online Payment is still off. Evidence: CLAUDE.md §6.
 
+**Read `readiness/20261113-card-payments-gaps.md` before 47.15 and 47.17, not
+only before 47.18** (moved here from 47.18 on 2026-11-14). It lists 31 verified
+gaps: 12 must be fixed before card payments go live (PG-01 to PG-11 and PG-31),
+9 need your decision (PG-12 to PG-17, PG-19, PG-20, PG-30), and 10 are real but
+not card blockers. Some of the fixes change the app, so they must be in the
+47.17 build, or they need another build and another store review: PG-03 (a
+cancelled order still shows Resend), PG-04 (closing the payment page unpaid
+blocks that phone's next order, cash included: "Pay another way", or the in-app
+disclosure if you accept the lock), PG-05 (the below-1.00 SAR message, which
+47.17 would otherwise ship saying "Use fewer points"), PG-20 (an order reference
+to quote, if you choose the code fix) and PG-31 (the checkout summary can show
+0.00 while the card page asks for the full amount). Others change what the
+47.15 documents must say: PG-04, PG-06, PG-12 and PG-13. Each fix is its own
+pull request and approval.
+
 **Progress, 2026-11-13 (afternoon; superseded above on what is next and on the
 row's state): 47.1-47.6 are DONE. The owner approved 47.2-47.5 together,
 each step named, in one multi-select, and 47.6 in a separate answer, then did
@@ -4052,6 +4093,11 @@ the new `payment-test-config` points its sandbox return at
 
 ### 47.7 Enter the TEST keys and the TEST webhook token in the console
 
+**DONE 2026-11-13** by the owner: TEST keys and webhook token saved, and Test
+connection answered "Connection OK". Re-read 2026-11-14 by name and length
+only: `moyasar_test_secret_key` (48) and `moyasar_test_webhook_secret_token`
+(34).
+
 Admin → Integrations → Payments (the Moyasar card): the test secret key, the
 test publishable key, and a test webhook secret token you choose. The token is
 the value you will also type into Moyasar in 47.8.
@@ -4066,6 +4112,11 @@ secret field can read "configured" while empty. Trust the panel's readiness
 rows, not the badge.
 
 ### 47.8 Register the TEST webhook in Moyasar, then enter its code within 30 minutes
+
+**DONE 2026-11-13** by the owner: the `webhook_verification` event was recorded
+at 18:21:57 UTC, and its code was entered in Moyasar. The eight payment events
+that followed (18:24-18:58 UTC) show the webhook was verified, because Moyasar
+delivers none before.
 
 **Only after 47.4 and 47.7.** The July `payment-webhook` answers Moyasar's
 one-time verification event with 200 and records nothing, and Moyasar never
@@ -4167,13 +4218,26 @@ regions, came from runtime **1.77.9**. If the hosted runtime lacked it anyway,
 every Moyasar call would be refused with `moyasar_proxy_unsupported` once the
 secret is set, TEST included.
 
-**Prove it in TEST before paying, and before touching any Allowed IPs list.**
-The comparison (`integrations/Moyasar_Static_IP_Proxy.md` §3 and §4) gives the
-order: set the secret while Moyasar's TEST list still accepts any address, run
-Test connection, then a wrong-password check that shows the proxy really carried
-the call. It recommends QuotaGuard Shield in Frankfurt and has two emails to send
-first (§7), to QuotaGuard and to Moyasar. Restricting the TEST list is optional,
-comes last, and may not be reversible (47.19).
+**Prove it in TEST during the proxy's free trial, before you pay for the
+service, and before touching any Allowed IPs list.** The order
+(`integrations/Moyasar_Static_IP_Proxy.md` §3 and §4):
+
+1. Send the two emails in that document's §7, to QuotaGuard and to Moyasar.
+   Moyasar's answers to its questions 1 (shared addresses) and 3 (can the TEST
+   list go back to "any address") must be in writing before any Allowed IPs
+   list is changed. Wait for the replies before step 2: QuotaGuard's answer to
+   its question 1 decides the plan, and Moyasar's answer to its question 1
+   decides whether shared addresses are acceptable at all.
+2. Choose the service and start its trial. The comparison recommends
+   QuotaGuard Shield in Frankfurt.
+3. Set `MOYASAR_PROXY_URL` (47.11) while Moyasar's TEST list still accepts any
+   address, run Test connection in TEST, then the wrong-password check that
+   shows the proxy really carried the call.
+4. Optional, the last TEST step, and possibly irreversible: restrict the TEST
+   list, only once you have decided to keep the service and Moyasar has
+   answered question 3.
+5. The LIVE list (47.12), only after the written answers to questions 1 and 3.
+6. The live keys, the live webhook and Test connection in LIVE (47.13).
 
 ### 47.11 Set `MOYASAR_PROXY_URL` as an Edge Function secret
 
@@ -4187,22 +4251,38 @@ Supabase dashboard → Edge Functions → Secrets. **Never paste it into a chat.
   sandbox failure, and before 47.13. Any later sandbox run goes through the
   proxy too.
 
-**Done looks like:** the secret name is listed. The value cannot be read back,
-and does not need to be.
+**Done looks like:** the secret name is listed (its value cannot be read back);
+Test connection in TEST says "Moyasar accepted the test key. Connection OK.";
+with one character of the proxy password changed it says "Could not reach
+Moyasar"; and with the right value back it says "Connection OK" again. If the
+wrong password still gives "Connection OK", the calls are not going through the
+proxy: put the right value back, stop and tell engineering. Detail:
+`integrations/Moyasar_Static_IP_Proxy.md` §3, step 2.
 
 ### 47.12 List the proxy's IPs in Moyasar's Allowed IPs
 
-Moyasar Dashboard → Settings → API Keys → Allowed IPs. Live needs at least one
-address, and the live key stays hidden until one is listed. Saving asks for a
-6-digit code.
-
 **Ask Moyasar first.** Once a live list is saved, Moyasar's page says live
 "cannot be set back to any IP address": addresses can be changed, but the list
-can never be emptied again. So get Moyasar's written answer to the
-shared-address question in 47.19 before saving it.
+can never be emptied again. So do this only after Moyasar's written answers to
+questions 1 and 3 of the email in `integrations/Moyasar_Static_IP_Proxy.md` §7
+(shared addresses; whether the TEST list can go back to "any address"; both
+also in 47.19).
 
-**Done looks like:** every outbound IP from 47.10 is listed. Proven only by
-47.13.
+1. In Moyasar's dashboard, switch to **LIVE** mode first (47.8 left it in test
+   mode), then open Settings → API Keys. Moyasar's page says each environment
+   has its own Allowed IPs list, under its keys.
+2. Add every outbound IP from 47.10 to the list under the **live** keys only.
+   Leave the test list as it is, unless you chose the optional TEST step (47.10,
+   step 4). Live needs at least one address, and the live key stays hidden
+   until one is listed.
+3. Saving the live list asks for a 6-digit code. The test list saves at once,
+   with no code, so check the heading above the list before you press Save. A
+   save that asked for no code changed the test list, which may then stay
+   restricted (47.19). If that happens, save nothing more and tell engineering.
+
+**Done looks like:** every outbound IP from 47.10 is on the live list, and the
+test list is unchanged (unless you chose the optional TEST step). Proven only
+by 47.13.
 
 ### 47.13 Switch to live and enter the LIVE keys and webhook
 
@@ -4219,6 +4299,17 @@ Allowed IPs list (47.12). A refusal's wording says which route our code took
 Moyasar saw. "Connection OK" means any Moyasar answer other than 401 or 403, so
 the small live payment at 47.18 is the firmer proof.
 
+**From step 1 on, TEST mode no longer refuses customer payments.** Only the
+Online Payment switch does, and it guards new checkouts and new orders only.
+`payment-initiate`'s older order flow reads neither the switch nor the order's
+status. Three cancelled online orders from 2026-07-12, all on one account, are
+still unpaid (read 2026-11-14). So from step 1, a direct API call signed in as
+that account could open a LIVE invoice for one of them, and paying it would mark
+that cancelled order paid and queue it for the kitchen. The app never makes that
+call: it pays only through checkout sessions. Close it before step 1 (a code fix,
+or a live write to those orders, each its own approval), or accept it. Gap PG-27
+is the same older path.
+
 ### 47.14 Make sure the payment row is enabled
 
 It is enabled, in TEST mode, since 2026-11-13 18:17:02 UTC, for the sandbox
@@ -4229,34 +4320,73 @@ check that the live keys are saved; 47.13's Test connection is that check.
 
 ### 47.15 Update the customer documents, before customers can pay by card
 
-Each is a live write, and each must land **before** 47.18. **Drafts of all of
-them were written and fact-checked on 2026-11-13**: the exact text in both
-languages, and the evidence for every change. Publishing is then a copy into
-the console, one approval per document:
+**Drafts of all of them were written and fact-checked on 2026-11-13**: the text
+in both languages, and the evidence for every change. They are not final yet:
+each still carries `[OWNER DECISION …]` markers and placeholders.
 
 - **`privacy_policy`**: name Moyasar as the payment processor
   (`RECORD_OF_PROCESSING.md` activity 15). Draft:
-  `legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`;
+  `legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`. The §43 location line is a
+  separate open correction: settle its timing first (§43);
 - **`payment_policy`** and **`cancellation_refund_policy`**: on 2026-09-03 both
   said payment is cash, that no online provider is selected, and that refunds are
   settled in cash at the branch (`GO_LIVE_READINESS.md` G5). Both promise to be
-  updated before an online option appears. This was not in the brief that
-  produced this section; it is here because the documents say so. Drafts:
+  updated before an online option appears. Drafts:
   `legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md` and
   `legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md`;
 - **`terms_conditions`**: v2.0 (2026-08-18) says "Orders are paid in cash at
   pickup or on delivery. See the Payment Policy." (read live 2026-11-13). This
   list missed it until 2026-11-13. Draft:
   `legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md`;
-- the store answers: App Store "Financial Info" (`APP_STORE_SUBMISSION.md` §4)
-  and Play "Payment info" (`PLAY_STORE_SUBMISSION.md` §6) need your re-decision;
-  the cash-only listing claim C-CASH (`store/LISTING_COPY.md`) must change; and
-  the App Review notes must stop saying card payment is off
-  (`APP_STORE_SUBMISSION.md` §11). Draft answers:
-  `store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md`.
+- **the store answers** (`store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md`, in its
+  order): the App Store "Financial Info" (`APP_STORE_SUBMISSION.md` §4) and Play
+  "Payment info" (`PLAY_STORE_SUBMISSION.md` §6) answers once the four documents
+  are live and the public legal page is rebuilt, still before 47.18; the listing
+  (C-CASH and the new C-CARD, `store/LISTING_COPY.md`), the release notes, the
+  TestFlight description and any App Store text saying card payment is available
+  only **after** 47.18 has ended with card payment still on and its device checks
+  passed; the App Review notes (`APP_STORE_SUBMISSION.md` §11) in the ON or OFF
+  variant that matches the switch when the build is submitted.
 
-The Arabic of every draft is engineering-drafted and needs the native read in
-§35 before it is published.
+**Publishing plan (proposed; you decide it).** Every draft recommends it, and
+gap PG-08 asks you to approve it:
+
+1. **Before anything is published:** settle every `[OWNER DECISION …]` marker
+   and fill every placeholder (`[N]`, `[DAY MONTH YEAR]`), using each draft's
+   "Open owner decisions". That includes the version, decided once for the set
+   (minor: privacy 2.4 and the other three 2.1, or privacy 2.5 if §43 goes
+   first; or 3.0 for all four), and one effective date for all four, written in
+   the column and in line 1 of both languages. Read the gaps list first (top of
+   §47): PG-04, PG-06, PG-12 and PG-13 change what these documents must say.
+   Then get the native Arabic read (§35), and counsel where a draft asks for it.
+2. **One owner-approved session, before 47.18:** write `privacy_policy`,
+   `payment_policy`, `cancellation_refund_policy` and `terms_conditions`
+   together, in both languages, with that one version decision and one
+   effective date, as the targeted replacements each draft lists (not a re-paste
+   of the whole document). Each row write is its own §5 approval, all four in
+   that session. Never one alone, and never one language first: any one
+   published alone contradicts live documents it does not replace. Decide in the
+   same session whether `account_data_deletion`, `offers_loyalty_terms`,
+   `contact_support` and `delivery_pickup_policy` change too (gap PG-08). The
+   §43 location line goes into the same privacy version, not separately and not
+   English first, unless you decide otherwise there.
+3. **Then a production rebuild of the web app** (§34: "A legal correction is
+   two steps, not one"). The public legal page that Apple, Google and other
+   no-JavaScript readers see is built from the documents when the site is
+   built, so until then it keeps the cash-only text. Today a merge to the
+   default branch is that rebuild (§34; `DEPLOY.md` §9, which says to re-check
+   this), for example the pull request that records the publication; that merge
+   is its own approval. Do not add another deploy path. Then have
+   `https://app.spicymeal.com.sa/privacy` fetched with `<script>` stripped, as
+   §34 did, and check the new version numbers and the "Published documents as
+   of" date: one fetch covers every legal URL. Looking at the page normally
+   proves nothing, because JavaScript hides that copy, and a build that cannot
+   read the documents still succeeds without them.
+4. **Then the store answers, in the store draft's order** (last bullet above).
+
+The Arabic of every draft is engineering-drafted. The native read (§35) comes
+before the publishing session; until it is done, nothing is published in either
+language.
 
 ### 47.16 Make sure `refund_trigger_secret` exists, and re-enable the refund job
 
@@ -4284,10 +4414,31 @@ Then the same length check returns 64. Saving the payment card later does not
 remove it: the save merges secret fields.
 
 Then re-enable the `payment-refund-worker` cron job (every 5 minutes) and watch
-one run.
+one run. In the Supabase SQL editor (a live write, its own approval):
+
+```sql
+select cron.alter_job(job_id := jobid, active := true)
+  from cron.job where jobname = 'payment-refund-worker';
+```
+
+After 5 minutes, read the last runs:
+
+```sql
+select d.status, d.start_time, d.return_message
+  from cron.job_run_details d join cron.job j using (jobid)
+ where j.jobname = 'payment-refund-worker'
+ order by d.start_time desc limit 3;
+```
+
+A `succeeded` run proves only that the SQL ran: the driver hands its call to
+`payment-refund` to the network and does not wait for the answer. So also check
+`payment-refund`'s invocations in the Supabase dashboard (Edge Functions →
+`payment-refund`): each run should show 200, not 401 (a wrong secret) or 503 (no
+secret). To stop the job again, run the same `alter_job` with `active := false`.
 
 **Done looks like:** `select jobname, active from cron.job where jobname =
-'payment-refund-worker'` shows `active = true`, and a run succeeds.
+'payment-refund-worker'` shows `active = true`, a run succeeds, and
+`payment-refund`'s invocation log shows 200 for it.
 
 ### 47.17 The EAS build that carries the app half
 
@@ -4296,6 +4447,10 @@ rules, the 1.00 SAR message, the "refunded" handling, the Moyasar footer, the
 guard that makes Place order do nothing while a payment run is in flight, and the removal of
 `expo-web-browser`.
 
+**The app-side gap fixes must be in this build** (the gaps list, top of §47):
+PG-03, PG-04, PG-05, PG-20 if you choose the code fix, and PG-31. A fix that
+misses it needs another build and another store review.
+
 **Builds already in customers' hands keep their old behaviour.** In LIVE mode
 they open Moyasar's page in the system browser, which works but offers no Apple
 Pay. They keep a short window in which Place order stays enabled during a "Try
@@ -4303,12 +4458,13 @@ again" payment run.
 
 ### 47.18 Turn on online payment, then the small live payment and its refund
 
-**Read `readiness/20261113-card-payments-gaps.md` before this step.** On
-2026-11-13 it listed 29 verified gaps: 11 must be fixed before card payments go
-live (among them refunds that fail or stick without anyone seeing, double
-charges nobody is told about, and a cancelled order that can still be resent to
-the kitchen), and 8 need your decision. Several are code or migration work,
-each with its own pull request and approval.
+**Do not start this step while any must-fix gap (PG-01 to PG-11, PG-31) is
+open** (`readiness/20261113-card-payments-gaps.md`, which the top of §47 asks
+you to read long before this step). Each is closed as its row says: fixed, or
+for PG-04 disclosed instead. PG-07 is closed by its code fix, or by the ticket
+check at step 3 below; if that ticket does not show the order as paid, switch
+Online Payment off and fix it first. The 9 decisions (PG-12 to PG-17, PG-19,
+PG-20, PG-30) are made before this step too.
 
 **Online payment is one global setting.** There is no per-customer switch in the
 code, so the live test happens with online payment offered to every customer.
@@ -4320,19 +4476,38 @@ Pick a quiet hour.
    device checks in `RELEASE_CHECKLIST.md` §7 "Online payment (Moyasar)": the
    Apple Pay sheet appears inside the payment WebView, a 3-D Secure challenge
    card completes, and the app returns to the order.
-3. Make one small live payment for a real order.
-4. Refund it, and confirm the money comes back. **Read 47.20 first: cancelling
-   the order does not refund it.** The automatic refund runs only for a paid
-   order that never reached the POS after the customer's resends. Producing one
-   on purpose has to be agreed with you before trying (`PAYMENTS.md` §9 B);
-   otherwise refund by hand in the Moyasar dashboard. A refund made there is not
-   written back to the order: as far as the code shows, the order still reads
-   paid. Note it by hand.
 
-**Done looks like:** the order reads paid, the order reaches the kitchen, the
-refund reads refunded in Moyasar, and the card statement shows it. Moyasar's
-FAQ gives mada 24 hours to 3 business days and credit cards 7 to 14 business
-days, weekends not included.
+   **Some of these checks take real money.** Each payment you complete is a
+   real charge and, once confirmed, a real order that goes to the branch like
+   any other: at least one for the iOS and one for the Android 3-D Secure
+   check, and one more if you complete Apple Pay. One of them can be step 3's
+   payment. Make them pickup orders at a branch you have warned, and collect
+   them. Refund each by hand in the Moyasar dashboard the same day (refunds
+   carry Moyasar's fees), and record each by hand, with the date, the order
+   number and the Moyasar payment id, because nothing writes a dashboard refund
+   back to the order (gap PG-14). The refunded-outcome check in
+   `RELEASE_CHECKLIST.md` §7 is different: its payment is refunded before an
+   order is confirmed, so it creates no order and needs no second refund.
+3. Make one small live payment for a real order, and check that the branch's
+   POS ticket shows it as paid (gap PG-07).
+4. **One automatic refund, seen end to end.** **Read 47.20 first: cancelling
+   the order does not refund it.** The automatic refund runs only for a paid
+   order that never reached the POS after the customer's resends. Produce one
+   in a way agreed with you beforehand (`PAYMENTS.md` §9 B), and watch it reach
+   refunded, both on the order (its refund status) and in Moyasar. If none can
+   be produced, or it does not complete, switch Online Payment off and publish
+   the refund draft's D7 fallback wording
+   (`legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md`) before switching
+   on again. Every other test payment is refunded by hand, as in step 2's note:
+   a refund made in the dashboard is not written back to the order, which still
+   reads paid as far as the code shows.
+
+**Done looks like:** each test order except step 4's reads paid, reaches the
+kitchen and shows paid on its ticket; step 4's order, which by design never
+reaches the POS, shows its refund as refunded, on the order and in Moyasar; every refund reads
+refunded in Moyasar, and the card statement shows it. Moyasar's FAQ gives mada
+24 hours to 3 business days and credit cards 7 to 14 business days, weekends not
+included.
 
 If anything fails, switch Online Payment off. Switching off is always allowed.
 It stops new checkout sessions only: a session opened before the switch can
@@ -4340,27 +4515,38 @@ still be resumed and paid until it expires.
 
 ### 47.19 Ask Moyasar support
 
+The Moyasar email in `integrations/Moyasar_Static_IP_Proxy.md` §7 asks every
+question below in one message. Send it first (47.10, step 1).
+
 - Is Apple Pay on the hosted invoice supported inside a third-party app's
   WKWebView (`enableApplePay`, no injected scripts)?
 - Does `checkout.moyasar.com` honour `lang=ar`?
 - Can a 3-D Secure payment still in flight complete after its invoice expires?
-- Confirm that SADAD and STC Pay are off for invoices. SADAD leaves an invoice
-  `on_hold` for days and cannot be refunded.
+- Is an unpaid invoice marked expired exactly at its expiry time, or can it
+  still be paid for a while after? It sets how long gap PG-04's lock lasts and
+  the duplicate risk in gap PG-02.
+- Confirm in writing that every method and card scheme other than mada, Visa,
+  Mastercard and Apple Pay (for example SADAD, STC Pay, Samsung Pay and American
+  Express) is off for invoices. A SADAD payment cannot be refunded, and on an
+  invoice it stays payable for as long as the invoice does (gap PG-11).
 - Could the hosted page ever be served from a domain other than `moyasar.com`?
   The server hands the app only `https` on `moyasar.com` or a subdomain, so any
   other domain fails closed.
 
 Added 2026-11-13, from the proxy comparison and the card-payment gaps:
 
-- **Before 47.12:** do you accept Allowed IPs addresses that a proxy service
-  shares with its other customers? How do platforms such as Salla meet the list
-  for their merchants, and do you recommend a provider? The live list cannot be
-  emptied once saved.
-- Once the TEST list is restricted to specific addresses, can it be put back to
-  "any address"? Moyasar's page does not say.
-- **A gate, not just a question:** which payment methods does the hosted invoice
-  page offer on our account? Do not publish a method list, and do not reach
-  47.18, without the written answer (gap PG-11).
+- **Before any Allowed IPs list is changed (47.12, or the optional TEST step in
+  47.10):** do you accept Allowed IPs addresses that a proxy service shares with
+  its other customers? How do platforms such as Salla meet the list for their
+  merchants, and do you recommend a provider? The live list cannot be emptied
+  once saved.
+- **Also before any Allowed IPs list is changed:** once the TEST list is
+  restricted to specific addresses, can it be put back to "any address"?
+  Moyasar's page does not say.
+- **A gate, not just a question:** which payment methods and card schemes does
+  the hosted invoice page offer on our account? Do not publish a method list, and
+  do not reach 47.18, until Moyasar confirms in writing that every one other than
+  mada, Visa, Mastercard and Apple Pay is off (gap PG-11).
 - What prints on a customer's card statement, and can we set it? Our
   `statement descriptor` setting is read but never sent (gap PG-29).
 - Must our account hold a balance to cover a refund?

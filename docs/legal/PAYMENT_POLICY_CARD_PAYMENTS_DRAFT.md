@@ -19,7 +19,7 @@
 > ADDED, which is replaced by PAYING ONLINE in the same position. PRICES AND VAT,
 > PAYING IN CASH and CONTACT stay byte-for-byte as they are.
 >
-> **Publishing plan (decided).** `privacy_policy`, `payment_policy`,
+> **Publishing plan (proposed; the owner decides).** `privacy_policy`, `payment_policy`,
 > `cancellation_refund_policy` and `terms_conditions` are published
 > **together, in both languages, in one owner-approved session**, before
 > `OWNER_ACTIONS.md` §47.18 (online payment on). This document is never
@@ -159,7 +159,7 @@ Online payment accepts mada, Visa and Mastercard cards. [OWNER DECISION (methods
 ```
 PAYING ONLINE
 Online payment is provided by Moyasar, our payment provider. When you place an order with online payment, the app opens Moyasar's secure payment page. You enter your card details on that page, and they go to Moyasar directly, not through us: your full card number and security code never reach us, and we never store them. Your bank may ask you to confirm the payment on its own page.
-Online payments are charged in Saudi Riyals, for the total confirmed by our system at checkout. Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. [OWNER DECISION (points used): this sentence no longer says how many points are used. The live Offers & Loyalty Terms say "your whole available balance is applied, up to the value of the order", but today no points are used at all when fewer whole points than the redemption minimum (100 live, worth SAR 10.00) fit the order (Product gaps, PG3). If the server is changed first so that the minimum applies only to the balance held, this sentence may become: "You cannot use only some of your points: when you use them, your whole available balance is applied, up to the value of the order."] If your points cover the whole order, nothing is charged and no payment page opens.
+Online payments are charged in Saudi Riyals, for the total confirmed by our system at checkout. Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. [OWNER DECISION (points used): this sentence no longer says how many points are used. The live Offers & Loyalty Terms say "your whole available balance is applied, up to the value of the order", but today no points are used at all when fewer whole points than the redemption minimum (100 live, worth SAR 10.00) fit the order (Product gaps, PAY-3; gap PG-31). If the server is changed first so that the minimum applies only to the balance held, this sentence may become: "You cannot use only some of your points: when you use them, your whole available balance is applied, up to the value of the order."] If your points cover the whole order, nothing is charged and no payment page opens.
 An order you pay for online is placed only after we have checked directly with Moyasar that your payment went through for the right amount. Until then there is no order, and nothing is sent to the branch. Once your payment is confirmed, you have a record of the order in your Orders tab, and the branch's order number appears in the app as soon as the branch issues it.
 If your payment is declined, or the payment page expires before you pay, no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash. If you close the payment page without paying, no payment is taken and no order is placed, but that payment stays open: until the payment page expires, the app takes you back to it when you return to checkout or place an order, even if you choose cash. If we cannot reach Moyasar to check a payment, the app keeps it open in the same way until we can, even after a decline or after the payment page expires. [OWNER DECISION (closing the payment page): this is what the app does today; it keeps a closed, unpaid payment open so that it cannot be paid alongside a second order, and it treats a payment that cannot be checked as still open. If the app is changed first so that a customer can end such a payment and pay in cash straight away, replace the sentence beginning "If you close the payment page" with: "If you close the payment page without paying, no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash.", and delete the sentence beginning "If we cannot reach Moyasar" if the same change lets a customer end a payment that cannot be checked.]
 If money is taken from your card but the app could not confirm your payment, or you are charged twice for one order, contact us using the details below, with the date, time and amount of the payment, and your order number if you have one. Never send us your full card number. [OWNER DECISION (refund promise; decide once, with cancellation_refund_policy D2 and D3): no refund is promised here, because nothing alerts staff to these payments and each is refunded by hand in the Moyasar dashboard. The Cancellation & Refund Policy draft currently promises one ("we will refund it once we have confirmed it with Moyasar"). Settle that sentence once; if a promise is also wanted here, add the same words, with a time limit only if staff can keep it.]
@@ -188,7 +188,7 @@ Our record of an online payment includes the card network (for example mada or V
 ```
 الدفع الإلكتروني
 تقدّم خدمة الدفع الإلكتروني Moyasar، مزوّد الدفع لدينا. وعند تقديمك طلباً بالدفع الإلكتروني، يفتح التطبيق صفحة الدفع الآمنة التابعة لـ Moyasar. وتُدخل بيانات بطاقتك في تلك الصفحة، فتصل إلى Moyasar مباشرةً دون أن تمر بنا: فلا يصل إلينا رقم بطاقتك كاملاً ولا رمز الأمان أبداً، ولا نخزّنهما في أي حال. وقد يطلب منك البنك المُصدر لبطاقتك تأكيد الدفع في صفحته الخاصة.
-وتُحصَّل المدفوعات الإلكترونية بالريال السعودي، بقيمة الإجمالي الذي يؤكده نظامنا عند إتمام الطلب. ويتطلب الدفع الإلكتروني ألا يقل المبلغ المستحق عن ١٫٠٠ ريال سعودي. فإذا ترك استبدال نقاطك مبلغاً مستحقاً أكبر من صفر وأقل من ١٫٠٠ ريال سعودي، فأوقف استبدال النقاط في هذا الطلب أو ادفع نقداً. ولا يمكنك أن تختار استخدام جزء من نقاطك فقط. [OWNER DECISION (النقاط المستخدمة): لم تعد هذه الجملة تذكر عدد النقاط التي تُستخدم. فشروط العروض والولاء الحالية تنص على أنه «يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب»، لكن النظام اليوم لا يستخدم أي نقاط إذا كان عدد النقاط الكاملة التي تتسع لها قيمة الطلب أقل من الحد الأدنى للاستبدال (١٠٠ نقطة حالياً، بقيمة ١٠٫٠٠ ريال) (Product gaps, PG3). وإذا عُدِّل النظام أولاً بحيث يسري الحد الأدنى على الرصيد وحده، فيمكن أن تصبح هذه الجملة: «ولا يمكنك استخدام جزء من نقاطك فقط، فعند استخدامها يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب.»] وإذا غطّت نقاطك قيمة الطلب كاملة، فلن يُحصَّل منك أي مبلغ ولن تُفتح صفحة الدفع.
+وتُحصَّل المدفوعات الإلكترونية بالريال السعودي، بقيمة الإجمالي الذي يؤكده نظامنا عند إتمام الطلب. ويتطلب الدفع الإلكتروني ألا يقل المبلغ المستحق عن ١٫٠٠ ريال سعودي. فإذا ترك استبدال نقاطك مبلغاً مستحقاً أكبر من صفر وأقل من ١٫٠٠ ريال سعودي، فأوقف استبدال النقاط في هذا الطلب أو ادفع نقداً. ولا يمكنك أن تختار استخدام جزء من نقاطك فقط. [OWNER DECISION (النقاط المستخدمة): لم تعد هذه الجملة تذكر عدد النقاط التي تُستخدم. فشروط العروض والولاء الحالية تنص على أنه «يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب»، لكن النظام اليوم لا يستخدم أي نقاط إذا كان عدد النقاط الكاملة التي تتسع لها قيمة الطلب أقل من الحد الأدنى للاستبدال (١٠٠ نقطة حالياً، بقيمة ١٠٫٠٠ ريال) (Product gaps, PAY-3; gap PG-31). وإذا عُدِّل النظام أولاً بحيث يسري الحد الأدنى على الرصيد وحده، فيمكن أن تصبح هذه الجملة: «ولا يمكنك استخدام جزء من نقاطك فقط، فعند استخدامها يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب.»] وإذا غطّت نقاطك قيمة الطلب كاملة، فلن يُحصَّل منك أي مبلغ ولن تُفتح صفحة الدفع.
 ولا يُقدَّم الطلب الذي تدفع قيمته إلكترونياً إلا بعد أن نتأكد مباشرةً لدى Moyasar أن دفعتك تمّت بالمبلغ الصحيح. وحتى ذلك الحين لا يوجد طلب، ولا يُرسَل شيء إلى الفرع. وبعد تأكيد دفعتك تجد سجلاً للطلب في قسم الطلبات، ويظهر رقم الطلب لدى الفرع في التطبيق فور إصداره من الفرع.
 وإذا رُفضت الدفعة، أو انتهت صلاحية صفحة الدفع قبل أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، وتبقى سلتك في التطبيق لتحاول مرة أخرى أو تختار الدفع نقداً حيث يتاح. وإذا أغلقت صفحة الدفع دون أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، لكن تلك الدفعة تبقى مفتوحة، فيعيدك التطبيق إليها عند عودتك إلى صفحة إتمام الطلب أو عند تقديمك طلباً، حتى لو اخترت الدفع نقداً، إلى أن تنتهي صلاحية صفحة الدفع. وإذا تعذّر علينا التحقق من الدفعة لدى Moyasar، فيُبقيها التطبيق مفتوحة على النحو نفسه إلى أن نتمكن من ذلك، حتى بعد رفض الدفعة أو انتهاء صلاحية صفحة الدفع. [OWNER DECISION (إغلاق صفحة الدفع): هذا ما يفعله التطبيق اليوم، إذ يُبقي الدفعة المغلقة غير المدفوعة مفتوحة كي لا تُدفع إلى جانب طلب ثانٍ، ويعامل الدفعة التي يتعذّر التحقق منها على أنها ما زالت مفتوحة. وإذا عُدِّل التطبيق أولاً بحيث يستطيع العميل إنهاء تلك الدفعة والدفع نقداً فوراً، فتُستبدل الجملة التي تبدأ بـ «وإذا أغلقت صفحة الدفع» بالجملة: «وإذا أغلقت صفحة الدفع دون أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، وتبقى سلتك في التطبيق لتحاول مرة أخرى أو تختار الدفع نقداً حيث يتاح.»، وتُحذف الجملة التي تبدأ بـ «وإذا تعذّر علينا التحقق» إذا كان التعديل نفسه يتيح للعميل إنهاء دفعة يتعذّر التحقق منها.]
 وإذا خُصم مبلغ من بطاقتك ولم يتمكن التطبيق من تأكيد دفعتك، أو خُصمت قيمة طلب واحد مرتين، فتواصل معنا عبر بيانات التواصل أدناه، مع ذكر تاريخ الدفعة ووقتها ومبلغها، ورقم الطلب إن وُجد. ولا ترسل إلينا رقم بطاقتك كاملاً أبداً. [OWNER DECISION (وعد الاسترداد، يُحسم مرة واحدة مع D2 وD3 في سياسة الإلغاء والاسترجاع): لا يَعِد هذا النص بالاسترداد، لأنه لا شيء ينبّه الفريق إلى هذه الدفعات، وكلٌّ منها يُردّ يدوياً من لوحة تحكم Moyasar. ومسودة سياسة الإلغاء والاسترجاع تَعِد به حالياً («وسنرد المبلغ بعد التحقق منه لدى Moyasar»). تُحسم تلك الجملة مرة واحدة، وإن أُريد الوعد هنا أيضاً فتُضاف الصيغة نفسها، مع مدة زمنية فقط إذا كان الفريق قادراً على الالتزام بها.]
@@ -198,7 +198,7 @@ Our record of an online payment includes the card network (for example mada or V
 
 ### The whole document after the edit (for reading, not for pasting)
 
-English, 7 039 characters with the brackets in place:
+English, 7 052 characters with the brackets in place:
 
 ```
 Effective date: [OWNER DECISION: publication date, e.g. 20 November 2026]
@@ -218,7 +218,7 @@ You receive an order number on confirmation and a record of the order in your Or
 
 PAYING ONLINE
 Online payment is provided by Moyasar, our payment provider. When you place an order with online payment, the app opens Moyasar's secure payment page. You enter your card details on that page, and they go to Moyasar directly, not through us: your full card number and security code never reach us, and we never store them. Your bank may ask you to confirm the payment on its own page.
-Online payments are charged in Saudi Riyals, for the total confirmed by our system at checkout. Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. [OWNER DECISION (points used): this sentence no longer says how many points are used. The live Offers & Loyalty Terms say "your whole available balance is applied, up to the value of the order", but today no points are used at all when fewer whole points than the redemption minimum (100 live, worth SAR 10.00) fit the order (Product gaps, PG3). If the server is changed first so that the minimum applies only to the balance held, this sentence may become: "You cannot use only some of your points: when you use them, your whole available balance is applied, up to the value of the order."] If your points cover the whole order, nothing is charged and no payment page opens.
+Online payments are charged in Saudi Riyals, for the total confirmed by our system at checkout. Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. [OWNER DECISION (points used): this sentence no longer says how many points are used. The live Offers & Loyalty Terms say "your whole available balance is applied, up to the value of the order", but today no points are used at all when fewer whole points than the redemption minimum (100 live, worth SAR 10.00) fit the order (Product gaps, PAY-3; gap PG-31). If the server is changed first so that the minimum applies only to the balance held, this sentence may become: "You cannot use only some of your points: when you use them, your whole available balance is applied, up to the value of the order."] If your points cover the whole order, nothing is charged and no payment page opens.
 An order you pay for online is placed only after we have checked directly with Moyasar that your payment went through for the right amount. Until then there is no order, and nothing is sent to the branch. Once your payment is confirmed, you have a record of the order in your Orders tab, and the branch's order number appears in the app as soon as the branch issues it.
 If your payment is declined, or the payment page expires before you pay, no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash. If you close the payment page without paying, no payment is taken and no order is placed, but that payment stays open: until the payment page expires, the app takes you back to it when you return to checkout or place an order, even if you choose cash. If we cannot reach Moyasar to check a payment, the app keeps it open in the same way until we can, even after a decline or after the payment page expires. [OWNER DECISION (closing the payment page): this is what the app does today; it keeps a closed, unpaid payment open so that it cannot be paid alongside a second order, and it treats a payment that cannot be checked as still open. If the app is changed first so that a customer can end such a payment and pay in cash straight away, replace the sentence beginning "If you close the payment page" with: "If you close the payment page without paying, no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash.", and delete the sentence beginning "If we cannot reach Moyasar" if the same change lets a customer end a payment that cannot be checked.]
 If money is taken from your card but the app could not confirm your payment, or you are charged twice for one order, contact us using the details below, with the date, time and amount of the payment, and your order number if you have one. Never send us your full card number. [OWNER DECISION (refund promise; decide once, with cancellation_refund_policy D2 and D3): no refund is promised here, because nothing alerts staff to these payments and each is refunded by hand in the Moyasar dashboard. The Cancellation & Refund Policy draft currently promises one ("we will refund it once we have confirmed it with Moyasar"). Settle that sentence once; if a promise is also wanted here, add the same words, with a time limit only if staff can keep it.]
@@ -229,7 +229,7 @@ CONTACT
 info@spicymeal.com.sa — 9200 31495
 ```
 
-Arabic, 6 279 characters with the brackets in place:
+Arabic, 6 292 characters with the brackets in place:
 
 ```
 تاريخ السريان: [OWNER DECISION: تاريخ النشر، مثل ٢٠ نوفمبر ٢٠٢٦]
@@ -249,7 +249,7 @@ Arabic, 6 279 characters with the brackets in place:
 
 الدفع الإلكتروني
 تقدّم خدمة الدفع الإلكتروني Moyasar، مزوّد الدفع لدينا. وعند تقديمك طلباً بالدفع الإلكتروني، يفتح التطبيق صفحة الدفع الآمنة التابعة لـ Moyasar. وتُدخل بيانات بطاقتك في تلك الصفحة، فتصل إلى Moyasar مباشرةً دون أن تمر بنا: فلا يصل إلينا رقم بطاقتك كاملاً ولا رمز الأمان أبداً، ولا نخزّنهما في أي حال. وقد يطلب منك البنك المُصدر لبطاقتك تأكيد الدفع في صفحته الخاصة.
-وتُحصَّل المدفوعات الإلكترونية بالريال السعودي، بقيمة الإجمالي الذي يؤكده نظامنا عند إتمام الطلب. ويتطلب الدفع الإلكتروني ألا يقل المبلغ المستحق عن ١٫٠٠ ريال سعودي. فإذا ترك استبدال نقاطك مبلغاً مستحقاً أكبر من صفر وأقل من ١٫٠٠ ريال سعودي، فأوقف استبدال النقاط في هذا الطلب أو ادفع نقداً. ولا يمكنك أن تختار استخدام جزء من نقاطك فقط. [OWNER DECISION (النقاط المستخدمة): لم تعد هذه الجملة تذكر عدد النقاط التي تُستخدم. فشروط العروض والولاء الحالية تنص على أنه «يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب»، لكن النظام اليوم لا يستخدم أي نقاط إذا كان عدد النقاط الكاملة التي تتسع لها قيمة الطلب أقل من الحد الأدنى للاستبدال (١٠٠ نقطة حالياً، بقيمة ١٠٫٠٠ ريال) (Product gaps, PG3). وإذا عُدِّل النظام أولاً بحيث يسري الحد الأدنى على الرصيد وحده، فيمكن أن تصبح هذه الجملة: «ولا يمكنك استخدام جزء من نقاطك فقط، فعند استخدامها يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب.»] وإذا غطّت نقاطك قيمة الطلب كاملة، فلن يُحصَّل منك أي مبلغ ولن تُفتح صفحة الدفع.
+وتُحصَّل المدفوعات الإلكترونية بالريال السعودي، بقيمة الإجمالي الذي يؤكده نظامنا عند إتمام الطلب. ويتطلب الدفع الإلكتروني ألا يقل المبلغ المستحق عن ١٫٠٠ ريال سعودي. فإذا ترك استبدال نقاطك مبلغاً مستحقاً أكبر من صفر وأقل من ١٫٠٠ ريال سعودي، فأوقف استبدال النقاط في هذا الطلب أو ادفع نقداً. ولا يمكنك أن تختار استخدام جزء من نقاطك فقط. [OWNER DECISION (النقاط المستخدمة): لم تعد هذه الجملة تذكر عدد النقاط التي تُستخدم. فشروط العروض والولاء الحالية تنص على أنه «يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب»، لكن النظام اليوم لا يستخدم أي نقاط إذا كان عدد النقاط الكاملة التي تتسع لها قيمة الطلب أقل من الحد الأدنى للاستبدال (١٠٠ نقطة حالياً، بقيمة ١٠٫٠٠ ريال) (Product gaps, PAY-3; gap PG-31). وإذا عُدِّل النظام أولاً بحيث يسري الحد الأدنى على الرصيد وحده، فيمكن أن تصبح هذه الجملة: «ولا يمكنك استخدام جزء من نقاطك فقط، فعند استخدامها يُستخدم رصيدك المتاح بالكامل بما لا يتجاوز قيمة الطلب.»] وإذا غطّت نقاطك قيمة الطلب كاملة، فلن يُحصَّل منك أي مبلغ ولن تُفتح صفحة الدفع.
 ولا يُقدَّم الطلب الذي تدفع قيمته إلكترونياً إلا بعد أن نتأكد مباشرةً لدى Moyasar أن دفعتك تمّت بالمبلغ الصحيح. وحتى ذلك الحين لا يوجد طلب، ولا يُرسَل شيء إلى الفرع. وبعد تأكيد دفعتك تجد سجلاً للطلب في قسم الطلبات، ويظهر رقم الطلب لدى الفرع في التطبيق فور إصداره من الفرع.
 وإذا رُفضت الدفعة، أو انتهت صلاحية صفحة الدفع قبل أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، وتبقى سلتك في التطبيق لتحاول مرة أخرى أو تختار الدفع نقداً حيث يتاح. وإذا أغلقت صفحة الدفع دون أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، لكن تلك الدفعة تبقى مفتوحة، فيعيدك التطبيق إليها عند عودتك إلى صفحة إتمام الطلب أو عند تقديمك طلباً، حتى لو اخترت الدفع نقداً، إلى أن تنتهي صلاحية صفحة الدفع. وإذا تعذّر علينا التحقق من الدفعة لدى Moyasar، فيُبقيها التطبيق مفتوحة على النحو نفسه إلى أن نتمكن من ذلك، حتى بعد رفض الدفعة أو انتهاء صلاحية صفحة الدفع. [OWNER DECISION (إغلاق صفحة الدفع): هذا ما يفعله التطبيق اليوم، إذ يُبقي الدفعة المغلقة غير المدفوعة مفتوحة كي لا تُدفع إلى جانب طلب ثانٍ، ويعامل الدفعة التي يتعذّر التحقق منها على أنها ما زالت مفتوحة. وإذا عُدِّل التطبيق أولاً بحيث يستطيع العميل إنهاء تلك الدفعة والدفع نقداً فوراً، فتُستبدل الجملة التي تبدأ بـ «وإذا أغلقت صفحة الدفع» بالجملة: «وإذا أغلقت صفحة الدفع دون أن تدفع، فلن يُحصَّل منك أي مبلغ ولن يُقدَّم الطلب، وتبقى سلتك في التطبيق لتحاول مرة أخرى أو تختار الدفع نقداً حيث يتاح.»، وتُحذف الجملة التي تبدأ بـ «وإذا تعذّر علينا التحقق» إذا كان التعديل نفسه يتيح للعميل إنهاء دفعة يتعذّر التحقق منها.]
 وإذا خُصم مبلغ من بطاقتك ولم يتمكن التطبيق من تأكيد دفعتك، أو خُصمت قيمة طلب واحد مرتين، فتواصل معنا عبر بيانات التواصل أدناه، مع ذكر تاريخ الدفعة ووقتها ومبلغها، ورقم الطلب إن وُجد. ولا ترسل إلينا رقم بطاقتك كاملاً أبداً. [OWNER DECISION (وعد الاسترداد، يُحسم مرة واحدة مع D2 وD3 في سياسة الإلغاء والاسترجاع): لا يَعِد هذا النص بالاسترداد، لأنه لا شيء ينبّه الفريق إلى هذه الدفعات، وكلٌّ منها يُردّ يدوياً من لوحة تحكم Moyasar. ومسودة سياسة الإلغاء والاسترجاع تَعِد به حالياً («وسنرد المبلغ بعد التحقق منه لدى Moyasar»). تُحسم تلك الجملة مرة واحدة، وإن أُريد الوعد هنا أيضاً فتُضاف الصيغة نفسها، مع مدة زمنية فقط إذا كان الفريق قادراً على الالتزام بها.]
@@ -280,14 +280,14 @@ each was re-checked against the code or the live database before it was applied
 | 5 | **"You enter your card details on that page, and they go to Moyasar directly, not through us: your full card number and security code never reach us, and we never store them."** Replaces "Your card details go to Moyasar, not to us", which overstated it (fact-check S2), and the previous revision's "not in our app", which the new build contradicts (R2). It keeps v2.0's promise ("we will never store your full card number") and makes it stronger. | `moyasar.ts:6-17`: Moyasar prohibits card data on the merchant backend, so the integration is the hosted **invoice**. The invoice request carries no card field (`moyasar.ts:336-354`). The app loads only Moyasar's page and injects no script of its own (`checkout.tsx:153-190`), and `payment-initiate` hands out only https URLs on `moyasar.com` (`moyasar.ts:373-386`). What does reach our server, in Moyasar's API replies, is a masked number (first six and last four digits), the cardholder name and the payer's IP address; `sanitizeMoyasarPayment` drops all three and keeps only the last four (`moyasar.ts:732-768`; test `moyasar.test.ts:669`, "drops the BIN, the token, the name and the payer IP"). The full number and the security code never reach us. "Secure" is the word the app's own payment footer uses: "Your card details are entered on Moyasar's secure page." (`checkout.tsx:221`). **Re-check (R2):** the new build shows Moyasar's page inside the app's own payment screen ("the customer stays in Spicy Meal the whole time", `checkout.tsx:2-5`), so "not in our app" was untrue there; builds already in the field open the system browser (`PAYMENTS.md` §5, lines 313-315). "They go to Moyasar directly, not through us" is true of both, and is the privacy draft's wording (its PAYMENT section); the store answers also describe the page as shown inside the app. |
 | 6 | **"Your bank may ask you to confirm the payment on its own page."** | 3-D Secure: `PAYMENTS.md` §2 step 4 and §5 (the issuer's challenge page is "on the bank's own domain"). |
 | 7 | **"Charged in Saudi Riyals, for the total confirmed by our system at checkout."** "By our system" added, as in PRICES AND VAT and the Arabic «يؤكده نظامنا» (fact-check N5). | The invoice is built in the **attempt's** currency, not a configurable one (`payment-initiate/index.ts:140-158`); the attempt's currency is the order's, and `orders.total` is SAR. The amount is the server-computed session total read through the customer's own client (`payment-initiate/index.ts:470-482`), never a client value. A payment confirms only if amount and currency match the attempt (`checkPaymentBinding`, `moyasar.ts:900-920`). Live: payment row `currency` = `SAR`. |
-| 8 | **Minimum and points: "Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. If your points cover the whole order, nothing is charged and no payment page opens."** The first draft said "use fewer points", which the app cannot do, and did not cover a zero total (fact-check B2). The previous revision's "when you use them, your whole available balance is applied, up to the value of the order" (the live Loyalty Terms' words) is now only in a bracket, because it is untrue for a small order (R1). | Minimum: `MOYASAR_MIN_INVOICE_MINOR_UNITS = 100` (`moyasar.ts:124`, `isBelowMoyasarMinimum` `:131-133`); `payment-initiate` refuses a smaller total before any attempt (`index.ts:406`, `:484-487`); the database refuses it too, and that check is **live** in `begin_session_attempt` and `begin_payment_attempt` (read 2026-11-13). All or nothing: the app redeems the whole available balance or none (`CheckoutScreen.tsx:415`, through the on/off control in `features/checkout/view/LoyaltyToggle.tsx`), which is what live `offers_loyalty_terms` v2.2 says: "When you do, your whole available balance is applied, up to the value of the order."; the sentence uses that wording. Zero: the points discount is capped at the order value (`previewTotals.ts:132-136`; live `compute_order_snapshot` and `place_order`: `least(v_loyalty_req, v_bal_start, floor(v_pre_loyalty / v_per_point)::int)`, then `least(round(v_loyalty_redeemed * v_per_point, 2), v_pre_loyalty)`), so a pickup order can reach exactly 0.00. Live `begin_checkout_session` then settles it at once without Moyasar ("Zero-total (fully covered): nothing to charge — settle immediately"; `supabase/migrations/20260826110000_checkout_zero_total_idempotency.sql:123`), and the app goes straight to the receipt (`CheckoutScreen.tsx:778-781`). Only 0.01 to 0.99 is refused. The app's own message still says "Use fewer points" (Product gaps, PG2), and the checkout summary does not apply two of the server's points rules (PG3). **Re-check (R1):** the same live functions then set the points used to 0 when they are fewer than `min_points_to_redeem` (live 100; `discount_per_point` 0.10), so an order worth less than SAR 10.00 after any coupon uses no points at all, whatever the balance; 24 of the 55 active products are priced under SAR 10.00 (read 2026-11-13). "Your whole available balance is applied, up to the value of the order" is untrue there. "You cannot choose to use only some of your points" is true in every case, because the app's switch sends the whole balance or nothing (`CheckoutScreen.tsx:415`). |
+| 8 | **Minimum and points: "Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves an amount to pay above zero but below SAR 1.00, switch off points redemption for this order or pay in cash. You cannot choose to use only some of your points. If your points cover the whole order, nothing is charged and no payment page opens."** The first draft said "use fewer points", which the app cannot do, and did not cover a zero total (fact-check B2). The previous revision's "when you use them, your whole available balance is applied, up to the value of the order" (the live Loyalty Terms' words) is now only in a bracket, because it is untrue for a small order (R1). | Minimum: `MOYASAR_MIN_INVOICE_MINOR_UNITS = 100` (`moyasar.ts:124`, `isBelowMoyasarMinimum` `:131-133`); `payment-initiate` refuses a smaller total before any attempt (`index.ts:406`, `:484-487`); the database refuses it too, and that check is **live** in `begin_session_attempt` and `begin_payment_attempt` (read 2026-11-13). All or nothing: the app redeems the whole available balance or none (`CheckoutScreen.tsx:415`, through the on/off control in `features/checkout/view/LoyaltyToggle.tsx`), which is what live `offers_loyalty_terms` v2.2 says: "When you do, your whole available balance is applied, up to the value of the order."; the sentence uses that wording. Zero: the points discount is capped at the order value (`previewTotals.ts:132-136`; live `compute_order_snapshot` and `place_order`: `least(v_loyalty_req, v_bal_start, floor(v_pre_loyalty / v_per_point)::int)`, then `least(round(v_loyalty_redeemed * v_per_point, 2), v_pre_loyalty)`), so a pickup order can reach exactly 0.00. Live `begin_checkout_session` then settles it at once without Moyasar ("Zero-total (fully covered): nothing to charge — settle immediately"; `supabase/migrations/20260826110000_checkout_zero_total_idempotency.sql:123`), and the app goes straight to the receipt (`CheckoutScreen.tsx:778-781`). Only 0.01 to 0.99 is refused. The app's own message still says "Use fewer points" (Product gaps, PAY-2; gap PG-05), and the checkout summary does not apply two of the server's points rules (PAY-3; gap PG-31). **Re-check (R1):** the same live functions then set the points used to 0 when they are fewer than `min_points_to_redeem` (live 100; `discount_per_point` 0.10), so an order worth less than SAR 10.00 after any coupon uses no points at all, whatever the balance; 24 of the 55 active products are priced under SAR 10.00 (read 2026-11-13). "Your whole available balance is applied, up to the value of the order" is untrue there. "You cannot choose to use only some of your points" is true in every case, because the app's switch sends the whole balance or nothing (`CheckoutScreen.tsx:415`). |
 | 9 | **"An order you pay for online is placed only after we have checked directly with Moyasar that your payment went through for the right amount. Until then there is no order, and nothing is sent to the branch. Once your payment is confirmed, you have a record of the order in your Orders tab, and the branch's order number appears in the app as soon as the branch issues it."** The first draft said "you receive an order number on confirmation … as with a cash order" (fact-check N4, N7). The previous revision's "Once it is placed" became "Once your payment is confirmed" (R3). | The app opens a checkout **session**, not an order (`CheckoutScreen.tsx:770-786`; the app calls `payment-initiate` only with a session id, `apps/mobile/src/services/api.ts:474-475`). A payment is confirmed **only** in `validateAndConfirmMoyasarPayment`, and only when Moyasar's own fetch says `paid`/`captured` and every bound field matches (`supabase/functions/_shared/moyasarVerify.ts:1-5`, `:312`). Only then does `finalize_checkout_session` create the order, already paid (`moyasarVerify.ts:343-346`, `:368`). Redirects and webhooks are never trusted on their own (`moyasarVerify.ts:13-20`). The receipt never shows the internal SM-… number, only the branch's own number once the branch has issued one (`apps/mobile/src/features/orders/ReceiptScreen.tsx:12-14`); the app's own copy is "It will appear here as soon as the branch issues it." / «سيظهر هنا فور إصداره من الفرع.» (`apps/mobile/src/i18n/strings.ts:388`, `:732`). The POS hand-off after a confirmed payment is best-effort (`moyasarVerify.ts:478-487`), so the number can come later than the confirmation. "As with a cash order" was dropped so that the sentence cannot be read as extending PAYING IN CASH's printed-invoice promise (Claims, item 10). "An order you pay for online" excludes the zero-total path, which is settled without Moyasar (row 8). **Re-check (R3, raised by the terms_conditions draft):** the live Terms & Conditions (ORDERING: "An order is placed when the app confirms it and gives you an order number") and the app use "placed" for a later moment: the app confirms an order only once the branch's POS has returned its reference (`apps/mobile/src/features/orders/orderConfirmation.ts:66`, `:148`), and titles a paid order that never reaches the branch "Order not placed" (`strings.ts:374`). "Once it is placed" used the word for the moment the paid order is created, before the POS has it. The first sentence ("placed only after …") is a condition, and stays true under either meaning. |
-| 10 | **Declined or expired: "no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash." Closed without paying: "that payment stays open: until the payment page expires, the app takes you back to it when you return to checkout or place an order, even if you choose cash." Moyasar out of reach (R4): "the app keeps it open in the same way until we can, even after a decline or after the payment page expires."** The first draft promised cash after closing the page, which the app does not allow (fact-check B3). "Basket" became "cart", the app's word (fact-check N2). | Decline: with no settled payment on the invoice, the most recent one is taken (`selectInvoicePayment`, `moyasar.ts:936`); Moyasar `failed` maps to failed (`moyasar.ts:474-496`) and `payment-verify` answers `failed` (`verifyAnswerStatus`, `moyasar.ts:1096`), which the app treats as terminal and clears (`features/checkout/pendingSession.ts:70`, `:83`). Expiry: an `expired` invoice is terminal (`closedInvoiceOutcome`, `moyasar.ts:565`, used at `moyasarVerify.ts:563`). After either, "Try again" opens a fresh session (`CheckoutScreen.tsx:927`) and a cash order goes through. Closed without paying: the invoice stays payable and `payment-verify` answers pending (`moyasarVerify.ts:584`, `reason: 'no_payment'`); the app keeps the saved session (`pendingSession.ts:79-85`) and resumes it (`:164-188`) on entering checkout (`CheckoutScreen.tsx:286-297`) and before every order, cash included (`:727-733`, ahead of the cash branch at `:789`); the dialog for that state offers "Continue payment" and "Check again" (`features/checkout/view/PaymentStatusDialog.tsx:112-116`), and Close, which keeps the saved session (`:125`); the app's own text is "Payment was not completed. You can continue or try again." (`strings.ts:221`). The docs agree: `PAYMENTS.md:225-229`; `RELEASE_CHECKLIST.md:180-183` ("Close and come back"). The page lasts the configured invoice expiry, 30 minutes live, bounded 5 to 60 (`moyasar.ts:259-260`), hence "until the payment page expires" rather than a number. No order is created in any of these cases, because only a confirmed payment creates one (row 9), and the cart is cleared only once an order exists (`CheckoutScreen.tsx:780`, `:790`, `:895`). Product gaps, PG1. **Re-check (R4):** a check that cannot reach Moyasar answers "pending", never a terminal status (`moyasarVerify.ts:550-556`; `payment-verify/index.ts:99`, `:253`), and the app keeps a pending session (`pendingSession.ts:84`), so while Moyasar or the proxy cannot be reached the hold outlasts the page, after a decline or an expiry too (`docs/readiness/20261113-card-payments-gaps.md` PG-04, which asks for this to be stated plainly). |
-| 11 | **"If money is taken from your card but the app could not confirm your payment, or you are charged twice for one order, contact us … with the date, time and amount of the payment, and your order number if you have one. Never send us your full card number."** No refund is promised here; the promise is decided once with the refund policy (bracket; fact-check S6). The previous revision's "does not confirm your order" became "could not confirm your payment" (R6). | In the first case there is no order number to quote, while the live Contact & Support page asks for one ("Please include your order number."); the refund draft asks for the same details and gives the same warning (`docs/legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md:202`, Arabic `:248`; the previous revision cited `:160`, which has since moved). The app tells the customer to contact support in exactly that case: `payUnknown`, "We could not confirm the payment. Please contact support if an amount was deducted." (`strings.ts:204`), used for a payment Moyasar reports paid that we did not confirm, and a payment refunded before confirmation (`PAYMENTS.md` §4, lines 240-245). A duplicate payment is recorded, never refunded automatically, and nothing alerts staff (`PAYMENTS.md` §10, lines 571-597; `OWNER_ACTIONS.md` §47.20). The automatic refund ledger refunds only an order's own paid payment (`supabase/migrations/20261003120000_moyasar_only_payments.sql:557-575`), so no code path refunds a payment that has no order, or a duplicate. Product gaps, PG4. **Re-check (R6):** "could not confirm your payment" is the app's own phrase for these cases (`payUnknown`) and the refund draft's (line 202). In the app, "Order confirmed" means the branch has confirmed the order (`orderConfirmation.ts:66`, `:148`), so "does not confirm your order" also took in a paid order that the POS has not yet received, which the app lets the customer resend and the refund policy covers. |
+| 10 | **Declined or expired: "no payment is taken and no order is placed; your cart stays in the app, so you can try again or, where it is offered, pay in cash." Closed without paying: "that payment stays open: until the payment page expires, the app takes you back to it when you return to checkout or place an order, even if you choose cash." Moyasar out of reach (R4): "the app keeps it open in the same way until we can, even after a decline or after the payment page expires."** The first draft promised cash after closing the page, which the app does not allow (fact-check B3). "Basket" became "cart", the app's word (fact-check N2). | Decline: with no settled payment on the invoice, the most recent one is taken (`selectInvoicePayment`, `moyasar.ts:936`); Moyasar `failed` maps to failed (`moyasar.ts:474-496`) and `payment-verify` answers `failed` (`verifyAnswerStatus`, `moyasar.ts:1096`), which the app treats as terminal and clears (`features/checkout/pendingSession.ts:70`, `:83`). Expiry: an `expired` invoice is terminal (`closedInvoiceOutcome`, `moyasar.ts:565`, used at `moyasarVerify.ts:563`). After either, "Try again" opens a fresh session (`CheckoutScreen.tsx:927`) and a cash order goes through. Closed without paying: the invoice stays payable and `payment-verify` answers pending (`moyasarVerify.ts:584`, `reason: 'no_payment'`); the app keeps the saved session (`pendingSession.ts:79-85`) and resumes it (`:164-188`) on entering checkout (`CheckoutScreen.tsx:286-297`) and before every order, cash included (`:727-733`, ahead of the cash branch at `:789`); the dialog for that state offers "Continue payment" and "Check again" (`features/checkout/view/PaymentStatusDialog.tsx:112-116`), and Close, which keeps the saved session (`:125`); the app's own text is "Payment was not completed. You can continue or try again." (`strings.ts:221`). The docs agree: `PAYMENTS.md:225-229`; `RELEASE_CHECKLIST.md:180-183` ("Close and come back"). The page lasts the configured invoice expiry, 30 minutes live, bounded 5 to 60 (`moyasar.ts:259-260`), hence "until the payment page expires" rather than a number. No order is created in any of these cases, because only a confirmed payment creates one (row 9), and the cart is cleared only once an order exists (`CheckoutScreen.tsx:780`, `:790`, `:895`). Product gaps, PAY-1 (gap PG-04). **Re-check (R4):** a check that cannot reach Moyasar answers "pending", never a terminal status (`moyasarVerify.ts:550-556`; `payment-verify/index.ts:99`, `:253`), and the app keeps a pending session (`pendingSession.ts:84`), so while Moyasar or the proxy cannot be reached the hold outlasts the page, after a decline or an expiry too (`docs/readiness/20261113-card-payments-gaps.md` PG-04, which asks for this to be stated plainly). |
+| 11 | **"If money is taken from your card but the app could not confirm your payment, or you are charged twice for one order, contact us … with the date, time and amount of the payment, and your order number if you have one. Never send us your full card number."** No refund is promised here; the promise is decided once with the refund policy (bracket; fact-check S6). The previous revision's "does not confirm your order" became "could not confirm your payment" (R6). | In the first case there is no order number to quote, while the live Contact & Support page asks for one ("Please include your order number."); the refund draft asks for the same details and gives the same warning (`docs/legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md`, ONLINE PAYMENT REFUNDS line 10, in both languages; earlier revisions cited file lines, which move). The app tells the customer to contact support in exactly that case: `payUnknown`, "We could not confirm the payment. Please contact support if an amount was deducted." (`strings.ts:204`), used for a payment Moyasar reports paid that we did not confirm, and a payment refunded before confirmation (`PAYMENTS.md` §4, lines 240-245). A duplicate payment is recorded, never refunded automatically, and nothing alerts staff (`PAYMENTS.md` §10, lines 571-597; `OWNER_ACTIONS.md` §47.20). The automatic refund ledger refunds only an order's own paid payment (`supabase/migrations/20261003120000_moyasar_only_payments.sql:557-575`), so no code path refunds a payment that has no order, or a duplicate. Product gaps, PAY-4 (gap PG-02). **Re-check (R6):** "could not confirm your payment" is the app's own phrase for these cases (`payUnknown`) and the refund draft's (its ONLINE PAYMENT REFUNDS line 10). In the app, "Order confirmed" means the branch has confirmed the order (`orderConfirmation.ts:66`, `:148`), so "does not confirm your order" also took in a paid order that the POS has not yet received, which the app lets the customer resend and the refund policy covers. |
 | 12 | **"Any refund of an online payment goes back to the card or payment method you paid with, through Moyasar … Our Cancellation & Refund Policy explains when refunds are made and how long they take."** Destination only; no trigger, no timing. Worded as in the refund draft, with its D4 marker (fact-check S4); "including a card used through Apple Pay" went with Apple Pay (row 4), and "payment method" covers it if it is named later. | Every refund the code makes is `POST /v1/payments/{payment id}/refund` against the original payment, body `{ amount }` alone (`supabase/functions/_shared/moyasarRefund.ts:260-262`, sent at `supabase/functions/payment-refund/index.ts:235-241`). The hand refund in Moyasar's dashboard is also against the payment (`PAYMENTS.md` §10, lines 616-620). No code path refunds a card payment in cash. **When** a refund happens is deliberately not here: the code refunds automatically only a paid order that never reached the POS after the customer's resends (`order_refund_due`, reason `pos_delivery_failed_after_customer_retries`, `20261003120000_moyasar_only_payments.sql:573`); a cancelled paid order and a duplicate are refunded by hand (`PAYMENTS.md` §6, lines 323-337; `OWNER_ACTIONS.md` §47.20). That belongs to `cancellation_refund_policy`. |
 | 13 | **"Our record of an online payment includes the card network (for example mada or Visa) and the last four digits of the card, never your full card number."** "Shows" became "includes", matching the Arabic «يتضمن», because the list is not complete (fact-check S3). "Card type" became "card network", the privacy draft's term (R7). | What is kept is `sanitizeMoyasarPayment` (`moyasar.ts:742-768`): the card scheme (`company`), the last four via `lastFourOf` (`:732-736`), and also the issuer's name and country, the authorisation code, reference number, response code and decline message. The scheme and the last four also go into columns: derived at `moyasarVerify.ts:332-333`, passed to `finalize_checkout_session` at `:375-376` (session path) and written at `:473-474` (order path). (The first draft cited `:182-183` and `:197-198`, which are the duplicate-payment helper; fact-check N8.) "mada" is a value Moyasar returns for `company` (fixture, `moyasar.test.ts:652`). The full list belongs in the Privacy Policy, to which the next sentence points. **Re-check (R7):** the sanitizer keeps the scheme (`company`) and nothing that says whether the card is debit or credit (`moyasar.ts:756-766`), and "card type" can be read as that. |
 | 14 | **"Our Privacy Policy, which also names Moyasar, explains what we keep about an online payment and what we share with Moyasar."** | v2.0 promised to name the provider "in this policy and in the Privacy Policy". The privacy draft does that, lists the stored payment fields (`docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`, WHAT WE COLLECT, "Payment:") and says what is sent to Moyasar (its PAYMENT section). "Explains", not the fact-check's "lists everything we keep": the privacy fact-check found two stored fields that draft did not list, the payment method type and Moyasar's fee (`docs/readiness/20261113-card-payments-reviews/privacy_policy.review.md`, item 12). Re-check: the privacy draft now lists the payment method and leaves the fee out on purpose, as Moyasar's charge to us rather than data about the customer (its row 6), so "explains" stays. `RECORD_OF_PROCESSING.md` activity 15 records what is sent: amount, currency, "Spicy Meal order", expiry, two opaque references, return addresses; "No name, phone number or email is sent" (`moyasar.ts:336-354`; `payment-initiate/index.ts:258-268`, `:456`, `:529`). |
-| 15 | **Version: an [OWNER DECISION], decided once for the whole set (fact-check N1).** | This repository has bumped minor for every content change since the 2026-08-18 v2.0 rewrite, including changes that added features (`offers_loyalty_terms` v2.2 added four loyalty features, one of which reduced what a delivery customer gets) and a processor (`privacy_policy` v2.3, and the 2.4 the privacy draft proposes). The refund draft proposes **3.0** for the same kind of change (`docs/legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md:57`, reasoned in its section "Version: 2.0 → 3.0 (major)", line 309; the previous revision cited `:255`, which has since moved). The terms_conditions draft leaves it open, as this one does. A 3.0 is defensible here too, because the document's central statement ("paid in cash") is reversed. No code ties customer acceptance to a version number: the app and the legal page read the active row (`apps/mobile/src/services/api.ts`, `src/legal/main.ts`), and no migration stores an accepted version. Note that `LEGAL_DOCUMENTS_AUDIT.md` lines 16-17 say the other rows are "unchanged at 2.1"; the live `payment_policy` row reads **2.0**, and this draft goes by the live row. |
+| 15 | **Version: an [OWNER DECISION], decided once for the whole set (fact-check N1).** | This repository has bumped minor for every content change since the 2026-08-18 v2.0 rewrite, including changes that added features (`offers_loyalty_terms` v2.2 added four loyalty features, one of which reduced what a delivery customer gets) and a processor (`privacy_policy` v2.3, and the 2.4 the privacy draft proposes). The refund draft proposes **3.0** for the same kind of change (`docs/legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md`, its header's version line, reasoned in its section "Version: 2.0 → 3.0 (major)"; earlier revisions cited file lines, which move). The terms_conditions draft leaves it open, as this one does. A 3.0 is defensible here too, because the document's central statement ("paid in cash") is reversed. No code ties customer acceptance to a version number: the app and the legal page read the active row (`apps/mobile/src/services/api.ts`, `src/legal/main.ts`), and no migration stores an accepted version. Note that `LEGAL_DOCUMENTS_AUDIT.md` lines 16-17 say the other rows are "unchanged at 2.1"; the live `payment_policy` row reads **2.0**, and this draft goes by the live row. |
 
 ### Left unchanged on purpose
 
@@ -301,7 +301,7 @@ each was re-checked against the code or the live database before it was applied
   refund, so it is true as it stands; see Open owner decisions, item 4. The
   sentence "The order summary at checkout shows … the amount due" is also kept;
   the summary can differ from the confirmed total when points are used (Product
-  gaps, PG3), and the next sentence already makes the confirmed total the one
+  gaps, PAY-3; gap PG-31), and the next sentence already makes the confirmed total the one
   that counts.
 - **PAYING IN CASH**, including "A printed invoice is available from the branch
   on request". Whether that also holds for an online order is not in the code
@@ -310,18 +310,19 @@ each was re-checked against the code or the live database before it was applied
   "You receive an order number on confirmation" is kept byte-identical, and it is
   accurate: the app says "Order confirmed" only once the branch's POS has
   returned its reference, and the branch's order number is written at the same
-  moment (Product gaps, PG8, withdrawn on re-check, R5).
+  moment (Product gaps, PAY-8, withdrawn on re-check, R5).
 - **CONTACT.** The new "contact us using the details below" points at it.
-- **Refund timing** (mada about 1 to 3 days, credit cards about 7 to 14) is not
-  in this document. It belongs in `cancellation_refund_policy`, which v2.0 of
-  that document promises to update "to explain how a card refund is returned and
-  how long it takes". The repository's source says "about 1 to 3 days" and
-  "about 7 to 14" (`docs/integrations/Moyasar_API_Reference.md:244-245`;
-  `OWNER_ACTIONS.md:4255-4256`), **not "business days"**; the brief's "business
-  days" is not supported by anything in the repository. As read on re-check
-  (R12), the refund draft now says "working days" / «أيام عمل» (the last line of
-  its ONLINE PAYMENT REFUNDS section), which that source does not support either;
-  that is for the refund draft to settle.
+- **Refund timing** (mada 24 hours to 3 business days, credit cards 7 to 14
+  business days, weekends not included: Moyasar's FAQ,
+  `moyasar.com/en/resources/faqs`, read 2026-11-13) is not in this document. It
+  belongs in `cancellation_refund_policy`, which v2.0 of that document promises
+  to update "to explain how a card refund is returned and how long it takes".
+  The repository's records said "about 1 to 3 days" and "about 7 to 14" until
+  they were corrected to the FAQ's wording on 2026-11-13
+  (`docs/integrations/Moyasar_API_Reference.md` §3.2, `OWNER_ACTIONS.md`
+  §47.18). So the refund draft's "working days" / «أيام عمل» (the last line of
+  its ONLINE PAYMENT REFUNDS section) renders Moyasar's "business days" and is
+  supported.
 - **What Moyasar receives** (amount, currency, a fixed description, references;
   no name, phone, email or address). That is privacy content and is in the
   privacy draft; this document points there.
@@ -353,9 +354,10 @@ each was re-checked against the code or the live database before it was applied
    re-check (R10): the store answers keep Apple Pay out of the listing copy
    until the check has passed (their App Review notes for card payment on carry
    it behind a bracket on the same check, which can be run before those notes
-   are sent); the privacy draft still names it twice (its PAYMENT section),
-   behind a bracket keyed to the same device check, which cannot pass before
-   publication. Under (a), both of the privacy draft's mentions go.
+   are sent); the privacy draft then named it twice (its PAYMENT section),
+   behind a bracket keyed to the same device check. Its own re-check (R1) has
+   since dropped Apple Pay by default, so all three now follow option (a), with
+   option (b) in a bracket.
 3. **Money taken without an order, and duplicates (fact-check S6).** The text
    says only "contact us", with the details to give. Whether to promise a refund
    here, and in what time, is decided **once**, together with the refund draft's
@@ -374,7 +376,7 @@ each was re-checked against the code or the live database before it was applied
    That is the only route the code has. If staff may ever settle a card-paid
    refund in cash at the branch, use the wording chosen for the refund draft's
    D4 in both documents. Marked in the text.
-6. **Publishing (decided; fact-check B1).** `privacy_policy`, `payment_policy`,
+6. **Publishing (proposed after fact-check B1; the owner decides, gap PG-08).** `privacy_policy`, `payment_policy`,
    `cancellation_refund_policy` and `terms_conditions` are published together,
    in both languages, in one owner-approved session, before §47.18; the store
    answers and the listing copy change in the same window. This text points at
@@ -388,10 +390,10 @@ each was re-checked against the code or the live database before it was applied
    policy the moment online payment is on. Their update is `docs/legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md`,
    now drafted (R9). Its PAYMENT line reuses this draft's HOW YOU PAY wording,
    the English after "at pickup or on delivery" and the second Arabic sentence
-   byte for byte, so any change to HOW YOU PAY is made in both. `OWNER_ACTIONS.md`
-   §47.15 and `GO_LIVE_READINESS.md` G5 still name only the other documents and
-   need `terms_conditions` added (read 2026-11-13; not changed here, because
-   this revision edits only this file). Publishing is two steps: the row write,
+   byte for byte, so any change to HOW YOU PAY is made in both. When read at
+   `04eb351`, `OWNER_ACTIONS.md` §47.15, `PAYMENTS.md` §7 step 11 and
+   `GO_LIVE_READINESS.md` G5 named only the other documents; `terms_conditions`
+   was added to all three on 2026-11-13. Publishing is two steps: the row write,
    then a production rebuild so the no-JavaScript `legal.html` carries it
    (`LEGAL_DOCUMENTS_AUDIT.md` §Method rule 7).
 7. **Naming the methods (fact-check S5).** mada, Visa and Mastercard are Moyasar
@@ -448,7 +450,7 @@ each was re-checked against the code or the live database before it was applied
     today: a closed, unpaid payment stays open, and until it expires every new
     order, cash included, takes the customer back to it. If the app is changed
     first so that a customer can end such a payment and pay in cash at once,
-    the bracket gives the replacement sentence (Product gaps, PG1). Since the
+    the bracket gives the replacement sentence (Product gaps, PAY-1; gap PG-04). Since the
     re-check (R4) the text also says that a payment we cannot check with
     Moyasar stays open in the same way, after a decline or an expiry too; the
     bracket says when that sentence goes.
@@ -472,7 +474,7 @@ each was re-checked against the code or the live database before it was applied
     in PAYING ONLINE, paragraph 2, "or, where it is offered, pay in cash" /
     «أو ادفع نقداً حيث يتاح». Not marked in the text, because the text is true
     today.
-12. **Points used (re-check, R1; Product gaps, PG3).** The text now says only
+12. **Points used (re-check, R1; Product gaps, PAY-3; gap PG-31).** The text now says only
     that a customer cannot choose to use some of their points. It no longer
     repeats the live Loyalty Terms' "your whole available balance is applied, up
     to the value of the order", which is untrue for an order worth less than
@@ -490,7 +492,7 @@ Where the product does not do what a reasonable promise needs, the text says
 what the product does today, and an `[OWNER DECISION]` gives the wording to use
 if the product changes first. None of these is fixed by this document.
 
-- **PG1. Closing the payment page holds every new order, cash included, until
+- **PAY-1 (gap PG-04). Closing the payment page holds every new order, cash included, until
   the page expires, and for as long as Moyasar cannot be reached** (fact-check
   B3; re-check R4; `docs/readiness/20261113-card-payments-gaps.md` PG-04). A customer who closes
   Moyasar's page meaning to pay cash is returned to it on entering checkout and
@@ -514,15 +516,17 @@ if the product changes first. None of these is fixed by this document.
   cannot be paid alongside a second order (`CheckoutScreen.tsx:722-726`), so the
   fix must keep that guarantee; PG-04 proposes cancelling the unpaid invoice at
   Moyasar first. Bracket in PAYING ONLINE, paragraph 4.
-- **PG2. The app's below-minimum message tells the customer to "Use fewer
+- **PAY-2 (gap PG-05). The app's below-minimum message tells the customer to "Use fewer
   points"**, which the app cannot do (fact-check B2): `payBelowMinimum`,
   "Online payment needs a total of at least 1.00 SAR. Use fewer points, or pay
   in cash." (`strings.ts:208`; AR «استخدم نقاطاً أقل» at `:569`).
   `RELEASE_CHECKLIST.md:190-192` and `PAYMENTS.md:275-277` expect that message,
   so they change with it. A copy fix ships only with an EAS build. This policy
   no longer repeats the old advice (`docs/readiness/20261113-card-payments-gaps.md` PG-05).
-- **PG3. The checkout summary does not apply two of the server's points rules**
-  (found while re-checking B2; not in the fact-check). The summary's points
+- **PAY-3 (gap PG-31). The checkout summary does not apply two of the server's points rules**
+  (found while re-checking B2; not in the fact-check; the gaps list carries it
+  as PG-31 since the final review, 2026-11-14, among the gaps to fix before card
+  payments go live, in the `OWNER_ACTIONS.md` §47.17 build). The summary's points
   discount is the balance times the point value, capped at the goods value
   after any coupon (`previewTotals.ts:132-136`). The server redeems whole points only, and redeems
   **none** when the whole points that fit the order are fewer than the minimum
@@ -534,7 +538,7 @@ if the product changes first. None of these is fixed by this document.
     switched on by a customer holding 100 points or more, shows a total of 0.00
     while the system redeems nothing and charges the full amount (24 of the 55
     active products are priced under SAR 10.00): with card payment, Moyasar's
-    page then asks for that amount, and closing it runs into PG1;
+    page then asks for that amount, and closing it runs into PAY-1;
   - with a percentage coupon (one, 15%, is active live) the value after the
     coupon can fall between tenths (for example SAR 21.25 from a SAR 25.00
     order), so the summary shows 0.00 while the system leaves SAR 0.01 to 0.09,
@@ -551,17 +555,17 @@ if the product changes first. None of these is fixed by this document.
   customer cannot choose to use some of their points; its bracket gives the
   fuller sentence to use if the server is changed so that the minimum applies to
   the balance held (Open owner decisions, item 12).
-- **PG4. Payments that only a person can put right: money taken without a
+- **PAY-4 (gap PG-02). Payments that only a person can put right: money taken without a
   confirmed order, and duplicates** (fact-check S6). Nothing alerts staff, each
   is refunded by hand in the Moyasar dashboard, and the automatic refund ledger
   refunds only an order's own paid payment, so it can reach neither (row 11).
   Text: "contact us", with the details to give; no promise. Bracket in PAYING
   ONLINE, paragraph 5, tied to the refund draft's D2 and D3
   (`docs/readiness/20261113-card-payments-gaps.md` PG-02).
-- **PG5. Apple Pay cannot be verified before this text must be live**
+- **PAY-5 (gap PG-12). Apple Pay cannot be verified before this text must be live**
   (fact-check B4). Not a code defect: the only check needs online payment on.
   Text: Apple Pay not named. Bracket in HOW YOU PAY.
-- **PG6. An order-first online path is still reachable through the API**
+- **PAY-6 (gap PG-27). An order-first online path is still reachable through the API**
   (fact-check N9, informational; checked live). `place_customer_order` is
   executable by `authenticated` and forwards `p_payment_method`; live
   `place_order` accepts `'online'` whenever online payment is on (it raises only
@@ -572,14 +576,14 @@ if the product changes first. None of these is fixed by this document.
 
 **Outside this document** (for the owners of those texts):
 
-- **PG7. Live `offers_loyalty_terms` v2.2 says "Points are added when you place
+- **PAY-7 (gap PG-22). Live `offers_loyalty_terms` v2.2 says "Points are added when you place
   the order, and your balance updates immediately."** Live `place_order` and
   `insert_order_from_snapshot` write `earn_pending`, and `admin_set_order_status`
   promotes it later (read 2026-11-13), so that sentence is already wrong. Worth
   adding to the card go-live set (fact-check, "Outside this draft").
   `docs/readiness/20261113-card-payments-gaps.md` PG-22 adds that the promotion happens only on
   Delivered, which nobody sets, so no order has been credited since 2026-09-14.
-- **PG8. Withdrawn on re-check (R5).** It said that "You receive an order
+- **PAY-8. Withdrawn on re-check (R5); no global ID.** It said that "You receive an order
   number on confirmation" (live PAYING IN CASH, kept here byte-identical) and
   "An order is placed when the app confirms it and gives you an order number"
   (live Terms & Conditions, ORDERING) had the imprecision fact-check N4 found.
@@ -588,7 +592,7 @@ if the product changes first. None of these is fixed by this document.
   `:148`); the sync worker writes that reference and the branch's order number
   together (`supabase/functions/lazywait-sync/index.ts:528-545`); and live, all
   71 orders that reached the POS carry both (read 2026-11-13). The
-  terms_conditions draft rejected PG8 on this evidence. N4 was right about the
+  terms_conditions draft rejected PAY-8 on this evidence. N4 was right about the
   first draft's online sentence, where "confirmation" could be read as the
   payment's; the real inconsistency left was this draft's own "Once it is
   placed" (row 9, R3). One theoretical case remains, the same for cash and
@@ -641,8 +645,12 @@ if the product changes first. None of these is fixed by this document.
     branch's number appears as soon as the branch issues it, which is what the
     receipt does (row 9). Not exercised with a live online order.
 12. **Moyasar being a Saudi company, where it processes data, and how long it
-    keeps it.** `RECORD_OF_PROCESSING.md` line 81 says Saudi, and "Unknown from
-    here" for location. This document makes no claim on any of it.
+    keeps it.** `RECORD_OF_PROCESSING.md` ("Where the data goes outside the
+    Kingdom") records Moyasar as inside the Kingdom by its own public statement,
+    not yet confirmed by contract. Moyasar's public privacy policy (last revised 8
+    December 2025) says it does not transfer personal data outside the Kingdom,
+    and states no retention period beyond "as long as necessary". The Moyasar
+    agreement has not been read. This document makes no claim on any of it.
 13. **The hold while Moyasar cannot be reached** (re-check, R4) follows from the
     code: a check that cannot reach Moyasar answers "pending", and the app keeps
     a pending payment open. It has not been exercised against a real outage.
@@ -659,7 +667,8 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
   owner decisions item 6) and `docs/legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md` referenced, not
   written; "Publishing early is safe" removed. Live T&C PAYMENT text and hashes
   confirmed; `OWNER_ACTIONS.md` §47.15 and `GO_LIVE_READINESS.md` G5 confirmed
-  not to list it (they need the addition outside this file).
+  not to list it (they needed the addition outside this file; both list it
+  since 2026-11-13).
 - **B2 → fixed.** "Use fewer points" removed; all-or-nothing stated; zero total
   added ("nothing is charged and no payment page opens"). Confirmed in
   `CheckoutScreen.tsx:415`, `:778-781`, the on/off `LoyaltyToggle`, live Loyalty
@@ -668,16 +677,16 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
   app always applies your whole points balance, not part of it" is untrue when
   the balance exceeds the order (only up to the order value is applied, live
   `least(…, floor(v_pre_loyalty / v_per_point))`), so the Loyalty Terms' own
-  words are used. The app message → PG2; a related summary gap → PG3.
+  words are used. The app message → PAY-2; a related summary gap → PAY-3.
 - **B3 → fixed + owner decision.** Text now says a closed payment stays open
   until it expires; bracket gives the wording for a changed app. Confirmed in
   `moyasarVerify.ts:584`, `pendingSession.ts:79-85`, `:164-188`,
   `CheckoutScreen.tsx:286-297`, `:727-733`, `PaymentStatusDialog.tsx:112-116`.
-  → PG1.
+  → PAY-1.
 - **B4 → owner decision.** Apple Pay removed from the text (option a,
   recommended); option b's exact EN and AR sentences are in the bracket.
   Confirmed in `RELEASE_CHECKLIST.md:161-173` and `OWNER_ACTIONS.md` §47.15,
-  §47.18. → PG5.
+  §47.18. → PAY-5.
 - **S1 → fixed.** "Where it is offered, online payment is available only in the
   app …". Confirmed: switch off live, TEST-mode refusal at
   `payment-initiate/index.ts:495`, `:509`.
@@ -694,7 +703,7 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
 - **S6 → fixed + owner decision.** Date, time, amount, order number if any, and
   "Never send us your full card number" added; the refund promise is tied to the
   refund draft's D2 and D3 so that it is decided once. Confirmed: live Contact &
-  Support asks for an order number; refund draft line 160. → PG4.
+  Support asks for an order number; refund draft line 160. → PAY-4.
 - **N1 → owner decision.** Version decided once for the set (Proposed text
   heading, item 1, row 15).
 - **N2 → fixed.** "Basket" → "cart" (`strings.ts:149-152`).
@@ -704,8 +713,8 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
   as soon as the branch issues it", the app's own copy (`strings.ts:388`,
   `:732`), instead of the suggested "once the branch accepts the order": the live
   T&C define "accepted" as "when the branch begins preparing it", a different
-  moment from the one the number appears. → PG8 for the cash and T&C sentences
-  (PG8 withdrawn on re-check, R5).
+  moment from the one the number appears. → PAY-8 for the cash and T&C sentences
+  (PAY-8 withdrawn on re-check, R5).
 - **N5 → fixed.** "Confirmed by our system".
 - **N6 → fixed.** Both clauses of the card sentence say "never" in Arabic; HOW
   YOU PAY split into two Arabic sentences. Flagged for the native read (item 9).
@@ -714,9 +723,9 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
   `:473-474` (confirmed); `:182-183` / `:197-198` are the duplicate helper.
 - **N9 → no text change (informational).** Confirmed live: `place_customer_order`
   executable by `authenticated`, forwards `p_payment_method`; `place_order`
-  accepts `'online'` when on. → PG6.
+  accepts `'online'` when on. → PAY-6.
 - **"Outside this draft" (Loyalty Terms, earn timing) → recorded.** Confirmed
-  live (`earn_pending` in `place_order` and `insert_order_from_snapshot`). → PG7.
+  live (`earn_pending` in `place_order` and `insert_order_from_snapshot`). → PAY-7.
 - **Rejected: none.** Three suggested wordings were adjusted (B2, S3, N4), each
   for the reason given on its line.
 
@@ -734,7 +743,7 @@ read for consistency. Each line below was re-checked before it was applied.
 - **re-check: earlier findings → all fixed or justified above.** B1 to B4, S1 to
   S6, N1 to N9 and "Outside this draft" each have a line. Four of those fixes
   were themselves revised by this re-check: B2's wording (R1), S2's "not in our
-  app" (R2), S3's "card type" (R7) and N4's pointer to PG8 (R5).
+  app" (R2), S3's "card type" (R7) and N4's pointer to PAY-8 (R5).
 - **re-check R1 (blocking) → fixed + owner decision.** "You cannot use only some
   of your points: when you use them, your whole available balance is applied, up
   to the value of the order" (the live Loyalty Terms' words, adopted for B2) is
@@ -743,7 +752,7 @@ read for consistency. Each line below was re-checked before it was applied.
   `min_points_to_redeem` (100) would be used, whatever the balance; 24 of 55
   active products cost under SAR 10.00. Now "You cannot choose to use only some
   of your points.", true in every case (`CheckoutScreen.tsx:415`), with the old
-  sentence in a bracket for a changed server. → PG3, Open owner decisions item 12.
+  sentence in a bracket for a changed server. → PAY-3, Open owner decisions item 12.
 - **re-check R2 (should-fix) → fixed.** "You enter your card details on that
   page, not in our app": the new build shows the page inside the app's payment
   screen (`checkout.tsx:2-5`), and the store answers say "shown inside the app".
@@ -758,9 +767,9 @@ read for consistency. Each line below was re-checked before it was applied.
   when the payment page expires; a check that cannot reach Moyasar is "pending"
   with no limit (`moyasarVerify.ts:550-556`), so it lasts as long as Moyasar or
   the proxy is out of reach, after a decline or an expiry too. Sentence added;
-  the closing bracket now says when it goes; PG1 extended (with the
+  the closing bracket now says when it goes; PAY-1 extended (with the
   session-expiry gap); the proxy bullet under "Left unchanged" corrected.
-- **re-check R5 (should-fix, notes) → fixed.** PG8 withdrawn: confirmation and
+- **re-check R5 (should-fix, notes) → fixed.** PAY-8 withdrawn: confirmation and
   the branch's number arrive together (`orderConfirmation.ts:66`,
   `lazywait-sync/index.ts:528-545`; 71 of 71 synced orders live). The PAYING IN
   CASH bullet under "Left unchanged" corrected.
@@ -772,7 +781,8 @@ read for consistency. Each line below was re-checked before it was applied.
 - **re-check R8 (nit) → fixed.** Moyasar as the subject of a verb is feminine
   (تقدّم; تؤكد in a bracket), as in the privacy draft and the live «تعرض Google».
 - **re-check R9 (nit, notes) → fixed.** Stale references: the refund draft's
-  `:160` and `:255` (now `:202` / `:248` and `:57` / `:309`); the terms draft
+  `:160` and `:255` (then `:202` / `:248` and `:57` / `:309`; section references
+  since the final review, 2026-11-14); the terms draft
   "being written in parallel" (now drafted, and byte-dependent on HOW YOU PAY);
   the privacy fact-check rationale in row 14; the pending-payment dialog also has
   Close (`PaymentStatusDialog.tsx:125`).
@@ -783,8 +793,10 @@ read for consistency. Each line below was re-checked before it was applied.
 - **re-check R11 (nit, notes) → owner decision.** The set-level choice to hedge
   cash (terms_conditions draft, its item 2; the privacy draft already hedges)
   needs matching HOW YOU PAY wording here; given in item 11, not in the text.
-- **re-check R12 (nit, notes) → recorded.** The refund draft's "working days" /
-  «أيام عمل» is not in the repository's source ("about 1 to 3 days").
+- **re-check R12 (nit, notes) → resolved 2026-11-13.** The refund draft's
+  "working days" / «أيام عمل» matches Moyasar's FAQ ("business days"). The
+  repository's records said "about 1 to 3 days" until they were corrected on
+  2026-11-13.
 - **re-check R13 (nit, notes) → fixed.** Product gaps cross-referenced to
   `docs/readiness/20261113-card-payments-gaps.md` (PG-02, PG-04, PG-05, PG-22, PG-27).
 - **re-check: considered, not changed.** (a) A customer whose card was declined
@@ -797,3 +809,46 @@ read for consistency. Each line below was re-checked before it was applied.
   there too, which is more than the sentence says, not less. (c) HOW YOU PAY's
   first paragraph is untouched, because the terms_conditions draft reuses it
   byte for byte.
+
+### Final review, 2026-11-14
+
+One line per review finding on this file. Each was checked against the
+repository at `ebdec3a`, Moyasar's own pages and read-only SQL before it was
+applied.
+
+- **K6 → applied.** No owner decision on the publishing plan is recorded
+  anywhere, so the header now reads "Publishing plan (proposed; the owner
+  decides)", and Open owner decisions, item 6, "proposed after fact-check B1;
+  the owner decides, gap PG-08".
+- **C2, K12 → applied.** Item 6 said §47.15 and G5 still needed
+  `terms_conditions`. It now says that §47.15, `PAYMENTS.md` §7 step 11 and G5
+  named only the other documents at `04eb351`, and that all three list it since
+  2026-11-13. The B1 line of the Fix log says the same.
+- **X2, K11 → applied, with the verifiers' corrected wording, by section rather
+  than by line.** "Left unchanged on purpose", refund timing, said the
+  repository gave "days", not "business days", and that the refund draft's
+  "working days" had no support. Moyasar's FAQ says "Mada cards: 24 hours to 3
+  business days. Credit cards: 7 to 14 business days. Weekends not included.",
+  and both records were corrected to that on 2026-11-13
+  (`Moyasar_API_Reference.md` §3.2, `OWNER_ACTIONS.md` §47.18). The note now
+  says so, and re-check R12 is marked resolved.
+- **C8, C9 → applied.** The local gap IDs PG1 to PG8 read like the global PG-01
+  to PG-08 and meant different gaps. They are now PAY-1 to PAY-8, each with its
+  global ID from `docs/readiness/20261113-card-payments-gaps.md`: PAY-1 (gap
+  PG-04), PAY-2 (gap PG-05), PAY-3 (gap PG-31, added to the gaps list in this
+  review), PAY-4 (gap PG-02), PAY-5 (gap PG-12), PAY-6 (gap PG-27), PAY-7 (gap
+  PG-22), PAY-8 (withdrawn, no global ID). The four "(Product gaps, PG3)"
+  citations inside the owner bracket of PAYING ONLINE paragraph 2 (English and
+  Arabic, in the edit blocks and the whole-document blocks) now read "(Product
+  gaps, PAY-3; gap PG-31)". Only bracket text changed, so no customer sentence
+  and nothing for the native read. The whole-document counts were re-measured
+  (English 7 052, Arabic 6 292). Putting the three old blocks back into the
+  whole-document blocks still gives both live v2.0 hashes, `0f883dcd…` and
+  `44e5b1f4…`.
+- **Consistency fixes made in this review (no finding ID).** Open owner
+  decisions, item 2, said the privacy draft names Apple Pay twice. That was
+  true when read, but that draft's own re-check (R1) has since dropped Apple Pay
+  by default, so the item now says all three drafts follow option (a). Claims,
+  item 12, now quotes Moyasar's public privacy policy on where it processes data
+  (the fact behind X3 in the privacy draft). Rows 11 and 15 now cite the refund
+  draft by section, because its file lines move.

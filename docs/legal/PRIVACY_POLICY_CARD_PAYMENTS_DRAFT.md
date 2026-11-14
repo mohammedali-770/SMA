@@ -10,7 +10,7 @@
 > the exact text and the evidence behind it, so publishing can be a copy-paste
 > in the admin console.
 >
-> **Publishing plan (decided).** `privacy_policy`, `payment_policy`,
+> **Publishing plan (proposed; the owner decides).** `privacy_policy`, `payment_policy`,
 > `cancellation_refund_policy` and `terms_conditions` are published
 > **together**, in **both languages**, in **one** owner-approved session, before
 > `OWNER_ACTIONS.md` §47.18 (online payment on). This text is never published on
@@ -37,7 +37,7 @@
 > **Scope.** Only what card payment requires. Every other sentence of v2.3 stays
 > byte-for-byte as it is. The pending location correction (`OWNER_ACTIONS.md`
 > §43, `docs/legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md`) is **not**
-> merged in. Under the decided plan `privacy_policy` is published once, in that
+> merged in. Under the proposed plan `privacy_policy` is published once, in that
 > session, so §43's timing has to be settled with it. See "Overlap with §43" at
 > the end of "What changed and why", and "Open owner decisions", item 1.
 >
@@ -48,7 +48,7 @@
 > app offers" it, and stays true while it is off.
 >
 > **Every `[OWNER DECISION: …]` bracket must be settled and removed before the
-> session.** Three of them (two for Product gap 1, one for Product gap 5) choose
+> session.** Three of them (two for PRIV-1, gap PG-06; one for PRIV-5, gap PG-27) choose
 > between wording that is true of the code today and wording that becomes true
 > only if the product is changed first. See "Product gaps found". Two are
 > pre-publish gates (the payment methods, and where Moyasar processes data), and
@@ -316,7 +316,7 @@ PAYMENT
 Where the app offers it, you can pay in cash at pickup or on delivery. Where the app offers online payment, you can also pay through Moyasar, our payment provider, with a mada, Visa or Mastercard card. [OWNER DECISION (methods), as in the payment_policy draft: publish this list only once Moyasar has confirmed in writing that SADAD, STC Pay and any card scheme not named here (for example American Express) are switched off for invoices on this account (OWNER_ACTIONS.md §47.19). If one is on, have it switched off first, or name it here and re-check this section against it: with STC Pay, for example, you would not enter card details at all.] [OWNER DECISION (Apple Pay), decided once with the payment_policy draft (its Open owner decisions, item 2) and the store answers: this text does not name Apple Pay, because the only proof that it works inside the app is the device check in RELEASE_CHECKLIST.md §7, which needs online payment switched on (OWNER_ACTIONS.md §47.18 step 2), after this text must already be live. (a) Recommended, as in the payment_policy draft: publish as it is, and name Apple Pay in a later version once that check has passed. (b) Name it now, accepting that it is unverified at publication: end the sentence before these brackets with "…with a mada, Visa or Mastercard card, or with Apple Pay on iPhone where the app shows it.", and add at the end of the next paragraph: "If you use Apple Pay, your card details reach Moyasar through Apple Pay, under Apple's own terms."]
 When you pay online, you enter your card details on Moyasar's own payment page, which the app opens for you. They go to Moyasar directly, not through us: your full card number and security code never reach us, and we never store them. Like any web page, Moyasar's page also receives the technical details your device sends, such as its IP address. Your bank may ask you to confirm the payment on its own page (3-D Secure).
 We send Moyasar only what it needs to take the payment: the amount and currency, a fixed description ("Spicy Meal order"), the time the payment page expires, the language you use the app in, and reference numbers that link the payment to your order. We do not send Moyasar your name, mobile number, email address or delivery address.
-We use online payment to complete the order you asked for, and we keep a record of the payment to confirm it, to make any refund and to answer your questions about it. [OWNER DECISION: Product gap 1. If account deletion is changed before publishing so that payment records are kept as financial records, use instead: "We use online payment to complete the order you asked for, and we keep a record of the payment to confirm it, to make any refund, to answer your questions about it and to meet our legal obligation to keep financial records."]
+We use online payment to complete the order you asked for, and we keep a record of the payment to confirm it, to make any refund and to answer your questions about it. [OWNER DECISION: PRIV-1 (gap PG-06). If account deletion is changed before publishing so that payment records are kept as financial records, use instead: "We use online payment to complete the order you asked for, and we keep a record of the payment to confirm it, to make any refund, to answer your questions about it and to meet our legal obligation to keep financial records."]
 ```
 
 **WHERE YOUR DATA IS PROCESSED: unchanged, with its pre-publish gate**
@@ -324,7 +324,7 @@ We use online payment to complete the order you asked for, and we keep a record 
 ```
 WHERE YOUR DATA IS PROCESSED
 Some of the providers listed above process data outside the Kingdom of Saudi Arabia. Where that happens, we rely on the data protection commitments in our contract with that provider.
-[OWNER DECISION: pre-publish gate; the paragraph above stays word for word if it passes. Confirm from the Moyasar agreement either that Moyasar processes this data inside the Kingdom, or that the agreement carries data protection commitments. If neither, counsel rewords this paragraph before it is published.]
+[OWNER DECISION: pre-publish gate; the paragraph above stays word for word if it passes. Confirm from the Moyasar agreement (Moyasar's public privacy policy already says it does not transfer personal data outside the Kingdom) either that Moyasar processes this data inside the Kingdom, or that the agreement carries data protection commitments. If neither, counsel rewords this paragraph before it is published.]
 ```
 
 **HOW LONG WE KEEP IT: full section**
@@ -333,7 +333,7 @@ Some of the providers listed above process data outside the Kingdom of Saudi Ara
 HOW LONG WE KEEP IT
 Account data: for as long as your account is open.
 Orders, invoices and financial records: for the period required by tax and accounting law, including after you delete your account. Your personal details on those records are anonymised.
-Payment records: for payments made in the app, while your account is open, and never longer than the order they belong to; they are deleted when you delete your account. Any other payment record is kept no longer than the order it belongs to. Payment records never contain your full card number. [OWNER DECISION: Product gap 1. If account deletion is changed before publishing so that payment records are kept, replace the three sentences before these brackets with: "Payment records: kept with the order they belong to, for as long as the order is kept. A payment record that belongs to no order, such as one for a declined card, is kept while your account is open. Payment records never contain your full card number." Re-check that wording against the change that actually lands, in particular for a captured payment that has no order.] [OWNER DECISION: Product gap 5. If, instead, the order-first payment path is closed to customers before publishing and account deletion is unchanged, the first two sentences may be shortened to: "Payment records: while your account is open, and never longer than the order they belong to. They are deleted when you delete your account."] [OWNER DECISION: Moyasar's own record. If the Moyasar agreement confirms it, add at the end of this line: "Moyasar keeps its own record of your payment for the period required of it as a payment provider." If it does not, add at least: "Deleting your account does not delete Moyasar's own record of your payment." That sentence is true of our code today: nothing in it asks Moyasar to delete a payment.]
+Payment records: for payments made in the app, while your account is open, and never longer than the order they belong to; they are deleted when you delete your account. Any other payment record is kept no longer than the order it belongs to. Payment records never contain your full card number. [OWNER DECISION: PRIV-1 (gap PG-06). If account deletion is changed before publishing so that payment records are kept, replace the three sentences before these brackets with: "Payment records: kept with the order they belong to, for as long as the order is kept. A payment record that belongs to no order, such as one for a declined card, is kept while your account is open. Payment records never contain your full card number." Re-check that wording against the change that actually lands, in particular for a captured payment that has no order.] [OWNER DECISION: PRIV-5 (gap PG-27). If, instead, the order-first payment path is closed to customers before publishing and account deletion is unchanged, the first two sentences may be shortened to: "Payment records: while your account is open, and never longer than the order they belong to. They are deleted when you delete your account."] [OWNER DECISION: Moyasar's own record. If the Moyasar agreement confirms it, add at the end of this line: "Moyasar keeps its own record of your payment for the period required of it as a payment provider." If it does not, add at least: "Deleting your account does not delete Moyasar's own record of your payment." That sentence is true of our code today: nothing in it asks Moyasar to delete a payment.]
 Verification codes: a short period, then deleted.
 Support messages: while we need them to resolve your request, and for a reasonable period afterwards.
 ```
@@ -431,7 +431,7 @@ Moyasar — مزوّد الدفع الإلكتروني لدينا، ويتولى
 يمكنك الدفع نقداً عند الاستلام أو عند التوصيل حيث يتيح التطبيق ذلك. وحيث يتيح التطبيق الدفع الإلكتروني، يمكنك أيضاً الدفع من خلال Moyasar، مزوّد الدفع لدينا، ببطاقة مدى أو Visa أو Mastercard. [OWNER DECISION (وسائل الدفع)، كما في مسودة سياسة الدفع: لا تُنشر هذه القائمة إلا بعد أن تؤكد Moyasar كتابياً أن SADAD وSTC Pay وأي شبكة بطاقات غير مذكورة هنا (مثل American Express) معطّلة للفواتير في هذا الحساب (OWNER_ACTIONS.md §47.19). وإن كان أيٌّ منها مفعّلاً، فيُعطَّل أولاً، أو يُذكر هنا وتُراجَع هذه الفقرة في ضوئه، فمع STC Pay مثلاً لا تُدخل بيانات بطاقة أصلاً.] [OWNER DECISION (Apple Pay)، يُتخذ مرة واحدة مع مسودة سياسة الدفع (البند ٢ من قراراتها المفتوحة) وإجابات المتاجر: لا يذكر هذا النص Apple Pay، لأن الدليل الوحيد على عمله داخل التطبيق هو فحص الجهاز في RELEASE_CHECKLIST.md §7، وهو يتطلب تشغيل الدفع الإلكتروني (الخطوة ٢ من OWNER_ACTIONS.md §47.18)، أي بعد أن يكون هذا النص قد نُشر. (أ) المقترح، كما في مسودة سياسة الدفع: يُنشر النص كما هو، ويُذكر Apple Pay في نسخة لاحقة بعد نجاح الفحص. (ب) ذكره الآن مع قبول أنه غير مُتحقَّق منه عند النشر: تنتهي الجملة السابقة لهذين القوسين بـ «…ببطاقة مدى أو Visa أو Mastercard، أو عبر Apple Pay على iPhone حيث يظهر خياره.»، وتُضاف في آخر الفقرة التالية الجملة «وإذا استخدمت Apple Pay، فتصل بيانات بطاقتك إلى Moyasar عبر Apple Pay وفق شروط Apple.»]
 وعند الدفع الإلكتروني تُدخل بيانات بطاقتك في صفحة الدفع التابعة لـ Moyasar، التي يفتحها لك التطبيق، فتصل إلى Moyasar مباشرة دون أن تمر بنا: فلا يصل إلينا رقم بطاقتك كاملاً ولا رمز الأمان أبداً، ولا نخزّنهما في أي حال. وكأي صفحة ويب، تتلقى صفحة Moyasar أيضاً البيانات التقنية التي يرسلها جهازك، مثل عنوان IP. وقد يطلب منك البنك المُصدر لبطاقتك تأكيد الدفع في صفحته الخاصة (3-D Secure).
 ولا نرسل إلى Moyasar إلا ما يلزم لإتمام الدفع: المبلغ والعملة، ووصفاً ثابتاً ("Spicy Meal order")، ووقت انتهاء صلاحية صفحة الدفع، ولغة استخدامك للتطبيق، وأرقاماً مرجعية تربط الدفعة بطلبك. ولا نرسل إلى Moyasar اسمك ولا رقم جوالك ولا بريدك الإلكتروني ولا عنوان التوصيل.
-ونستخدم الدفع الإلكتروني لإتمام الطلب الذي طلبته، ونحتفظ بسجل للدفعة لتأكيدها ولإجراء أي استرداد وللرد على استفساراتك بشأنها. [OWNER DECISION: (Product gap 1) إذا عُدّل حذف الحساب قبل النشر بحيث تُحفظ سجلات الدفع ضمن السجلات المالية، فاستخدم بدلاً من هذه الجملة: «ونستخدم الدفع الإلكتروني لإتمام الطلب الذي طلبته، ونحتفظ بسجل للدفعة لتأكيدها ولإجراء أي استرداد وللرد على استفساراتك بشأنها وللوفاء بالتزامنا النظامي بحفظ السجلات المالية.»]
+ونستخدم الدفع الإلكتروني لإتمام الطلب الذي طلبته، ونحتفظ بسجل للدفعة لتأكيدها ولإجراء أي استرداد وللرد على استفساراتك بشأنها. [OWNER DECISION: (PRIV-1, gap PG-06) إذا عُدّل حذف الحساب قبل النشر بحيث تُحفظ سجلات الدفع ضمن السجلات المالية، فاستخدم بدلاً من هذه الجملة: «ونستخدم الدفع الإلكتروني لإتمام الطلب الذي طلبته، ونحتفظ بسجل للدفعة لتأكيدها ولإجراء أي استرداد وللرد على استفساراتك بشأنها وللوفاء بالتزامنا النظامي بحفظ السجلات المالية.»]
 ```
 
 **أين تُعالج بياناتك: unchanged, with its pre-publish gate**
@@ -439,7 +439,7 @@ Moyasar — مزوّد الدفع الإلكتروني لدينا، ويتولى
 ```
 أين تُعالج بياناتك
 بعض المزوّدين المذكورين أعلاه يعالجون البيانات خارج المملكة العربية السعودية. وعند حدوث ذلك نعتمد على التزامات حماية البيانات المنصوص عليها في عقدنا مع ذلك المزوّد.
-[OWNER DECISION: شرط قبل النشر، وتبقى الفقرة أعلاه كما هي حرفياً إن تحقق. تأكّد من اتفاقية Moyasar إما أن Moyasar تعالج هذه البيانات داخل المملكة، وإما أن الاتفاقية تتضمن التزامات لحماية البيانات. وإن لم يتحقق أيٌّ منهما، فيعيد المستشار القانوني صياغة هذه الفقرة قبل نشرها.]
+[OWNER DECISION: شرط قبل النشر، وتبقى الفقرة أعلاه كما هي حرفياً إن تحقق. تأكّد من اتفاقية Moyasar (تنص سياسة الخصوصية المنشورة لدى Moyasar على أنها لا تنقل البيانات الشخصية خارج المملكة) إما أن Moyasar تعالج هذه البيانات داخل المملكة، وإما أن الاتفاقية تتضمن التزامات لحماية البيانات. وإن لم يتحقق أيٌّ منهما، فيعيد المستشار القانوني صياغة هذه الفقرة قبل نشرها.]
 ```
 
 **مدة الاحتفاظ: full section**
@@ -448,7 +448,7 @@ Moyasar — مزوّد الدفع الإلكتروني لدينا، ويتولى
 مدة الاحتفاظ
 بيانات الحساب: طوال بقاء حسابك مفتوحاً.
 الطلبات والفواتير والسجلات المالية: للمدة التي يتطلبها النظام الضريبي والمحاسبي، بما في ذلك بعد حذف حسابك، مع إخفاء بياناتك الشخصية من تلك السجلات.
-سجلات الدفع: للدفعات التي تتم في التطبيق، طوال بقاء حسابك مفتوحاً، ولا نحتفظ بها مدةً أطول من الطلب الذي تخصّه، وتُحذف عند حذف حسابك. وأي سجل دفع آخر لا نحتفظ به مدةً أطول من الطلب الذي يخصّه. ولا تتضمن سجلات الدفع رقم بطاقتك كاملاً في أي حال. [OWNER DECISION: (Product gap 1) إذا عُدّل حذف الحساب قبل النشر بحيث تُحفظ سجلات الدفع، فاستبدل الجمل الثلاث السابقة لهذه الأقواس بما يلي: «سجلات الدفع: نحتفظ بها مع الطلب الذي تخصّه طوال مدة الاحتفاظ به. أما سجل الدفع الذي لا يخصّ أي طلب، مثل سجل بطاقة مرفوضة، فنحتفظ به طوال بقاء حسابك مفتوحاً. ولا تتضمن سجلات الدفع رقم بطاقتك كاملاً في أي حال.» وتُراجَع هذه الصيغة على التغيير الذي يُعتمد فعلاً، ولا سيما الدفعة المحصّلة التي لا يخصّها طلب.] [OWNER DECISION: (Product gap 5) وإذا أُغلق بدلاً من ذلك مسار الدفع عن طلب قائم أمام العملاء قبل النشر وبقي حذف الحساب دون تغيير، فيمكن اختصار الجملتين الأوليين إلى: «سجلات الدفع: طوال بقاء حسابك مفتوحاً، ولا نحتفظ بها مدةً أطول من الطلب الذي تخصّه. وتُحذف عند حذف حسابك.»] [OWNER DECISION: سجل Moyasar الخاص. إذا أكدته اتفاقية Moyasar، فأضف في آخر هذا السطر: «وتحتفظ Moyasar بسجلها الخاص لدفعتك للمدة المطلوبة منها بوصفها مزوّد دفع.» وإن لم تؤكده، فأضف على الأقل: «ولا يؤدي حذف حسابك إلى حذف سجل Moyasar الخاص بدفعتك.» وهذه الجملة صحيحة في الكود اليوم، إذ لا شيء فيه يطلب من Moyasar حذف أي دفعة.]
+سجلات الدفع: للدفعات التي تتم في التطبيق، طوال بقاء حسابك مفتوحاً، ولا نحتفظ بها مدةً أطول من الطلب الذي تخصّه، وتُحذف عند حذف حسابك. وأي سجل دفع آخر لا نحتفظ به مدةً أطول من الطلب الذي يخصّه. ولا تتضمن سجلات الدفع رقم بطاقتك كاملاً في أي حال. [OWNER DECISION: (PRIV-1, gap PG-06) إذا عُدّل حذف الحساب قبل النشر بحيث تُحفظ سجلات الدفع، فاستبدل الجمل الثلاث السابقة لهذه الأقواس بما يلي: «سجلات الدفع: نحتفظ بها مع الطلب الذي تخصّه طوال مدة الاحتفاظ به. أما سجل الدفع الذي لا يخصّ أي طلب، مثل سجل بطاقة مرفوضة، فنحتفظ به طوال بقاء حسابك مفتوحاً. ولا تتضمن سجلات الدفع رقم بطاقتك كاملاً في أي حال.» وتُراجَع هذه الصيغة على التغيير الذي يُعتمد فعلاً، ولا سيما الدفعة المحصّلة التي لا يخصّها طلب.] [OWNER DECISION: (PRIV-5, gap PG-27) وإذا أُغلق بدلاً من ذلك مسار الدفع عن طلب قائم أمام العملاء قبل النشر وبقي حذف الحساب دون تغيير، فيمكن اختصار الجملتين الأوليين إلى: «سجلات الدفع: طوال بقاء حسابك مفتوحاً، ولا نحتفظ بها مدةً أطول من الطلب الذي تخصّه. وتُحذف عند حذف حسابك.»] [OWNER DECISION: سجل Moyasar الخاص. إذا أكدته اتفاقية Moyasar، فأضف في آخر هذا السطر: «وتحتفظ Moyasar بسجلها الخاص لدفعتك للمدة المطلوبة منها بوصفها مزوّد دفع.» وإن لم تؤكده، فأضف على الأقل: «ولا يؤدي حذف حسابك إلى حذف سجل Moyasar الخاص بدفعتك.» وهذه الجملة صحيحة في الكود اليوم، إذ لا شيء فيه يطلب من Moyasar حذف أي دفعة.]
 رموز التحقق: مدة قصيرة ثم تُحذف.
 رسائل الدعم: طوال حاجتنا إليها لمعالجة طلبك ولمدة معقولة بعد ذلك.
 ```
@@ -477,10 +477,10 @@ export, and live facts were read from Production with read-only SQL on 2026-11-1
 | 6 | **WHAT WE COLLECT gains a `Payment:` line** listing what our server receives from Moyasar and keeps, what it receives and discards, and that it never collects the full card number. | Kept fields: `sanitizeMoyasarPayment`, `moyasar.ts:742-769`: id, status, amount, currency, fee, refunded, captured, invoice_id, created_at, and from `source` the type (the payment method), company (the card network), **last four** (`lastFourOf`, `:732-736`, which deliberately drops the first six), message (the decline reason), reference number, authorisation code, response code, issuer name and issuer country. Card network and last four also go into columns (`moyasarVerify.ts:332-333`, `:196-198`; `finalize_checkout_session`). Every check writes the sanitized payment into `raw`, a declined one included (`moyasarVerify.ts:306-310`, `:524`). **Received and discarded:** the sanitizer "Drops the BIN, tokens, the payer IP, and everything unlisted" (`moyasar.ts:740`); `source.number` arrives "masked as first-six + last-four" (`:728-730`); its test fixture also carries the cardholder name, and the test asserts it is dropped (`moyasar.test.ts:647-657`, `:668-676`). **Re-check R8:** "Moyasar's reply" became "What Moyasar sends us", because the full payment object also arrives unasked, in the webhook (`payment-webhook/index.ts:131-133`, `evt.data`), and nothing of it but its ids is stored. No Moyasar payment body is logged (every `console.*` call in `_shared/moyasar*.ts` and `payment-*/index.ts` was read), and the webhook stores ids only (`payment-webhook/index.ts:116-118`, `:148-150`, `:176-178`). Live `payment_records` columns, read 2026-11-13, include `card_scheme`, `card_last_four`, `raw`, `failure_message_safe`; there is no name, phone, IP or customer column. "Card type" became "card network", because Moyasar's `issuer_card_type` (debit or credit) is one of the fields we discard. Moyasar's `fee` is stored but not listed: it is Moyasar's charge to us, not data about the customer. |
 | 7 | **WHY WE COLLECT IT gains one purpose:** take, confirm and refund an online payment. | Purpose of activity 15 in `docs/RECORD_OF_PROCESSING.md`: "Take payment for an order, confirm it, and refund it". The refund clause says "make **any** refund" and promises no trigger or timing (see below). |
 | 8 | **WHO WE SHARE IT WITH gains Moyasar**, placed after Lazywait because both are order-path providers. Its role: "takes the payment, confirms it to us and returns refunds to the card or payment method you paid with". | Moyasar is the only recipient of the invoice body (row 3). The v2.3 promise *"we will name the payment provider in this policy before the option appears"* requires it. **Re-check R3:** the earlier "and makes any refund" was true of the code (every refund path is Moyasar's: `payment-refund/index.ts:235-241`, or by hand in its dashboard, `OWNER_ACTIONS.md` §47.20), but it would turn false if the cancellation_refund_policy draft's open D4 allows a card-paid refund to be settled in cash at the branch, a choice the payment_policy draft brackets too. The new clause is the siblings' own phrase ("the card or payment method you paid with") and stays true either way, because it does not say every refund goes that way. |
-| 9 | **The Lazywait line gains a sentence:** "If you pay online, it can also receive the amount paid and Moyasar's reference for the payment." Its v2.3 sentence is unchanged. | After a confirmed payment, `moyasarVerify.ts:481-487` calls `pushLazywaitOnlinePayment`, which POSTs `/pos/orders/update-online-payment` with `Trans_Amount` (the order total), `Approval_No` (the Moyasar payment id) and `Card_Type: 'card'` (`supabase/functions/_shared/paymentSync.ts:41-84`). It is sent only if the POS already holds the order (`:46`). Despite that line's comment, no later step sends it: the only caller is `moyasarVerify.ts:485`, and the API client's own `updateOnlinePayment` (`lazywaitApi.ts:926`) has no caller. Hence "can also receive". The Lazywait order payload itself carries no payment detail (`lazywait-sync` does not pass `is_paid`). `RECORD_OF_PROCESSING.md` activities 3 and 15 do not list this transfer. |
-| 10 | **HOW LONG WE KEEP IT gains "Payment records: for payments made in the app, while your account is open, and never longer than the order they belong to; they are deleted when you delete your account. Any other payment record is kept no longer than the order it belongs to…"**, with two alternative wordings in brackets. | **Re-check R2:** the earlier line promised deletion for every payment record ("They are deleted when you delete your account"). That is not true of a payment made through the order-first path, which keeps its record on the anonymised order (Finding, the two order-first bullets), and that path is open to any signed-in caller of the API once online payment is on, not only to old builds (Product gap 5). The deletion promise now covers payments made in the app, which all go through a checkout session; the order bound covers the rest; the bracket gives the shorter wording if the path is closed first. What the code does today: see "Finding" below. `payment_records.order_id` is `ON DELETE CASCADE` to `orders`, so a record never outlives its order. Apart from that cascade (no function in `public` deletes an order), records are removed only by account deletion: none of the 12 live cron jobs touches `checkout_sessions` or `payment_records`, and the only functions that delete from either are `anonymize_account_data` and a race branch of `begin_checkout_session` that drops a session it inserted moments earlier, before any payment row can reference it (`20260826110000_checkout_zero_total_idempotency.sql:144-176`). That also covers a payment that never completed an order, such as a declined card (fact-check finding 5): its record has a session and no order, and lasts until the account is deleted. The old "we will never store your full card number" is kept in substance, in both WHAT WE COLLECT and this line. |
+| 9 | **The Lazywait line gains a sentence:** "If you pay online, it can also receive the amount paid and Moyasar's reference for the payment." Its v2.3 sentence is unchanged. | After a confirmed payment, `moyasarVerify.ts:481-487` calls `pushLazywaitOnlinePayment`, which POSTs `/pos/orders/update-online-payment` with `Trans_Amount` (the order total), `Approval_No` (the Moyasar payment id) and `Card_Type: 'card'` (`supabase/functions/_shared/paymentSync.ts:41-84`). It is sent only if the POS already holds the order (`:46`). Despite that line's comment, no later step sends it: the only caller is `moyasarVerify.ts:485`, and the API client's own `updateOnlinePayment` (`lazywaitApi.ts:926`) has no caller. Hence "can also receive". The Lazywait order payload itself carries no payment detail (`lazywait-sync` does not pass `is_paid`). `RECORD_OF_PROCESSING.md` activity 15 has listed this transfer since 2026-11-13; activity 3 does not. |
+| 10 | **HOW LONG WE KEEP IT gains "Payment records: for payments made in the app, while your account is open, and never longer than the order they belong to; they are deleted when you delete your account. Any other payment record is kept no longer than the order it belongs to…"**, with two alternative wordings in brackets. | **Re-check R2:** the earlier line promised deletion for every payment record ("They are deleted when you delete your account"). That is not true of a payment made through the order-first path, which keeps its record on the anonymised order (Finding, the two order-first bullets), and that path is open to any signed-in caller of the API once online payment is on, not only to old builds (PRIV-5). The deletion promise now covers payments made in the app, which all go through a checkout session; the order bound covers the rest; the bracket gives the shorter wording if the path is closed first. What the code does today: see "Finding" below. `payment_records.order_id` is `ON DELETE CASCADE` to `orders`, so a record never outlives its order. Apart from that cascade (no function in `public` deletes an order), records are removed only by account deletion: none of the 12 live cron jobs touches `checkout_sessions` or `payment_records`, and the only functions that delete from either are `anonymize_account_data` and a race branch of `begin_checkout_session` that drops a session it inserted moments earlier, before any payment row can reference it (`20260826110000_checkout_zero_total_idempotency.sql:144-176`). That also covers a payment that never completed an order, such as a declined card (fact-check finding 5): its record has a session and no order, and lasts until the account is deleted. The old "we will never store your full card number" is kept in substance, in both WHAT WE COLLECT and this line. |
 | 11 | **The PAYMENT section's last sentence no longer claims a legal obligation.** It now says the record is kept "to confirm it, to make any refund and to answer your questions about it"; the old sentence waits in a bracket. | A record deleted on the customer's request is not kept "to meet our legal obligation to keep financial records" (Finding below). What the record is used for: confirmation reads the attempt row (`moyasarVerify.ts:289-310`), a refund takes its id from the row (`order_refunds.charge_ref` is filled from `provider_ref`, `PAYMENTS.md` §2), and a duplicate payment is refunded by hand from its row (`PAYMENTS.md` §10). **Re-check R9:** the card fields themselves (network, last four) serve neither confirmation nor refund; staff see them on the order in the console (`src/components/admin/view/orders/PaymentDetails.tsx:91`), for support and reconciliation, which is the purpose the store answers draft declares for them. So "to answer your questions about it" was added, here and in the bracket's alternative. |
-| 12 | **WHERE YOUR DATA IS PROCESSED: wording unchanged, behind a pre-publish gate.** | Moyasar's processing location is "Unknown from here" (`RECORD_OF_PROCESSING.md`, "Where the data goes outside the Kingdom"), and nobody has read the Moyasar agreement ("Claims the drafter could not verify", item 1). Adding Moyasar to "the providers listed above" makes the paragraph's second sentence a claim about that agreement, so it must be checked before the session. An earlier version of this draft called the paragraph "true either way"; that was not established. |
+| 12 | **WHERE YOUR DATA IS PROCESSED: wording unchanged, behind a pre-publish gate.** | Moyasar's public privacy policy (last revised 8 December 2025) says it keeps personal data inside the Kingdom, but nobody has read the Moyasar agreement ("Claims the drafter could not verify", item 1). Adding Moyasar to "the providers listed above" makes the paragraph's second sentence a claim about that agreement, so it must be checked before the session. An earlier version of this draft called the paragraph "true either way"; that was not established. |
 | 13 | **Version: 2.4 (minor) or 3.0 (major), an [OWNER DECISION] decided once for the set** (re-check R5). | The payment_policy and terms_conditions drafts mark their version as one decision for the four documents, and the cancellation_refund_policy draft proposes 3.0, so a fixed 2.4 here pre-empted that decision. The case for minor, unchanged: this document's convention: every content correction since the v2.0 rewrite (2026-08-18) has been a minor bump. v2.1 on 2026-09-08; v2.2 and v2.3 on 2026-09-16, and v2.3 itself *added* a processor (Apple for the iPhone reverse-geocode, `GO_LIVE_READINESS.md` A9). §43 also plans a minor bump. This change adds a processor, a data category and a purpose, but keeps the structure and every existing commitment. That is the same kind of change as v2.3's. A 3.0 would also be defensible to mark online payment; that is the owner's call. |
 
 ### Left unchanged on purpose
@@ -489,7 +489,7 @@ export, and live facts were read from Production with read-only SQL on 2026-11-1
   already says *"We process your data to provide the ordering service you asked
   for and to meet our legal obligations"*. The PAYMENT section now rests card
   payment on the first of those grounds only, because the code deletes payment
-  records with the account (Product gap 1). The second ground still covers the
+  records with the account (PRIV-1). The second ground still covers the
   order and invoice records, which are kept. Activity 15's lawful basis in
   `RECORD_OF_PROCESSING.md`, "Contract; legal obligation (financial records)",
   overstates the second for the payment record as the code stands. This is
@@ -505,8 +505,9 @@ export, and live facts were read from Production with read-only SQL on 2026-11-1
   to Moyasar's page never passes through it.
 - **Refund triggers and timings** (automatic only for a paid order that never
   reached the POS after the customer's resends; cancellation and duplicate
-  payments refunded by hand; mada about 1-3 days, credit cards about 7-14) are
-  **not** in the privacy policy. They belong in `cancellation_refund_policy`
+  payments refunded by hand; mada 24 hours to 3 business days, credit cards 7
+  to 14 business days, by Moyasar's FAQ, re-read 2026-11-13) are **not** in the
+  privacy policy. They belong in `cancellation_refund_policy`
   and `payment_policy` (`OWNER_ACTIONS.md` §47.15, §47.20;
   `docs/integrations/Moyasar_API_Reference.md` §3.2). The privacy text says only
   "make any refund", which promises nothing the code does not do.
@@ -517,7 +518,7 @@ export, and live facts were read from Production with read-only SQL on 2026-11-1
 
 Verified in code and live, read-only, on 2026-11-13, and re-verified for this
 revision. It is why the HOW LONG line and the PAYMENT section's last sentence
-say what they say (Product gap 1).
+say what they say (PRIV-1).
 
 - The app pays through a **checkout session** (`docs/PAYMENTS.md` §2). In the
   app, online payment opens a session and cash goes to `order-intake`
@@ -569,15 +570,16 @@ say what they say (Product gap 1).
   order and pay it through `payment-initiate` with its order id. The record of
   that payment, card network, last four, issuer and codes included, outlives the
   account. This is `docs/readiness/20261113-card-payments-gaps.md` PG-27, and it is why the HOW LONG
-  line now limits its deletion promise to payments made in the app (Product
-  gap 5).
+  line now limits its deletion promise to payments made in the app (PRIV-5).
 - **No live Moyasar row is affected yet.** On 2026-11-13 `payment_records` held
   9 rows, all `tap`: 6 failed with a session and no order, 3 initiated with an
   order and no session, 0 with both, and 0 from Moyasar.
 - This is not a privacy breach, since it deletes more and not less. It may be a
-  financial-records problem. It contradicts `docs/RECORD_OF_PROCESSING.md`
-  activity 15 ("Account deletion does not clear it"), and it is wider than live
-  `account_data_deletion` v2.0 says ("Your open checkout sessions"). An earlier
+  financial-records problem. It contradicted `docs/RECORD_OF_PROCESSING.md`
+  activity 15 as read at `04eb351` ("Account deletion does not clear it"); that
+  line was corrected on 2026-11-13 to say that account deletion deletes these
+  records. It is wider than live `account_data_deletion` v2.0 says ("Your open
+  checkout sessions"). An earlier
   version of this draft said the record is kept "to meet our legal obligation to
   keep financial records", which this finding refutes. The text now says what
   the code does, and the old wording waits in a bracket for a code change.
@@ -596,12 +598,12 @@ say what they say (Product gap 1).
   2. the **body's line 1** (effective date);
   3. the **`version` / `effective_date` columns.** Carried in the same session,
      as the plan requires, the two edits share one version and one date.
-- **Timing (re-check R6).** Under the decided plan, `privacy_policy` is
+- **Timing (re-check R6).** Under the proposed plan, `privacy_policy` is
   published once, in the four-document session, in both languages. The way to
   keep to that is to carry §43's line in the same session, as a separate
   `replace()` edit under the same version. `OWNER_ACTIONS.md` §43 still says
-  *"The English can go first"*; that was written on 2026-11-10, before the plan
-  was decided, and the two cannot both hold, so §43's timing needs the owner's
+  *"The English can go first"*; that was written on 2026-11-10, before this plan
+  was proposed, and the two cannot both hold, so §43's timing needs the owner's
   explicit decision (Open owner decisions, item 1). This draft's edits go out
   only inside that session, and neither draft depends on the other's wording.
 
@@ -612,9 +614,10 @@ say what they say (Product gap 1).
 Places where the product does not do what a reasonable customer promise would
 need. The text above is written to be true of the code today; where a product
 change would allow different wording, the alternative is in an
-`[OWNER DECISION: …]` bracket.
+`[OWNER DECISION: …]` bracket. Each is numbered PRIV-n, with its ID in
+`docs/readiness/20261113-card-payments-gaps.md` beside it.
 
-1. **Account deletion deletes every app card payment's record** (fact-check
+1. **PRIV-1 (gap PG-06). Account deletion deletes every app card payment's record** (fact-check
    finding 1; detail in "Finding" above). The order survives, anonymised and
    marked paid; the payment record does not. Consequences:
    - the HOW LONG line and the PAYMENT section's last sentence now say so, and
@@ -627,31 +630,32 @@ change would allow different wording, the alternative is in an
      still has an active order or an unfinished financial matter";
    - live `account_data_deletion` v2.0 says only "Your open checkout sessions"
      are deleted, and "We keep completed order and financial records". That
-     document is outside the decided publishing set; see "Open owner
+     document is outside the proposed publishing set; see "Open owner
      decisions", item 9;
-   - `RECORD_OF_PROCESSING.md` activity 15 says "Account deletion does not clear
-     it", which is wrong.
+   - `RECORD_OF_PROCESSING.md` activity 15 said "Account deletion does not clear
+     it"; it was corrected on 2026-11-13 to say that account deletion deletes
+     these records.
 
    Keeping payment records after deletion needs a code and migration change,
    with its own §5 approval, landed before the session. Then the bracketed
    wording replaces today's, and the deletion page and the record of processing
    are corrected.
-2. **A payment that never became an order has no time limit except account
+2. **PRIV-2 (gap PG-24). A payment that never became an order has no time limit except account
    deletion** (fact-check finding 5). A declined or abandoned attempt keeps the
    sanitized payment in `raw` (card network, last four, issuer, decline
    message), and nothing purges attempts or expired sessions. Live: 6 such
    payment records (2026-07-13 to 07-19) and 5 expired sessions with no order
    (2026-07-13 to 07-15) are still present (re-read 2026-11-13: the same 6 and
-   5, plus the 1 stuck session of gap 4). The text ("while your account is
+   5, plus the 1 stuck session of PRIV-4). The text ("while your account is
    open") is true. A purge job would allow a shorter stated period; the text
    stays true either way, because it is a maximum.
-3. **The in-app copy of your data leaves out payment records** (fact-check
+3. **PRIV-3 (gap PG-26). The in-app copy of your data leaves out payment records** (fact-check
    finding 14). Live `export_my_data` (md5 `0edc9f73…`) reads no
    `payment_records`, `checkout_sessions` or `order_refunds`. YOUR RIGHTS says
    you can "ask us to … give you a copy", which stays true, because a request to
    support can include them. No wording change either way; the in-app copy
    should include payment records.
-4. **A session stuck in `pending_payment` blocks self-service deletion**
+4. **PRIV-4 (gap PG-23). A session stuck in `pending_payment` blocks self-service deletion**
    (fact-check aside). One live session has been in that state since
    2026-07-19, past its expiry, and nothing moves it out. A deletion request by
    that customer would wait and then go to manual review
@@ -667,7 +671,7 @@ change would allow different wording, the alternative is in an
    review. "They are deleted when you delete your account" in HOW LONG stays
    true, because it speaks of when deletion happens, not how soon after the
    request.
-5. **The order-first payment path is still open to direct API calls**
+5. **PRIV-5 (gap PG-27). The order-first payment path is still open to direct API calls**
    (re-check R2; `docs/readiness/20261113-card-payments-gaps.md` PG-27). Live `place_customer_order`
    is granted to `authenticated` (live `place_order` is not) and accepts
    `online` once online payment is on; `order-intake`, the app's cash path,
@@ -694,7 +698,7 @@ change would allow different wording, the alternative is in an
    cancellation_refund_policy draft proposes 3.0). Set the publication date, the
    same for all four, in the `effective_date` column **and** in line 1 of both
    languages (`LEGAL_DOCUMENTS_AUDIT.md` §Method rule 6). Marked in the text.
-   **§43:** the decided plan publishes `privacy_policy` once, in that session,
+   **§43:** the proposed plan publishes `privacy_policy` once, in that session,
    in both languages, so §43's line belongs in the same session as a separate
    `replace()` under the same version. `OWNER_ACTIONS.md` §43 still says its
    English "can go first"; that conflicts with the plan and needs your explicit
@@ -710,7 +714,11 @@ change would allow different wording, the alternative is in an
    the app "are deleted when you delete your account", and without the
    bracket's sentence that could be read as covering Moyasar's copy too.
 3. **Where Moyasar processes data.** Now a pre-publish gate in the text
-   (WHERE YOUR DATA IS PROCESSED). The repository records it as unknown. If the
+   (WHERE YOUR DATA IS PROCESSED). Moyasar's public privacy policy (last
+   revised 8 December 2025) says "Moyasar does not transfer personal data
+   outside the Kingdom of Saudi Arabia". Confirm that the agreement says the
+   same: a public notice is not a contract term, and Moyasar says it may update
+   it "from time to time". If the
    agreement places processing inside the Kingdom, nothing needs adding, though
    the owner may add a sentence. If it places any of it outside, the paragraph
    holds only if the agreement carries data protection commitments, and the
@@ -731,15 +739,15 @@ change would allow different wording, the alternative is in an
    nothing false if Moyasar's page shows Apple Pay before a later version names
    it: Apple Pay only passes card details to Moyasar, from the customer's own
    device, and the card number still never reaches us.
-5. **Payment-record deletion on account deletion** (Product gap 1), **and the
-   order-first path** (Product gap 5). Decide whether a card payment's record
+5. **Payment-record deletion on account deletion** (PRIV-1), **and the
+   order-first path** (PRIV-5). Decide whether a card payment's record
    must survive account deletion as a financial record, and whether to close
    the order-first path to customers. The text states today's behaviour, and
    three brackets carry the wording for the other answers. Any code and
    migration change, with its own approval, must land **before** the session;
-   otherwise publish today's wording. Either way, correct
-   `RECORD_OF_PROCESSING.md` activity 15 ("Account deletion does not clear
-   it").
+   otherwise publish today's wording. `RECORD_OF_PROCESSING.md` activity 15 was
+   corrected on 2026-11-13 to say that account deletion deletes these records;
+   if the code is changed, correct it again to match.
 6. **Refund behaviour** (`OWNER_ACTIONS.md` §47.20) stays open. The privacy text
    is written not to depend on it ("make any refund"). It also does not depend
    on the cancellation_refund_policy draft's D4 (whether a card-paid refund may
@@ -754,15 +762,15 @@ change would allow different wording, the alternative is in an
    وتحتفظ), as the live text treats Google; the payment_policy draft makes it
    masculine («يقدّم خدمة الدفع الإلكتروني Moyasar»، «بعد أن يؤكد Moyasar»).
    One choice for the four documents.
-8. **Publishing: one session, four documents, both languages.**
-   `privacy_policy`, `payment_policy`, `cancellation_refund_policy` and
-   `terms_conditions` are written in one owner-approved session, in both
-   languages, and then the production rebuild runs, so that the no-JavaScript
-   `legal.html` and `/privacy` carry them (`LEGAL_DOCUMENTS_AUDIT.md` §Method
-   rule 7). Both steps come **before** §47.18. `OWNER_ACTIONS.md` §47.15 lists
-   only the first three documents and must add `terms_conditions`: its PAYMENT
-   line, *"Orders are paid in cash at pickup or on delivery. See the Payment
-   Policy."*, contradicts this text from §47.18 on. Its new wording belongs in
+8. **Publishing: one session, four documents, both languages (proposed; the
+   owner decides, gap PG-08).** The proposal: `privacy_policy`, `payment_policy`,
+   `cancellation_refund_policy` and `terms_conditions` are written in one
+   owner-approved session, in both languages, and then the production rebuild
+   runs, so that the no-JavaScript `legal.html` and `/privacy` carry them
+   (`LEGAL_DOCUMENTS_AUDIT.md` §Method rule 7). Both steps come **before**
+   §47.18. `OWNER_ACTIONS.md` §47.15 has listed `terms_conditions` since
+   2026-11-13: its live PAYMENT line, *"Orders are paid in cash at pickup or on
+   delivery. See the Payment Policy."*, contradicts this text from §47.18 on. Its new wording belongs in
    its own draft, not here. Closing `RECORD_OF_PROCESSING.md` finding 6 follows.
 9. **`account_data_deletion` is outside the publishing set, and its wording is
    narrower than the code.** It says "Your open checkout sessions" are deleted,
@@ -783,9 +791,13 @@ change would allow different wording, the alternative is in an
 
 ## Claims the drafter could not verify
 
-1. **Where Moyasar stores and processes data, and for how long.** Neither is in
-   the repository. `RECORD_OF_PROCESSING.md` says "Unknown from here". Both are
-   now gated by brackets.
+1. **Where Moyasar stores and processes data, and for how long.** Moyasar's
+   public privacy policy (last revised 8 December 2025) says "All personal data
+   is stored and processed locally" and that it does not transfer personal data
+   outside the Kingdom. It gives no retention period, only "as long as
+   necessary", extended for "regulatory record-keeping obligations". Neither
+   point has been confirmed from the Moyasar agreement, which has not been read.
+   Both are gated by brackets.
 2. **The exact fields on Moyasar's hosted page** (for example, whether it asks
    for the name on the card or an email address). They are not in the
    repository. The draft says "card details" and does not list them. The
@@ -813,8 +825,10 @@ change would allow different wording, the alternative is in an
    with no custom certificate authority (`moyasarHttp.ts:133`), so a proxy that
    decrypted TLS would fail the certificate check and the request would fail
    rather than be read. The recommended service, QuotaGuard Shield
-   (`docs/integrations/Moyasar_Static_IP_Proxy.md` §2), states that it does not decrypt the tunnel
-   (§6). No service has been chosen yet (§47.10).
+   (`docs/integrations/Moyasar_Static_IP_Proxy.md` §2), states that tunnelled
+   traffic is "not visible to the proxy in ordinary operation" (that document's
+   §2 and §6). The real protection is our end-to-end TLS to Moyasar with
+   certificate checking. No service has been chosen yet (§47.10).
 5. **That mada, Visa, Mastercard and Apple Pay are enabled** is the owner's
    statement (`PAYMENTS.md` line 15), not something the repository can read from
    the Moyasar account. That SADAD and STC Pay are off is unconfirmed (§47.19).
@@ -825,7 +839,7 @@ change would allow different wording, the alternative is in an
    is why the default text does not name Apple Pay (re-check R1).
 7. **The lawful bases** ("complete the order you asked for") are engineering's
    reading, consistent with v2.3's framing. The PAYMENT section no longer claims
-   the legal-obligation ground for payment records (Product gap 1). Counsel has
+   the legal-obligation ground for payment records (PRIV-1). Counsel has
    not reviewed this (`OWNER_ACTIONS.md` §44).
 8. **The Arabic** is engineering-drafted. It reuses the live document's own
    phrasing where it can (مزوّد، نظاماً، في أي حال، Latin provider names), but
@@ -860,9 +874,9 @@ change would allow different wording, the alternative is in an
    use, a payment made from it keeps its record with the order after account
    deletion. Since the re-check, HOW LONG promises deletion only for "payments
    made in the app", and bounds any other record by its order, because the path
-   is also open to any signed-in caller of the API (Product gap 5). A build that
+   is also open to any signed-in caller of the API (PRIV-5). A build that
    still paid order-first would count as "in the app", so the promise holds only
-   if no such build is in use: if one is found, apply Product gap 5's fix before
+   if no such build is in use: if one is found, apply PRIV-5's fix before
    the session (closing the path on the server covers old builds too).
 
 ---
@@ -873,12 +887,12 @@ One line per finding in `docs/readiness/20261113-card-payments-reviews/privacy_p
 in the repository export or with read-only SQL on 2026-11-13 before it was
 applied.
 
-- **1 (blocking) → fixed, with an owner decision.** Re-verified live: both FKs `ON DELETE CASCADE`; `anonymize_account_data` (md5 `c44b5c79…`) deletes every session; `finalize_checkout_session` (md5 `870de938…`) keeps `checkout_session_id`. HOW LONG and the PAYMENT section's last sentence now say what the code does, and brackets carry the "keep" wording (Product gap 1). Because the line now says records "are deleted", the Moyasar-retention bracket no longer offers leaving Moyasar unstated (Open owner decisions, item 2). Exception recorded: order-first records (3 live Tap rows, no card data) are not reached by account deletion. *Amended by re-check R2: that path is open to the API, so the HOW LONG line now limits its deletion promise to payments made in the app.*
-- **2 (blocking, publishing plan) → fixed.** The header states the decided plan: four documents, both languages, one owner-approved session, before §47.18. The old header's two sentences allowing this text to go out ahead of the others, or in English first, are removed. Live `payment_policy` (md5_en `0f883dcd…`) and `cancellation_refund_policy` (md5_en `5a67d9d5…`) re-read and quoted. *Amended by re-check R6: the §43 text that still let this document be published before the session is removed too.*
+- **1 (blocking) → fixed, with an owner decision.** Re-verified live: both FKs `ON DELETE CASCADE`; `anonymize_account_data` (md5 `c44b5c79…`) deletes every session; `finalize_checkout_session` (md5 `870de938…`) keeps `checkout_session_id`. HOW LONG and the PAYMENT section's last sentence now say what the code does, and brackets carry the "keep" wording (PRIV-1). Because the line now says records "are deleted", the Moyasar-retention bracket no longer offers leaving Moyasar unstated (Open owner decisions, item 2). Exception recorded: order-first records (3 live Tap rows, no card data) are not reached by account deletion. *Amended by re-check R2: that path is open to the API, so the HOW LONG line now limits its deletion promise to payments made in the app.*
+- **2 (blocking, publishing plan) → fixed.** The header states the proposed plan: four documents, both languages, one owner-approved session, before §47.18. The old header's two sentences allowing this text to go out ahead of the others, or in English first, are removed. Live `payment_policy` (md5_en `0f883dcd…`) and `cancellation_refund_policy` (md5_en `5a67d9d5…`) re-read and quoted. *Amended by re-check R6: the §43 text that still let this document be published before the session is removed too.*
 - **3 (should-fix) → fixed, with an owner decision.** "Apple Pay on iPhone where the app shows it", plus a bracket tied to the `RELEASE_CHECKLIST.md` §7 device check, matching the `payment_policy` draft. Re-verified: `enableApplePay` at `checkout.tsx:187` (iOS only); builds in the field use the system browser (`PAYMENTS.md` §5). *Superseded by re-check R1: Apple Pay is no longer named by default, and the hedged wording is option (b) of the bracket.*
 - **4 (should-fix) → fixed.** Lazywait line keeps its v2.3 sentence and gains "If you pay online, it can also receive the amount paid and Moyasar's reference for the payment." The review's "receives" became "can also receive", because the push is sent only when the POS already holds the order (`paymentSync.ts:46`), and nothing sends it later.
-- **5 (should-fix) → fixed.** Covered by finding 1's line ("while your account is open"), and the bracket's alternative wording names declined payments. Re-verified live: 6 session-only payment records and 5 expired order-less sessions from July; no purge job among the 12 cron jobs. Listed as Product gap 2.
-- **6 (should-fix) → fixed in the publishing plan.** `terms_conditions` is in the four-document session; live line 17 ("Orders are paid in cash at pickup or on delivery. See the Payment Policy.") re-read. Its new wording belongs to its own draft, so none is written here. `OWNER_ACTIONS.md` §47.15 must add it (Open owner decisions, item 8).
+- **5 (should-fix) → fixed.** Covered by finding 1's line ("while your account is open"), and the bracket's alternative wording names declined payments. Re-verified live: 6 session-only payment records and 5 expired order-less sessions from July; no purge job among the 12 cron jobs. Listed as PRIV-2.
+- **6 (should-fix) → fixed in the publishing plan.** `terms_conditions` is in the four-document session; live line 17 ("Orders are paid in cash at pickup or on delivery. See the Payment Policy.") re-read. Its new wording belongs to its own draft, so none is written here. `OWNER_ACTIONS.md` §47.15 had to add it (Open owner decisions, item 8); it lists it since 2026-11-13.
 - **7 (should-fix) → owner decision.** WHERE YOUR DATA IS PROCESSED keeps its wording and now carries a pre-publish gate in both languages. "Moyasar | Unknown from here" re-read in `RECORD_OF_PROCESSING.md`.
 - **8 (nit) → fixed.** Cash is now "where the app offers it". Re-verified: `cash_payment_enabled` is an admin switch (live true), enforced in `place_order`; `payment.ts:6` says cash is "NEVER assumed".
 - **9 (nit) → fixed.** «ولا نجمع رقم بطاقتك كاملاً أبداً», matching the English, now a full sentence: "We never collect your full card number."
@@ -886,9 +900,9 @@ applied.
 - **11 (nit) → fixed.** "If you use Apple Pay, your card details reach Moyasar through Apple Pay, under Apple's own terms." The review's "your card" became "your card details", to match the sentence before it. The sentence is inside the Apple Pay bracket.
 - **12 (nit) → fixed, partly.** Added: the payment method; the received-and-discarded sentence (first six digits, name on the card, IP address; `moyasar.ts:740`, `moyasar.test.ts:668-676`); "card type" became "card network". Not added, by decision: Moyasar's fee, which is Moyasar's charge to us, not data about the customer.
 - **13 (nit) → fixed; the review's example rejected.** The review's example (WHO «ويتولى» against HOW LONG «وتحتفظ») is not an inconsistency: «ويتولى» agrees with «مزوّد», as the live Lazywait line does with «نظام». The real one was «يمنحها Moyasar» (masculine, Moyasar as subject) against «وتحتفظ Moyasar». It is now «تمنحها», feminine as the live text treats Google. The ميسر decision is now a bracket in the Arabic Moyasar line.
-- **14 (nit, code follow-up) → no wording change, product gap.** Re-verified: live `export_my_data` (md5 `0edc9f73…`) reads no payment table. "Ask us" stays true. Listed as Product gap 3.
+- **14 (nit, code follow-up) → no wording change, product gap.** Re-verified: live `export_my_data` (md5 `0edc9f73…`) reads no payment table. "Ask us" stays true. Listed as PRIV-3.
 - **15 (nit) → fixed.** The proxy claim is narrowed in "Left unchanged on purpose" and "Claims the drafter could not verify", item 4. Re-verified: `moyasarHttp.ts:133` passes no custom certificate authority; `proxy_comparison.md` §2 recommends QuotaGuard Shield, and §6 quotes "neither Static nor Shield decrypts your payload".
-- **Aside (stuck `pending_payment` session) → listed as Product gap 4**, no wording change. Re-verified live: 1 session in `pending_payment` since 2026-07-19.
+- **Aside (stuck `pending_payment` session) → listed as PRIV-4**, no wording change. Re-verified live: 1 session in `pending_payment` since 2026-07-19.
 
 ### Re-check (independent checker, 2026-11-13, evening)
 
@@ -935,8 +949,8 @@ this file.
   forwards whatever method the client sends (`order-intake/index.ts:307-320`),
   and `payment-initiate` serves an order id (`index.ts:395-458`). HOW LONG now
   promises deletion for payments made in the app and bounds any other record
-  by its order; Product gap 5 is new, with a bracket for the shorter wording if
-  the path is closed first. The Product gap 1 bracket's alternative was
+  by its order; PRIV-5 is new, with a bracket for the shorter wording if
+  the path is closed first. The PRIV-1 bracket's alternative was
   reworded ("belongs to no order") so it stays true with the path open.
 - **re-check: R3 (should-fix) "Moyasar … makes any refund" hung on an open
   decision in another document → fixed.** The cancellation_refund_policy
@@ -957,7 +971,7 @@ this file.
 - **re-check: R6 (should-fix) text allowing this document out early →
   fixed.** "§43 can be published before the four-document session" and "v2.4
   if this goes first; v2.5 if §43 goes first" let `privacy_policy` be published
-  outside the decided session, and `OWNER_ACTIONS.md` §43 still says its
+  outside the proposed session, and `OWNER_ACTIONS.md` §43 still says its
   "English can go first". Both are gone from this file; §43's line is to be
   carried in the session, and the conflict with §43 is an owner decision (Open
   owner decisions, item 1; "Overlap with §43").
@@ -986,7 +1000,7 @@ this file.
   distinct unchanged lines" included the 3 per language that are replaced, and
   "Two lines appear twice" was three. Corrected, and the rebuild check added
   ("Current (live) text").
-- **re-check: R13 (nit) Product gap 4 understated → context added, no text
+- **re-check: R13 (nit) PRIV-4 understated → context added, no text
   change.** Live: all 7 accounts that have ordered hold an order neither
   delivered nor cancelled (75 of 82 Received), so every deletion request from
   them waits 30 days for manual review (`docs/readiness/20261113-card-payments-gaps.md` PG-21, PG-23).
@@ -1000,6 +1014,54 @@ this file.
   bracket's minimum sentence (no code path asks Moyasar to delete).
 - **re-check: notes for the sibling drafts (not edited here).** The store
   answers call this "privacy policy 2.4" (lines 32, 730, 744, 758); the number
-  is now the set's decision. Their Play Data safety rows still describe the
+  is now the set's decision (the store answers have since been corrected, their
+  re-check R4). Their Play Data safety rows still describe the
   same fields this draft lists, and their "card or Apple Pay payment attempt"
   stays a true statement of data even with Apple Pay unnamed here.
+
+### Final review, 2026-11-14
+
+One line per review finding on this file. Each was checked against the
+repository at `ebdec3a`, Moyasar's own pages and read-only SQL before it was
+applied. No customer sentence changed: with the `[OWNER DECISION …]` brackets
+removed, every line inside this file's code blocks is identical to the previous
+revision, so the byte-for-byte claims under "Current (live) text" still hold.
+
+- **K6 → applied.** No owner decision on the publishing plan is recorded
+  anywhere. The header now reads "Publishing plan (proposed; the owner
+  decides)", and "decided plan", "decided publishing set" and "decided session"
+  became "proposed" in the header's Scope, "Overlap with §43", PRIV-1, Open
+  owner decisions items 1 and 8, and this Fix log.
+- **C2, K12 → applied.** Open owner decisions, item 8, said §47.15 must add
+  `terms_conditions`; it has listed it since 2026-11-13. Item 5, PRIV-1 and the
+  "Finding" said `RECORD_OF_PROCESSING.md` activity 15 still claims deletion
+  does not clear payment records; it was corrected on 2026-11-13, so they now
+  say so (item 5: correct it again only if the code changes). Row 9 now says
+  activity 15 lists the Lazywait transfer and activity 3 does not. Fix log
+  item 6 notes the §47.15 addition.
+- **X3 → applied, with the verifier's corrected wording.** Moyasar's public
+  privacy policy (read 2026-11-14, "Last Revised: : December 8, 2025") says
+  "Moyasar does not transfer personal data outside the Kingdom of Saudi
+  Arabia. All personal data is stored and processed locally". Open owner
+  decisions item 3, row 12 and Claims item 1 now say so, and add that it gives
+  no retention period beyond "as long as necessary". The WHERE YOUR DATA IS
+  PROCESSED gate stays, because a public notice is not a contract term. Its
+  owner bracket now carries the same note in both languages; the Arabic note,
+  «(تنص سياسة الخصوصية المنشورة لدى Moyasar على أنها لا تنقل البيانات الشخصية
+  خارج المملكة)», sits inside the bracket, which is removed before publishing.
+  `RECORD_OF_PROCESSING.md`'s Moyasar row was updated to match the same day
+  (inside the Kingdom by Moyasar's own statement, not yet confirmed by
+  contract).
+- **K11 → applied.** "Left unchanged on purpose", refund timings: "mada about
+  1-3 days, credit cards about 7-14" became Moyasar's FAQ figures, "mada 24
+  hours to 3 business days, credit cards 7 to 14 business days".
+- **C17 → applied.** Claims item 4 dropped QuotaGuard's qualifier. It now
+  quotes it in full: tunnelled traffic is "not visible to the proxy in ordinary
+  operation". It adds that the real protection is our end-to-end TLS with
+  certificate checking.
+- **C8 → applied.** "Product gap 1" to "5" read like the global PG-01 to PG-05
+  and meant different gaps. They are now PRIV-1 (gap PG-06), PRIV-2 (gap
+  PG-24), PRIV-3 (gap PG-26), PRIV-4 (gap PG-23) and PRIV-5 (gap PG-27),
+  everywhere they appear, the owner brackets included.
+- **Consistency note (no finding ID).** The re-check's note that the store
+  answers call this "privacy policy 2.4" is marked as since corrected there.

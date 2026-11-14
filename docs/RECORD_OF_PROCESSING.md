@@ -78,7 +78,7 @@ protection commitments in our contract with that provider."*
 | Vercel | United States company, global edge network | 12 |
 | Lazywait | **Unknown** — the POS vendor's hosting is not visible from here | 3 |
 | Email provider | **Unknown** — named in the policy only as "our email provider" | 13, 14 |
-| Moyasar | **Unknown from here.** Moyasar is a Saudi company; where it stores and processes data is not visible from the repository. If it stays in the Kingdom, this is not a transfer. The owner's contract with Moyasar settles it, and counsel confirms | 15 |
+| Moyasar | **Inside the Kingdom, by Moyasar's own public statement; not yet confirmed by contract.** Its privacy policy (§8, "Last Revised: December 8, 2025", read 2026-11-14) says "Moyasar does not transfer personal data outside the Kingdom of Saudi Arabia. All personal data is stored and processed locally in compliance with applicable laws and regulations." If that holds, this is not a transfer. The owner's contract with Moyasar settles it, and counsel confirms | 15 |
 
 **What the law asks for each of these, read 2026-11-10.** Hosting with a
 foreign processor is a transfer (PDPL Art 1(9), Art 29). SDAIA has published

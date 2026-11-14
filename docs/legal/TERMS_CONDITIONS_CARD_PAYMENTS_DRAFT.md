@@ -20,7 +20,7 @@
 > Cancellation and Refund Policy, and every clause that touches payment was read
 > against the code and kept (see "Left unchanged on purpose").
 >
-> **Publishing plan (decided).** `privacy_policy`, `payment_policy`,
+> **Publishing plan (proposed; the owner decides).** `privacy_policy`, `payment_policy`,
 > `cancellation_refund_policy` and `terms_conditions` are published **together,
 > in both languages, in one owner-approved session**, before `OWNER_ACTIONS.md`
 > §47.18 (online payment on). This document is never published alone, and never
@@ -345,20 +345,20 @@ Every clause that card payment touches was read against the code.
   (`apps/mobile/src/i18n/strings.ts:374`; «لم يتم إنشاء الطلب», `:718`). Live,
   all 71 orders that reached the POS carry both the reference and the number,
   and every order since 2026-08-28 has reached it (read 2026-11-13). This is why
-  payment_policy PG8 is rejected for this document (Fix log).
+  payment_policy PAY-8 is rejected for this document (Fix log).
 - **ORDERING, "A branch may decline an order … and we will tell you if it
   does", and YOUR ACCOUNT, "We may refuse or cancel an order if the details are
   clearly false."** Neither promises anything about payment, so both stay true
   for an order paid in advance. What happens to the money is the Cancellation
   and Refund Policy's to say, and today it is a refund by hand (Product gaps,
-  PG-T1). "We will tell you" is kept, and was checked rather than assumed: a
+  TC-1). "We will tell you" is kept, and was checked rather than assumed: a
   decline is a staff cancellation in the console, which sends the "Order
   cancelled" push to the customer's devices that have order updates on
   (`src/lib/api.ts:911-923`; `supabase/functions/push-dispatch/index.ts:107-110`,
   `:431-435`), and the Orders tab shows the order as "Cancelled" / «ملغي»
   (`apps/mobile/src/features/orders/OrdersScreen.tsx:23`,
   `apps/mobile/src/features/orders/view/OrderCard.tsx:22`; `strings.ts:351`,
-  `:698`). The order's own receipt does not show it (Product gaps, PG-T4).
+  `:698`). The order's own receipt does not show it (Product gaps, TC-4).
 - **CANCELLING, "See the Cancellation and Refund Policy."** Already the pointer a
   card customer needs; that policy's draft adds a section on refunds of online
   payments. The heading is not renamed.
@@ -406,10 +406,9 @@ Every clause that card payment touches was read against the code.
 
    Not marked in the text, because the text is true today and matches the
    document it points to. If chosen, the post-publish check uses these lines.
-3. **Publishing (decided).** As in the header. Outside this file, and not
-   changed here (read 2026-11-13): `OWNER_ACTIONS.md` §47.15 (lines 4173-4188),
-   `PAYMENTS.md` §7 step 11 (lines 420-426) and `GO_LIVE_READINESS.md` G5
-   (line 179) name only the other documents and need `terms_conditions` added;
+3. **Publishing (proposed; the owner decides, gap PG-08).** As in the header.
+   Outside this file: `OWNER_ACTIONS.md` §47.15, `PAYMENTS.md` §7 step 11 and
+   `GO_LIVE_READINESS.md` G5 have named `terms_conditions` since 2026-11-13;
    `LEGAL_DOCUMENTS_AUDIT.md`'s "Verified accurate" entry for
    `terms_conditions` (lines 119-122, "VAT and cash-payment statements match
    settings") describes v2.0. The write: one row; the two `replace()` edits per
@@ -462,11 +461,13 @@ None of the wording this draft adds depends on something the product does not
 do: the new line says which ways of paying exist and that online payment is
 conditional, and both are true of the code today and after §47.18. Four gaps
 touch the new line or sentences kept beside it. None makes a sentence of this
-document untrue, so none needs a bracket here; each is owned elsewhere.
+document untrue, so none needs a bracket here; each is owned elsewhere. IDs
+are TC-n, with the matching gap in `docs/readiness/20261113-card-payments-gaps.md`
+beside each.
 
-- **PG-T1. A paid order that we cancel, or that a branch declines after
+- **TC-1 (gap PG-13). A paid order that we cancel, or that a branch declines after
   payment, is not refunded automatically** (`docs/readiness/20261113-card-payments-gaps.md` PG-13; the
-  refund draft's P5). Live `admin_set_order_status` lets
+  refund draft's REF-5). Live `admin_set_order_status` lets
   staff cancel from every open status; on cancel it restores redeemed points and
   the coupon slot, and it does not touch `order_refunds` (its "refund" lines are
   about points; read 2026-11-13). The automatic refund enrols only a paid order
@@ -491,7 +492,11 @@ document untrue, so none needs a bracket here; each is owned elsewhere.
   include a cancellation by us under these terms. If every cancelled paid order
   is to be refunded, say "for any reason" in the second sentence; if some are
   not, that is counsel's question and both sentences would have to say so.
-- **PG-T2. Online payment can be offered while it cannot complete**
+  *Answered there since (its re-check R3 and D14): ONLINE PAYMENT REFUNDS line 8
+  now also lists a paid order we cancel under these terms, and says "accept or
+  complete". It does not say "for any reason", which would contradict its
+  UNCOLLECTED PICKUP ORDERS rule and its D10 on a returned delivery order.*
+- **TC-2 (gap PG-18). Online payment can be offered while it cannot complete**
   (`docs/readiness/20261113-card-payments-gaps.md` PG-18). The app offers online payment on the switch
   and the platform alone
   (`payment.ts:50-55`). The console allows the switch on only for an enabled,
@@ -510,7 +515,7 @@ document untrue, so none needs a bracket here; each is owned elsewhere.
   (`OWNER_ACTIONS.md` §47, live-state note). "Where the app offers it" stays
   literally true, but an offered option then fails at the payment step. For the
   code owners; no text change.
-- **PG-T3 (the payment_policy draft's PG1; `docs/readiness/20261113-card-payments-gaps.md` PG-04).**
+- **TC-3 (gap PG-04; the payment_policy draft's PAY-1).**
   After a customer closes Moyasar's page without paying, every new order, cash
   included, takes them back to that payment until the page expires (30 minutes
   live, configurable 5 to 60), and for longer while Moyasar or the proxy cannot
@@ -518,7 +523,7 @@ document untrue, so none needs a bracket here; each is owned elsewhere.
   (`supabase/functions/_shared/moyasarVerify.ts:550-556`). The new line's "can
   be paid in cash" stays true as a description of the ways to pay; the Payment
   Policy states the hold (its PAYING ONLINE, paragraph 4). No text change here.
-- **PG-T4. A cancelled order's receipt still says "Order confirmed"**
+- **TC-4 (part of gap PG-03). A cancelled order's receipt still says "Order confirmed"**
   (`docs/readiness/20261113-card-payments-reviews/cancellation_refund_policy.review.md` S5, re-checked
   2026-11-13). The receipt works out its state from the payment, POS and refund
   fields and never reads `orders.status`
@@ -549,8 +554,9 @@ document untrue, so none needs a bracket here; each is owned elsewhere.
   appears in your Orders tab, and the branch's order number appears in the app
   as soon as the branch issues it." / «وبعد تأكيد دفعتك يظهر الطلب في قسم الطلبات، ويظهر رقم الطلب لدى الفرع في التطبيق فور إصداره من الفرع.»
   Its other uses ("placed only after we have checked directly with Moyasar",
-  "no order is placed") agree with these terms.
-- **Cancellation & Refund Policy draft:** the cancellation note under PG-T1.
+  "no order is placed") agree with these terms. *Done there since (its re-check
+  R3): the sentence now begins "Once your payment is confirmed".*
+- **Cancellation & Refund Policy draft:** the cancellation note under TC-1, answered there by its D14.
 
 ---
 
@@ -590,8 +596,9 @@ was applied.
 
 - **payment_policy.review B1 → fixed.** Re-checked: the live row and its PAYMENT
   line (re-read, decoded and hashed); `OWNER_ACTIONS.md` §47.15 (4173-4188),
-  `PAYMENTS.md` §7 step 11 (420-426) and `GO_LIVE_READINESS.md` G5 (179) do not
-  list this document; no other draft changed it before this one. Its
+  `PAYMENTS.md` §7 step 11 (420-426) and `GO_LIVE_READINESS.md` G5 (179) did not
+  list this document at `04eb351` (all three list it since 2026-11-13); no other
+  draft changed it before this one. Its
   suggested wording was adjusted in three places: "are paid" → "can be paid",
   the payment_policy draft's own words, so the two documents read alike (the
   suggested "are paid … or … online" is not false, only different); "online
@@ -604,14 +611,14 @@ was applied.
   two Arabic sentences added to its suggested "…or online where the app offers
   it". Its other points concern the refund draft alone (whether that draft
   names Moyasar, and a timing claim in its first header, since deleted there).
-  Under the decided plan the four documents are published together, and no
+  Under the proposed plan the four documents are published together, and no
   line of this draft says any document may go before the others or in one
   language first.
 - **privacy_policy.review 2 (never alone, never in English first) → fixed, by
-  applying its rule here.** The header states the decided plan, and nothing in
+  applying its rule here.** The header states the proposed plan, and nothing in
   this draft says it can be published early, alone or in English first.
 - **privacy_policy.review 6 → fixed, without naming Moyasar.** Re-checked: line
-  17 in both languages and §47.15's omission. Moyasar is not named because these
+  17 in both languages and §47.15's omission (since added, 2026-11-13). Moyasar is not named because these
   terms leave payment detail to the Payment Policy, whose draft names it in
   PAYING ONLINE; v2.0's promise to name the provider is made by the Payment and
   Privacy policies, not by these terms; the payment_policy draft's HOW YOU PAY
@@ -619,7 +626,8 @@ was applied.
   fourth document to change if the provider changes. Not a factual
   disagreement: the wording that names it is in Open owner decisions, item 4(a).
 - **store_answers.review B1 → fixed for this document.** Re-checked: no terms
-  draft existed before this one; §47.15 omits the document; the listing
+  draft existed before this one; §47.15 omitted the document (it lists it since
+  2026-11-13); the listing
   mentions the terms (`docs/store/LISTING_COPY.md:124`, `:166`; the review cites
   `:126` and `:165`, a line or two off). Its wording "online in the app through
   Moyasar where that option is shown at checkout" is adjusted as on the lines
@@ -633,8 +641,8 @@ was applied.
   refuses cash when it is off; `payment.ts:53`. "Can be paid in cash" is true
   today and is kept as the payment_policy draft words it; whether the set hedges
   cash is decided once (Open owner decisions, item 2, with the wording).
-- **payment_policy draft PG8, as it applies to this document → rejected;
-  ORDERING kept byte-identical.** PG8 calls "An order is placed when the app
+- **payment_policy draft PAY-8, as it applies to this document → rejected;
+  ORDERING kept byte-identical.** PAY-8 calls "An order is placed when the app
   confirms it and gives you an order number" imprecise because the app shows
   only the branch's number, once issued (`ReceiptScreen.tsx:12-14`). The
   evidence is right; the conclusion is not. The app confirms an order only once
@@ -645,14 +653,14 @@ was applied.
   reached the POS carry both. One theoretical gap remains, the same for cash and
   card and so not a card-payment change: a POS reply with a reference but no
   number would show "Order confirmed" beside "Not issued yet". The inconsistency
-  PG8 sensed is in the payment_policy draft's own "Once it is placed" sentence
+  PAY-8 sensed is in the payment_policy draft's own "Once it is placed" sentence
   (Product gaps, "Outside this document").
 - **cancellation_refund_policy.review S2 (cites this document's decline
   sentence) → no change needed here; the finding is about the refund draft.**
   "A branch may decline an order … and we will
   tell you if it does" promises nothing about payment, so it stays true of a
   prepaid order; the correction S2 asks for belongs to the refund draft's "you
-  pay nothing". The underlying gap is PG-T1.
+  pay nothing". The underlying gap is TC-1.
 - **payment_policy.review N1, for the set → owner decision.** Open owner
   decisions, item 1.
 - **payment_policy.review N3 and N6, applied by alignment → fixed.** Rows 3
@@ -674,8 +682,8 @@ around it.
   the Orders tab shows "Cancelled" (`OrdersScreen.tsx:23`, `OrderCard.tsx:22`).
   The sentence holds. The receipt never reads `orders.status`
   (`orderConfirmation.ts:51-66`, `:158`) and keeps "Order confirmed": added as
-  PG-T4, and the bullet now says how the customer is told.
-- **re-check: R2 (should-fix) → fixed.** PG-T1's note to the refund draft
+  TC-4, and the bullet now says how the customer is told.
+- **re-check: R2 (should-fix) → fixed.** TC-1's note to the refund draft
   quoted one of the two refund-draft sentences that decide which cancellations
   are refunded. Re-read that draft (written 22:17): CANCELLING AN ORDER says
   "our team refunds … once the order is cancelled", in the section about a
@@ -735,7 +743,7 @@ around it.
   lines' lengths (143, 145) and md5s reproduce. The Arabic second sentence and
   «يمكن دفع قيمة الطلبات» occur in the payment_policy draft. Neither new line
   carries an unexpected character, and «نقداً» keeps v2.0's code points. Every
-  path cited in rows 1-7, "Left unchanged on purpose", PG-T1 to PG-T3 and
+  path cited in rows 1-7, "Left unchanged on purpose", TC-1 to TC-3 and
   Claims was re-opened and is accurate. So is the live context: both switches,
   the payment row, the one 0.00 online order with no payment record, 71 of 71
   POS orders with reference and number, and 23 of 23 since 2026-08-28. The
@@ -743,3 +751,33 @@ around it.
   only (live: WhatsApp login on, SMS fallback off, SMS provider a disabled
   sandbox), VAT is 15 and the currency SAR, and the contact email and phone
   match `app_settings`.
+
+### Final review, 2026-11-14
+
+One line per review finding on this file. Each was checked against the
+repository at `ebdec3a` before it was applied. The proposed text did not
+change: every line inside this file's code blocks is byte-identical to the
+previous revision, so the span hashes, the new lines' md5s and the
+whole-document blocks above still hold.
+
+- **K6 → applied.** No owner decision on the publishing plan is recorded
+  anywhere. The header now reads "Publishing plan (proposed; the owner
+  decides)", Open owner decisions item 3 reads "proposed; the owner decides, gap
+  PG-08", and the B2 and privacy_policy.review 2 lines above say "the proposed
+  plan".
+- **K12, C2 → applied.** Open owner decisions, item 3, said §47.15,
+  `PAYMENTS.md` §7 step 11 and G5 still need `terms_conditions`. All three have
+  named it since 2026-11-13, and the item now says so, without the line numbers
+  that had moved. The B1, privacy_policy.review 6 and store_answers.review B1
+  lines above keep what they found at `04eb351` and note the addition.
+- **C8 → applied.** The local IDs PG-T1 to PG-T4 became TC-1 (gap PG-13), TC-2
+  (gap PG-18), TC-3 (gap PG-04) and TC-4 (part of gap PG-03, whose fix includes
+  showing "Cancelled" on the receipt). The sibling drafts' IDs cited here follow
+  their own renames: the payment_policy draft's PG1 and PG8 are PAY-1 and PAY-8,
+  and the refund draft's P5 is REF-5.
+- **Stale notes to the sibling drafts → marked as answered (no finding ID).**
+  TC-1's note to the refund draft (which cancellations are refunded) was
+  answered there the same evening by its re-check R3 and D14, and the "Outside
+  this document" note on the payment_policy draft's "Once it is placed" by that
+  draft's re-check R3. Both notes keep their text and now say where they were
+  answered.
