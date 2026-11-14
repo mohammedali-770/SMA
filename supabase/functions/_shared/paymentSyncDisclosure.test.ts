@@ -22,6 +22,8 @@ import { describe, expect, it } from 'vitest';
  *      the approval number is the Moyasar payment id;
  *   3. the record of processing names, in activity 3 (ordering) and in
  *      activity 15 (online card payment), every customer field the POS gets;
+ *      and both say it is sent each time the payment is confirmed while the
+ *      POS holds the order, which paymentPosTiming.test.ts measures;
  *   4. the privacy draft's proposed Lazywait line, in both languages, still
  *      tells customers the POS can receive the amount and Moyasar's reference.
  */
@@ -100,6 +102,15 @@ describe('the record of processing names it', () => {
     for (const [field, words] of Object.entries(CUSTOMER_FIELDS)) {
       expect(row, `activity ${n} does not name ${field}`).toMatch(words);
     }
+  });
+
+  // WHEN it is sent, as paymentPosTiming.test.ts measures it: on every
+  // confirmation while the POS holds the order, so possibly more than once.
+  // The first version of these rows said "once" and "nothing sends it later".
+  it.each([3, 15])('activity %i says it is sent each time the payment is confirmed', (n) => {
+    const row = ropaRow(n);
+    expect(row).toMatch(/each time (?:it|our server) confirms the payment while the POS holds the order/);
+    expect(row).not.toMatch(/sent once|nothing sends it later/i);
   });
 });
 
