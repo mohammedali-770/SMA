@@ -116,8 +116,9 @@ the checkout-session flow (above); it remains for the orders it was built for.
 Live on 2026-11-14 (read-only), the only unpaid online orders are three
 cancelled ones from 2026-07-12, on one account.
 
-`20261012120000_cancelled_orders_guard` (written 2026-11-14, **not applied**)
-closes it from both ends, with no deploy:
+`20261012120000_cancelled_orders_guard` (written 2026-11-14, **applied 2026-11-14
+17:27:37 UTC**, `MIGRATIONS.md` ledger row 117) closes it from both ends, with no
+deploy:
 
 - **No new order-first orders.** `place_customer_order`, the RPC every signed-in
   customer may call, refuses an online order (gap PG-27). The app sends `cash`
@@ -408,9 +409,9 @@ not the worker.
   The 2026-11-12 review reproduced this on a local chain. It predates this
   change. The owner's answer "Automatic via Moyasar" therefore is not yet fully
   implemented; covering it needs an owner decision and its own change.
-- **Any cancelled paid order, once `20261012120000` is applied.** Until then, a
-  cancelled order that the branch never received could still be enrolled by the
-  rule above, after three failed resends, on top of the hand refund staff had
+- **Any cancelled paid order, since `20261012120000` was applied (2026-11-14).**
+  Before that, a cancelled order that the branch never received could be enrolled
+  by the rule above, after three failed resends, on top of the hand refund staff had
   already made (gap PG-03). The trigger now skips a cancelled order. A refund
   enrolled *before* the order was cancelled still runs, so look at the order's
   refund status before refunding it by hand.
@@ -978,8 +979,8 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 - **If Moyasar serves the hosted page from another domain**, online payment
   fails closed until the URL rule is updated (§2).
 
-Added 2026-11-14 with `20261012120000_cancelled_orders_guard` (gap PG-03; not
-applied):
+Added 2026-11-14 with `20261012120000_cancelled_orders_guard` (gap PG-03;
+applied 2026-11-14):
 
 - **A refund enrolled before an order is cancelled still runs.** Refunding that
   order by hand as well would refund it twice. Check the order's refund status

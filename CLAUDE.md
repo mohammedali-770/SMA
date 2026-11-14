@@ -301,9 +301,13 @@ and read back byte-identical, `20261004120000_drop_tap_payment_rpcs` (17:45:00,
 (rows 8-9), 0 unapplied. Money-path pair unchanged. **This changes no customer
 behaviour yet:** the payment row is disabled and online payment is off.
 
-**AMENDED 2026-11-14 — `20261012120000_cancelled_orders_guard` is written,
-validated and awaiting approval, so on merge it is outstanding** (with any other
-file merged unapplied since the read above). Six function bodies: a cancelled
+**APPLIED 2026-11-14 — `20261012120000_cancelled_orders_guard`** (17:27:37 UTC,
+live `20261114172737`, ledger row 117, on the owner's approval naming it by
+version). History **161 → 162**. Reconciled by name against the default branch
+at `de7edbe`: 158 files = 154 applied + 2 superseded (rows 8-9) + **2
+unapplied**, `20261013120000` and `20261014120000`, each awaiting its own
+approval. **Name the target by version.** The note it supersedes: it was written,
+validated and awaiting approval. Six function bodies: a cancelled
 order is never resent, claimed for the POS, enrolled for an automatic refund or
 invoiced, and `place_customer_order` places no online order (gaps PG-03 and
 PG-27). No signature, table or row; no deploy; money path self-asserted

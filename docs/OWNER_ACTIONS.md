@@ -4458,6 +4458,11 @@ call: it pays only through checkout sessions. Close it before step 1 (a code fix
 or a live write to those orders, each its own approval), or accept it. Gap PG-27
 is the same older path.
 
+**CLOSED 2026-11-14 — the code fix is APPLIED: `20261012120000_cancelled_orders_guard`**
+(17:27:37 UTC, live `20261114172737`, `MIGRATIONS.md` ledger row 117).
+`begin_payment_attempt` now refuses a cancelled order, so this warning no longer
+blocks step 1. The paragraph below is kept as it was written before the apply.
+
 **The code fix is now written: `20261012120000_cancelled_orders_guard`** (branch
 `fix/cancelled-orders-guard-20261114`, 2026-11-14, **not applied**).
 Once applied, `begin_payment_attempt` refuses a cancelled order, so
@@ -5076,6 +5081,10 @@ already answers the new refusal with a 400 and opens no invoice.
    cancelled order as "Order cancelled" with no Resend. That reads only the
    order's status, so it is right whether or not step 2 has happened. The
    phone apps get it only in the §47.17 build.
+**Steps 1-3 DONE 2026-11-14.** Merged as `094a38b` (#471); applied 17:27:37 UTC,
+live `20261114172737`, ledger row 117; step 3's checks all held (detail in
+`MIGRATIONS.md` §64). What remains is the §47.17 build for the phones' half.
+
 2. **Apply `20261012120000_cancelled_orders_guard` by name.** Recommended
    before §47.13 step 1, which is what closes that section's warning; the
    warning's other choices are still yours (§47.13). Re-hash the merged copy first (`docs/MIGRATIONS.md` §64 has the
