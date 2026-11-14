@@ -61,7 +61,10 @@
 --   D. PG-25: the payment card's stale-attempt count reads only attempts a
 --      payment SETTLED on (provider_ref is set). See the comment at the
 --      predicate for the evidence and why the other option, ignoring attempts
---      past their invoice expiry, was not taken.
+--      past their invoice expiry, was not taken. The old count is kept as a
+--      details field, open_unverified_24h, that does not move the state: it
+--      is the only number that still sees a payment Moyasar captured whose
+--      webhook never arrived and whose customer never returned.
 --
 -- WHAT THIS DOES NOT DO: refund anything, change when a refund is owed, retry
 -- or cap a refund, decide who receives alerts, or change place_order or
@@ -155,8 +158,8 @@ begin
    where p.oid = to_regprocedure('public.operations_health_snapshot_internal()');
   if v_hash is distinct from '1e300b3d61759729e523d7c74224ce78'
      and v_hash is distinct from '2545639fcf3421dbaf35ae023d6ed68d'
-     and v_hash is distinct from 'ccf08e21718864e8462e65852dea670a'
-     and v_hash is distinct from 'c13838a669d5edcdb3ffa6f3d24455c1' then
+     and v_hash is distinct from '2ad226c3754ba03ff9f6f4986a99db65'
+     and v_hash is distinct from '3847b5f3e18713bb0b322cacf9ce46ab' then
     raise exception 'operations_health_snapshot_internal is not the 20261003120000 body (md5 %): re-derive this file',
       coalesce(v_hash, 'NULL');
   end if;
@@ -935,7 +938,7 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Re-emitted whole because `create or replace` takes no smaller unit.
 -- DERIVED, NOT RETYPED: 20261003120000_moyasar_only_payments.sql, the latest
--- definition, with two anchored substitutions, each asserted to match once:
+-- definition, with five anchored substitutions, each asserted to match once:
 --
 --   (a) PG-25. The stale-attempt count keeps its window (created in the last
 --       24 hours, open for more than 30 minutes) and now also requires
@@ -956,6 +959,20 @@ end $$;
 --           (settable 5-60), so an attempt open past 30 minutes is almost
 --           always past its expiry already, and the money-taken case above is
 --           past expiry too. It would have hidden the one case that matters.
+--       WHAT IT GIVES UP, stated rather than buried. A payment Moyasar
+--       captured whose webhook never arrived AND whose customer never came
+--       back to the app is never verified, so nothing stamps provider_ref and
+--       it looks exactly like an abandoned checkout. Before this file it was
+--       counted, inside the noise of every abandoned checkout; after it, the
+--       stale count no longer sees it, and no watchdog rule does either (R2-R6
+--       read paid rows, R17 needs a verify to have run). So the old predicate
+--       is KEPT as a details field, open_unverified_24h (one new declaration,
+--       one new count, one new details key). It does not move the state,
+--       because nearly every row it counts is an abandoned checkout, but it
+--       keeps the number readable on the payment card. Finding the real
+--       captures among them needs a reconciliation sweep that asks Moyasar
+--       about each open invoice; that is a separate change with a deploy, and
+--       it is listed as open in docs/PAYMENTS.md section 12.
 --   (b) The payment card's incident count names its rule codes, so the four
 --       new rules are added to it. A monitor that enumerates its subjects by
 --       name goes quiet when one is added (CLAUDE.md section 8).
@@ -1009,6 +1026,7 @@ declare
   v_payment_counts_24h jsonb := '{}'::jsonb;
   v_payment_stale_initiated integer := 0;
   v_payment_oldest_stale timestamptz;
+  v_payment_open_unverified integer := 0;
   v_payment_oldest_initiated timestamptz;
   v_payment_latest_paid timestamptz;
   v_payment_integrity_critical integer := 0;
@@ -1414,6 +1432,20 @@ begin
       -- before the order is confirmed; a confirmation moves the row on.
       -- An abandoned checkout never gets one, so it no longer counts.
       and provider_ref is not null
+      and created_at >= now() - interval '24 hours'
+      and coalesce(initiated_at, created_at) < now() - interval '30 minutes';
+
+    -- 20261013120000 (gap PG-25): what the count above no longer covers,
+    -- kept readable. The same window, on attempts NO payment was verified
+    -- on. Nearly all are abandoned checkouts, so it does not move the
+    -- state. But a payment Moyasar captured whose webhook never arrived,
+    -- and whose customer never came back, looks exactly like this too:
+    -- nothing verified it, so nothing stamped it. Nothing else counts it.
+    select count(*)::integer
+      into v_payment_open_unverified
+    from public.payment_records
+    where status = 'initiated'
+      and provider_ref is null
       and created_at >= now() - interval '24 hours'
       and coalesce(initiated_at, created_at) < now() - interval '30 minutes';
 
@@ -1855,6 +1887,7 @@ begin
         'counts_24h',v_payment_counts_24h,
         'stale_initiated_24h',v_payment_stale_initiated,
         'oldest_stale_initiated_at',v_payment_oldest_stale,
+        'open_unverified_24h',v_payment_open_unverified,
         'oldest_initiated_at',v_payment_oldest_initiated,
         'latest_paid_at',v_payment_latest_paid,
         'integrity_critical_count',v_payment_integrity_critical,
@@ -2102,7 +2135,7 @@ grant execute on function public.operations_health_snapshot_internal()
   to service_role;
 
 comment on function public.operations_health_snapshot_internal() is
-  'Read-only Operations Health snapshot. Since 20260807 it carries an order_flow card in the critical set; since 20260820 the cron allowlist also observes branch-availability-sweep, and a NON-critical branch_availability card reports whether timed closures actually reopen — the sweeper swallows its own errors, so pg_cron cannot see a sweep that runs and fails. Since 20260925 that card also observes branch_variant_availability, so a stuck PRICE TIER counts toward closed_sizes and toward the overdue-restore backlog. Since 20261003 the payment card''s configured flag mirrors resolveMoyasarConfig: provider moyasar, a secret key with the selected mode''s prefix, and a webhook token. Since 20261013 its stale-attempt count reads only attempts a payment settled on (provider_ref set), so an abandoned checkout no longer reads degraded, and its payment incident count includes the refund and payment rules REFUND_FAILED, DUPLICATE_PAYMENT_RECORDED, PAYMENT_VERIFICATION_MISMATCH and PAYMENT_CONFIRMATION_FAILED. Counts only: no branch identity, PII, secrets, raw provider payloads, tokens, cron commands or external provider probe results.';
+  'Read-only Operations Health snapshot. Since 20260807 it carries an order_flow card in the critical set; since 20260820 the cron allowlist also observes branch-availability-sweep, and a NON-critical branch_availability card reports whether timed closures actually reopen — the sweeper swallows its own errors, so pg_cron cannot see a sweep that runs and fails. Since 20260925 that card also observes branch_variant_availability, so a stuck PRICE TIER counts toward closed_sizes and toward the overdue-restore backlog. Since 20261003 the payment card''s configured flag mirrors resolveMoyasarConfig: provider moyasar, a secret key with the selected mode''s prefix, and a webhook token. Since 20261013 its stale-attempt count reads only attempts a payment settled on (provider_ref set), so an abandoned checkout no longer reads degraded; open_unverified_24h keeps the attempts it no longer counts readable without moving the state (it is also the only place a captured payment whose webhook never arrived, and whose customer never returned, still shows), and its payment incident count includes the refund and payment rules REFUND_FAILED, DUPLICATE_PAYMENT_RECORDED, PAYMENT_VERIFICATION_MISMATCH and PAYMENT_CONFIRMATION_FAILED. Counts only: no branch identity, PII, secrets, raw provider payloads, tokens, cron commands or external provider probe results.';
 
 -- ---------------------------------------------------------------------------
 -- 5. list_payments_needing_attention: the console card's feed
@@ -2371,6 +2404,12 @@ begin
   if v_src !~ 'where status = ''initiated''\s+and provider_ref is not null\s+and created_at >= now\(\) - interval ''24 hours''\s+and coalesce\(initiated_at, created_at\) < now\(\) - interval ''30 minutes'';' then
     raise exception 'VERIFY: the stale-attempt count does not require a settled payment (PG-25)';
   end if;
+  if v_src !~ 'into v_payment_open_unverified\s+from public.payment_records\s+where status = ''initiated''\s+and provider_ref is null\s+and created_at >= now\(\) - interval ''24 hours''\s+and coalesce\(initiated_at, created_at\) < now\(\) - interval ''30 minutes'';' then
+    raise exception 'VERIFY: the unverified open-attempt count is not the old window on unstamped attempts (PG-25)';
+  end if;
+  if v_src ~ 'v_payment_open_unverified\s*>' then
+    raise exception 'VERIFY: the unverified open-attempt count drives a state or condition; it must only be reported (PG-25)';
+  end if;
   if v_src !~ '''MULTIPLE_SUCCESSFUL_CAPTURES'',\s+''REFUND_FAILED'',\s+''DUPLICATE_PAYMENT_RECORDED'',\s+''PAYMENT_VERIFICATION_MISMATCH'',\s+''PAYMENT_CONFIRMATION_FAILED''\s+\);' then
     raise exception 'VERIFY: the payment card does not count the four new rules';
   end if;
@@ -2476,7 +2515,8 @@ $verify$;
 --     'order_integrity:incidents' condition, and the payment card counts
 --     exactly the open critical incidents of its nine rule codes;
 --   * PG-25: the stale count equals the settled-attempt predicate, and the
---     probe's abandoned attempt, which the old predicate counted, is outside it;
+--     probe's abandoned attempt, which the old predicate counted, is outside it
+--     and is reported in open_unverified_24h instead;
 --   * the console feed: every list returns the right rows with exactly its
 --     columns.
 -- Real rows are never asserted on: real pending refunds are passed as
@@ -2685,6 +2725,12 @@ begin
     end if;
     if v_m <= v_n or v_n < 1 then
       raise exception 'VERIFY PG-25: the probe could not tell an abandoned attempt (% open) from a settled one (%)', v_m, v_n;
+    end if;
+    -- What the stale count gives up stays readable: every open attempt is in
+    -- exactly one of the two counts.
+    if (v_card -> 'details' ->> 'open_unverified_24h')::integer is distinct from v_m - v_n then
+      raise exception 'VERIFY PG-25: the payment card reports % unverified open attempts, expected %',
+        coalesce(v_card -> 'details' ->> 'open_unverified_24h', 'NULL'), v_m - v_n;
     end if;
 
     -- ---- The console feed ------------------------------------------------------

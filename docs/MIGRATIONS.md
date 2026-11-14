@@ -8643,7 +8643,7 @@ awaiting owner approval.** No ledger row: nothing is applied. It covers gaps
 PG-01 (the visibility and fairness parts), PG-02 (the alert and list parts) and
 PG-25 in [the card-payment gaps](readiness/20261113-card-payments-gaps.md).
 
-sha256 `2a059fda264686d03900bd9154d31b6cc7782daf3bde1c11653732bbd1bb2c6f`, 2 786 lines / 146 239 bytes. **Re-hash the MERGED copy before
+sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **Re-hash the MERGED copy before
 applying**, per §15.
 
 **What it changes.**
@@ -8661,8 +8661,15 @@ applying**, per §15.
   byte-identical.
 - `operations_health_snapshot_internal`: the payment card counts a stale
   attempt only when a payment settled on it (`provider_ref` set), which is
-  PG-25, and counts the four new rules among its payment incidents. The other
-  nine cards are byte-identical.
+  PG-25, and counts the four new rules among its payment incidents. It also
+  reports the old count's remainder, `open_unverified_24h` (the same window,
+  on attempts with no `provider_ref`), **without** letting it move the state.
+  That keeps one real case readable that the new filter would otherwise hide:
+  a payment Moyasar captured whose webhook never arrived and whose customer
+  never came back, which nothing verified and so nothing stamped. Added
+  2026-11-14 after review; `PAYMENTS.md` §12 lists the sweep that would tell
+  such a payment from an abandoned checkout as open. The other nine cards are
+  byte-identical.
 - New: `list_payments_needing_attention(p_limit)`, the console card's feed. It
   checks `is_admin()` (role and AAL2) before it reads anything. `authenticated`
   may call it and `anon` may not. It wraps
@@ -8689,7 +8696,9 @@ back-off or "stuck after" age is added; those are the owner's numbers (PG-01).
    new queue order at once, but not the once-per-run rule.
 
 The console card ships with the merge (CLAUDE.md §13). Until step 1 its RPC does
-not exist (PGRST202), and the card hides itself. The Operations Health line for
+not exist (PGRST202), and the card hides itself and stops asking until Live
+Orders is opened again (it is rendered for the admin role only, so other staff
+never send the request). The Operations Health line for
 a stale payment also changes on merge, to "A payment went through at Moyasar,
 but its order was not confirmed within 30 minutes." Until step 1 it describes
 the old count, which still includes abandoned checkouts, so apply soon after
@@ -8720,15 +8729,19 @@ can produce such an attempt.
 | --- | --- | --- | --- |
 | `claim_order_refund(text, uuid[])` | `999471eed604d690da4e61675b89a02e` | 2 151 | `eae9b2f4af51614481a4fee743750f55` |
 | `order_integrity_watchdog()` | `fb4fc4e2bdcee6ec46ced01029269cb0` | 34 998 | `7361cfde246c3d63119bed84e52f64a1` |
-| `operations_health_snapshot_internal()`, as written | `ccf08e21718864e8462e65852dea670a` | 49 890 | `872f22bc887450c9588d377ccaa35364` |
-| `operations_health_snapshot_internal()`, as the transport stores it | `c13838a669d5edcdb3ffa6f3d24455c1` | 49 790 | not measured |
+| `operations_health_snapshot_internal()`, as written | `2ad226c3754ba03ff9f6f4986a99db65` | 50 721 | `205f312bfb83759e90c1fb752ee19403` |
+| `operations_health_snapshot_internal()`, as the transport stores it | `3847b5f3e18713bb0b322cacf9ce46ab` | 50 621 | not measured |
 | `list_payments_needing_attention(integer)` | `9f4ceb05a05dba19169454d7c5dfff91` | 222 | `4f2944226c9680e331bec2123e1de297` |
 | `payments_needing_attention_internal(integer)` | `6dd733ccc74ef5f7f8888aa817fe7a95` | 4 744 | `f11f50a6402c6786f72e7a4624df9a20` |
 
 The snapshot carries 25 `\u` escapes. Expect the 20 at or above U+0020 to
 arrive decoded and the five control characters (U+0009 to U+000D) as written,
 as on row 115. The decoded hash above was reproduced from the stored body with
-exactly that decoding. The other four bodies carry no escape.
+exactly that decoding. The same decoding, run on the base chain's stored body,
+gives the live value `2545639f…` above, which is what makes it trustworthy.
+The snapshot's hashes changed on 2026-11-14 when `open_unverified_24h` was
+added; the earlier pair, `ccf08e21…` / `c13838a6…`, is retired and the file no
+longer accepts it. The other four bodies carry no escape.
 
 ### What the file checks
 
@@ -8753,7 +8766,9 @@ exactly that decoding. The other four bodies carry no escape.
     rule codes, and `operations_alerts_derive` raises the critical
     `order_integrity:incidents` condition;
   - PG-25: of two attempts open for 40 minutes, both past their invoice expiry,
-    only the settled one is counted;
+    only the settled one is counted, and the other is reported in
+    `open_unverified_24h`; the source never compares that count, so it cannot
+    move a state;
   - the feed returns the right rows, with exactly its columns.
 
 What survives the abort: the `order_change_events` and `order_integrity_runs`
@@ -8780,22 +8795,26 @@ waits for it, so a scan already running is waited for, not overlapped.
     counted by the payment card, and end when settled (before: no incident);
   - case 6: the real evaluator opens the critical `order_integrity:incidents`
     and `payment:health` alerts;
-  - case 7: an abandoned checkout no longer reads degraded; a settled payment
-    whose confirmation stalled still does (before: degraded, 1);
+  - case 7: an abandoned checkout no longer reads degraded but is reported in
+    `open_unverified_24h`, inside the same window; a settled payment whose
+    confirmation stalled still reads degraded (before: degraded, 1);
   - case 8: only an admin at AAL2 reads the feed; its limit clamps items and
     never totals;
   - case 9: grants and the money-path pair.
 - **Two existing suites changed on purpose:** `order_integrity_watchdog_test.sql`
   (17 rules evaluated, was 13) and `order_confirmation_state_machine_test.sql`
   (the claim's new signature).
-- **Mutation testing:** 10 SQL mutants, all killed, each twice: refused at apply
+- **Mutation testing:** 13 SQL mutants, all killed, each twice: refused at apply
   by the file's own verification, and failed by the paired suite with the
   verification stripped. They are: the old created_at order, the exclusion
   ignored, a NULL kept in the list, R14 reporting a refund a newer one
   replaced, the feed without its gate, R15 at warning, R17 reporting a payment
   a later verify confirmed, the payment card not counting R15, the PG-25 filter
-  removed, and the other PG-25 option (ignore attempts past their invoice
-  expiry). The unmutated file passes both.
+  removed, the other PG-25 option (ignore attempts past their invoice
+  expiry), and three on `open_unverified_24h` (counting stamped attempts
+  instead, moving the state to degraded, and dropping it from the card). The
+  unmutated file passes both. Re-run in full on 2026-11-14 after the review
+  changes, against the new hashes.
 
 ### Applying it (owner, §5, named by version)
 
@@ -8823,5 +8842,9 @@ waits for it, so a scan already running is waited for, not overlapped.
    payment".
 5. Then, as its own §5 approval, deploy `payment-refund`. Its cron job was
    inactive when read on 2026-11-14, so the deploy alone sends nothing.
+   **Between steps 2 and 5 the old job still claims one stuck refund 5 times a
+   run**, measured on the local chain by calling the claim with the token
+   alone after the apply. The apply alone stops a stuck refund starving the
+   others; the once-per-run limit and the call saving arrive with this deploy.
 
 Rollback is the notes at the foot of the file.

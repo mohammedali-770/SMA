@@ -21,7 +21,9 @@
 --                    'order_integrity:incidents' alert and turn the payment card
 --                    'failing', through the real evaluator.
 --   PG-25            an abandoned checkout no longer reads "payment degraded"; a
---                    settled payment whose confirmation stalled still does.
+--                    settled payment whose confirmation stalled still does; and
+--                    the unverified open attempts the stale count no longer
+--                    covers are still reported, in open_unverified_24h.
 --   the feed         admin at AAL2 only; exactly its columns; no raw payload,
 --                    no customer field; limits and totals.
 --
@@ -576,6 +578,14 @@ begin
               where x ->> 'code' = 'STALE_PAYMENT_INITIATIONS') then
     raise exception 'CASE 7 FAILED: an abandoned checkout raised STALE_PAYMENT_INITIATIONS';
   end if;
+  -- What the stale count gives up stays readable. An unverified open attempt
+  -- is usually an abandoned checkout, but a payment Moyasar captured whose
+  -- webhook never arrived and whose customer never came back looks the same,
+  -- so it is reported, without moving the state.
+  if (v_card -> 'details' ->> 'open_unverified_24h') is distinct from '1' then
+    raise exception 'CASE 7 FAILED: the unverified open attempt is not reported: open_unverified_24h %',
+      coalesce(v_card -> 'details' ->> 'open_unverified_24h', 'NULL');
+  end if;
 
   -- Moyasar took the money on another attempt and the confirmation never
   -- finished (the payment id was stamped, the attempt is still open). Its
@@ -591,13 +601,30 @@ begin
     raise exception 'CASE 7 FAILED: a settled payment whose confirmation stalled reads %, stale %, expected degraded and 1',
       v_card ->> 'state', v_card -> 'details' ->> 'stale_initiated_24h';
   end if;
+  -- The settled attempt is in the stale count only, never in both.
+  if (v_card -> 'details' ->> 'open_unverified_24h') is distinct from '1' then
+    raise exception 'CASE 7 FAILED: the settled attempt was also counted as unverified: %',
+      v_card -> 'details' ->> 'open_unverified_24h';
+  end if;
   -- Within the 30 minutes it is still in flight, and not counted.
   update public.payment_records set created_at = now() - interval '10 minutes', initiated_at = now() - interval '10 minutes'
    where provider_ref = 'pay_prv_7b';
   if (pg_temp.prv_payment_card() -> 'details' ->> 'stale_initiated_24h')::integer <> 0 then
     raise exception 'CASE 7 FAILED: an attempt inside its 30 minutes was counted';
   end if;
-  raise notice 'CASE 7 ok: an abandoned checkout is not degraded; a stalled settled payment still is';
+  -- The same window applies to the unverified count: older than 24 hours, or
+  -- younger than 30 minutes, it is not reported.
+  update public.payment_records set created_at = now() - interval '25 hours', initiated_at = now() - interval '25 hours'
+   where provider_checkout_ref = 'inv_prv_7a';
+  if (pg_temp.prv_payment_card() -> 'details' ->> 'open_unverified_24h') is distinct from '0' then
+    raise exception 'CASE 7 FAILED: an unverified attempt outside the 24-hour window was reported';
+  end if;
+  update public.payment_records set created_at = now() - interval '10 minutes', initiated_at = now() - interval '10 minutes'
+   where provider_checkout_ref = 'inv_prv_7a';
+  if (pg_temp.prv_payment_card() -> 'details' ->> 'open_unverified_24h') is distinct from '0' then
+    raise exception 'CASE 7 FAILED: an unverified attempt inside its 30 minutes was reported';
+  end if;
+  raise notice 'CASE 7 ok: an abandoned checkout is not degraded but stays readable; a stalled settled payment is degraded';
 end $$;
 
 -- ---- 8. The feed: who may read it, its limits, its columns --------------------------

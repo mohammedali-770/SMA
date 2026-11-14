@@ -2950,6 +2950,13 @@ taken rather than an abandoned checkout (PG-25): «تمت دفعة لدى Moyasa
 طلبها لم يُؤكَّد خلال 30 دقيقة.» — English: *"A payment went through at
 Moyasar, but its order was not confirmed within 30 minutes."*
 
+And one Operations Health figure on the payment card, in
+`src/components/admin/view/health/HealthSystemCard.tsx`, which counts open
+checkouts that no payment was verified on (PG-25, added 2026-11-14):
+«عمليات مفتوحة دون تحقق 24س» — English: *"Open unverified 24h"*. It sits beside
+the existing «عمليات عالقة 24س» (*"Stale 24h"*), and the two must read as
+different things.
+
 Words to check first: «الوسيط (البروكسي)» for the outbound proxy, «قائمة عناوين
 IP المسموح بها» for Moyasar's Allowed IPs, and «يُعلَّم مدفوعاً» for "marked
 paid".
@@ -4962,7 +4969,15 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
 - **One stuck refund no longer takes every refund claim.** A refund the job
   could not finish goes to the back of the queue, and the job tries each refund
   at most once per run. Before, one stuck refund was claimed 5 times a run, up
-  to 1,440 times a day, and every newer refund waited behind it.
+  to 1,440 times a day, and every newer refund waited behind it. **The two
+  halves arrive at different steps.** The apply alone (step 2) puts a released
+  refund behind the others, so a newer refund is no longer starved. The
+  once-per-run limit, and with it the cut from about 1,440 to about 288 Moyasar
+  calls a day, comes only with the `payment-refund` deploy (step 4): the job
+  deployed today does not pass the list of refunds it has already tried, so
+  until step 4 it still claims one stuck refund 5 times a run. Measured on the
+  local chain on 2026-11-14 by calling the claim the old job's way after the
+  apply.
 - **Refund and payment problems reach staff.** A refund that gave up, a
   customer charged twice, a payment that matched nothing, and a payment whose
   order was not confirmed each raise a critical incident. The incident reaches
@@ -4972,6 +4987,16 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
   attention", with what to do: refund by hand in Moyasar's dashboard
   ([`PAYMENTS.md`](PAYMENTS.md) §10). The card has no refund button.
 - **Abandoned card checkouts no longer read as "payment degraded"** (PG-25).
+  **One thing is given up, and it is stated here rather than buried.** A
+  customer who pays on Moyasar's page and closes the tab before coming back,
+  on a day the webhook also fails to arrive, leaves a payment nobody verified.
+  It looks exactly like an abandoned checkout in the database. Before the
+  change it made the card read "degraded", among every abandoned checkout;
+  after it, it no longer does, and no watchdog rule sees it either. So the
+  card keeps a separate figure, "Open unverified 24h", that counts those
+  attempts without moving the state. Finding the real payments among them
+  needs a sweep that asks Moyasar about each open invoice. That is not built;
+  it is listed as open in [`PAYMENTS.md`](PAYMENTS.md) §12.
 
 **The steps, each its own approval (CLAUDE.md §5):**
 
@@ -4987,7 +5012,8 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
 3. **Check afterwards**, read-only, as §65 step 3 lists.
 4. **Deploy `payment-refund`**, only after step 2. Deployed first, the new job
    claims nothing until the apply. Its cron job was inactive when read on
-   2026-11-14, so the deploy alone sends nothing.
+   2026-11-14, so the deploy alone sends nothing. Until this step, a stuck
+   refund is still claimed 5 times a run (see above).
 5. **Open Live Orders once at AAL2.** With nothing owed the card is absent,
    which is what to expect today: `order_refunds` was empty and no Moyasar
    payment record existed when read on 2026-11-14.

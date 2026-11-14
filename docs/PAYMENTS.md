@@ -361,8 +361,9 @@ then, no screen and no alert reads `order_refunds`.
 After it:
 
 - a refund that gave up (`failed`) raises the critical watchdog incident R14
-  `REFUND_FAILED`, unless a newer refund for the order is pending, processing
-  or succeeded, or the order reads refunded. The incident reaches the alert
+  `REFUND_FAILED`, unless another refund for the same order is pending,
+  processing or succeeded (only one such refund can exist per order, by the
+  index `order_refunds_one_active_uq`), or the order reads refunded. The incident reaches the alert
   inbox through the Order Integrity card, and turns the payment card in
   Operations Health to failing while the payment row is enabled and
   configured;
@@ -371,7 +372,10 @@ After it:
   and every refund tried at least once and still pending under "Refunds still
   being retried", with its attempts and the reason for its last release. It has
   no refund button: the instruction on each section is to check the payment in
-  Moyasar's dashboard and refund it there by hand (§10).
+  Moyasar's dashboard and refund it there by hand (§10). It is rendered only
+  for the admin role, re-reads every 60 seconds, and stops re-reading after a
+  refusal (an admin not at AAL2) or before the migration is applied, so a
+  refused request is not sent every minute.
 
 Nothing records a refund made by hand (gap PG-14), so after one the incident
 and the card row stay until that is decided.
@@ -875,7 +879,17 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   stay listed after the money has gone back.
 - **Until `20261013120000` is applied, an abandoned card checkout makes the
   payment card read "degraded"** for up to 24 hours (PG-25). After it, only a
-  payment that settled without a confirmed order does.
+  payment that settled without a confirmed order does, **provided a verify
+  ran on it**: the webhook, or the customer's return to the app.
+- **A payment nobody verified is not detected.** If a customer pays and closes
+  the tab, and the webhook also never arrives, the attempt stays `initiated`
+  with no payment id, exactly like an abandoned checkout. No watchdog rule and,
+  after `20261013120000`, no health state reads it; the payment card shows it
+  only inside the figure "Open unverified 24h", which counts abandoned
+  checkouts too and does not move the state. **Open, not built:** a sweep that
+  asks Moyasar about each attempt still open after its invoice expired, and
+  confirms or flags the ones that were paid. That is a new scheduled job and a
+  deploy, so it is its own change.
 - **The Online Payment guard is console-only** (§3).
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the

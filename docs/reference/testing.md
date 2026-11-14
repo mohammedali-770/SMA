@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**271 TypeScript test files declaring 4030 test blocks, plus 93 SQL suites.**
+**271 TypeScript test files declaring 4036 test blocks, plus 93 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -262,7 +262,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-133 files, 1798 declared test blocks.
+133 files, 1804 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -277,7 +277,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LazywaitPanel.test.tsx` | 5 | LazywaitPanel |
-| `src/components/admin/LiveOrdersPanel.test.tsx` | 17 | permission gate |
+| `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
@@ -299,7 +299,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/branches/DeliveryAreasEditor.test.tsx` | 10 | DeliveryAreasEditor |
 | `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
 | `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
-| `src/components/admin/view/health/HealthSystemCard.test.tsx` | 5 | branch_availability health card |
+| `src/components/admin/view/health/HealthSystemCard.test.tsx` | 6 | branch_availability health card |
 | `src/components/admin/view/health/healthView.test.ts` | 23 | polling contract |
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 5 | admin rule filter ↔ watchdog rule set |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
@@ -308,7 +308,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/orders/ordersView.test.ts` | 28 | needsPaymentConfirm — the money contract |
 | `src/components/admin/view/orders/PaymentDetails.test.tsx` | 7 | a Moyasar payment |
 | `src/components/admin/view/orders/paymentsAttentionView.test.ts` | 8 | which failed reads hide the card |
-| `src/components/admin/view/orders/PaymentsNeedingAttentionCard.test.tsx` | 7 | what staff are shown |
+| `src/components/admin/view/orders/PaymentsNeedingAttentionCard.test.tsx` | 10 | what staff are shown |
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |

@@ -134,6 +134,22 @@ configuration error has the highest precedence.
   for it reads "A payment went through at Moyasar, but its order was not
   confirmed within 30 minutes."
 
+  **What this gives up, stated rather than buried.** `provider_ref` is stamped
+  only when a verify runs: the webhook, or the customer's return to the app.
+  If the customer pays and closes the tab, and the webhook also never arrives
+  (for example a wrong webhook token), nothing verifies the payment, nothing
+  stamps it, and the attempt looks exactly like an abandoned checkout. Before
+  this change it was counted, inside the noise. After it, the stale count no
+  longer sees it, and no watchdog rule does either: R2-R6 read paid rows, and
+  R17 needs a verify to have run. So the card keeps the old count as a
+  separate figure, **"Open unverified 24h"** (`open_unverified_24h`): the same
+  window, on attempts no payment was verified on. It does **not** move the
+  state, because nearly every row it counts is an abandoned checkout, but the
+  number stays on the card. A figure well above the day's usual abandoned
+  checkouts is worth a look in Moyasar's dashboard. Telling the real payments
+  apart needs a sweep that asks Moyasar about each open invoice; that is not
+  built (`PAYMENTS.md` §12).
+
   The other option, ignoring attempts past their invoice expiry, was not
   taken. The invoice expiry is 30 minutes (read live 2026-11-13), so an attempt
   open past 30 minutes is almost always past its expiry, and so is the

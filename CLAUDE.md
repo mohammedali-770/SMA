@@ -307,7 +307,9 @@ branches written the same day may add files too: read the count live. It
 changes the refund claim order, adds four critical watchdog rules (failed
 refunds, double charges, mismatched payments, payments whose order was not
 confirmed) and an `is_admin()`-gated console feed, and stops abandoned checkouts
-reading as "payment degraded" (gap PG-25). It sends, refunds and writes nothing;
+reading as "payment degraded" (gap PG-25) while still reporting those
+attempts, without moving the state, because a payment nobody verified looks the
+same. It sends, refunds and writes nothing;
 the money path is self-asserted. **Apply it BEFORE deploying `payment-refund`**,
 each on its own approval: the new worker passes a parameter only this file
 defines. **Name the target by version.** Detail: `docs/MIGRATIONS.md` §65.

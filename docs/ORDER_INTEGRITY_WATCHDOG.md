@@ -196,8 +196,11 @@ place and already has `list_pos_confirmation_required()` and the admin feed.
 
 **R14-R17 have no threshold, on purpose.** Each fires on a definite event the
 payment code already records. Whether a person must act, and how soon, is not
-decided by the rule. Each incident ends only when the record itself moves on: a
-newer refund, a later verify that confirms the payment, a row no longer failed.
+decided by the rule. Each incident ends only when the record itself moves on:
+another refund for the order that is pending, processing or succeeded (the
+index `order_refunds_one_active_uq` allows one such row per order, so in
+practice it is the newer one), a later verify that confirms the payment, a row
+no longer failed.
 Acknowledging is not fixing (§7), so an incident stays counted until then.
 **Nothing records a refund made by hand in Moyasar's dashboard** (gap PG-14, an
 owner decision), so after one the incident stays open until that is decided.
