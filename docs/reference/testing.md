@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**268 TypeScript test files declaring 3997 test blocks, plus 92 SQL suites.**
+**269 TypeScript test files declaring 4019 test blocks, plus 93 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -56,6 +56,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/branch_delivery_requests_test.sql`
 - `supabase/tests/branch_reference_entries_test.sql`
 - `supabase/tests/branch_variant_availability_test.sql`
+- `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/comp_members_test.sql`
 - `supabase/tests/coupon_code_identity_guard_test.sql`
@@ -157,7 +158,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-97 files, 1286 declared test blocks.
+98 files, 1308 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -188,7 +189,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 26 | parsePendingSession |
-| `apps/mobile/src/features/checkout/previewTotals.test.ts` | 39 | lineTotal |
+| `apps/mobile/src/features/checkout/previewParity.test.ts` | 6 | checkout preview matches compute_order_snapshot (PG-31) |
+| `apps/mobile/src/features/checkout/previewTotals.test.ts` | 51 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 19 | decideNavigation — allow (Moyasar hosted page and 3-D Secure) |
 | `apps/mobile/src/features/menu/bannerFetchOwnership.test.ts` | 5 | banner fetch ownership |
@@ -220,7 +222,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/documentLang.test.ts` | 6 | applyDocumentLang |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
-| `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
+| `apps/mobile/src/i18n/strings.test.ts` | 10 | STRINGS |
 | `apps/mobile/src/lib/catalogSelect.test.ts` | 5 | catalog select lists |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |

@@ -1545,6 +1545,24 @@ Review caught it on #336. The general shape is worth remembering: **"keep the
 last value while refreshing" is only safe when the refresh was triggered by
 time, not by the input changing.**
 
+## 10a-quater. The checkout total uses the server's points rule (gap PG-31)
+
+Until 2026-11-14 the checkout summary worked out the points discount its own
+way: the balance times the point value, capped at the goods. The server uses
+only whole points that fit the order, and none when fewer than
+`min_points_to_redeem` fit. So with points on, a SAR 8.00 pickup order read
+0.00 while the server used no points and charged 8.00: `place_order` for cash,
+and `compute_order_snapshot` for the card page, which asked for 8.00. Measured
+on 23 carts at `52a3976`: the summary was wrong on 11.
+
+`apps/mobile/src/features/checkout/previewTotals.ts` now runs the server's
+steps in whole halalas, and `previewParity.test.ts` holds it to the real
+`compute_order_snapshot`. The rule and its tests are in
+[`LOYALTY.md`](LOYALTY.md) §1. The receipt was never affected: it shows the
+order's own figures. This change is on branch
+`fix/checkout-points-preview-20261114` and reaches customers with the
+`OWNER_ACTIONS.md` §47.17 EAS build.
+
 ## 10b. Tap `description` (closed)
 
 > **History, 2026-11-11.** The Tap code is gone. The Moyasar invoice's
