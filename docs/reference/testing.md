@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**268 TypeScript test files declaring 3997 test blocks, plus 92 SQL suites.**
+**268 TypeScript test files declaring 4001 test blocks, plus 92 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -157,7 +157,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-97 files, 1286 declared test blocks.
+97 files, 1290 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -215,7 +215,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
 | `apps/mobile/src/features/profile/addressForm.test.ts` | 34 | validateAddressForm — a complete address |
 | `apps/mobile/src/features/profile/customerName.test.ts` | 28 | normalizeCustomerName |
-| `apps/mobile/src/features/profile/dataExport.test.ts` | 13 | shouldStartExport |
+| `apps/mobile/src/features/profile/dataExport.test.ts` | 17 | shouldStartExport |
 | `apps/mobile/src/features/profile/loyaltyExpiry.test.ts` | 8 | formatExpiryDate |
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/documentLang.test.ts` | 6 | applyDocumentLang |

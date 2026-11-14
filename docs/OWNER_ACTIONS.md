@@ -2888,6 +2888,18 @@ is customer legal text, so rank it with the consent copy above. Read the Arabic
 the publishing session in §47.15: until then, nothing is published in either
 language.
 
+**Widened 2026-11-14 — one summary line** (`apps/mobile/src/features/profile/dataExport.ts`,
+`summaryLine`), shown under *Get a copy of my data* after the customer shares
+their copy, and only when the copy carries payment records (§56).
+Engineering-drafted; at `/app` once merged, on phones with the next EAS build:
+
+- «3 سجل دفع» — English *"3 payment records"*, appended after the four counts
+  already there («… · 1 جهاز · 3 سجل دفع»).
+
+It follows the line's existing pattern of a number before a singular noun
+(«2 طلب», «1 عنوان»). Check that «سجل دفع» reads as "payment record" next to
+those, and whether a number above 2 wants the plural.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -4886,6 +4898,47 @@ There is no number to decide and no function to deploy.
 
 **Done looks like:** all three applies recorded as ledger rows in
 `docs/MIGRATIONS.md`, and §61 and §62 marked APPLIED.
+
+## 56. "Get a copy of my data" with payment records — one apply
+
+**Opened 2026-11-14.** Gap PG-26 in `readiness/20261113-card-payments-gaps.md`.
+The customer's copy says it holds everything personal to them, and it reads no
+payment table. `20261014120000_export_my_data_payments` adds their checkouts,
+their payment records (with the card details Moyasar reported for each try) and
+their refunds. Detail: `docs/MIGRATIONS.md` §66.
+
+**It is not urgent today, and it should be live before §47.18.** Live on
+2026-11-14 the only payment rows are 9 Tap history rows and 7 checkouts, all on
+team accounts. From the first live card payment, every customer's copy would
+miss their card payments.
+
+**Every step is its own approval (CLAUDE.md §5).** There is no number to decide
+and no function to deploy.
+
+### The steps
+
+1. **Merge the pull request.** Merging changes nothing a customer sees. The web
+   app at `/app` ships on merge (CLAUDE.md §13), and its new summary line counts
+   payment records only when the server sends them, so it stays silent until
+   step 3.
+2. **Before applying, read-only, as the role that will apply the file:**
+   `select has_table_privilege('auth.users', 'insert');` must be **true**. The
+   file's own check creates two throwaway sign-in identities, and takes them
+   back, to prove the export gives a customer only their own rows. No earlier
+   file has written `auth.users`, so this has never been measured. If it is
+   false, do not apply: report it, and the check is reworked in a new file.
+3. **Apply `20261014120000` by name**, after re-hashing the merged copy against
+   `docs/MIGRATIONS.md` §66. Never "the outstanding migrations": other gap-fix
+   files written the same day may be outstanding beside this one, and each
+   needs its own approval.
+4. **Check afterwards, read-only:** one `export_my_data` overload, with no
+   arguments; `anon` cannot execute it and `authenticated` can; the money-path
+   pair unchanged (`12b6816d…` / `22e2d429…`); `auth.users` and
+   `payment_records` hold the same number of rows as before step 3.
+
+**Done looks like:** a ledger row in `docs/MIGRATIONS.md`, §66 marked APPLIED,
+and PG-26 marked live in the gaps list. The phone's summary line arrives with
+the §47.17 EAS build; nothing extra is needed for it.
 
 ## Owner-action closeout rule
 

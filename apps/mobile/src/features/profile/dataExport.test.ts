@@ -66,6 +66,49 @@ describe('summaryLine', () => {
   });
 });
 
+/**
+ * Gap PG-26: the copy now carries the customer's payment records, the one part
+ * of it with card details, so the line names them. Only when the server sent
+ * the list: `/app` ships on merge, before the migration that adds it is
+ * applied, and "0 payment records" would then be untrue.
+ */
+describe('payment records in the summary', () => {
+  it('counts the payment records the server sends', () => {
+    expect(
+      summarizeExport({
+        orders: [1],
+        saved_addresses: [],
+        loyalty_history: [],
+        notification_devices: [],
+        payments: [1, 2, 3],
+      }),
+    ).toEqual({ orders: 1, addresses: 0, loyaltyEntries: 0, devices: 0, payments: 3 });
+  });
+
+  it('counts an empty list as zero, because the server did look', () => {
+    expect(summarizeExport({ payments: [] }).payments).toBe(0);
+  });
+
+  it('says nothing about payments when the server sent no list', () => {
+    for (const payload of [{ orders: [1] }, { payments: 'nope' }, null]) {
+      const s = summarizeExport(payload);
+      expect(s).not.toHaveProperty('payments');
+      expect(summaryLine(s, 'en')).not.toMatch(/payment/i);
+      expect(summaryLine(s, 'ar')).not.toContain('دفع');
+    }
+  });
+
+  it('names the payment records in both languages', () => {
+    const s = { orders: 2, addresses: 1, loyaltyEntries: 5, devices: 1, payments: 3 };
+    expect(summaryLine(s, 'en')).toBe(
+      '2 orders · 1 addresses · 5 loyalty entries · 1 devices · 3 payment records',
+    );
+    const ar = summaryLine(s, 'ar');
+    expect(ar).toContain('3 سجل دفع');
+    expect(ar).not.toBe(summaryLine(s, 'en'));
+  });
+});
+
 describe('exportTitle', () => {
   it('uses LOCAL calendar parts, not a UTC-shifted date', () => {
     // Same trap as loyaltyExpiry.ts: a UTC-derived date reads as the previous

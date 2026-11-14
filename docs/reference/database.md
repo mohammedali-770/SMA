@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **155**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261011120000_drop_push_devices_admin_select.sql`.
+Migration files in the repository: **156**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261014120000_export_my_data_payments.sql`.
 
 ## Tables
 
@@ -187,7 +187,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `enforce_refund_state_transition` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `enforce_single_default_address` | 1 | `20260801120000_address_single_default.sql` |
 | `expire_stale_order_refund_claims` | 1 | `20260729090000_payment_refund_scheduler.sql` |
-| `export_my_data` | 1 | `20260912120000_export_my_data.sql` |
+| `export_my_data` | 2 | `20261014120000_export_my_data_payments.sql` |
 | `finalize_admin_push_notification` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `finalize_checkout_session` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
 | `finalize_operations_alert_email` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
