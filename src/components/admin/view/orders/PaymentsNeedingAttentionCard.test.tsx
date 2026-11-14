@@ -86,7 +86,7 @@ function owed(): PaymentsNeedingAttention {
           order_number: null,
           amount: 20,
           currency: 'SAR',
-          mode: 'live',
+          mode: 'test',
           failure_message_safe: 'x',
           payment_ref: 'pay_mm_1',
           created_at: '2026-11-11T19:30:00Z',
@@ -166,6 +166,9 @@ describe('what staff are shown', () => {
     expect(within(card).getByText(/Moyasar refused our address \(Allowed IPs\) · Attempts: 12/)).toBeTruthy();
     expect(within(card).getByText(/Charged twice/)).toBeTruthy();
     expect(within(card).getByText(/Did not match its checkout/)).toBeTruthy();
+    // A sandbox payment says so, because it is not among Moyasar's live payments.
+    expect(within(card).getByText(/Did not match its checkout · Test payment/)).toBeTruthy();
+    expect(within(card).getAllByText(/Test payment/)).toHaveLength(1);
     expect(within(card).getByText(/The order could not be created · Times logged: 2/)).toBeTruthy();
     expect(within(card).getAllByText('No order')).toHaveLength(2);
     // Two more retrying refunds exist than were returned.
@@ -187,6 +190,7 @@ describe('what staff are shown', () => {
       expect(within(card).getByText(t[key])).toBeTruthy();
     }
     expect(within(card).getAllByText(/رقم الدفعة/).length).toBeGreaterThan(0);
+    expect(within(card).getAllByText(new RegExp(t.payattn_test_mode))).toHaveLength(1);
     // 21:29 UTC on 11 November is 00:29 on the 12th in Riyadh; London would say 21:29.
     const line = within(card).getByText(/مرات التسجيل/);
     expect(line.textContent).toContain('2026-11-12 00:29');

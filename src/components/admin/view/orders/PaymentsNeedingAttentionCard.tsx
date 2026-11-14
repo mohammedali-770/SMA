@@ -99,6 +99,9 @@ export function PaymentsNeedingAttentionCard({
     if (!key) return null;
     return key === 'payattn_reason_other' ? `${t[key]} (${code})` : t[key];
   };
+  // A sandbox payment is found in Moyasar's test view, not among live payments.
+  const testMode = (mode: string | null | undefined): string | null =>
+    mode === 'test' ? t.payattn_test_mode : null;
   const viewButton = (orderId: string | null) =>
     orderId ? (
       <button
@@ -155,8 +158,11 @@ export function PaymentsNeedingAttentionCard({
         <Text variant="caption" tone="secondary" as="p">
           {[
             p.kind === 'duplicate_payment' ? t.payattn_kind_duplicate : t.payattn_kind_mismatch,
+            testMode(p.mode),
             `${t.payattn_since} ${when(p.created_at)}`,
-          ].join(' · ')}
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
         {paymentId(p.payment_ref)}
       </div>
@@ -178,6 +184,7 @@ export function PaymentsNeedingAttentionCard({
         <Text variant="caption" tone="secondary" as="p">
           {[
             reason(u.error),
+            testMode(u.mode),
             `${t.payattn_logged_times}: ${u.log_count}`,
             `${t.payattn_since} ${when(u.first_logged_at)}`,
           ]

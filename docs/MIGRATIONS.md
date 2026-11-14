@@ -8817,9 +8817,10 @@ waits for it, so a scan already running is waited for, not overlapped.
    `to_regprocedure('public.claim_order_refund(text)')` is null.
 4. Expect no R14-R16 incident on live data: `order_refunds` was empty and no
    Moyasar payment record existed when read on 2026-11-14. R17 reads
-   `integration_sync_logs`, which was not read. An R17 incident names a real
+   `integration_sync_logs`, which was not read. An R17 incident names a
    Moyasar payment whose order was not confirmed; check it in Moyasar's
-   dashboard.
+   dashboard. The console card marks one made with the test keys "Test
+   payment".
 5. Then, as its own §5 approval, deploy `payment-refund`. Its cron job was
    inactive when read on 2026-11-14, so the deploy alone sends nothing.
 

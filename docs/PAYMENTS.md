@@ -912,6 +912,6 @@ added on 2026-11-11 (in `MoyasarPaymentPanel.tsx`, `PaymentDetails.tsx`,
 `SettingsPanel.tsx` and the alert and health labels).
 
 Staff-facing, added 2026-11-14: the Live Orders card "Refunds and payments
-needing attention" (36 `payattn_*` strings in
+needing attention" (37 `payattn_*` strings in
 `src/components/admin/adminLocales.ts`) and the Operations Health line for a
 stale payment. Each is listed in `OWNER_ACTIONS.md` §35.

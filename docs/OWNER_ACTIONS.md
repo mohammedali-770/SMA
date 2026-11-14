@@ -2923,6 +2923,7 @@ Row labels:
 - `payattn_last_try` — «آخر محاولة»
 - `payattn_logged_times` — «مرات التسجيل»
 - `payattn_more` — «أخرى غير معروضة», shown after a number, as in «+2 أخرى غير معروضة»
+- `payattn_test_mode` — «دفعة تجريبية», on a payment made with the test keys
 
 The reasons, one per stored failure code:
 
