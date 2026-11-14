@@ -301,6 +301,28 @@ and read back byte-identical, `20261004120000_drop_tap_payment_rpcs` (17:45:00,
 (rows 8-9), 0 unapplied. Money-path pair unchanged. **This changes no customer
 behaviour yet:** the payment row is disabled and online payment is off.
 
+**AMENDED 2026-11-14 — `20261012120000_cancelled_orders_guard` is written,
+validated and awaiting approval, so on merge it is outstanding** (with any other
+file merged unapplied since the read above). Six function bodies: a cancelled
+order is never resent, claimed for the POS, enrolled for an automatic refund or
+invoiced, and `place_customer_order` places no online order (gaps PG-03 and
+PG-27). No signature, table or row; no deploy; money path self-asserted
+(`12b6816d…` / `22e2d429…`). Applying it before `docs/OWNER_ACTIONS.md` §47.13
+step 1 closes that section's warning (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
+
+**AMENDED 2026-11-14 — `20261013120000_payment_refund_visibility` is written,
+validated and awaiting approval, so on merge it is outstanding.** Other gap-fix
+branches written the same day may add files too: read the count live. It
+changes the refund claim order, adds four critical watchdog rules (failed
+refunds, double charges, mismatched payments, payments whose order was not
+confirmed) and an `is_admin()`-gated console feed, and stops abandoned checkouts
+reading as "payment degraded" (gap PG-25) while still reporting those
+attempts, without moving the state, because a payment nobody verified looks the
+same. It sends, refunds and writes nothing;
+the money path is self-asserted. **Apply it BEFORE deploying `payment-refund`**,
+each on its own approval: the new worker passes a parameter only this file
+defines. **Name the target by version.** Detail: `docs/MIGRATIONS.md` §65.
+
 **AMENDED 2026-11-14 — `20261014120000_export_my_data_payments` is written,
 validated and awaiting approval** (branch `fix/export-my-data-payments-20261114`,
 gap PG-26). It redefines `export_my_data()` only, adding the caller's

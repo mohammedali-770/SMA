@@ -5,8 +5,9 @@ import { basicAuthHeader, resolveMoyasarConfig, timingSafeEqual, toMinorUnits } 
 import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import {
   buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, decideRefundLogging,
-  moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview, refundFinalStatus,
-  refundRequestIsValid, resolveRefundFromPayment, type RefundClassification,
+  moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview, pendingReleaseDetail,
+  refundFinalStatus, refundRequestIsValid, releaseReasonWithoutPosting, resolveRefundFromPayment,
+  type RefundClassification,
 } from '../_shared/moyasarRefund.ts';
 
 /**
@@ -30,6 +31,14 @@ import {
  *     order — a customer can never be refunded twice.
  *   * A 'pending' classification RELEASES the claim for a later attempt rather
  *     than resolving it, so an unknown/timeout outcome is retried, never guessed.
+ *   * ONE TRY PER REFUND PER RUN (gap PG-01, 20261013120000). Every claim passes
+ *     the ids this run has already claimed, and claim_order_refund skips them;
+ *     it also takes the least recently touched refund first, so a refund just
+ *     released goes to the back of the queue. Before that, a refund released as
+ *     'pending' was the oldest again and the next claim took it straight back,
+ *     so one stuck refund used all five claims of every run.
+ *   * A refund released as 'pending' records WHY (releaseReasonWithoutPosting,
+ *     pendingReleaseDetail), so the console card can show it.
  *
  * verify_jwt = false (config.toml): the caller is a scheduler/server, gated by
  * the same shared-secret pattern as lazywait-sync and failing CLOSED.
@@ -67,12 +76,18 @@ Deno.serve(async (req: Request) => {
   } catch { /* no body — use the default */ }
 
   const processed: Array<Record<string, unknown>> = [];
+  // Every refund this run has claimed, whatever became of it. Passed to each
+  // claim, so a refund is tried at most once per run: a released one is not
+  // taken straight back while others wait. Needs 20261013120000 applied first;
+  // without it the call is refused and the run claims nothing.
+  const claimedThisRun: string[] = [];
 
   for (let i = 0; i < limit; i++) {
     // A fresh token per attempt: the lease we finalize is provably the one we took.
     const claimToken = crypto.randomUUID();
     const { data: claimed, error: claimErr } = await admin.rpc('claim_order_refund', {
       p_claim_token: claimToken,
+      p_exclude_refund_ids: claimedThisRun,
     });
     if (claimErr) {
       console.error('claim_order_refund failed', String(claimErr.message ?? '').slice(0, 200));
@@ -83,6 +98,8 @@ Deno.serve(async (req: Request) => {
       idempotency_key: string; amount: number; currency: string; attempt_count: number;
     } | undefined;
     if (!row) break; // queue drained
+    // Recorded before anything else can `continue`: every claim counts.
+    claimedThisRun.push(String(row.refund_id));
 
     // ONLY A MOYASAR REFUND CAN BE EXECUTED HERE. order_refunds.provider records
     // which gateway actually took the money, and Moyasar is the only gateway
@@ -155,9 +172,10 @@ Deno.serve(async (req: Request) => {
     if (!secretKey) {
       // Cannot authenticate to Moyasar for this refund → release for a later run.
       // Never resolve a money movement we could not even attempt.
+      const why = releaseReasonWithoutPosting('key_unavailable');
       await admin.rpc('finalize_order_refund', {
         p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'pending',
-        p_provider_ref: null, p_failure_code: null, p_error_safe: null,
+        p_provider_ref: null, p_failure_code: why.failureCode, p_error_safe: why.errorSafe,
       });
       processed.push({ refund: row.refund_id, outcome: 'pending', reason: 'key_unavailable' });
       continue;
@@ -207,15 +225,19 @@ Deno.serve(async (req: Request) => {
     // nothing has been refunded.
     // ---------------------------------------------------------------------
     let settledWithoutPosting: RefundClassification | null = null;
+    // The refund POST's HTTP status in this run: 0 when no answer arrived, null
+    // when nothing was posted. Only used to say why a refund stays pending.
+    let postHttpStatus: number | null = null;
     if (mustReconcileBeforePost(row.attempt_count)) {
       const decision = decideAfterReconcile(await reconcile());
       if (decision.action === 'release') {
         // We could not establish what the earlier attempt did. Sending another
         // refund now is the one action that could pay the customer twice, so
         // release the row untouched and let a later run ask again.
+        const why = releaseReasonWithoutPosting(decision.reason);
         await admin.rpc('finalize_order_refund', {
           p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'pending',
-          p_provider_ref: null, p_failure_code: null, p_error_safe: null,
+          p_provider_ref: null, p_failure_code: why.failureCode, p_error_safe: why.errorSafe,
         });
         processed.push({ refund: row.refund_id, outcome: 'pending', reason: decision.reason });
         continue;
@@ -251,6 +273,7 @@ Deno.serve(async (req: Request) => {
       }
 
       verdict = classifyMoyasarRefundResponse(ok, httpStatus, body);
+      postHttpStatus = httpStatus;
 
       // An ambiguous response is resolved immediately where we can, which
       // often settles it in this same run. When it cannot be resolved the row
@@ -271,13 +294,19 @@ Deno.serve(async (req: Request) => {
         refund: String(row.refund_id).slice(0, 36),
       }));
     }
+    const finalStatus = refundFinalStatus(verdict);
+    // A pending outcome records why, from what this run saw; succeeded and
+    // failed record exactly the verdict, as before.
+    const detail = finalStatus === 'pending'
+      ? pendingReleaseDetail(verdict, postHttpStatus)
+      : { failureCode: verdict.failureCode, errorSafe: verdict.errorSafe };
     const { data: finalized } = await admin.rpc('finalize_order_refund', {
       p_refund_id: row.refund_id,
       p_claim_token: claimToken,
-      p_status: refundFinalStatus(verdict),
+      p_status: finalStatus,
       p_provider_ref: verdict.providerRef,
-      p_failure_code: verdict.failureCode,
-      p_error_safe: verdict.errorSafe,
+      p_failure_code: detail.failureCode,
+      p_error_safe: detail.errorSafe,
     });
 
     // Token-fenced: a non-`true` result means this run no longer owns the lease
@@ -298,7 +327,7 @@ Deno.serve(async (req: Request) => {
       provider: rowProvider, order_id: row.order_id, direction: 'push',
       status: decision.logStatus,
       request: { action: 'refund', attempt: row.attempt_count },
-      error: verdict.failureCode,
+      error: detail.failureCode,
     }).then(() => {}, () => {});
 
     processed.push({ refund: row.refund_id, outcome: verdict.outcome });

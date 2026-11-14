@@ -15,7 +15,7 @@ import { HealthJobsTable } from './view/health/HealthJobsTable';
 import { HealthMetric } from './view/health/HealthMetric';
 import { HealthSystemCard, StateIcon } from './view/health/HealthSystemCard';
 import {
-  HEALTH_POLL_INTERVAL_MS, STATE_LABELS, attentionText, attentionTone,
+  HEALTH_POLL_INTERVAL_MS, STATE_LABELS, attentionText, attentionTone, staleCountsSettledOnly,
   exactTime, healthStateTone, relativeAge,
   type AdminLang, type TargetTab,
 } from './view/health/healthView';
@@ -89,6 +89,7 @@ export const OperationsHealthPanel: React.FC<{
   }
 
   const attention = summary?.attention ?? [];
+  const settledOnly = staleCountsSettledOnly(systems);
 
   return (
     <div className="space-y-4" dir={isAr ? 'rtl' : 'ltr'}>
@@ -189,7 +190,7 @@ export const OperationsHealthPanel: React.FC<{
             {attention.map((item, index) => (
               <Notice
                 key={`${item.code}-${index}`}
-                title={attentionText(item, lang)}
+                title={attentionText(item, lang, { staleCountsSettledOnly: settledOnly })}
                 action={`${isAr ? 'العدد' : 'Count'}: ${item.count}${item.oldest_at ? ` · ${relativeAge(item.oldest_at, lang)}` : ''}`}
                 tone={attentionTone(item.severity)}
               />

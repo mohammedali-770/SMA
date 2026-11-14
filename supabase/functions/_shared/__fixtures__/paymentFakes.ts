@@ -12,10 +12,14 @@
  *     the order-or-session CHECK, and the trigger stamping confirmed_at /
  *     failed_at (20260707121300, 20260712120000, 20260712160000);
  *   - begin_payment_attempt / begin_session_attempt: reuse, expiry and the
- *     1.00 SAR minimum (20261003120000). The loyalty guard is not modelled; the
- *     SQL suite proves it;
+ *     1.00 SAR minimum (20261003120000), and begin_payment_attempt's refusal
+ *     of a cancelled order (20261012120000). The loyalty guard is not
+ *     modelled; the SQL suite proves it;
  *   - finalize_checkout_session, row picker included (20260712170000);
- *   - confirm_order_payment (20260827120000, with 20261003120000's refusal).
+ *   - confirm_order_payment (20260827120000, with 20261003120000's refusal);
+ *   - claim_order_refund and finalize_order_refund: the token fence, the
+ *     attempt counter, and 20261013120000's queue order (least recently
+ *     touched first) and per-run exclusion list.
  *
  * Every RPC is atomic: on an error nothing it wrote survives, as in Postgres.
  * Each call yields to the event loop first, so two flows started together
@@ -40,6 +44,7 @@ const TABLES = [
   'payment_records',
   'integration_sync_logs',
   'integration_settings',
+  'order_refunds',
 ] as const;
 
 let uuidSeq = 0;
@@ -221,7 +226,7 @@ function project(row: Row, cols: string): Row {
 export class FakePaymentDb {
   tables: Record<string, Row[]> = Object.fromEntries(TABLES.map((t) => [t, [] as Row[]]));
   /** RPC calls and their outcome, in order. */
-  rpcLog: { name: string; args: Row; error: string | null }[] = [];
+  rpcLog: { name: string; args: Row; error: string | null; result?: unknown }[] = [];
   private failures = new Map<string, DbError[]>();
   private gates = new Map<string, () => Promise<void>>();
   private seq = 0;
@@ -392,7 +397,10 @@ export class FakePaymentDb {
       if (!fn) throw new Error(`rpc ${name} not modelled`);
       const data = fn(this, args);
       this.checkPaymentRecords();
-      this.rpcLog.push({ name, args: clone(args), error: null });
+      this.rpcLog.push({
+        name, args: clone(args), error: null,
+        result: name === 'claim_order_refund' && Array.isArray(data) && data[0] ? (data[0] as Row).refund_id : undefined,
+      });
       return { data: clone(data), error: null };
     } catch (e) {
       this.tables = snapshot;
@@ -455,6 +463,40 @@ export class FakePaymentDb {
 
   attempts(where: Row): Row[] {
     return this.rows('payment_records').filter((r) => Object.entries(where).every(([k, v]) => r[k] === v));
+  }
+
+  /** A pending refund, as open_order_refund_record opens one, for a paid live Moyasar payment. */
+  refund(input: Row = {}): Row {
+    const order = this.order({ payment_status: 'paid', payment_provider: 'moyasar', refund_state: 'pending', ...((input.order as Row) ?? {}) });
+    const paymentId = String(input.charge_ref ?? `pay_${uuid().slice(-6)}`);
+    this.insertRow('payment_records', {
+      order_id: order.id, provider: 'moyasar', provider_ref: paymentId, status: 'paid',
+      amount: order.total, currency: 'SAR', mode: 'live',
+    });
+    const rest = Object.fromEntries(Object.entries(input).filter(([k]) => k !== 'order'));
+    return this.insertRow('order_refunds', {
+      order_id: order.id,
+      provider: 'moyasar',
+      charge_ref: paymentId,
+      provider_ref: null,
+      idempotency_key: `refund_${String(order.id).replace(/-/g, '')}`,
+      amount: order.total,
+      currency: 'SAR',
+      status: 'pending',
+      attempt_count: 0,
+      claim_token: null,
+      failure_code: null,
+      last_error_safe: null,
+      completed_at: null,
+      ...rest,
+    });
+  }
+
+  /** claim_order_refund calls that returned a refund, in order, by refund id. */
+  claims(): string[] {
+    return this.rpcLog
+      .filter((c) => c.name === 'claim_order_refund' && c.error === null && c.result != null)
+      .map((c) => String(c.result));
   }
 }
 
@@ -563,7 +605,65 @@ function beginAttempt(
   return attemptOut(row, false);
 }
 
+/** Text order, the way Postgres compares these columns. */
+function byText(a: unknown, b: unknown): number {
+  return String(a ?? '').localeCompare(String(b ?? ''));
+}
+
 const RPCS: Record<string, (db: FakePaymentDb, a: Row) => unknown> = {
+  // 20261013120000: least recently touched first, skipping the ids passed.
+  // The candidate is re-checked as 'pending'; SKIP LOCKED has nothing to skip
+  // in a single-threaded fake.
+  claim_order_refund(db, a) {
+    const token = String(a.p_claim_token ?? '');
+    if (!token) throw new PgError('claim token required', '22004');
+    if (a.p_exclude_refund_ids != null && !Array.isArray(a.p_exclude_refund_ids)) {
+      throw new PgError('p_exclude_refund_ids must be an array', '22P02');
+    }
+    const exclude = new Set(((a.p_exclude_refund_ids as unknown[] | null) ?? []).filter((x) => x != null).map(String));
+    const next = db
+      .rows('order_refunds')
+      .filter((r) => r.status === 'pending' && !exclude.has(String(r.id)))
+      .sort((x, y) => byText(x.updated_at, y.updated_at) || byText(x.created_at, y.created_at) || byText(x.id, y.id))[0];
+    if (!next) return [];
+    db.updateRow('order_refunds', next, {
+      status: 'processing', claim_token: token, attempt_count: Number(next.attempt_count) + 1,
+    });
+    const order = db.rows('orders').find((o) => o.id === next.order_id);
+    if (order && ['pending', 'failed'].includes(String(order.refund_state))) order.refund_state = 'processing';
+    return [{
+      refund_id: next.id, order_id: next.order_id, provider: next.provider, charge_ref: next.charge_ref,
+      idempotency_key: next.idempotency_key, amount: next.amount, currency: next.currency,
+      attempt_count: next.attempt_count,
+    }];
+  },
+
+  finalize_order_refund(db, a) {
+    const status = String(a.p_status ?? '');
+    if (!['succeeded', 'failed', 'pending'].includes(status)) {
+      throw new PgError(`invalid refund final status ${status}`, '22023');
+    }
+    const r = db
+      .rows('order_refunds')
+      .find((x) => x.id === a.p_refund_id && x.status === 'processing' && x.claim_token === a.p_claim_token);
+    if (!r) return false;
+    const err = String(a.p_error_safe ?? '').slice(0, 300);
+    db.updateRow('order_refunds', r, {
+      status,
+      provider_ref: a.p_provider_ref ?? r.provider_ref,
+      failure_code: status === 'succeeded' ? null : (a.p_failure_code ?? null),
+      last_error_safe: status === 'succeeded' ? null : (err || null),
+      claim_token: null,
+      completed_at: status === 'succeeded' ? new Date().toISOString() : r.completed_at,
+    });
+    const order = db.rows('orders').find((o) => o.id === r.order_id);
+    if (order) {
+      order.refund_state = status === 'succeeded' ? 'refunded' : status === 'failed' ? 'failed' : 'pending';
+      order.refund_failure_code = status === 'failed' ? (a.p_failure_code ?? null) : null;
+    }
+    return true;
+  },
+
   begin_session_attempt(db, a) {
     if (!String(a.p_provider ?? '').trim()) throw new PgError('A payment provider is required');
     const s = db.rows('checkout_sessions').find((r) => r.id === a.p_session_id);
@@ -580,6 +680,7 @@ const RPCS: Record<string, (db: FakePaymentDb, a: Row) => unknown> = {
     if (!String(a.p_provider ?? '').trim()) throw new PgError('A payment provider is required');
     const o = db.rows('orders').find((r) => r.id === a.p_order_id);
     if (!o) throw new PgError(`Order ${String(a.p_order_id)} not found`, 'P0002');
+    if (o.status === 'cancelled') throw new PgError('Order is cancelled');
     if (o.payment_status === 'paid') throw new PgError('Order is already paid');
     if (o.payment_method !== 'online') throw new PgError('Order is not an online-payment order');
     if (!(Number(o.total) > 0)) throw new PgError('Order total must be greater than zero');
@@ -728,6 +829,10 @@ export class FakeMoyasar {
   payments = new Map<string, FakePayment>();
   /** Invoice create bodies, in order. */
   posts: Row[] = [];
+  /** Every request, `METHOD /path`, in order. */
+  requests: string[] = [];
+  /** When set, every request throws, as a refused proxy or a dead network does. */
+  unreachable = false;
   private seq = 0;
 
   pay(invoiceId: string, paymentId: string, status: string): FakePayment {
@@ -762,7 +867,9 @@ export class FakeMoyasar {
     const reply = (status: number, body: unknown) =>
       new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
     if (url.hostname !== 'api.moyasar.com') throw new TypeError(`no network in tests: ${url.hostname}`);
-    const [, kind, id] = url.pathname.split('/').filter(Boolean);
+    this.requests.push(`${method} ${url.pathname}`);
+    if (this.unreachable) throw new TypeError('error sending request: connection refused');
+    const [, kind, id, action] = url.pathname.split('/').filter(Boolean);
     if (kind === 'invoices' && method === 'POST') {
       const body = JSON.parse(String(init.body ?? '{}')) as Row;
       this.posts.push(body);
@@ -796,6 +903,14 @@ export class FakeMoyasar {
       return reply(200, {
         invoices: [...this.invoices.values()].filter((i) => i.metadata.reference_transaction === ref),
       });
+    }
+    if (kind === 'payments' && method === 'POST' && id && action === 'refund') {
+      const p = this.payments.get(decodeURIComponent(id));
+      if (!p) return reply(404, { type: 'not_found', message: 'Object not found' });
+      const body = JSON.parse(String(init.body ?? '{}')) as Row;
+      p.refunded = Number(p.refunded ?? 0) + Number(body.amount ?? p.amount);
+      if (Number(p.refunded) >= Number(p.amount)) p.status = 'refunded';
+      return reply(200, p);
     }
     if (kind === 'payments' && method === 'GET' && id) {
       const p = this.payments.get(decodeURIComponent(id));

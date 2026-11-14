@@ -14,6 +14,9 @@ function line(unitPrice: number, quantity: number, id = 'p1', modifiers: Modifie
   };
 }
 
+// `minPointsToRedeem: 0` keeps the cases below about what each one names (the
+// cap, the channel, the comp) rather than about the redemption floor, which has
+// its own section further down, with the live minimum of 100.
 const base = {
   orderType: 'delivery' as const,
   deliveryFee: 10,
@@ -21,6 +24,7 @@ const base = {
   couponDiscount: 0,
   loyaltyPoints: 0,
   discountPerPoint: 0,
+  minPointsToRedeem: 0,
 };
 
 describe('lineTotal', () => {
@@ -135,6 +139,24 @@ describe('computePreviewTotals — discounts', () => {
   });
 
   it('caps loyalty at what remains after the coupon', () => {
+    // Pickup, so the cap is the goods after the coupon and nothing else.
+    const r = computePreviewTotals({
+      ...base, orderType: 'pickup', items: [line(20, 1)], couponDiscount: 15, loyaltyPoints: 100,
+      discountPerPoint: 1,
+    });
+    expect(r.couponDiscount).toBe(15);
+    expect(r.loyaltyDiscount).toBe(5); // not 100
+    expect(r.loyaltyPointsRedeemed).toBe(5); // whole points that fit, not the balance
+    expect(r.total).toBe(0);
+  });
+
+  it('lets points cover the delivery fee too, as the server does', () => {
+    // The server caps points at `v_pre_loyalty` = subtotal + delivery fee -
+    // coupon. This preview used to cap them at the goods alone and so showed
+    // 10.00 still to pay here, where the server charges 0.00. Reachable only
+    // with `loyalty_pickup_only` off, since a delivery order redeems nothing
+    // while it is on; parity case 16 measures it against the real function.
+    //
     // `loyaltyPickupOnly: false` because `base` is a DELIVERY cart and this case
     // is about the CAP, not the channel. Without it the assertion would pass on
     // a loyaltyDiscount of 0 for the wrong reason and stop guarding the cap.
@@ -143,8 +165,9 @@ describe('computePreviewTotals — discounts', () => {
       discountPerPoint: 1, loyaltyPickupOnly: false,
     });
     expect(r.couponDiscount).toBe(15);
-    expect(r.loyaltyDiscount).toBe(5); // not 100
-    expect(r.total).toBe(10);
+    expect(r.loyaltyDiscount).toBe(15); // 20 goods + 10 delivery - 15 coupon
+    expect(r.loyaltyPointsRedeemed).toBe(15);
+    expect(r.total).toBe(0);
   });
 
   it('never produces a negative total', () => {
@@ -223,6 +246,113 @@ describe('computePreviewTotals — loyalty is pickup only', () => {
     expect(t.couponDiscount).toBe(10);
     expect(t.loyaltyDiscount).toBe(0);
     expect(t.total).toBe(40);            // 40 goods + 10 delivery - 10 coupon
+  });
+});
+
+describe('computePreviewTotals — whole points and the redemption minimum (PG-31)', () => {
+  // The live settings, read 2026-11-14: 0.10 a point, a minimum of 100 points.
+  // The server uses least(requested, balance, floor(before points / 0.10))
+  // points, and none at all below 100. previewParity.test.ts checks the same
+  // rules against compute_order_snapshot itself; these name them one by one.
+  const live = {
+    ...base, orderType: 'pickup' as const, discountPerPoint: 0.1, minPointsToRedeem: 100,
+  };
+
+  it('uses no points on an order under SAR 10.00, however large the balance', () => {
+    // The gap's own case: this read 0.00 and the card page asked for 8.00.
+    const t = computePreviewTotals({ ...live, items: [line(8, 1)], loyaltyPoints: 150 });
+    expect(t.loyaltyPointsRedeemed).toBe(0);
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.total).toBe(8);
+    expect(t.loyaltyOrderTooSmall).toBe(true);
+    expect(t.loyaltyMinimumOrder).toBe(10);
+  });
+
+  it('uses exactly the minimum when the order is worth exactly its value', () => {
+    const t = computePreviewTotals({ ...live, items: [line(10, 1)], loyaltyPoints: 150 });
+    expect(t.loyaltyPointsRedeemed).toBe(100);
+    expect(t.total).toBe(0);
+    expect(t.loyaltyOrderTooSmall).toBe(false);
+  });
+
+  it('uses whole points only, so a remainder under 0.10 is left to pay', () => {
+    // 10.05 fits 100.5 points; the server takes 100 and leaves 0.05, which is
+    // what then meets the card minimum (PG-05).
+    const t = computePreviewTotals({ ...live, items: [line(10.05, 1)], loyaltyPoints: 150 });
+    expect(t.loyaltyPointsRedeemed).toBe(100);
+    expect(t.loyaltyDiscount).toBe(10);
+    expect(t.total).toBe(0.05);
+  });
+
+  it('judges the minimum after a coupon, not before', () => {
+    // 11.00 less 15% is 9.35, which fits 93 points: none are used.
+    const t = computePreviewTotals({ ...live, items: [line(11, 1)], couponDiscount: 1.65, loyaltyPoints: 150 });
+    expect(t.loyaltyPointsRedeemed).toBe(0);
+    expect(t.total).toBe(9.35);
+    expect(t.loyaltyOrderTooSmall).toBe(true);
+  });
+
+  it('takes no more points than the customer holds', () => {
+    const t = computePreviewTotals({ ...live, items: [line(32, 2)], loyaltyPoints: 500 });
+    expect(t.loyaltyPointsRedeemed).toBe(500);
+    expect(t.loyaltyDiscount).toBe(50);
+    expect(t.total).toBe(14);
+  });
+
+  it('does not blame the order when the balance itself is under the minimum', () => {
+    // The app hides the switch then, so this never reaches the screen; the
+    // flag stays false so a note can never name the wrong reason.
+    const t = computePreviewTotals({ ...live, items: [line(10.5, 1)], loyaltyPoints: 99 });
+    expect(t.loyaltyPointsRedeemed).toBe(0);
+    expect(t.total).toBe(10.5);
+    expect(t.loyaltyOrderTooSmall).toBe(false);
+  });
+
+  it('has nothing to explain with points off, on delivery, or for a comped customer', () => {
+    const small = { ...live, items: [line(8, 1)] };
+    expect(computePreviewTotals({ ...small, loyaltyPoints: 0 }).loyaltyOrderTooSmall).toBe(false);
+    expect(computePreviewTotals({ ...small, loyaltyPoints: 150, comped: true }).loyaltyOrderTooSmall).toBe(false);
+    const delivery = computePreviewTotals({ ...small, orderType: 'delivery', loyaltyPoints: 150 });
+    expect(delivery.loyaltyOrderTooSmall).toBe(false);
+    expect(delivery.loyaltyBlockedByChannel).toBe(true);
+  });
+
+  it('withholds points when the minimum is not known', () => {
+    // A settings row that has not loaded must under-promise, never over-promise.
+    for (const minPointsToRedeem of [Number.NaN, Infinity, undefined as unknown as number]) {
+      const t = computePreviewTotals({ ...live, items: [line(64, 1)], loyaltyPoints: 500, minPointsToRedeem });
+      expect(t.loyaltyDiscount).toBe(0);
+      expect(t.total).toBe(64);
+      expect(t.loyaltyOrderTooSmall).toBe(false);
+    }
+  });
+
+  it('floors exactly where binary floating point would not', () => {
+    // 0.30 / 0.10 is 2.9999999999999996 in a float, which floors to 2. The
+    // server's numeric division gives 3, and so must this.
+    const t = computePreviewTotals({ ...live, minPointsToRedeem: 0, items: [line(0.3, 1)], loyaltyPoints: 150 });
+    expect(t.loyaltyPointsRedeemed).toBe(3);
+    expect(t.total).toBe(0);
+  });
+
+  it('rounds a four-decimal point value the way Postgres round(…, 2) does', () => {
+    // discount_per_point is numeric(10,4). 15 x 0.0333 = 0.4995 -> 0.50.
+    const t = computePreviewTotals({
+      ...live, minPointsToRedeem: 0, discountPerPoint: 0.0333, items: [line(10, 1)], loyaltyPoints: 15,
+    });
+    expect(t.loyaltyDiscount).toBe(0.5);
+    expect(t.total).toBe(9.5);
+  });
+
+  it('rounds the quoted minimum order UP to the halala', () => {
+    // 15 points at 0.0333 are worth 0.4995, so 0.50 is the first order value
+    // they fit: 0.49 fits only 14.
+    const t = computePreviewTotals({
+      ...live, minPointsToRedeem: 15, discountPerPoint: 0.0333, items: [line(0.49, 1)], loyaltyPoints: 20,
+    });
+    expect(t.loyaltyMinimumOrder).toBe(0.5);
+    expect(t.loyaltyOrderTooSmall).toBe(true);
+    expect(computePreviewTotals({ ...live, minPointsToRedeem: 0, items: [] }).loyaltyMinimumOrder).toBe(0);
   });
 });
 

@@ -180,7 +180,11 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     setResending(true);
     setResendError(null);
     try {
-      await orders.requestResend(orderId);
+      const res = await orders.requestResend(orderId);
+      // The order was cancelled after this screen loaded (gap PG-03). The
+      // refresh below shows it as cancelled; this line covers a refresh that
+      // fails and leaves the old screen up.
+      if (res?.reason === 'order_cancelled') setResendError(t('oc_resend_cancelled'));
     } catch {
       // A transport failure says nothing about the order's real state; surface a
       // neutral retry hint and let the refresh below show the truth.

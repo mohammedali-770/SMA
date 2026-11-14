@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**270 TypeScript test files declaring 4015 test blocks, plus 92 SQL suites.**
+**275 TypeScript test files declaring 4097 test blocks, plus 95 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -56,6 +56,8 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/branch_delivery_requests_test.sql`
 - `supabase/tests/branch_reference_entries_test.sql`
 - `supabase/tests/branch_variant_availability_test.sql`
+- `supabase/tests/cancelled_orders_guard_test.sql`
+- `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/comp_members_test.sql`
 - `supabase/tests/coupon_code_identity_guard_test.sql`
@@ -111,6 +113,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/order_refund_claim_liveness_test.sql`
 - `supabase/tests/otp_login_rate_limit_test.sql`
 - `supabase/tests/otp_retention_sweep_test.sql`
+- `supabase/tests/payment_refund_visibility_test.sql`
 - `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/place_order_variants_test.sql`
 - `supabase/tests/platform_rollup_suppression_test.sql`
@@ -157,7 +160,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-97 files, 1295 declared test blocks.
+99 files, 1331 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -188,7 +191,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 26 | parsePendingSession |
-| `apps/mobile/src/features/checkout/previewTotals.test.ts` | 39 | lineTotal |
+| `apps/mobile/src/features/checkout/previewParity.test.ts` | 8 | checkout preview matches compute_order_snapshot (PG-31) |
+| `apps/mobile/src/features/checkout/previewTotals.test.ts` | 51 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 19 | decideNavigation — allow (Moyasar hosted page and 3-D Secure) |
 | `apps/mobile/src/features/menu/bannerFetchOwnership.test.ts` | 5 | banner fetch ownership |
@@ -207,8 +211,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/stackedTabsWiring.test.ts` | 4 | screens opened above another route go back to it |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
+| `apps/mobile/src/features/orders/cancelledOrderWiring.test.ts` | 5 | cancelled order wiring |
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 25 | reference and channel safety |
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
@@ -220,7 +225,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/documentLang.test.ts` | 6 | applyDocumentLang |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
-| `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
+| `apps/mobile/src/i18n/strings.test.ts` | 11 | STRINGS |
 | `apps/mobile/src/lib/catalogSelect.test.ts` | 5 | catalog select lists |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
 | `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
@@ -261,7 +266,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-131 files, 1779 declared test blocks.
+133 files, 1808 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -276,7 +281,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LazywaitPanel.test.tsx` | 5 | LazywaitPanel |
-| `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
+| `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
@@ -284,7 +289,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 14 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
-| `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
+| `src/components/admin/OperationsHealthPanel.test.tsx` | 7 | OperationsHealthPanel — push failure metrics |
 | `src/components/admin/PushToolsPanel.test.tsx` | 2 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
@@ -298,14 +303,16 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/branches/DeliveryAreasEditor.test.tsx` | 10 | DeliveryAreasEditor |
 | `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
 | `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
-| `src/components/admin/view/health/HealthSystemCard.test.tsx` | 5 | branch_availability health card |
-| `src/components/admin/view/health/healthView.test.ts` | 22 | polling contract |
-| `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 4 | admin rule filter ↔ watchdog rule set |
+| `src/components/admin/view/health/HealthSystemCard.test.tsx` | 6 | branch_availability health card |
+| `src/components/admin/view/health/healthView.test.ts` | 25 | polling contract |
+| `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 5 | admin rule filter ↔ watchdog rule set |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 4 | OrderReceiptModal — customer note |
 | `src/components/admin/view/orders/ordersView.test.ts` | 28 | needsPaymentConfirm — the money contract |
 | `src/components/admin/view/orders/PaymentDetails.test.tsx` | 7 | a Moyasar payment |
+| `src/components/admin/view/orders/paymentsAttentionView.test.ts` | 8 | which failed reads hide the card |
+| `src/components/admin/view/orders/PaymentsNeedingAttentionCard.test.tsx` | 10 | what staff are shown |
 | `src/components/admin/view/PushBell.test.tsx` | 9 | pushBellLabel |
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 21 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
@@ -399,7 +406,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-41 files, 932 declared test blocks.
+42 files, 949 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -422,13 +429,14 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasar.test.ts` | 118 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 24 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
-| `supabase/functions/_shared/moyasarRefund.test.ts` | 38 | moyasarRefundUrl / moyasarPaymentUrl |
+| `supabase/functions/_shared/moyasarRefund.test.ts` | 42 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
-| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 9 | no invoice outlives its attempt (C1 part 4) |
+| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 11 | no invoice outlives its attempt (C1 part 4) |
 | `supabase/functions/_shared/paymentPosTiming.test.ts` | 2 | when the POS receives a card payment |
+| `supabase/functions/_shared/paymentRefundQueue.test.ts` | 8 | one stuck refund no longer takes every claim of a run |
 | `supabase/functions/_shared/paymentSyncDisclosure.test.ts` | 7 | what the POS receives about a card payment |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
-| `supabase/functions/_shared/paymentWiring.test.ts` | 68 | payment functions talk to Moyasar only |
+| `supabase/functions/_shared/paymentWiring.test.ts` | 71 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |

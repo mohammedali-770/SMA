@@ -108,6 +108,34 @@ servers: Moyasar's terms forbid it
    then re-fetches the payment itself and runs the same confirmation. A webhook
    body is never evidence of payment.
 
+### The older order-first path, and why it can no longer pay a cancelled order
+
+`payment-initiate` also accepts an `orderId`: pay for an order that already
+exists, unpaid, with `payment_method = 'online'`. The app has not used it since
+the checkout-session flow (above); it remains for the orders it was built for.
+Live on 2026-11-14 (read-only), the only unpaid online orders are three
+cancelled ones from 2026-07-12, on one account.
+
+`20261012120000_cancelled_orders_guard` (written 2026-11-14, **not applied**)
+closes it from both ends, with no deploy:
+
+- **No new order-first orders.** `place_customer_order`, the RPC every signed-in
+  customer may call, refuses an online order (gap PG-27). The app sends `cash`
+  there.
+- **No invoice for a cancelled order.** `begin_payment_attempt` refuses one
+  (P0001 `Order is cancelled`) before it reuses or opens an attempt.
+  `payment-initiate` answers that with a 400, *Could not start the payment.
+  Please try again.*, and never reaches the invoice create
+  (`paymentWiring.test.ts` pins it). This is what makes the
+  `OWNER_ACTIONS.md` §47.13 warning about the three July orders go away, once
+  the file is applied. Applying it before §47.13 step 1 is recommended, not
+  required: §47.13 also lists a live write to the three orders, or accepting the
+  risk, and which to take is the owner's. Until one of them is done, the
+  TEST-mode refusal is what keeps them unpayable.
+
+`place_order` and `compute_order_snapshot` are unchanged
+(`12b6816d…` / `22e2d429…`), and the file asserts it.
+
 ### Two ids
 
 | Id | Where it is stored | When it exists |
@@ -289,9 +317,42 @@ older invoice-carrying attempts, newest first:
 It then reads the session once more, and answers `paid` if an order now exists.
 
 **A total under 1.00 SAR.** The new build clears the saved session and says
-"Online payment needs a total of at least 1.00 SAR. Use fewer points, or pay in
-cash." Older builds show "Online payment is unavailable right now."; the server
-retires the session, so `payment-verify` then answers it terminal.
+"Online payment needs a total of at least 1.00 SAR. Turn off points for this
+order, or pay in cash." Older builds show "Online payment is unavailable right
+now."; the server retires the session, so `payment-verify` then answers it
+terminal. Until 2026-11-14 the new build's message said "Use fewer points",
+which the app cannot do: points are all or nothing, because the switch sends
+the whole balance (gap PG-05). The change is on branch
+`fix/checkout-points-preview-20261114` and reaches customers with the
+`OWNER_ACTIONS.md` §47.17 build. Points that cover the whole order are fine:
+it is settled at once, with nothing to charge. Points are the usual cause of a
+total under 1.00 SAR, but not the only possible one: a fixed-amount coupon, or
+an order of a single item priced near 1.00 SAR, could leave one with points
+off, and then the first half of the message does not apply. Whether any live
+coupon or item can do that was not measured for this change.
+
+**The summary shows what the card page will ask for.** With points on, the
+checkout summary now uses the server's own points rule: only whole points that
+fit the order, and none when fewer than `min_points_to_redeem` fit (100 points
+at 0.10 on 2026-11-14, so an order under SAR 10.00 before points uses none).
+Until 2026-11-14 it took the balance times the point value, so a SAR 8.00
+pickup order read 0.00 and Moyasar's page then asked for 8.00 (gap PG-31). The
+switch now also says "Points can be used when the total before points is
+10.00 SAR or more." when that is why no points are used, and a screen reader
+reads it as part of the switch. `previewParity.test.ts` checks the summary
+against the real `compute_order_snapshot` for 23 carts; detail in
+[`LOYALTY.md`](LOYALTY.md) §1. Same branch. App customers get it with the same
+build; the web checkout at `/app` gets it as soon as the branch is merged,
+because a merge deploys the web build (CLAUDE.md §13).
+
+What it matches is the server's rule for the settings and balance the app last
+loaded. `min_points_to_redeem` and `discount_per_point` come from the settings
+row the app reads once at launch, and the balance from the cached profile, so an
+administrator changing either setting while a customer has the app open, or a
+balance that moved elsewhere, can still make the summary differ from the card
+page until the app reloads. Only `loyalty_pickup_only` is re-read at submission.
+This was already true of `discount_per_point` before the change; re-reading the
+other two at submission is a possible follow-up, not part of this one.
 
 **Place order waits for a payment run.** In the new build, Place order does
 nothing while an online payment run (for example "Try again" from the status
@@ -347,10 +408,44 @@ not the worker.
   The 2026-11-12 review reproduced this on a local chain. It predates this
   change. The owner's answer "Automatic via Moyasar" therefore is not yet fully
   implemented; covering it needs an owner decision and its own change.
+- **Any cancelled paid order, once `20261012120000` is applied.** Until then, a
+  cancelled order that the branch never received could still be enrolled by the
+  rule above, after three failed resends, on top of the hand refund staff had
+  already made (gap PG-03). The trigger now skips a cancelled order. A refund
+  enrolled *before* the order was cancelled still runs, so look at the order's
+  refund status before refunding it by hand.
 - **A duplicate payment** (§10). Nothing refunds it automatically.
 
 Either one is refunded by hand in Moyasar's dashboard today. That is a live
 money action and an owner approval (§5 of CLAUDE.md).
+
+### Where staff see a refund problem
+
+**Written 2026-11-14, not live until `20261013120000` is applied** (on the
+branch `fix/payment-refund-visibility-20261114`, `MIGRATIONS.md` §65). Until
+then, no screen and no alert reads `order_refunds`.
+
+After it:
+
+- a refund that gave up (`failed`) raises the critical watchdog incident R14
+  `REFUND_FAILED`, unless another refund for the same order is pending,
+  processing or succeeded (only one such refund can exist per order, by the
+  index `order_refunds_one_active_uq`), or the order reads refunded. The incident reaches the alert
+  inbox through the Order Integrity card, and turns the payment card in
+  Operations Health to failing while the payment row is enabled and
+  configured;
+- Live Orders shows the card "Refunds and payments needing attention" to an
+  admin at AAL2. It lists those refunds under "Automatic refunds that stopped",
+  and every refund tried at least once and still pending under "Refunds still
+  being retried", with its attempts and the reason for its last release. It has
+  no refund button: the instruction on each section is to check the payment in
+  Moyasar's dashboard and refund it there by hand (§10). It is rendered only
+  for the admin role, re-reads every 60 seconds, and stops re-reading after a
+  refusal (an admin not at AAL2) or before the migration is applied, so a
+  refused request is not sent every minute.
+
+Nothing records a refund made by hand (gap PG-14), so after one the incident
+and the card row stay until that is decided.
 
 ### How the worker runs
 
@@ -366,6 +461,28 @@ money action and an owner approval (§5 of CLAUDE.md).
    function answers 503 and does nothing.
 4. The worker claims up to 5 refunds, one at a time, and sends
    `POST /v1/payments/{payment id}/refund` with the amount in halalas.
+
+**The queue order, written 2026-11-14 (gap PG-01).** Live today, a claim takes
+the OLDEST pending refund by `created_at`. A refund released as `pending` stays
+the oldest, so the next claim of the same run takes it straight back: one stuck
+refund uses all 5 claims of every run, up to 1,440 a day, and every newer refund
+waits. On the branch `fix/payment-refund-visibility-20261114`:
+
+- `claim_order_refund` takes the least recently touched pending refund first
+  (`updated_at`, then `created_at`), so a refund just released goes to the back
+  of the queue. This needs only `20261013120000` applied;
+- `payment-refund` passes the ids it has already claimed in the run, and the
+  claim skips them, so a refund is tried at most once per run: one stuck refund
+  then costs one claim a run, up to 288 a day. This needs the apply AND then the
+  deploy, in that order: the new worker deployed first claims nothing;
+- a refund released as `pending` now records why: `provider_no_answer` (a
+  network, proxy or timeout failure), `http_429`, a server error such as
+  `http_503`, `refund_not_final`, `key_unavailable` or `reconcile_unavailable`.
+  The last two say nothing was sent.
+
+There is still **no attempt cap and no back-off**, and no age after which a
+pending refund counts as stuck. Those numbers are the owner's
+(`OWNER_ACTIONS.md` §55).
 
 **Settled 2026-11-13: `refund_trigger_secret` is present on the payment row**
 (read by length only: 64). The paragraph below is the 2026-11-11 position.
@@ -396,9 +513,12 @@ A 401 whose message names the IP allow-list is classified `pending` with
 `failure_code = 'moyasar_ip_not_allowed'`, and the claim is released, the same
 path as a 429 or a 5xx. The order stays `refund_state = 'pending'` and does not
 appear in `list_failed_order_refunds()`. **There is no attempt cap**: until the
-proxy and Allowed IPs are fixed, every cron run claims and releases it again.
-Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a bad
-key) is a definitive failure.
+proxy and Allowed IPs are fixed, every cron run claims and releases it again,
+five times a run today and once a run after `20261013120000` and the
+`payment-refund` deploy (above). After the apply it is listed under "Refunds
+still being retried" with the reason "Moyasar refused our address (Allowed
+IPs)". Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a
+bad key) is a definitive failure.
 
 ---
 
@@ -700,13 +820,40 @@ The order-first race is decided under the order's row lock
 record.
 
 **Nothing refunds a duplicate automatically.** Making it automatic needs an owner
-decision. Nothing alerts on it either: no watchdog rule or alert reads
-`duplicate_payment` (the watchdog's double-capture rule counts `paid` rows, and a
-duplicate is `failed`).
+decision (refund draft D2). **Live today, nothing alerts on it either:** no
+watchdog rule or alert reads `duplicate_payment` (the watchdog's double-capture
+rule counts `paid` rows, and a duplicate is `failed`).
 
-**Finding them.** The console has no list of them. The order receipt shows only
-the **newest** payment row for an order, so it may show the duplicate or hide it,
-and a duplicate with no order id appears on no receipt. Use a read-only query:
+**Written 2026-11-14, not live until `20261013120000` is applied** (gap PG-02,
+`MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
+`DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and, while the
+payment row is enabled and configured, turns the payment card to failing. The
+Live Orders card "Refunds and payments needing
+attention" lists it under "Payments to refund", with the Moyasar payment id to
+search for.
+
+**Two neighbours are handled the same way, and are money taken for nothing:**
+
+- **a payment that settled but matched nothing** (wrong invoice, amount,
+  currency or mode). Its attempt is `failed` with
+  `failure_code = 'verification_mismatch'` and confirms nothing. The payment id
+  is in the sanitized `raw`, not in `provider_ref`. After the apply: R16
+  `PAYMENT_VERIFICATION_MISMATCH`, and the same "Payments to refund" list.
+  Check it in Moyasar's dashboard, then refund it;
+- **a payment whose order was not created or not marked paid.** Only an
+  `integration_sync_logs` row records it: `error = 'finalize_failed'` (session
+  flow, no order exists) or `'confirm_failed'` (order flow, the order is not
+  marked paid), with the payment id in `request`. After the apply: R17
+  `PAYMENT_CONFIRMATION_FAILED`, one incident per payment, and the list "Paid,
+  but no confirmed order". If an order is named, open it and use "Re-verify via
+  Moyasar" on the receipt first. If there is no order, or it stays unpaid,
+  refund the payment by hand. The incident ends when a later verify confirms the
+  payment.
+
+**Finding them.** Until the apply, the console has no list of them. The order
+receipt shows only the **newest** payment row for an order, so it may show the
+duplicate or hide it, and a duplicate with no order id appears on no receipt.
+Use a read-only query:
 
 ```sql
 select id, order_id, checkout_session_id, provider_ref as moyasar_payment_id,
@@ -726,6 +873,11 @@ the amount shown. That is a live money action and needs owner approval each
 time. Afterwards there is no column to mark the row refunded; record what was
 done (date, payment id, who) in the incident notes. Never refund the payment on
 the `paid` row.
+
+**After a hand refund the incident and the card row stay** (gap PG-14): nothing
+records the refund, and acknowledging an incident marks it seen without
+removing it from the counts. Until PG-14 is decided, the written record is the
+only proof the money went back.
 
 ---
 
@@ -757,8 +909,10 @@ For the owner:
 
 - automatic refund of a duplicate payment (§10), and of a cancelled paid order
   the branch accepted (§6);
-- whether a refund refused by Allowed IPs should stop after some number of
-  attempts;
+- how many times a refund is tried, the wait between tries, and when a pending
+  refund counts as stuck (PG-01; any cause, not only Allowed IPs);
+- who receives payment alerts outside the console (PG-10), and how a hand
+  refund is recorded (PG-14);
 - whether `set_payment_settings` should also refuse Online Payment unless the
   row is live (a migration);
 - whether the webhook verification code may stay readable by accountants;
@@ -781,7 +935,28 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   same session, the second is recorded as a duplicate and must be refunded by
   hand.
 - **Duplicates are manual.** See §10.
-- **Allowed IPs refusal has no attempt cap** (§6).
+- **Refunds have no attempt cap and no back-off** (§6, PG-01). Until
+  `20261013120000` is applied and `payment-refund` redeployed, one stuck refund
+  takes all five claims of every run. After both, it takes one.
+- **Until `20261013120000` is applied, no refund or payment problem reaches a
+  screen or an alert** (PG-01, PG-02). After it they reach the console's alert
+  inbox; outside the console they reach nobody until external alert email is on
+  (PG-10).
+- **A hand refund is recorded nowhere** (PG-14), so its incident and card row
+  stay listed after the money has gone back.
+- **Until `20261013120000` is applied, an abandoned card checkout makes the
+  payment card read "degraded"** for up to 24 hours (PG-25). After it, only a
+  payment that settled without a confirmed order does, **provided a verify
+  ran on it**: the webhook, or the customer's return to the app.
+- **A payment nobody verified is not detected.** If a customer pays and closes
+  the tab, and the webhook also never arrives, the attempt stays `initiated`
+  with no payment id, exactly like an abandoned checkout. No watchdog rule and,
+  after `20261013120000`, no health state reads it; the payment card shows it
+  only inside the figure "Open unverified 24h", which counts abandoned
+  checkouts too and does not move the state. **Open, not built:** a sweep that
+  asks Moyasar about each attempt still open after its invoice expired, and
+  confirms or flags the ones that were paid. That is a new scheduled job and a
+  deploy, so it is its own change.
 - **The Online Payment guard is console-only** (§3).
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the
@@ -803,6 +978,31 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 - **If Moyasar serves the hosted page from another domain**, online payment
   fails closed until the URL rule is updated (§2).
 
+Added 2026-11-14 with `20261012120000_cancelled_orders_guard` (gap PG-03; not
+applied):
+
+- **A refund enrolled before an order is cancelled still runs.** Refunding that
+  order by hand as well would refund it twice. Check the order's refund status
+  first (§6).
+- **A payment that is captured for a cancelled order is still recorded.** Money
+  taken is never refused (`confirm_order_payment`), the order is not sent to the
+  kitchen, and nothing refunds it automatically, so it is a hand refund. After
+  the apply no attempt can be opened for a cancelled order, and on 2026-11-14
+  there were 0 Moyasar attempts live, so this needs an attempt opened before
+  the apply.
+- **Builds already installed still show Resend on a cancelled order.** After the
+  apply the server refuses it and nothing happens. The new state ships in the
+  next EAS build (`OWNER_ACTIONS.md` §47.17).
+- **A cancelled order left in the POS queue gets a "could not send" push** when
+  its deadline passes, and an admin Retry can put one back in the queue
+  (`ORDER_CONFIRMATION_FLOW.md` §11). Neither sends anything to the kitchen.
+- **An order cancelled in the few seconds after the worker claims it is still
+  sent to the kitchen.** The worker's last check before it sends reads the sync
+  state, not the order's status (`LAZYWAIT.md`, *Retry / backoff /
+  dead-letter*). Measured on a local chain on 2026-11-14; not fixed here. A
+  paid order sent this way is still refunded by hand if the customer is owed
+  one.
+
 ---
 
 ## 13. Arabic that needs a native read
@@ -811,10 +1011,16 @@ All engineering-drafted.
 
 Customer-facing:
 
-- `payBelowMinimum`: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. استخدم نقاطاً أقل، أو ادفع نقداً.»
+- `payBelowMinimum`: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.» Rewritten 2026-11-14 (gap PG-05); it said «استخدم نقاطاً أقل» before. «استبدال» is the points switch's own word (`useLoyalty`).
+- `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00. It names the total before points, not the order, because the minimum is judged after any coupon.
 - payment screen footer: «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.»
 - web stand-in: «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.»
 
 Staff-facing: the Moyasar panel, payment card, receipt and Settings strings
 added on 2026-11-11 (in `MoyasarPaymentPanel.tsx`, `PaymentDetails.tsx`,
 `SettingsPanel.tsx` and the alert and health labels).
+
+Staff-facing, added 2026-11-14: the Live Orders card "Refunds and payments
+needing attention" (37 `payattn_*` strings in
+`src/components/admin/adminLocales.ts`) and the Operations Health line for a
+stale payment. Each is listed in `OWNER_ACTIONS.md` §35.

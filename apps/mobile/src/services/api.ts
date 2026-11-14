@@ -389,9 +389,12 @@ export const orders = {
    * branch. The SERVER owns every rule: ownership, the proven-not-sent safety
    * check (a resend can never duplicate a POS ticket) and the attempt budget.
    *
-   * The response deliberately carries NO reason and NO counter — only an opaque
-   * outcome plus the freshly derived state, so the attempt limit is never
-   * disclosed to the client.
+   * The response deliberately carries NO counter — only an opaque outcome plus
+   * the freshly derived state, so the attempt limit is never disclosed to the
+   * client. One refusal adds a reason (20261012120000): a CANCELLED order is
+   * answered with `reason: 'order_cancelled'` and an English `message`, which
+   * discloses nothing the customer cannot already see. ReceiptScreen shows its
+   * own translation of that message.
    *
    * DO NOT RENDER FROM `state`. This comment used to end "the UI renders from
    * `state` alone", and that was never what the caller did: ReceiptScreen
@@ -406,7 +409,7 @@ export const orders = {
    * remains the authority for what is displayed; `state` is advisory only.
    */
   requestResend: async (id: string) =>
-    ok<{ outcome: 'accepted' | 'unavailable'; state: string }>(
+    ok<{ outcome: 'accepted' | 'unavailable'; state: string; reason?: string; message?: string }>(
       await supabase.rpc('request_customer_pos_resend', { p_order_id: id })),
 };
 

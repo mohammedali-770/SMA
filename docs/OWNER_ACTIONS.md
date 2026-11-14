@@ -2816,7 +2816,9 @@ Customer-facing, in the app (ships with the EAS build in §47.17):
   web build a trial version;
 - `payBelowMinimum` (`apps/mobile/src/i18n/strings.ts`), shown when points leave
   a total under 1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال.
-  استخدم نقاطاً أقل، أو ادفع نقداً.»
+  استخدم نقاطاً أقل، أو ادفع نقداً.» **Superseded 2026-11-14: rewritten on
+  branch `fix/checkout-points-preview-20261114` (gap PG-05). Read the new text
+  in the 2026-11-14 entry at the end of this section, not this one.**
 
 Admin-facing, in the console (live on merge):
 
@@ -2887,6 +2889,125 @@ is customer legal text, so rank it with the consent copy above. Read the Arabic
 12). Each draft lists its points for the reader. All of it must be read before
 the publishing session in §47.15: until then, nothing is published in either
 language.
+
+**Widened 2026-11-14 — the checkout points fix (gaps PG-05 and PG-31).** Two
+customer-facing strings in `apps/mobile/src/i18n/strings.ts`, both
+engineering-drafted, on branch `fix/checkout-points-preview-20261114`.
+`payBelowMinimum` reaches customers only with the §47.17 build, because the web
+build takes no card payment. `loyaltyOrderTooSmall` also appears in the web
+checkout at `/app` as soon as the branch is merged, because a merge deploys the
+web build (CLAUDE.md §13); if you want it read before anyone sees it, read it
+before that merge:
+
+- `payBelowMinimum`, rewritten. Shown when a card payment would be under
+  1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال
+  النقاط في هذا الطلب، أو ادفع نقداً.» — English: *"Online payment needs a total
+  of at least 1.00 SAR. Turn off points for this order, or pay in cash."* It
+  used to say «استخدم نقاطاً أقل» ("use fewer points"), which the app cannot do.
+  «أوقف استبدال النقاط» deliberately reuses «استبدال», the word on the switch
+  itself (`useLoyalty`, «استبدال نقاط الولاء»), and matches the payment policy
+  draft's own sentence;
+- `loyaltyOrderTooSmall`, new. Added after the balance under the points switch,
+  when the switch is on and the order is too small for any points to be used:
+  «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو
+  أكثر.» — English: *"Points can be used when the total before points is
+  {amount} SAR or more."* The app replaces `{amount}` with a figure such as
+  10.00. It names the total, not the order, because the server judges the
+  minimum after any coupon: with the 15% coupon, an 11.00 order comes to 9.35
+  and uses no points. An earlier draft on the same branch said «في الطلبات التي
+  تبلغ قيمتها» ("on orders of"), which read wrong beside that 11.00 subtotal.
+  Check that «الإجمالي قبل خصم النقاط» reads naturally, and that a screen
+  reader reading the switch's name and this note together sounds right.
+
+**Widened 2026-11-14 — a cancelled order** (gap PG-03, branch
+`fix/cancelled-orders-guard-20261114`; `apps/mobile/src/i18n/strings.ts`, ships
+with the §47.17 build). Customer-facing:
+
+- `oc_cancelled` — «تم إلغاء الطلب» — *"Order cancelled"*, the receipt title;
+- `oc_cancelled_body` — «تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع.» —
+  *"Your order was cancelled. Contact support if this is unexpected."*;
+- `oc_resend_cancelled` — «تم إلغاء هذا الطلب، لذلك لم يُرسل إلى الفرع.» — *"This
+  order was cancelled, so it was not sent to the branch."*, shown under Resend
+  when the order was cancelled after the receipt opened.
+
+The first two are not new wording: they are the Arabic of the "cancelled" status
+push (`push-dispatch` `STATUS_COPY`, in the deployed function), and a test keeps
+the two identical, so a correction made here must be made in the push too.
+Whether that push copy ever had a native read is not recorded. The third is new
+and engineering-drafted. Check «لذلك» reads naturally there.
+
+**Widened 2026-11-14 — "Refunds and payments needing attention" (§55).**
+Staff-facing, in the console's Live Orders. All engineering-drafted, none read
+by a native speaker. It goes live with the merge but shows only after
+`20261013120000` is applied. The English sits under the same key in
+`src/components/admin/adminLocales.ts`. Read the four instructions first: they
+tell a person what to do with a customer's money.
+
+The four instructions:
+
+- `payattn_unconfirmed_do` — «خصم Moyasar المبلغ، لكن الطلب لم يُنشأ أو لم يُعلَّم مدفوعاً. إن ظهر رقم طلب فافتحه واستخدم «إعادة التحقق من الدفع عبر Moyasar». وإن لم يوجد طلب، أو بقي غير مدفوع، فاسترد المبلغ يدوياً من لوحة Moyasar.»
+- `payattn_payments_do` — «هذه المدفوعات لم تدفع ثمن أي طلب: دفعة ثانية لعملية دفع واحدة، أو دفعة لا تطابق عملية الدفع. ابحث عن كل منها في لوحة Moyasar برقم الدفعة، وتحقّق منها، ثم استردها يدوياً. لا تسترد أبداً الدفعة المدفوعة للطلب نفسه.»
+- `payattn_failed_do` — «توقف الاسترداد التلقائي. ابحث عن الدفعة في لوحة Moyasar برقمها. إذا لم تُسترد بعد، فاستردها يدوياً من هناك.»
+- `payattn_retrying_do` — «ستعيد مهمة الاسترداد المحاولة في تشغيلها التالي. يوضح السبب ما أوقف المحاولة الأخيرة. إذا ذكر قائمة عناوين IP المسموح بها أو المفتاح أو عدم استجابة Moyasar، فراجع إعدادات Moyasar والوسيط (البروكسي).»
+
+The card's title, subtitle, error and section titles:
+
+- `payattn_title` — «استردادات ومدفوعات تحتاج متابعة»
+- `payattn_sub` — «مبالغ قد تكون مستحقة للعملاء، الأقدم أولاً. الاسترداد اليدوي من لوحة Moyasar لا يُسجَّل هنا: دوّن التاريخ ورقم الدفعة ومن قام به.»
+- `payattn_error` — «تعذّر تحميل الاستردادات والمدفوعات التي تحتاج متابعة. حاول مرة أخرى بعد قليل.»
+- `payattn_unconfirmed_title` — «مدفوع دون طلب مؤكَّد»
+- `payattn_payments_title` — «مدفوعات يجب استردادها»
+- `payattn_failed_title` — «استردادات تلقائية توقفت»
+- `payattn_retrying_title` — «استردادات قيد إعادة المحاولة»
+
+Row labels:
+
+- `payattn_kind_duplicate` — «خُصم مرتين»
+- `payattn_kind_mismatch` — «لا تطابق عملية الدفع»
+- `payattn_no_order` — «بلا طلب»
+- `payattn_payment_id` — «رقم الدفعة»
+- `payattn_attempts` — «المحاولات»
+- `payattn_since` — «منذ»
+- `payattn_last_try` — «آخر محاولة»
+- `payattn_logged_times` — «مرات التسجيل»
+- `payattn_more` — «أخرى غير معروضة», shown after a number, as in «+2 أخرى غير معروضة»
+- `payattn_test_mode` — «دفعة تجريبية», on a payment made with the test keys
+
+The reasons, one per stored failure code:
+
+- `payattn_reason_provider_no_answer` — «لا استجابة من Moyasar (الشبكة أو الوسيط أو انتهاء المهلة)»
+- `payattn_reason_reconcile_unavailable` — «تعذّر سؤال Moyasar عن المحاولة الأخيرة»
+- `payattn_reason_key_unavailable` — «لا يوجد مفتاح Moyasar صالح لهذه الدفعة»
+- `payattn_reason_ip_not_allowed` — «رفض Moyasar عنواننا (قائمة عناوين IP المسموح بها)»
+- `payattn_reason_rate_limited` — «طلب Moyasar إبطاء الطلبات»
+- `payattn_reason_not_final` — «لم يُكمل Moyasar الاسترداد بعد»
+- `payattn_reason_lease_expired` — «توقفت مهمة الاسترداد في منتصفها؛ راجع Moyasar أولاً»
+- `payattn_reason_no_payment_id` — «لا يوجد رقم دفعة مسجّل لهذا الطلب»
+- `payattn_reason_old_provider` — «دُفع عبر مزوّد دفع لم يعد مستخدماً»
+- `payattn_reason_ambiguous` — «رد Moyasar غير متسق؛ تحقّق منه يدوياً»
+- `payattn_reason_not_refundable` — «يفيد Moyasar بأن هذه الدفعة لا يمكن استردادها»
+- `payattn_reason_order_not_created` — «تعذّر إنشاء الطلب»
+- `payattn_reason_order_not_paid` — «تعذّر تعليم الطلب مدفوعاً»
+- `payattn_reason_server_error` — «خطأ في خادم Moyasar»
+- `payattn_reason_refused` — «رفض Moyasar الاسترداد»
+- `payattn_reason_other` — «أخرى», followed by the raw code in brackets
+
+And one Operations Health line, `STALE_PAYMENT_INITIATIONS` in
+`src/components/admin/view/health/healthView.ts`, which now describes money
+taken rather than an abandoned checkout (PG-25): «تمت دفعة لدى Moyasar، لكن
+طلبها لم يُؤكَّد خلال 30 دقيقة.» — English: *"A payment went through at
+Moyasar, but its order was not confirmed within 30 minutes."*
+
+And one Operations Health figure on the payment card, in
+`src/components/admin/view/health/HealthSystemCard.tsx`, which counts open
+checkouts that no payment was verified on (PG-25, added 2026-11-14):
+«عمليات مفتوحة دون تحقق 24س» — English: *"Open unverified 24h"*. It sits beside
+the existing «عمليات عالقة 24س» (*"Stale 24h"*), and the two must read as
+different things.
+
+Words to check first: «الوسيط (البروكسي)» for the outbound proxy, «قائمة عناوين
+IP المسموح بها» for Moyasar's Allowed IPs, and «يُعلَّم مدفوعاً» for "marked
+paid".
 
 **Widened 2026-11-14 — one summary line** (`apps/mobile/src/features/profile/dataExport.ts`,
 `summaryLine`), shown under *Get a copy of my data* after the customer shares
@@ -4337,6 +4458,15 @@ call: it pays only through checkout sessions. Close it before step 1 (a code fix
 or a live write to those orders, each its own approval), or accept it. Gap PG-27
 is the same older path.
 
+**The code fix is now written: `20261012120000_cancelled_orders_guard`** (branch
+`fix/cancelled-orders-guard-20261114`, 2026-11-14, **not applied**).
+Once applied, `begin_payment_attempt` refuses a cancelled order, so
+`payment-initiate` answers a 400 and opens no invoice, and
+`place_customer_order` creates no new online order. It needs no deploy.
+Applying it (§54) before step 1 closes this warning. The other choices above
+still stand; which one to take, and when, is yours. Until something is done,
+the TEST-mode refusal is what keeps the three orders unpayable.
+
 ### 47.14 Make sure the payment row is enabled
 
 It is enabled, in TEST mode, since 2026-11-13 18:17:02 UTC, for the sandbox
@@ -4476,7 +4606,13 @@ guard that makes Place order do nothing while a payment run is in flight, and th
 
 **The app-side gap fixes must be in this build** (the gaps list, top of §47):
 PG-03, PG-04, PG-05, PG-20 if you choose the code fix, and PG-31. A fix that
-misses it needs another build and another store review.
+misses it needs another build and another store review. PG-05 and PG-31 are
+fixed on branch `fix/checkout-points-preview-20261114` (2026-11-14): this build
+carries them only if that pull request is merged before it starts. Their device
+checks are in `RELEASE_CHECKLIST.md` §7 ("A total under 1.00 SAR" and "Points
+on an order under SAR 10.00"). PG-03's app half (a
+cancelled order reads "Order cancelled" and offers no Resend) is on branch
+`fix/cancelled-orders-guard-20261114`, with its server half (§54).
 
 **Builds already in customers' hands keep their old behaviour.** In LIVE mode
 they open Moyasar's page in the system browser, which works but offers no Apple
@@ -4590,7 +4726,10 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   An admin cancelling a paid online order reverses loyalty points and refunds no
   money. Until that changes, refund a cancelled paid order by hand in the Moyasar
   dashboard. Making cancellation refund automatically is a code and migration
-  change.
+  change. Once `20261012120000` is applied (§54), the POS-failure rule also skips
+  a cancelled order, so the hand refund cannot be followed by an automatic one
+  after failed resends (gap PG-03). A refund enrolled before the cancellation
+  still runs: check the order's refund status before refunding by hand.
 - **A duplicate payment is recorded, not refunded.** If a customer pays twice for
   one order or checkout session, the second payment is recorded as a `failed`
   `payment_records` row with `failure_code = 'duplicate_payment'` and the message
@@ -4913,6 +5052,136 @@ There is no number to decide and no function to deploy.
 
 **Done looks like:** all three applies recorded as ledger rows in
 `docs/MIGRATIONS.md`, and §61 and §62 marked APPLIED.
+
+## 54. A cancelled order is never resent, sent, refunded automatically or paid — one apply
+
+**Opened 2026-11-14.** Gaps PG-03 and PG-27
+(`readiness/20261113-card-payments-gaps.md`), and the §47.13 warning. Branch
+`fix/cancelled-orders-guard-20261114`. Nothing about it is a decision: the gaps
+list says "Approve" for both.
+
+**What it stops, in one line each.** Resend on a cancelled order (it printed a
+ticket); the worker sending a cancelled order that was still queued; an
+automatic refund on top of a hand refund; a direct API call creating an unpaid
+online order; and an invoice being opened for one of the three cancelled July
+online orders once the gateway is live. Detail: `docs/MIGRATIONS.md` §64.
+
+**There is no number to decide and no function to deploy.** `payment-initiate`
+already answers the new refusal with a 400 and opens no invoice.
+
+### The steps, each its own approval (CLAUDE.md §5)
+
+1. **Merge the pull request.** The console is not touched. A merge does ship
+   the web build `/app` (CLAUDE.md §13), so from then on `/app` shows a
+   cancelled order as "Order cancelled" with no Resend. That reads only the
+   order's status, so it is right whether or not step 2 has happened. The
+   phone apps get it only in the §47.17 build.
+2. **Apply `20261012120000_cancelled_orders_guard` by name.** Recommended
+   before §47.13 step 1, which is what closes that section's warning; the
+   warning's other choices are still yours (§47.13). Re-hash the merged copy first (`docs/MIGRATIONS.md` §64 has the
+   sha256). Never "the outstanding migrations". The file refuses to apply if
+   any of the six functions it replaces is not the definition it was written
+   against, or if the money-path pair has moved; if it refuses, nothing has
+   changed, and the file must be re-derived, not forced.
+3. **Check afterwards, read-only:** one overload of each of the six functions;
+   `anon` executes none of them; `authenticated` still executes
+   `request_customer_pos_resend` and `place_customer_order`; the money-path pair
+   unchanged (`12b6816d…` / `22e2d429…`); no order or branch whose name starts
+   `VERIFY-20261012120000-` exists (the file's own probe rows, which it rolls
+   back).
+
+**Done looks like:** the apply recorded as a ledger row in `docs/MIGRATIONS.md`,
+§64 marked APPLIED, the §47.13 warning marked closed, and rows PG-03 and PG-27
+of the gaps list marked live for their server half. PG-03's app half is live
+only when the §47.17 build is in customers' hands.
+
+## 55. Refunds and payments needing attention — one apply, then one deploy
+
+**Opened 2026-11-14.** The branch `fix/payment-refund-visibility-20261114`
+fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
+([the card-payment gaps](readiness/20261113-card-payments-gaps.md)):
+
+- **One stuck refund no longer takes every refund claim.** A refund the job
+  could not finish goes to the back of the queue, and the job tries each refund
+  at most once per run. Before, one stuck refund was claimed 5 times a run, up
+  to 1,440 times a day, and every newer refund waited behind it. **The two
+  halves arrive at different steps.** The apply alone (step 2) puts a released
+  refund behind the others, so a newer refund is no longer starved. The
+  once-per-run limit, and with it the cut from about 1,440 to about 288 Moyasar
+  calls a day, comes only with the `payment-refund` deploy (step 4): the job
+  deployed today does not pass the list of refunds it has already tried, so
+  until step 4 it still claims one stuck refund 5 times a run. Measured on the
+  local chain on 2026-11-14 by calling the claim the old job's way after the
+  apply.
+- **Refund and payment problems reach staff.** A refund that gave up, a
+  customer charged twice, a payment that matched nothing, and a payment whose
+  order was not confirmed each raise a critical incident. The incident reaches
+  the alert inbox, and turns the payment card in Operations Health to failing
+  while the payment row is enabled and configured.
+  They are also listed on a new Live Orders card, "Refunds and payments needing
+  attention", with what to do: refund by hand in Moyasar's dashboard
+  ([`PAYMENTS.md`](PAYMENTS.md) §10). The card has no refund button.
+- **Abandoned card checkouts no longer read as "payment degraded"** (PG-25).
+  **One thing is given up, and it is stated here rather than buried.** A
+  customer who pays on Moyasar's page and closes the tab before coming back,
+  on a day the webhook also fails to arrive, leaves a payment nobody verified.
+  It looks exactly like an abandoned checkout in the database. Before the
+  change it made the card read "degraded", among every abandoned checkout;
+  after it, it no longer does, and no watchdog rule sees it either. So the
+  card keeps a separate figure, "Open unverified 24h", that counts those
+  attempts without moving the state. Finding the real payments among them
+  needs a sweep that asks Moyasar about each open invoice. That is not built;
+  it is listed as open in [`PAYMENTS.md`](PAYMENTS.md) §12.
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** The console card ships with the merge and hides
+   itself until step 2, because its function does not exist yet.
+2. **Apply `20261013120000` by name**, after the read-only checks in
+   [`MIGRATIONS.md`](MIGRATIONS.md) §65 step 1 and after re-hashing the merged
+   copy. Never "the outstanding migrations": other files may be outstanding.
+   The Operations Health line for a stale payment keeps its old wording until
+   this step: the console switches to "A payment went through at Moyasar…" only
+   when the server's snapshot shows the new count.
+3. **Check afterwards**, read-only, as §65 step 3 lists.
+4. **Deploy `payment-refund`**, only after step 2. Deployed first, the new job
+   claims nothing until the apply. Its cron job was inactive when read on
+   2026-11-14, so the deploy alone sends nothing. Until this step, a stuck
+   refund is still claimed 5 times a run (see above).
+5. **Open Live Orders once at AAL2.** With nothing owed the card is absent,
+   which is what to expect today: `order_refunds` was empty and no Moyasar
+   payment record existed when read on 2026-11-14.
+
+**Done looks like:** §65 marked APPLIED with a ledger row, and the deploy
+recorded.
+
+**Your decisions. None of these is made by this change; each is a
+recommendation:**
+
+- **How many tries, and the wait between them (PG-01).** Today a refund that
+  cannot finish is tried once every run (every 5 minutes) for ever: about 288
+  claims a day, each one or two Moyasar requests through the metered proxy.
+  *Recommended:* double the wait after each failed try, from 5 minutes up to 6
+  hours, and stop after 10 tries. Mark the refund failed with its last reason,
+  so it moves to "Automatic refunds that stopped" and raises R14. That is a
+  migration and a `payment-refund` change of its own.
+- **When a pending refund counts as stuck (PG-01).** The card lists every
+  refund already tried once, with its attempts and last reason, but nothing
+  raises an incident for a refund that is still being retried. *Recommended:* a
+  warning after one hour pending with at least one try, critical after 24 hours.
+- **Who receives these alerts outside the console (PG-10).** All four new rules
+  are critical, so they would pass the current `dispatch_min_severity`.
+  *Recommended:* turn external alert email on before §47.18 and name at least
+  two people who can refund in Moyasar's dashboard.
+- **Refund duplicates automatically, or by hand (refund draft D2).**
+  *Recommended:* by hand from this card until the first real duplicates have
+  been seen, then decide.
+- **How a hand refund is recorded (PG-14). This one now matters more.** Nothing
+  records a refund made in Moyasar's dashboard, so after one the incident stays
+  open, the payment card stays failing and the card row stays listed.
+  Acknowledging marks it seen and it still counts, by design. Today the only way
+  to end one is a database write, itself a §5 action. *Recommended:* the PG-14
+  code fix, and a written refund log until then.
 
 ## 56. "Get a copy of my data" with payment records — one apply
 

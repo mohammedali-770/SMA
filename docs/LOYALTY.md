@@ -17,7 +17,7 @@ redemption and configuration to this file, so behaviour and prose move together
 | `loyalty_enabled` | `true` | The programme is on |
 | `points_per_riyal` | `1.00` | 1 point per riyal payable |
 | `discount_per_point` | `0.10` | Each point is worth 0.10 SAR at redemption |
-| `min_points_to_redeem` | `100` | Nothing below 100 points can be spent |
+| `min_points_to_redeem` | `100` | An order uses no points at all when fewer than 100 whole points fit it, so at 0.10 a point an order under SAR 10.00 uses none; see "How many points an order uses" below |
 | `loyalty_pickup_only` | `true` (default) | **Pickup only** — see §2 |
 
 Earning and redemption both live in **two** SQL functions that must agree line
@@ -36,6 +36,40 @@ carries a test for it.
 `adjustment`), each row carrying `balance_after`. The order keeps its own record
 in `orders.loyalty_points_earned` / `_redeemed` / `loyalty_discount_amount` /
 `loyalty_awarded_at`.
+
+**How many points an order uses.** Read from the latest `place_order` and
+`compute_order_snapshot` on 2026-11-14 (`20260924120000`); both run the same
+lines. With the switch on, the app asks for the customer's whole balance; there
+is no way to ask for part of it. The server then uses
+`least(requested, balance, floor(amount before points / discount_per_point))`
+whole points, where the amount before points is the subtotal plus the delivery
+fee, less any coupon. If that is fewer than `min_points_to_redeem`, it uses
+**none**. So at the live settings an order under SAR 10.00 uses no points
+however large the balance, and a SAR 25.00 order with a 15% coupon (21.25)
+uses 212 points and leaves 0.05 to pay. A remainder under 1.00 SAR cannot be
+paid by card (`docs/PAYMENTS.md` §4).
+
+**The checkout summary shows the same figure.** Until 2026-11-14 it did not:
+`computePreviewTotals` took the balance times the point value, capped at the
+goods, so a SAR 8.00 pickup order read 0.00 while the server used no points and
+charged 8.00 (gap PG-31). It now runs the server's steps in whole halalas.
+`previewParity.test.ts` compares it with the real `compute_order_snapshot` for
+23 carts. Its fixture is written by `scripts/checkout-preview-parity.sh`, and
+`supabase/tests/checkout_preview_parity_test.sql` fails in CI if the server's
+answers for those carts ever change, so the two cannot drift apart unnoticed.
+When the switch is on and the order is too small for the minimum, the line
+under the switch adds "Points can be used when the total before points is
+10.00 SAR or more." It names the total, not the order: the server judges the
+minimum after any coupon and with any delivery fee, and while no points are
+used that is the Total line. Screen readers hear it too, because it is part of
+the switch's accessible name. The Arabic is engineering-drafted
+(`docs/OWNER_ACTIONS.md` §35). This is on branch
+`fix/checkout-points-preview-20261114`. App customers get it only with the
+`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
+branch is merged, because a merge deploys the web build (CLAUDE.md §13).
+Whether the minimum should apply to the balance held instead of the points used
+is an open owner decision (the payment draft's item 12); it is a server change,
+and this one does not make it.
 
 **Effective rate.** Earning 1 point per riyal and redeeming each at 0.10 SAR is a
 **10% rebate**. The QSR norm is 1–5%. That is a pricing decision, not an
@@ -505,7 +539,9 @@ Production read-only and found 0 campaigns, so no live campaign was shown wrong.
 | Suite | Covers |
 | --- | --- |
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
-| `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
+| `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default, whole points and the redemption minimum |
+| `apps/mobile/src/features/checkout/previewParity.test.ts` · `previewParity.fixture.json` | The client mirror against the **real** `compute_order_snapshot`: 23 carts (points on and off, balances under and over the minimum, totals around SAR 10.00, a 15% coupon, delivery, a comp), every amount equal. Regenerate the fixture with `bash scripts/checkout-preview-parity.sh` |
+| `supabase/tests/checkout_preview_parity_test.sql` | The server half of that check: the same carts through `compute_order_snapshot` and `place_order`, which must agree, reduced to a digest that must match the fixture's. A server change that moves any of these totals fails here first |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
 | `src/lib/loyaltyRulesSummary.test.ts` | The admin "rules in force" summary: silent when the programme is off, flags only the rules that REMOVE value, never prints a bare `null` |
 | `supabase/tests/loyalty_multipliers_test.sql` · `loyaltyCampaignState.test.ts` | Campaigns: neutral when empty, **identical to §3 with none live**, clamp-safe (points may exceed the total), specificity, windows, branch scope, composition with the channel gate and the comp, preview parity, and the bounds |

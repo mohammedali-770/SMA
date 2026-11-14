@@ -120,6 +120,10 @@ const ATTENTION_TEXT: Record<string, { en: string; ar: string }> = {
     en: 'Payment integrity incidents require investigation.',
     ar: 'توجد حوادث في سلامة الدفع تحتاج إلى مراجعة.',
   },
+  // The wording a server BEFORE 20261013120000 earns: it counts every attempt
+  // still initiated after 30 minutes, abandoned checkouts included. The console
+  // ships on merge, ahead of the apply, so this stays the default and the
+  // settled-only wording below is chosen only when the snapshot proves it.
   STALE_PAYMENT_INITIATIONS: {
     en: 'Payment attempts remained initiated for more than 30 minutes.',
     ar: 'عمليات دفع بقيت في حالة البدء لأكثر من 30 دقيقة.',
@@ -153,7 +157,34 @@ const ATTENTION_TEXT: Record<string, { en: string; ar: string }> = {
  * learned yet still has to appear. Silently dropping unknown codes would hide
  * exactly the incidents nobody has seen before.
  */
-export function attentionText(item: OperationsHealthAttention, lang: AdminLang): string {
+// Since 20261013120000 (gap PG-25) the count reads only attempts a payment
+// SETTLED on, so an abandoned checkout no longer raises it. It then means money
+// Moyasar took whose order was not confirmed within 30 minutes.
+const STALE_PAYMENT_SETTLED_TEXT = {
+  en: 'A payment went through at Moyasar, but its order was not confirmed within 30 minutes.',
+  ar: 'تمت دفعة لدى Moyasar، لكن طلبها لم يُؤكَّد خلال 30 دقيقة.',
+};
+
+/**
+ * True when the snapshot comes from a server with 20261013120000 applied, whose
+ * stale-payment count reads only settled attempts. That snapshot, and only that
+ * one, gives the payment card an `open_unverified_24h` key: the remainder the
+ * old count used to include. Its presence, not its value, is the proof.
+ */
+export function staleCountsSettledOnly(systems: readonly OperationsHealthSystem[] | null | undefined): boolean {
+  const payment = (systems ?? []).find((s) => s.id === 'payment');
+  const details = payment?.details;
+  return !!details && Object.prototype.hasOwnProperty.call(details, 'open_unverified_24h');
+}
+
+export function attentionText(
+  item: OperationsHealthAttention,
+  lang: AdminLang,
+  opts: { staleCountsSettledOnly?: boolean } = {},
+): string {
+  if (item.code === 'STALE_PAYMENT_INITIATIONS' && opts.staleCountsSettledOnly) {
+    return STALE_PAYMENT_SETTLED_TEXT[lang];
+  }
   return ATTENTION_TEXT[item.code]?.[lang]
     ?? `${item.subsystem}: ${item.code.replaceAll('_', ' ')}`;
 }

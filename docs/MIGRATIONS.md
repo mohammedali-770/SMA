@@ -58,6 +58,23 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-14 — `20261012120000_cancelled_orders_guard` is written,
+> validated and NOT applied (§64).** On merge it is outstanding, with any other
+> file merged unapplied since the read above. It replaces six function bodies so
+> that a cancelled order is never resent, claimed for the POS, enrolled for an
+> automatic refund or invoiced, and `place_customer_order` places no online
+> order. No deploy is implied; the money path is self-asserted. Applying it
+> before `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended; §47.13 lists the
+> owner's other two choices. **Name the target by version.**
+
+> **Updated 2026-11-14 — `20261013120000_payment_refund_visibility` is written,
+> validated and NOT applied (§65).** On merge it is outstanding. Other gap-fix
+> branches written the same day may add files of their own, so read the count
+> live rather than from here. It changes the refund claim order and adds four
+> watchdog rules, a console feed and the PG-25 filter; it sends, refunds and
+> writes nothing, and the money path is self-asserted. Apply it BEFORE deploying
+> `payment-refund`. **Name the target by version.**
+
 > **Updated 2026-11-13 (night) — `20261006120000` is APPLIED** (16:59:39 UTC,
 > live `20261113165939`, ledger row 113, §58), on the owner's approval naming it
 > by version. Live history **157 → 158**. **The outstanding set is THREE, and
@@ -8662,6 +8679,388 @@ change (CLAUDE.md §7). **MONEY PATH UNTOUCHED, and the file asserts it.**
 2. Apply `20261011120000` by name. Never "the outstanding migrations".
 3. Afterwards, read-only: the policy is absent; Push Tools still shows its two
    counts. Rollback is the one-line `create policy` at the foot of the file.
+
+## 64. A cancelled order is never resent, sent, refunded automatically or paid — written 2026-11-14, NOT applied
+
+`20261012120000_cancelled_orders_guard.sql`. **Written 2026-11-14 on branch
+`fix/cancelled-orders-guard-20261114`, validated, awaiting owner approval.** No
+ledger row yet: rows are added at apply time. Gaps PG-03 and PG-27
+(`docs/readiness/20261113-card-payments-gaps.md`) and the
+`docs/OWNER_ACTIONS.md` §47.13 warning.
+
+sha256 `77e4e3a7386af77fecf3a7ef206501a76f80c056e4b41b07c77a60c74e40eba7`, 842 lines / 47 152 bytes. **Re-hash the MERGED copy before
+applying**, per §15. The file has no `\u` escape, so an inline apply cannot
+decode one.
+
+**It replaces six function bodies and nothing else.** No signature, table,
+column or row changes, and one grant narrows (below). **MONEY PATH UNTOUCHED, and
+the file asserts it** before and after (`12b6816d…` / `22e2d429…`). **No deploy
+implied**: `payment-initiate` already answers the new refusal with a 400.
+
+### Why
+
+Measured on the default branch at `52a3976`, where all six functions hash as
+they do live (read 2026-11-14, `md5(prosrc)` and `md5(pg_get_functiondef)`
+both):
+
+- **PG-03.** Nothing on the way to the kitchen read `orders.status`, and
+  cancelling does not touch the sync state. A cancelled order could be resent
+  by its customer, claimed by the worker, and after three failed resends
+  enrolled for an automatic refund on top of the hand refund staff had made.
+- **PG-27.** `place_customer_order`, executable by every signed-in customer,
+  passed `online` to `place_order`, which created an unpaid online order. The
+  app never sends one.
+- **§47.13.** `begin_payment_attempt` refused only paid, non-online and
+  under-1.00 orders, so once the gateway is LIVE a direct call could open an
+  invoice for one of the three cancelled July online orders.
+
+### What it does
+
+| Function | Change |
+| --- | --- |
+| `request_customer_pos_resend` | Refuses a cancelled order after the lock and the ownership test: `{outcome:'unavailable', reason:'order_cancelled', message, state}`, logged `resend_rejected_order_cancelled`. The ownership test becomes `is distinct from`, so an order with no customer (after an account deletion) is "not found" to every caller instead of passing for any |
+| `claim_lazywait_sync_batch`, `claim_lazywait_sync_one` | One added line each: `status <> 'cancelled'`. The two predicates stay identical apart from the id filter and the ordering |
+| `set_order_refund_enrollment` | `new.status <> 'cancelled' and order_refund_due(...)`. `order_refund_due` itself is unchanged; it takes no status and this trigger is its only caller. EXECUTE revoked from PUBLIC, anon and authenticated: a trigger function cannot be called directly, and a trigger fires without the writer holding EXECUTE (measured on PG16) |
+| `place_customer_order` | Refuses `online` before any lock or write, normalised as `place_order` normalises it; and refuses an order that `place_order` resolved to online from the default, after the call (the order rolls back; the SM- number it drew does not). P0001, hint `online_orders_use_checkout` |
+| `begin_payment_attempt` | Refuses a cancelled order (P0001 `Order is cancelled`) before the reuse lookup, so no attempt is opened or handed back |
+
+**Pre-images, asserted by the file before it changes anything** (`md5(prosrc)`;
+each must be this or the file's own version):
+`request_customer_pos_resend` `5ffad2102d6f05f79c088bd67edf376f`,
+`claim_lazywait_sync_batch` `6109cbe2f43dcbdcb09f0e562710f239`,
+`claim_lazywait_sync_one` `f150563fe92cd9b477638b82bb06fb8f`,
+`set_order_refund_enrollment` `3494b28d166b5bde64923f6d6fc0be14`,
+`place_customer_order` `bf7af92d35cc2c79e7ffb0e0718e2a4b`,
+`begin_payment_attempt` `9add3686b376e30ec4795a4695230df5`. Each matched the
+2026-11-14 live read on the local chain before a body was derived from it. A
+diff of every stored body against its pre-image shows only the changes in the
+table.
+
+**What it deliberately does not touch.** `customer_order_state`,
+`customer_manual_pos_resend_eligibility` and `order_refund_due` (their clause
+sequences are pinned by `orderConfirmationSqlParity.test.ts`);
+`confirm_order_payment` (a captured payment is never refused);
+`requeue_lazywait_order`, the admin Retry, whose live hash was not part of the
+read; `begin_session_attempt`; and PG-13, the owner's decision on refunding a
+cancelled paid order.
+
+**What it does not close.** An order cancelled **after** the worker has claimed
+it is still sent. The claim moves it to `syncing`, and the pre-send gate
+`begin_lazywait_create_attempt` does not read `status`; measured on the local
+chain with this file applied, a claimed-then-cancelled order got
+`ready_to_send`. The window is the seconds between claim and POST. A check
+there is left for the admin-Retry follow-up, because that function's live hash
+was not part of the 2026-11-14 read (`docs/LAZYWAIT.md`,
+`docs/ORDER_CONFIRMATION_FLOW.md` §11).
+
+### What the file checks
+
+All inside a sub-transaction that a final raise aborts, then the rollback is
+proven (no probe order, branch, attempt or refund left). Probe orders carry
+explicit order numbers, so no SM- number is drawn.
+
+- **The claims, as outcomes:** `claim_lazywait_sync_one` takes no cancelled
+  order and still takes a received, an out-for-delivery and a delivered one;
+  `claim_lazywait_sync_batch(1)` takes a `ready` probe, where without the
+  filter it would take the cancelled one, which sorts first. So a filter
+  narrowed to the early statuses (`received`, `preparing`) is refused too.
+- **The refund trigger, as an outcome:** a cancelled paid order and paid
+  orders in `received`, `ready` and `delivered`, all driven into the refund-due
+  shape; every one but the cancelled one is enrolled, with one refund record.
+- **`begin_payment_attempt`, as outcomes:** a cancelled order with no attempt,
+  and one with a live attempt, both answer `P0001 Order is cancelled`; a
+  received unpaid online order still opens one.
+- **`place_customer_order`:** `online`, ` Online ` and `ONLINE` are refused with
+  the hint; `cash` and no method reach `place_order`'s own sign-in refusal.
+- **`request_customer_pos_resend`** is called only as far as its sign-in gate,
+  because the rest needs a signed-in customer, and building one would mean
+  writing to `auth.users` in Production. Its new statements are checked in the
+  comment-stripped body, in position: after the row lock **and after the
+  ownership test**, and before the eligibility check, so a customer who does not
+  own the order still gets "not found" and no log row. (Until review on
+  2026-11-14 the position was compared against the lock only, so moving the
+  refusal ahead of the ownership test applied cleanly; it is now refused.) The
+  same holds for `place_customer_order`'s backstop. Both are proven by the
+  paired suite. That is said rather than glossed.
+- **Grants:** `anon` executes none of the six (nor `order_refund_due`);
+  `authenticated` keeps `request_customer_pos_resend` and
+  `place_customer_order`; `service_role` keeps the claims and
+  `begin_payment_attempt`.
+- The money-path pair, one overload each first.
+
+### Validation
+
+- **Paired suite** `cancelled_orders_guard_test.sql`, 15 cases. **Fail-before:**
+  on the chain at `52a3976`, cases 1, 3-9, 11, 13 and 14 fail and the honest
+  cases 2, 10, 12 and 15 pass. With the file, all 15 pass.
+  - guard: a cancelled order's resend is refused with its reason and message
+    and nothing moves (1); an ownerless order is not found (3); a cancelled
+    order with a refund keeps the refund as its state (4); neither claim takes a
+    cancelled order, and each still takes an order in every other status (5,
+    6); no path enrols a cancelled order, while an eligible paid order is still
+    enrolled in every other status: the third failed
+    resend, the deadline sweep, a direct write, a later edit (7); `online` in
+    three spellings is refused and draws no SM- number (8); a method-less call
+    that resolves to online is refused (9); a cancelled order gets no new or
+    reused attempt (11); the gap's own story end to end, an administrator's
+    cancellation then three resends (13); grants and the money path (14);
+  - honest: an eligible received order is re-queued (2); cash and a cash
+    default still place (10); `begin_payment_attempt` still serves an unpaid
+    online order and `begin_session_attempt` is unaffected (12); a customer who
+    does not own a cancelled order gets "not found" and writes no log row (15).
+- **`payment-initiate`, in the vitest fakes.** `paymentFakes.ts` now models the
+  new refusal, and `paymentInitiateGuards.test.ts` checks that a cancelled
+  order gets a 400 with no attempt and no invoice, while the same order not
+  cancelled still gets both. The first case fails with the fake as it was at
+  `52a3976`.
+- **Full private chain** (copy of `.github/sql-ci`, databases prefixed `gca_`):
+  156 migrations applied, 93 suites, 91 passed, 2 quarantined
+  (`lazywait_mapping`, `lazywait_sync_scheduler`), 0 new failures. The file
+  re-applies cleanly. Existing-data stage: applied onto existing rows, no row
+  changed, smoke passed.
+- **Mutation testing:** 18 mutants, all killed by the suite with the file's own
+  block stripped; 17 also refused at apply by that block. Four were added after
+  review on 2026-11-14, because the first version of both the file and the
+  suite let them through: the cancelled refusal moved ahead of the ownership
+  test, both claims narrowed to `received`/`preparing`, the batch claim alone
+  narrowed the same way, and the refund trigger narrowed to `received`. The
+  other fourteen are the resend
+  refusal removed, refusing `delivered` instead, the ownership test made
+  NULL-unsafe again, each claim's filter removed, the batch filter on the wrong
+  column (`lazywait_status`), the refund status test removed, `and` turned into
+  `or`, the refund trigger's grant left to `anon`, the `online` pre-check
+  removed, the pre-check not normalised, the attempt check removed, and the
+  attempt check moved after the reuse lookup. The survivor at apply is the
+  backstop removed: it needs a signed-in caller, so only suite case 9 sees it.
+
+### Applying it (owner, §5, named by version)
+
+1. Merge first (`docs/OWNER_ACTIONS.md` §54). Applying it **before**
+   `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended: it closes that
+   section's warning. Until something closes it, the TEST-mode refusal is what
+   keeps the three cancelled July online orders unpayable. The warning's other
+   choices are still the owner's.
+2. Apply `20261012120000` by name, re-hashing the merged copy first. Never "the
+   outstanding migrations". If the pre-image check refuses, nothing changed: a
+   function moved since 2026-11-14, so re-derive the file, do not force it.
+3. Afterwards, read-only: one overload of each of the six; `anon` false on all
+   six; `authenticated` true on `request_customer_pos_resend` and
+   `place_customer_order`; the money-path pair unchanged; no
+   `VERIFY-20261012120000-` order or branch.
+
+## 65. Refund and payment problems reach staff — WRITTEN 2026-11-14, NOT APPLIED
+
+`20261013120000_payment_refund_visibility.sql`. **Written 2026-11-14 on the
+branch `fix/payment-refund-visibility-20261114`, validated on a local chain,
+awaiting owner approval.** No ledger row: nothing is applied. It covers gaps
+PG-01 (the visibility and fairness parts), PG-02 (the alert and list parts) and
+PG-25 in [the card-payment gaps](readiness/20261113-card-payments-gaps.md).
+
+sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **Re-hash the MERGED copy before
+applying**, per §15.
+
+**What it changes.**
+
+- `claim_order_refund` gains `p_exclude_refund_ids uuid[] default '{}'`. It
+  takes the least recently touched pending refund first (`updated_at`, then
+  `created_at`, then `id`) and skips the ids it is given. The one-argument
+  version is dropped in the same transaction. A refund just released goes to
+  the back of the queue. `payment-refund`, changed in the same pull request,
+  passes the ids it has already claimed in the run, so it tries a refund at
+  most once per run.
+- `order_integrity_watchdog` gains four critical rules: R14 `REFUND_FAILED`,
+  R15 `DUPLICATE_PAYMENT_RECORDED`, R16 `PAYMENT_VERIFICATION_MISMATCH` and R17
+  `PAYMENT_CONFIRMATION_FAILED` (`ORDER_INTEGRITY_WATCHDOG.md` §3). R1-R13 are
+  byte-identical.
+- `operations_health_snapshot_internal`: the payment card counts a stale
+  attempt only when a payment settled on it (`provider_ref` set), which is
+  PG-25, and counts the four new rules among its payment incidents. It also
+  reports the old count's remainder, `open_unverified_24h` (the same window,
+  on attempts with no `provider_ref`), **without** letting it move the state.
+  That keeps one real case readable that the new filter would otherwise hide:
+  a payment Moyasar captured whose webhook never arrived and whose customer
+  never came back, which nothing verified and so nothing stamped. Added
+  2026-11-14 after review; `PAYMENTS.md` §12 lists the sweep that would tell
+  such a payment from an abandoned checkout as open. The other nine cards are
+  byte-identical.
+- New: `list_payments_needing_attention(p_limit)`, the console card's feed. It
+  checks `is_admin()` (role and AAL2) before it reads anything. `authenticated`
+  may call it and `anon` may not. It wraps
+  `payments_needing_attention_internal(p_limit)`, which only `service_role` may
+  call.
+- New: the partial index `integration_sync_logs_moyasar_unconfirmed_idx`, so
+  R17 reads only failed Moyasar confirmation rows.
+
+**What it does not change.** It sends, refunds, retries, caps and marks
+nothing. The apply writes no row: its probe rolls back, and the rollback is
+checked. Who receives alerts does not change (gap PG-10). No attempt cap,
+back-off or "stuck after" age is added; those are the owner's numbers (PG-01).
+**MONEY PATH UNTOUCHED, and the file asserts it:** `place_order`
+`12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot`
+`22e2d42935459e7bf93abb2941b56325`.
+
+### Ordering, not enforceable, so the approver holds it
+
+1. Apply this file.
+2. Then deploy `payment-refund`. The new worker passes `p_exclude_refund_ids`,
+   which only this file defines. Deployed first, its first claim is refused and
+   each run processes nothing until the apply. The worker deployed today keeps
+   working after the apply, because the parameter has a default; it gets the
+   new queue order at once, but not the once-per-run rule.
+
+The console card ships with the merge (CLAUDE.md §13). Until step 1 its RPC does
+not exist (PGRST202), and the card hides itself and stops asking until Live
+Orders is opened again (it is rendered for the admin role only, so other staff
+never send the request). The Operations Health line for
+a stale payment does **not** change on merge. It reads "A payment went through
+at Moyasar, but its order was not confirmed within 30 minutes." only when the
+payment card's snapshot carries `open_unverified_24h`, which only this file's
+body emits (`staleCountsSettledOnly` in `healthView.ts`). Until step 1 it keeps
+the old wording, which matches the old count.
+
+### Pre-images, and the one that is not proven
+
+- `order_integrity_watchdog`: md5(prosrc) `a05add09270f96881199d4e3da0f94c8`,
+  equal to the live value read 2026-11-14.
+- `operations_health_snapshot_internal`: live md5(prosrc)
+  `2545639fcf3421dbaf35ae023d6ed68d` (49 181 characters, read 2026-11-14) is
+  the repository body with its `\u` escapes at or above U+0020 decoded (ledger
+  row 115). The guard accepts that and the as-written
+  `1e300b3d61759729e523d7c74224ce78`.
+- `claim_order_refund(text)`: **NOT proven.** Live md5(prosrc) is
+  `13d67fdde079b9eaaa61dd0a0ebaffd3`, 1 279 characters (read 2026-11-14); the
+  repository body is `a2c334b2…`, 1 586. Ledger row 51 records the 2026-07-29
+  apply as content-equivalent, with the stored text condensed. That was not
+  re-proven here, so the guard compares CONTENT: comments, whitespace and
+  semicolons removed, lower-cased, against `727e7909eb24142d42083b583be98bc5`.
+  Whether the live body passes is not known until it is read. Step 1 of the
+  apply below reads it. If it differs, the file refuses and nothing changes.
+
+### Post-image hashes, measured on the local chain
+
+| Function | md5(prosrc) | Length | md5(pg_get_functiondef) |
+| --- | --- | --- | --- |
+| `claim_order_refund(text, uuid[])` | `999471eed604d690da4e61675b89a02e` | 2 151 | `eae9b2f4af51614481a4fee743750f55` |
+| `order_integrity_watchdog()` | `fb4fc4e2bdcee6ec46ced01029269cb0` | 34 998 | `7361cfde246c3d63119bed84e52f64a1` |
+| `operations_health_snapshot_internal()`, as written | `2ad226c3754ba03ff9f6f4986a99db65` | 50 721 | `205f312bfb83759e90c1fb752ee19403` |
+| `operations_health_snapshot_internal()`, as the transport stores it | `3847b5f3e18713bb0b322cacf9ce46ab` | 50 621 | not measured |
+| `list_payments_needing_attention(integer)` | `9f4ceb05a05dba19169454d7c5dfff91` | 222 | `4f2944226c9680e331bec2123e1de297` |
+| `payments_needing_attention_internal(integer)` | `6dd733ccc74ef5f7f8888aa817fe7a95` | 4 744 | `f11f50a6402c6786f72e7a4624df9a20` |
+
+The snapshot carries 25 `\u` escapes. Expect the 20 at or above U+0020 to
+arrive decoded and the five control characters (U+0009 to U+000D) as written,
+as on row 115. The decoded hash above was reproduced from the stored body with
+exactly that decoding. The same decoding, run on the base chain's stored body,
+gives the live value `2545639f…` above, which is what makes it trustworthy.
+The snapshot's hashes changed on 2026-11-14 when `open_unverified_24h` was
+added; the earlier pair, `ccf08e21…` / `c13838a6…`, is retired and the file no
+longer accepts it. The other four bodies carry no escape.
+
+### What the file checks
+
+- **Before anything:** each replaced body is one of its known pre-images (or
+  this file's own post-image, so a re-apply is accepted), and the two new names
+  are free.
+- **Structure:** one overload of each function; the claim's new parameter has a
+  default; the grants; and, in each body with its `--` comments stripped, the
+  queue order, the exclusion, the NULL removal, the four rules at critical, the
+  payment card's rule list, the PG-25 predicate and the feed's gate before any
+  read. As `authenticated` with no admin claim, the feed raises 42501.
+- **The money-path pair**, one overload each first.
+- **Outcomes**, on fixtures written inside a sub-transaction that a sentinel
+  aborts, with the rollback then checked:
+  - the least recently touched refund is claimed first, a refund just released
+    goes behind one that waited, an excluded id is never claimed, and a NULL in
+    the list hides nothing;
+  - each rule fires on its event and stays silent on its nearest healthy row,
+    including a failed refund that a newer one replaced;
+  - no raw payment id reaches `order_integrity_incidents`;
+  - the payment card counts exactly the open critical incidents of its nine
+    rule codes, and `operations_alerts_derive` raises the critical
+    `order_integrity:incidents` condition;
+  - PG-25: of two attempts open for 40 minutes, both past their invoice expiry,
+    only the settled one is counted, and the other is reported in
+    `open_unverified_24h`; the source never compares that count, so it cannot
+    move a state;
+  - the feed returns the right rows, with exactly its columns.
+
+What survives the abort: the `order_change_events` and `order_integrity_runs`
+id sequences each advance. Every probe order has an explicit number, so no
+`SM-` number is used up. The probe takes the watchdog's advisory lock and
+waits for it, so a scan already running is waited for, not overlapped.
+
+### Validation
+
+- **Local chain**, a private copy of `.github/sql-ci/run.sh` on Postgres 16:
+  156 migrations applied; this file re-applies cleanly on the replay; 93 suites,
+  91 passed, 2 quarantined (`lazywait_mapping`, `lazywait_sync_scheduler`),
+  **0 new failures**; the existing-data stage held.
+- **Paired suite** `payment_refund_visibility_test.sql`, 9 cases. Every case
+  fails on `52a3976` and passes on this branch, each run on its own:
+  - case 1: a refund just released goes behind one that waited (before: it is
+    claimed again);
+  - case 2: one stuck refund is claimed once per run, and a NULL in the list
+    hides nothing;
+  - case 3: an honest refund is claimed, refunded and leaves nothing listed;
+  - case 4: R14 fires on a failed refund and ends after a successful retry;
+    the feed lists failed and retried refunds (before: no incident);
+  - case 5: R15, R16 and R17 fire, stay silent beside their healthy rows, are
+    counted by the payment card, and end when settled (before: no incident);
+  - case 6: the real evaluator opens the critical `order_integrity:incidents`
+    and `payment:health` alerts;
+  - case 7: an abandoned checkout no longer reads degraded but is reported in
+    `open_unverified_24h`, inside the same window; a settled payment whose
+    confirmation stalled still reads degraded (before: degraded, 1);
+  - case 8: only an admin at AAL2 reads the feed; its limit clamps items and
+    never totals;
+  - case 9: grants and the money-path pair.
+- **Two existing suites changed on purpose:** `order_integrity_watchdog_test.sql`
+  (17 rules evaluated, was 13) and `order_confirmation_state_machine_test.sql`
+  (the claim's new signature).
+- **Mutation testing:** 13 SQL mutants, all killed, each twice: refused at apply
+  by the file's own verification, and failed by the paired suite with the
+  verification stripped. They are: the old created_at order, the exclusion
+  ignored, a NULL kept in the list, R14 reporting a refund a newer one
+  replaced, the feed without its gate, R15 at warning, R17 reporting a payment
+  a later verify confirmed, the payment card not counting R15, the PG-25 filter
+  removed, the other PG-25 option (ignore attempts past their invoice
+  expiry), and three on `open_unverified_24h` (counting stamped attempts
+  instead, moving the state to degraded, and dropping it from the card). The
+  unmutated file passes both. Re-run in full on 2026-11-14 after the review
+  changes, against the new hashes.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must match, or stop and read the live body:
+   ```sql
+   select md5(lower(regexp_replace(regexp_replace(prosrc, '--[^\n]*', '', 'g'),
+                                   '[[:space:];]+', '', 'g')))
+     from pg_proc where oid = 'public.claim_order_refund(text)'::regprocedure;
+   -- 727e7909eb24142d42083b583be98bc5
+   select md5(prosrc) from pg_proc where oid = 'public.order_integrity_watchdog()'::regprocedure;
+   -- a05add09270f96881199d4e3da0f94c8
+   select md5(prosrc) from pg_proc
+    where oid = 'public.operations_health_snapshot_internal()'::regprocedure;
+   -- 2545639fcf3421dbaf35ae023d6ed68d
+   ```
+2. Apply `20261013120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the post-image hashes above (the snapshot's in its
+   stored form); the money-path pair unchanged;
+   `to_regprocedure('public.claim_order_refund(text)')` is null.
+4. Expect no R14-R16 incident on live data: `order_refunds` was empty and no
+   Moyasar payment record existed when read on 2026-11-14. R17 reads
+   `integration_sync_logs`, which was not read. An R17 incident names a
+   Moyasar payment whose order was not confirmed; check it in Moyasar's
+   dashboard. The console card marks one made with the test keys "Test
+   payment".
+5. Then, as its own §5 approval, deploy `payment-refund`. Its cron job was
+   inactive when read on 2026-11-14, so the deploy alone sends nothing.
+   **Between steps 2 and 5 the old job still claims one stuck refund 5 times a
+   run**, measured on the local chain by calling the claim with the token
+   alone after the apply. The apply alone stops a stuck refund starving the
+   others; the once-per-run limit and the call saving arrive with this deploy.
+
+Rollback is the notes at the foot of the file.
 
 ## 66. Payment records in "Get a copy of my data" — WRITTEN 2026-11-14, awaiting approval (no ledger row)
 

@@ -187,13 +187,42 @@ devices only; the console's sandbox test does not open the app.
       support if an amount was deducted." In both cases
       the app lets the customer start again, cash included. Neither must leave the
       app refusing every order.
-- [ ] **A total under 1.00 SAR.** Redeem enough points to bring an online total
-      under 1.00 SAR. The app shows "Online payment needs a total of at least
-      1.00 SAR. Use fewer points, or pay in cash." and opens no payment page.
+- [ ] **A total under 1.00 SAR.** Points are all or nothing, so choose a pickup
+      order worth a little more than your points: with 150 points (worth
+      15.00), an order of 15.50 leaves 0.50 to pay, and the summary shows 0.50.
+      Choose online payment. The app shows "Online payment needs a total of at
+      least 1.00 SAR. Turn off points for this order, or pay in cash." and opens
+      no payment page. Check the Arabic too: «أوقف استبدال النقاط في هذا الطلب،
+      أو ادفع نقداً». Released builds show "Online payment is unavailable
+      right now." here instead (`PAYMENTS.md` §4). The message was written on
+      2026-11-12 for the §47.17 build and said "Use fewer points", which the
+      app cannot do, until 2026-11-14 (gap PG-05).
+- [ ] **Points on an order under SAR 10.00 (gap PG-31).** With a balance of 100
+      points or more, switch points on for a pickup order under SAR 10.00. The
+      summary shows the full amount and no points line, and the line under the
+      switch adds "Points can be used when the total before points is 10.00
+      SAR or more." With VoiceOver or TalkBack on, the switch reads that note
+      too. Choose
+      online payment: Moyasar's page asks for the same full amount. Close it
+      without paying; until PG-04 is fixed, that phone then cannot place
+      another order until the invoice expires (the live setting was 30 minutes
+      on 2026-11-13). Builds before
+      2026-11-14 showed 0.00 in the summary here, while the server used no
+      points and charged the full amount.
 - [ ] **Arabic.** The payment screen footer and Moyasar's own page read in Arabic
       when the app is in Arabic.
 - [ ] **The web build offers no online option.** Open `/app` in a browser with
       online payment on. Checkout offers cash only.
+- [ ] **A cancelled order shows Cancelled and no Resend** (gap PG-03, added
+      2026-11-14). No live order is needed: in a development build open
+      `/dev-fixture?fixture=receipt-cancelled` and `?fixture=orders`, in English
+      and in Arabic. The receipt shows **Order cancelled** / «تم إلغاء الطلب»
+      with no Resend button and no branch number; the cancelled card in the list
+      shows the Cancelled pill only. The three refund scenes
+      (`receipt-refund-pending`, `receipt-refunded`, `receipt-refund-failed`) are
+      cancelled orders too, and still show their refund status. On a real
+      device after `20261012120000` is applied, an order that an administrator
+      cancels shows the same.
 
 ### Screen readers — added 2026-11-12
 

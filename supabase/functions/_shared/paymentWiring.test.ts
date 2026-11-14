@@ -218,6 +218,24 @@ describe('payment-initiate', () => {
     expect(handler.indexOf('adminClient()')).toBeGreaterThan(gate);
   });
 
+  // Since 20261012120000 begin_payment_attempt refuses a cancelled order
+  // (P0001 'Order is cancelled'), which is how the three cancelled July online
+  // orders stay unpayable once the gateway is live (OWNER_ACTIONS §47.13). The
+  // order flow must answer that refusal with a 400, never a 500, and must not
+  // reach the invoice create, so no deploy is needed for the fix to hold.
+  it('answers a refused begin_payment_attempt with a 400, before any invoice exists', () => {
+    const body = fnBody(src, 'async function initiateMoyasar(');
+    const begin = body.indexOf("admin.rpc('begin_payment_attempt'");
+    const refused = body.indexOf('if (beginErr) {', begin);
+    const answer = body.indexOf("return json({ error: 'Could not start the payment. Please try again.' }, 400);", refused);
+    const invoice = body.indexOf('createMoyasarInvoice(');
+    expect(begin).toBeGreaterThan(-1);
+    expect(refused).toBeGreaterThan(begin);
+    expect(answer).toBeGreaterThan(refused);
+    expect(invoice).toBeGreaterThan(answer);
+    expect(body.slice(refused, answer)).not.toMatch(/moyasarFetch|createMoyasarInvoice|status: 500|, 500\)/);
+  });
+
   // The native app reaches customers only through an EAS build, so these keys
   // are a contract with every installed copy: status, orderId, checkoutUrl,
   // needsVerify, mode and checkoutSessionId (CheckoutScreen.tsx reads them).
@@ -592,8 +610,29 @@ describe('payment-refund', () => {
     expect(reconcileFirst).toBeGreaterThan(-1);
     expect(post).toBeGreaterThan(reconcileFirst);
     expect(src).toContain('if (needsHumanReview(verdict)) {');
-    expect(src).toContain('p_status: refundFinalStatus(verdict),');
+    expect(src).toContain('const finalStatus = refundFinalStatus(verdict);');
+    expect(src).toContain('p_status: finalStatus,');
     expect(src).toContain('const decision = decideRefundLogging(finalized, verdict.outcome);');
+  });
+
+  // Gap PG-01: one refund the worker cannot finish took every claim of a run,
+  // because a refund released as 'pending' was claimed straight back.
+  it('passes every refund it has claimed this run to the next claim (20261013120000)', () => {
+    const claim = block(src, "admin.rpc('claim_order_refund', {");
+    expect(claim).toContain('p_claim_token: claimToken,');
+    expect(claim).toContain('p_exclude_refund_ids: claimedThisRun,');
+    // Recorded straight after the claim, before any branch can `continue`.
+    const push = src.indexOf('claimedThisRun.push(String(row.refund_id));');
+    expect(push).toBeGreaterThan(src.indexOf('if (!row) break;'));
+    expect(push).toBeLessThan(src.indexOf("if (rowProvider !== 'moyasar') {"));
+    expect(src.match(/claimedThisRun\.push\(/g)).toHaveLength(1);
+  });
+
+  it('records why a refund is released as pending', () => {
+    expect(src).toContain("const why = releaseReasonWithoutPosting('key_unavailable');");
+    expect(src).toContain('const why = releaseReasonWithoutPosting(decision.reason);');
+    expect(src).toContain('? pendingReleaseDetail(verdict, postHttpStatus)');
+    expect(src).not.toMatch(/p_status: 'pending',\s*p_provider_ref: null, p_failure_code: null/);
   });
 
   it('takes its two provider-neutral helpers from the Moyasar modules', () => {
