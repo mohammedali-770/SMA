@@ -1560,8 +1560,9 @@ steps in whole halalas, and `previewParity.test.ts` holds it to the real
 `compute_order_snapshot`. The rule and its tests are in
 [`LOYALTY.md`](LOYALTY.md) §1. The receipt was never affected: it shows the
 order's own figures. This change is on branch
-`fix/checkout-points-preview-20261114` and reaches customers with the
-`OWNER_ACTIONS.md` §47.17 EAS build.
+`fix/checkout-points-preview-20261114`. App customers get it with the
+`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
+branch is merged, because a merge deploys the web build (CLAUDE.md §13).
 
 ## 10b. Tap `description` (closed)
 

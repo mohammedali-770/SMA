@@ -312,7 +312,9 @@ pickup order read 0.00 and Moyasar's page then asked for 8.00 (gap PG-31). The
 switch now also says "Points can be used on orders of 10.00 SAR or more." when
 that is why no points are used. `previewParity.test.ts` checks the summary
 against the real `compute_order_snapshot` for 23 carts; detail in
-[`LOYALTY.md`](LOYALTY.md) §1. Same branch, same build.
+[`LOYALTY.md`](LOYALTY.md) §1. Same branch. App customers get it with the same
+build; the web checkout at `/app` gets it as soon as the branch is merged,
+because a merge deploys the web build (CLAUDE.md §13).
 
 **Place order waits for a payment run.** In the new build, Place order does
 nothing while an online payment run (for example "Try again" from the status

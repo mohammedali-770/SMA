@@ -60,10 +60,12 @@ answers for those carts ever change, so the two cannot drift apart unnoticed.
 When the switch is on and the order is too small for the minimum, the line
 under the switch adds "Points can be used on orders of 10.00 SAR or more." (the
 Arabic is engineering-drafted, `docs/OWNER_ACTIONS.md` §35). This is on branch
-`fix/checkout-points-preview-20261114` and reaches customers only with the
-`OWNER_ACTIONS.md` §47.17 EAS build. Whether the minimum should apply to the
-balance held instead of the points used is an open owner decision (the payment
-draft's item 12); it is a server change, and this one does not make it.
+`fix/checkout-points-preview-20261114`. App customers get it only with the
+`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
+branch is merged, because a merge deploys the web build (CLAUDE.md §13).
+Whether the minimum should apply to the balance held instead of the points used
+is an open owner decision (the payment draft's item 12); it is a server change,
+and this one does not make it.
 
 **Effective rate.** Earning 1 point per riyal and redeeming each at 0.10 SAR is a
 **10% rebate**. The QSR norm is 1–5%. That is a pricing decision, not an

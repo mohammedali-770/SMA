@@ -2892,8 +2892,12 @@ language.
 
 **Widened 2026-11-14 — the checkout points fix (gaps PG-05 and PG-31).** Two
 customer-facing strings in `apps/mobile/src/i18n/strings.ts`, both
-engineering-drafted, both shipping only with the §47.17 build. They are on
-branch `fix/checkout-points-preview-20261114`:
+engineering-drafted, on branch `fix/checkout-points-preview-20261114`.
+`payBelowMinimum` reaches customers only with the §47.17 build, because the web
+build takes no card payment. `loyaltyOrderTooSmall` also appears in the web
+checkout at `/app` as soon as the branch is merged, because a merge deploys the
+web build (CLAUDE.md §13); if you want it read before anyone sees it, read it
+before that merge:
 
 - `payBelowMinimum`, rewritten. Shown when a card payment would be under
   1.00 SAR: «يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال
