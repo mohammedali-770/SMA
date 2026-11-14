@@ -317,6 +317,15 @@ against the real `compute_order_snapshot` for 23 carts; detail in
 build; the web checkout at `/app` gets it as soon as the branch is merged,
 because a merge deploys the web build (CLAUDE.md §13).
 
+What it matches is the server's rule for the settings and balance the app last
+loaded. `min_points_to_redeem` and `discount_per_point` come from the settings
+row the app reads once at launch, and the balance from the cached profile, so an
+administrator changing either setting while a customer has the app open, or a
+balance that moved elsewhere, can still make the summary differ from the card
+page until the app reloads. Only `loyalty_pickup_only` is re-read at submission.
+This was already true of `discount_per_point` before the change; re-reading the
+other two at submission is a possible follow-up, not part of this one.
+
 **Place order waits for a payment run.** In the new build, Place order does
 nothing while an online payment run (for example "Try again" from the status
 dialog) is in flight. Older builds keep a short window here; see §12.

@@ -178,6 +178,13 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
     expect(toggle).toContain(
       "t('loyaltyOrderTooSmall').replace('{amount}', totals.loyaltyMinimumOrder.toFixed(2))",
     );
+    // The note goes on the true branch and only there: an inverted or
+    // short-circuited condition would show it on every normal order instead.
+    const compact = toggle.replace(/\s+/g, ' ');
+    expect(compact).toContain(
+      "pointsLabel={totals.loyaltyOrderTooSmall ? `${availablePoints} ${t('pointsAvailable')} — ${t('loyaltyOrderTooSmall')",
+    );
+    expect(compact).toContain(": `${availablePoints} ${t('pointsAvailable')}`}");
   });
 
   it('lets a screen reader hear that note too', () => {
