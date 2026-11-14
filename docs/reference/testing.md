@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**269 TypeScript test files declaring 4022 test blocks, plus 93 SQL suites.**
+**270 TypeScript test files declaring 4036 test blocks, plus 94 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -56,6 +56,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/branch_delivery_requests_test.sql`
 - `supabase/tests/branch_reference_entries_test.sql`
 - `supabase/tests/branch_variant_availability_test.sql`
+- `supabase/tests/cancelled_orders_guard_test.sql`
 - `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/comp_members_test.sql`
@@ -158,7 +159,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-98 files, 1311 declared test blocks.
+99 files, 1322 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -209,8 +210,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/stackedTabsWiring.test.ts` | 4 | screens opened above another route go back to it |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
+| `apps/mobile/src/features/orders/cancelledOrderWiring.test.ts` | 5 | cancelled order wiring |
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 25 | reference and channel safety |
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
@@ -401,7 +403,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-39 files, 923 declared test blocks.
+39 files, 926 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -426,9 +428,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 38 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
-| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 9 | no invoice outlives its attempt (C1 part 4) |
+| `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 11 | no invoice outlives its attempt (C1 part 4) |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
-| `supabase/functions/_shared/paymentWiring.test.ts` | 68 | payment functions talk to Moyasar only |
+| `supabase/functions/_shared/paymentWiring.test.ts` | 69 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |

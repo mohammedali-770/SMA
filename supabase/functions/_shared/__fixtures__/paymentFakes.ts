@@ -12,8 +12,9 @@
  *     the order-or-session CHECK, and the trigger stamping confirmed_at /
  *     failed_at (20260707121300, 20260712120000, 20260712160000);
  *   - begin_payment_attempt / begin_session_attempt: reuse, expiry and the
- *     1.00 SAR minimum (20261003120000). The loyalty guard is not modelled; the
- *     SQL suite proves it;
+ *     1.00 SAR minimum (20261003120000), and begin_payment_attempt's refusal
+ *     of a cancelled order (20261012120000). The loyalty guard is not
+ *     modelled; the SQL suite proves it;
  *   - finalize_checkout_session, row picker included (20260712170000);
  *   - confirm_order_payment (20260827120000, with 20261003120000's refusal).
  *
@@ -580,6 +581,7 @@ const RPCS: Record<string, (db: FakePaymentDb, a: Row) => unknown> = {
     if (!String(a.p_provider ?? '').trim()) throw new PgError('A payment provider is required');
     const o = db.rows('orders').find((r) => r.id === a.p_order_id);
     if (!o) throw new PgError(`Order ${String(a.p_order_id)} not found`, 'P0002');
+    if (o.status === 'cancelled') throw new PgError('Order is cancelled');
     if (o.payment_status === 'paid') throw new PgError('Order is already paid');
     if (o.payment_method !== 'online') throw new PgError('Order is not an online-payment order');
     if (!(Number(o.total) > 0)) throw new PgError('Order total must be greater than zero');

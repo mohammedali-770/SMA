@@ -108,6 +108,34 @@ servers: Moyasar's terms forbid it
    then re-fetches the payment itself and runs the same confirmation. A webhook
    body is never evidence of payment.
 
+### The older order-first path, and why it can no longer pay a cancelled order
+
+`payment-initiate` also accepts an `orderId`: pay for an order that already
+exists, unpaid, with `payment_method = 'online'`. The app has not used it since
+the checkout-session flow (above); it remains for the orders it was built for.
+Live on 2026-11-14 (read-only), the only unpaid online orders are three
+cancelled ones from 2026-07-12, on one account.
+
+`20261012120000_cancelled_orders_guard` (written 2026-11-14, **not applied**)
+closes it from both ends, with no deploy:
+
+- **No new order-first orders.** `place_customer_order`, the RPC every signed-in
+  customer may call, refuses an online order (gap PG-27). The app sends `cash`
+  there.
+- **No invoice for a cancelled order.** `begin_payment_attempt` refuses one
+  (P0001 `Order is cancelled`) before it reuses or opens an attempt.
+  `payment-initiate` answers that with a 400, *Could not start the payment.
+  Please try again.*, and never reaches the invoice create
+  (`paymentWiring.test.ts` pins it). This is what makes the
+  `OWNER_ACTIONS.md` §47.13 warning about the three July orders go away, once
+  the file is applied. Applying it before §47.13 step 1 is recommended, not
+  required: §47.13 also lists a live write to the three orders, or accepting the
+  risk, and which to take is the owner's. Until one of them is done, the
+  TEST-mode refusal is what keeps them unpayable.
+
+`place_order` and `compute_order_snapshot` are unchanged
+(`12b6816d…` / `22e2d429…`), and the file asserts it.
+
 ### Two ids
 
 | Id | Where it is stored | When it exists |
@@ -380,6 +408,12 @@ not the worker.
   The 2026-11-12 review reproduced this on a local chain. It predates this
   change. The owner's answer "Automatic via Moyasar" therefore is not yet fully
   implemented; covering it needs an owner decision and its own change.
+- **Any cancelled paid order, once `20261012120000` is applied.** Until then, a
+  cancelled order that the branch never received could still be enrolled by the
+  rule above, after three failed resends, on top of the hand refund staff had
+  already made (gap PG-03). The trigger now skips a cancelled order. A refund
+  enrolled *before* the order was cancelled still runs, so look at the order's
+  refund status before refunding it by hand.
 - **A duplicate payment** (§10). Nothing refunds it automatically.
 
 Either one is refunded by hand in Moyasar's dashboard today. That is a live
@@ -835,6 +869,31 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   more than two.
 - **If Moyasar serves the hosted page from another domain**, online payment
   fails closed until the URL rule is updated (§2).
+
+Added 2026-11-14 with `20261012120000_cancelled_orders_guard` (gap PG-03; not
+applied):
+
+- **A refund enrolled before an order is cancelled still runs.** Refunding that
+  order by hand as well would refund it twice. Check the order's refund status
+  first (§6).
+- **A payment that is captured for a cancelled order is still recorded.** Money
+  taken is never refused (`confirm_order_payment`), the order is not sent to the
+  kitchen, and nothing refunds it automatically, so it is a hand refund. After
+  the apply no attempt can be opened for a cancelled order, and on 2026-11-14
+  there were 0 Moyasar attempts live, so this needs an attempt opened before
+  the apply.
+- **Builds already installed still show Resend on a cancelled order.** After the
+  apply the server refuses it and nothing happens. The new state ships in the
+  next EAS build (`OWNER_ACTIONS.md` §47.17).
+- **A cancelled order left in the POS queue gets a "could not send" push** when
+  its deadline passes, and an admin Retry can put one back in the queue
+  (`ORDER_CONFIRMATION_FLOW.md` §11). Neither sends anything to the kitchen.
+- **An order cancelled in the few seconds after the worker claims it is still
+  sent to the kitchen.** The worker's last check before it sends reads the sync
+  state, not the order's status (`LAZYWAIT.md`, *Retry / backoff /
+  dead-letter*). Measured on a local chain on 2026-11-14; not fixed here. A
+  paid order sent this way is still refunded by hand if the customer is owed
+  one.
 
 ---
 

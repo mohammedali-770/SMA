@@ -218,6 +218,24 @@ describe('payment-initiate', () => {
     expect(handler.indexOf('adminClient()')).toBeGreaterThan(gate);
   });
 
+  // Since 20261012120000 begin_payment_attempt refuses a cancelled order
+  // (P0001 'Order is cancelled'), which is how the three cancelled July online
+  // orders stay unpayable once the gateway is live (OWNER_ACTIONS §47.13). The
+  // order flow must answer that refusal with a 400, never a 500, and must not
+  // reach the invoice create, so no deploy is needed for the fix to hold.
+  it('answers a refused begin_payment_attempt with a 400, before any invoice exists', () => {
+    const body = fnBody(src, 'async function initiateMoyasar(');
+    const begin = body.indexOf("admin.rpc('begin_payment_attempt'");
+    const refused = body.indexOf('if (beginErr) {', begin);
+    const answer = body.indexOf("return json({ error: 'Could not start the payment. Please try again.' }, 400);", refused);
+    const invoice = body.indexOf('createMoyasarInvoice(');
+    expect(begin).toBeGreaterThan(-1);
+    expect(refused).toBeGreaterThan(begin);
+    expect(answer).toBeGreaterThan(refused);
+    expect(invoice).toBeGreaterThan(answer);
+    expect(body.slice(refused, answer)).not.toMatch(/moyasarFetch|createMoyasarInvoice|status: 500|, 500\)/);
+  });
+
   // The native app reaches customers only through an EAS build, so these keys
   // are a contract with every installed copy: status, orderId, checkoutUrl,
   // needsVerify, mode and checkoutSessionId (CheckoutScreen.tsx reads them).

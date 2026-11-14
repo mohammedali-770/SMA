@@ -58,6 +58,15 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-14 — `20261012120000_cancelled_orders_guard` is written,
+> validated and NOT applied (§64).** On merge it is outstanding, with any other
+> file merged unapplied since the read above. It replaces six function bodies so
+> that a cancelled order is never resent, claimed for the POS, enrolled for an
+> automatic refund or invoiced, and `place_customer_order` places no online
+> order. No deploy is implied; the money path is self-asserted. Applying it
+> before `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended; §47.13 lists the
+> owner's other two choices. **Name the target by version.**
+
 > **Updated 2026-11-13 (night) — `20261006120000` is APPLIED** (16:59:39 UTC,
 > live `20261113165939`, ledger row 113, §58), on the owner's approval naming it
 > by version. Live history **157 → 158**. **The outstanding set is THREE, and
@@ -8662,3 +8671,171 @@ change (CLAUDE.md §7). **MONEY PATH UNTOUCHED, and the file asserts it.**
 2. Apply `20261011120000` by name. Never "the outstanding migrations".
 3. Afterwards, read-only: the policy is absent; Push Tools still shows its two
    counts. Rollback is the one-line `create policy` at the foot of the file.
+
+## 64. A cancelled order is never resent, sent, refunded automatically or paid — written 2026-11-14, NOT applied
+
+`20261012120000_cancelled_orders_guard.sql`. **Written 2026-11-14 on branch
+`fix/cancelled-orders-guard-20261114`, validated, awaiting owner approval.** No
+ledger row yet: rows are added at apply time. Gaps PG-03 and PG-27
+(`docs/readiness/20261113-card-payments-gaps.md`) and the
+`docs/OWNER_ACTIONS.md` §47.13 warning.
+
+sha256 `77e4e3a7386af77fecf3a7ef206501a76f80c056e4b41b07c77a60c74e40eba7`, 842 lines / 47 152 bytes. **Re-hash the MERGED copy before
+applying**, per §15. The file has no `\u` escape, so an inline apply cannot
+decode one.
+
+**It replaces six function bodies and nothing else.** No signature, table,
+column or row changes, and one grant narrows (below). **MONEY PATH UNTOUCHED, and
+the file asserts it** before and after (`12b6816d…` / `22e2d429…`). **No deploy
+implied**: `payment-initiate` already answers the new refusal with a 400.
+
+### Why
+
+Measured on the default branch at `52a3976`, where all six functions hash as
+they do live (read 2026-11-14, `md5(prosrc)` and `md5(pg_get_functiondef)`
+both):
+
+- **PG-03.** Nothing on the way to the kitchen read `orders.status`, and
+  cancelling does not touch the sync state. A cancelled order could be resent
+  by its customer, claimed by the worker, and after three failed resends
+  enrolled for an automatic refund on top of the hand refund staff had made.
+- **PG-27.** `place_customer_order`, executable by every signed-in customer,
+  passed `online` to `place_order`, which created an unpaid online order. The
+  app never sends one.
+- **§47.13.** `begin_payment_attempt` refused only paid, non-online and
+  under-1.00 orders, so once the gateway is LIVE a direct call could open an
+  invoice for one of the three cancelled July online orders.
+
+### What it does
+
+| Function | Change |
+| --- | --- |
+| `request_customer_pos_resend` | Refuses a cancelled order after the lock and the ownership test: `{outcome:'unavailable', reason:'order_cancelled', message, state}`, logged `resend_rejected_order_cancelled`. The ownership test becomes `is distinct from`, so an order with no customer (after an account deletion) is "not found" to every caller instead of passing for any |
+| `claim_lazywait_sync_batch`, `claim_lazywait_sync_one` | One added line each: `status <> 'cancelled'`. The two predicates stay identical apart from the id filter and the ordering |
+| `set_order_refund_enrollment` | `new.status <> 'cancelled' and order_refund_due(...)`. `order_refund_due` itself is unchanged; it takes no status and this trigger is its only caller. EXECUTE revoked from PUBLIC, anon and authenticated: a trigger function cannot be called directly, and a trigger fires without the writer holding EXECUTE (measured on PG16) |
+| `place_customer_order` | Refuses `online` before any lock or write, normalised as `place_order` normalises it; and refuses an order that `place_order` resolved to online from the default, after the call (the order rolls back; the SM- number it drew does not). P0001, hint `online_orders_use_checkout` |
+| `begin_payment_attempt` | Refuses a cancelled order (P0001 `Order is cancelled`) before the reuse lookup, so no attempt is opened or handed back |
+
+**Pre-images, asserted by the file before it changes anything** (`md5(prosrc)`;
+each must be this or the file's own version):
+`request_customer_pos_resend` `5ffad2102d6f05f79c088bd67edf376f`,
+`claim_lazywait_sync_batch` `6109cbe2f43dcbdcb09f0e562710f239`,
+`claim_lazywait_sync_one` `f150563fe92cd9b477638b82bb06fb8f`,
+`set_order_refund_enrollment` `3494b28d166b5bde64923f6d6fc0be14`,
+`place_customer_order` `bf7af92d35cc2c79e7ffb0e0718e2a4b`,
+`begin_payment_attempt` `9add3686b376e30ec4795a4695230df5`. Each matched the
+2026-11-14 live read on the local chain before a body was derived from it. A
+diff of every stored body against its pre-image shows only the changes in the
+table.
+
+**What it deliberately does not touch.** `customer_order_state`,
+`customer_manual_pos_resend_eligibility` and `order_refund_due` (their clause
+sequences are pinned by `orderConfirmationSqlParity.test.ts`);
+`confirm_order_payment` (a captured payment is never refused);
+`requeue_lazywait_order`, the admin Retry, whose live hash was not part of the
+read; `begin_session_attempt`; and PG-13, the owner's decision on refunding a
+cancelled paid order.
+
+**What it does not close.** An order cancelled **after** the worker has claimed
+it is still sent. The claim moves it to `syncing`, and the pre-send gate
+`begin_lazywait_create_attempt` does not read `status`; measured on the local
+chain with this file applied, a claimed-then-cancelled order got
+`ready_to_send`. The window is the seconds between claim and POST. A check
+there is left for the admin-Retry follow-up, because that function's live hash
+was not part of the 2026-11-14 read (`docs/LAZYWAIT.md`,
+`docs/ORDER_CONFIRMATION_FLOW.md` §11).
+
+### What the file checks
+
+All inside a sub-transaction that a final raise aborts, then the rollback is
+proven (no probe order, branch, attempt or refund left). Probe orders carry
+explicit order numbers, so no SM- number is drawn.
+
+- **The claims, as outcomes:** `claim_lazywait_sync_one` takes no cancelled
+  order and still takes a received, an out-for-delivery and a delivered one;
+  `claim_lazywait_sync_batch(1)` takes a `ready` probe, where without the
+  filter it would take the cancelled one, which sorts first. So a filter
+  narrowed to the early statuses (`received`, `preparing`) is refused too.
+- **The refund trigger, as an outcome:** a cancelled paid order and paid
+  orders in `received`, `ready` and `delivered`, all driven into the refund-due
+  shape; every one but the cancelled one is enrolled, with one refund record.
+- **`begin_payment_attempt`, as outcomes:** a cancelled order with no attempt,
+  and one with a live attempt, both answer `P0001 Order is cancelled`; a
+  received unpaid online order still opens one.
+- **`place_customer_order`:** `online`, ` Online ` and `ONLINE` are refused with
+  the hint; `cash` and no method reach `place_order`'s own sign-in refusal.
+- **`request_customer_pos_resend`** is called only as far as its sign-in gate,
+  because the rest needs a signed-in customer, and building one would mean
+  writing to `auth.users` in Production. Its new statements are checked in the
+  comment-stripped body, in position: after the row lock **and after the
+  ownership test**, and before the eligibility check, so a customer who does not
+  own the order still gets "not found" and no log row. (Until review on
+  2026-11-14 the position was compared against the lock only, so moving the
+  refusal ahead of the ownership test applied cleanly; it is now refused.) The
+  same holds for `place_customer_order`'s backstop. Both are proven by the
+  paired suite. That is said rather than glossed.
+- **Grants:** `anon` executes none of the six (nor `order_refund_due`);
+  `authenticated` keeps `request_customer_pos_resend` and
+  `place_customer_order`; `service_role` keeps the claims and
+  `begin_payment_attempt`.
+- The money-path pair, one overload each first.
+
+### Validation
+
+- **Paired suite** `cancelled_orders_guard_test.sql`, 15 cases. **Fail-before:**
+  on the chain at `52a3976`, cases 1, 3-9, 11, 13 and 14 fail and the honest
+  cases 2, 10, 12 and 15 pass. With the file, all 15 pass.
+  - guard: a cancelled order's resend is refused with its reason and message
+    and nothing moves (1); an ownerless order is not found (3); a cancelled
+    order with a refund keeps the refund as its state (4); neither claim takes a
+    cancelled order, and each still takes an order in every other status (5,
+    6); no path enrols a cancelled order, while an eligible paid order is still
+    enrolled in every other status: the third failed
+    resend, the deadline sweep, a direct write, a later edit (7); `online` in
+    three spellings is refused and draws no SM- number (8); a method-less call
+    that resolves to online is refused (9); a cancelled order gets no new or
+    reused attempt (11); the gap's own story end to end, an administrator's
+    cancellation then three resends (13); grants and the money path (14);
+  - honest: an eligible received order is re-queued (2); cash and a cash
+    default still place (10); `begin_payment_attempt` still serves an unpaid
+    online order and `begin_session_attempt` is unaffected (12); a customer who
+    does not own a cancelled order gets "not found" and writes no log row (15).
+- **`payment-initiate`, in the vitest fakes.** `paymentFakes.ts` now models the
+  new refusal, and `paymentInitiateGuards.test.ts` checks that a cancelled
+  order gets a 400 with no attempt and no invoice, while the same order not
+  cancelled still gets both. The first case fails with the fake as it was at
+  `52a3976`.
+- **Full private chain** (copy of `.github/sql-ci`, databases prefixed `gca_`):
+  156 migrations applied, 93 suites, 91 passed, 2 quarantined
+  (`lazywait_mapping`, `lazywait_sync_scheduler`), 0 new failures. The file
+  re-applies cleanly. Existing-data stage: applied onto existing rows, no row
+  changed, smoke passed.
+- **Mutation testing:** 18 mutants, all killed by the suite with the file's own
+  block stripped; 17 also refused at apply by that block. Four were added after
+  review on 2026-11-14, because the first version of both the file and the
+  suite let them through: the cancelled refusal moved ahead of the ownership
+  test, both claims narrowed to `received`/`preparing`, the batch claim alone
+  narrowed the same way, and the refund trigger narrowed to `received`. The
+  other fourteen are the resend
+  refusal removed, refusing `delivered` instead, the ownership test made
+  NULL-unsafe again, each claim's filter removed, the batch filter on the wrong
+  column (`lazywait_status`), the refund status test removed, `and` turned into
+  `or`, the refund trigger's grant left to `anon`, the `online` pre-check
+  removed, the pre-check not normalised, the attempt check removed, and the
+  attempt check moved after the reuse lookup. The survivor at apply is the
+  backstop removed: it needs a signed-in caller, so only suite case 9 sees it.
+
+### Applying it (owner, §5, named by version)
+
+1. Merge first (`docs/OWNER_ACTIONS.md` §54). Applying it **before**
+   `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended: it closes that
+   section's warning. Until something closes it, the TEST-mode refusal is what
+   keeps the three cancelled July online orders unpayable. The warning's other
+   choices are still the owner's.
+2. Apply `20261012120000` by name, re-hashing the merged copy first. Never "the
+   outstanding migrations". If the pre-image check refuses, nothing changed: a
+   function moved since 2026-11-14, so re-derive the file, do not force it.
+3. Afterwards, read-only: one overload of each of the six; `anon` false on all
+   six; `authenticated` true on `request_customer_pos_resend` and
+   `place_customer_order`; the money-path pair unchanged; no
+   `VERIFY-20261012120000-` order or branch.

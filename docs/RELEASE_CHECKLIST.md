@@ -213,6 +213,16 @@ devices only; the console's sandbox test does not open the app.
       when the app is in Arabic.
 - [ ] **The web build offers no online option.** Open `/app` in a browser with
       online payment on. Checkout offers cash only.
+- [ ] **A cancelled order shows Cancelled and no Resend** (gap PG-03, added
+      2026-11-14). No live order is needed: in a development build open
+      `/dev-fixture?fixture=receipt-cancelled` and `?fixture=orders`, in English
+      and in Arabic. The receipt shows **Order cancelled** / «تم إلغاء الطلب»
+      with no Resend button and no branch number; the cancelled card in the list
+      shows the Cancelled pill only. The three refund scenes
+      (`receipt-refund-pending`, `receipt-refunded`, `receipt-refund-failed`) are
+      cancelled orders too, and still show their refund status. On a real
+      device after `20261012120000` is applied, an order that an administrator
+      cancels shows the same.
 
 ### Screen readers — added 2026-11-12
 

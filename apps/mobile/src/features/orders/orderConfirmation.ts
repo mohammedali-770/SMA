@@ -19,7 +19,14 @@ export type CustomerOrderState =
   | 'final_failure_refund_pending'
   | 'final_failure_refunded'
   | 'final_failure_refund_failed'
-  | 'unpaid_final_failure';
+  | 'unpaid_final_failure'
+  /**
+   * The order was cancelled. Never derived from the POS columns: it comes from
+   * `orders.status`, in `orderConfirmationState` below, because the SQL
+   * function this file mirrors takes no status. The server's resend refusal
+   * reports the same name (20261012120000).
+   */
+  | 'order_cancelled';
 
 export interface OrderConfirmationInput {
   orderType?: string | null;
@@ -111,13 +118,14 @@ export function deriveCustomerOrderState(o: OrderConfirmationInput): CustomerOrd
 export type ConfirmationTone = 'info' | 'success' | 'warning' | 'danger';
 export type ConfirmationTitleKey =
   | 'oc_payment_pending' | 'oc_payment_received' | 'oc_received' | 'oc_sending'
-  | 'oc_confirmed' | 'oc_verifying' | 'oc_not_sent' | 'oc_failed';
+  | 'oc_confirmed' | 'oc_verifying' | 'oc_not_sent' | 'oc_failed' | 'oc_cancelled';
 export type ConfirmationBodyKey =
   | 'oc_payment_pending_body' | 'oc_no_pos_channel_body' | 'oc_sending_body'
   | 'oc_confirmed_body' | 'oc_verifying_body'
   | 'oc_not_sent_paid_body' | 'oc_not_sent_unpaid_body'
   | 'oc_failed_refund_pending_body' | 'oc_failed_refunded_body'
-  | 'oc_failed_refund_failed_body' | 'oc_failed_unpaid_body';
+  | 'oc_failed_refund_failed_body' | 'oc_failed_unpaid_body'
+  | 'oc_cancelled_body';
 export interface ConfirmationPresentation {
   titleKey: ConfirmationTitleKey; bodyKey: ConfirmationBodyKey; tone: ConfirmationTone;
   success: boolean; canResend: boolean;
@@ -153,6 +161,30 @@ const PRESENTATION: Record<CustomerOrderState, ConfirmationPresentation> = {
   final_failure_refunded:{titleKey:'oc_failed',bodyKey:'oc_failed_refunded_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
   final_failure_refund_failed:{titleKey:'oc_failed',bodyKey:'oc_failed_refund_failed_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
   unpaid_final_failure:{titleKey:'oc_failed',bodyKey:'oc_failed_unpaid_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
+  order_cancelled:{titleKey:'oc_cancelled',bodyKey:'oc_cancelled_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
 };
 export function confirmationPresentation(s:CustomerOrderState):ConfirmationPresentation{return PRESENTATION[s];}
-export function orderConfirmationState(o:{orderType?:string|null;paymentMethod?:string|null;paymentStatus?:string|null;lazywaitSyncState?:string|null;lazywaitRef?:unknown;syncBlockedReason?:string|null;syncNextAttemptAt?:string|null;posCreateAttemptedAt?:string|null;posCustomerRetryCount?:number|null;refundState?:string|null;}):CustomerOrderState{return deriveCustomerOrderState({orderType:o.orderType,paymentMethod:o.paymentMethod,paymentStatus:o.paymentStatus,syncState:o.lazywaitSyncState,ref:o.lazywaitRef,blockedReason:o.syncBlockedReason,nextAttemptAt:o.syncNextAttemptAt,posCreateAttemptedAt:o.posCreateAttemptedAt,customerRetryCount:o.posCustomerRetryCount,refundState:o.refundState});}
+
+/** A refund that exists. Its state, not the cancellation, is what the customer needs to read. */
+const REFUND_LIFECYCLE = new Set(['pending', 'processing', 'refunded', 'failed']);
+
+/**
+ * The state of an Order as the customer sees it.
+ *
+ * A CANCELLED order is 'order_cancelled' (gap PG-03): it is never offered
+ * Resend, never says it is being sent, and never promises an automatic refund,
+ * because the server no longer resends, sends or automatically refunds one
+ * (20261012120000). Before this, the state ignored `status`, so a paid order
+ * that never reached the branch, cancelled and refunded by hand, still showed
+ * "Resend order".
+ *
+ * One exception, the same one the server makes: a refund that already exists
+ * stays the story, because it says what is happening to the money.
+ *
+ * `deriveCustomerOrderState` is untouched. It mirrors `customer_order_state`,
+ * which takes no status, and orderConfirmationSqlParity.test.ts pins the two.
+ */
+export function orderConfirmationState(o:{status?:string|null;orderType?:string|null;paymentMethod?:string|null;paymentStatus?:string|null;lazywaitSyncState?:string|null;lazywaitRef?:unknown;syncBlockedReason?:string|null;syncNextAttemptAt?:string|null;posCreateAttemptedAt?:string|null;posCustomerRetryCount?:number|null;refundState?:string|null;}):CustomerOrderState{
+  if(o.status==='cancelled'&&!REFUND_LIFECYCLE.has(o.refundState??'none'))return 'order_cancelled';
+  return deriveCustomerOrderState({orderType:o.orderType,paymentMethod:o.paymentMethod,paymentStatus:o.paymentStatus,syncState:o.lazywaitSyncState,ref:o.lazywaitRef,blockedReason:o.syncBlockedReason,nextAttemptAt:o.syncNextAttemptAt,posCreateAttemptedAt:o.posCreateAttemptedAt,customerRetryCount:o.posCustomerRetryCount,refundState:o.refundState});
+}
