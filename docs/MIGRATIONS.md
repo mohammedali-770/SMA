@@ -9061,3 +9061,207 @@ waits for it, so a scan already running is waited for, not overlapped.
    others; the once-per-run limit and the call saving arrive with this deploy.
 
 Rollback is the notes at the foot of the file.
+
+## 66. Payment records in "Get a copy of my data" — WRITTEN 2026-11-14, awaiting approval (no ledger row)
+
+`20261014120000_export_my_data_payments.sql`. **Written 2026-11-14 on branch
+`fix/export-my-data-payments-20261114`, validated, awaiting owner approval.**
+Gap PG-26 in `docs/readiness/20261113-card-payments-gaps.md`. Revised the same
+day after review (below, "What review changed").
+
+sha256 `3eb020d2837a48ec4655de5d86d1947345aa024329e1a94b671bd3ab52bb8a8d`,
+920 lines / 49 240 bytes. **Re-hash the MERGED copy before applying**, per §15.
+
+**It redefines `export_my_data()` and nothing else.** No data, no deploy: the
+app calls the function by name with no arguments, so the existing call binds to
+the new body. **MONEY PATH UNTOUCHED, and the file asserts it** (`12b6816d…` /
+`22e2d429…`).
+
+### Why
+
+The copy tells the customer it holds "Everything Spicy Meal holds about you
+that is personal to you", and it reads no payment table: not `payment_records`,
+`checkout_sessions` or `order_refunds`. Measured 2026-11-14 on the local chain
+at `52a3976`, whose `export_my_data` reproduces the live hashes from the live
+facts read that morning (md5(prosrc) `0edc9f73…`, 4 973 characters;
+md5(pg_get_functiondef) `d44bad48…`). Once card payment is on, every customer's
+copy would miss their card payments, the card details we keep, each declined
+try and each refund. Live that day the gap touches only team accounts: 9 Tap
+history rows and 7 checkouts; 0 Moyasar records and 0 refunds.
+
+### What it does
+
+The copy gains three lists, and every key it had keeps its value:
+
+- `checkouts`: each online checkout, finished or not. Each gives its id, times,
+  status, order type, payment method and, if it became one of the customer's
+  orders, that order's number. **A checkout that did not become an order also
+  gives** its totals, its note, the coupon code as priced, the address as it
+  was and its lines, read out of the priced snapshot: for an abandoned checkout
+  that is the only record of what was in it. For one that became an order those
+  were copied into the order, which `orders` already lists.
+- `payments`: each payment record, with Moyasar's payment and invoice ids, the
+  card that paid, the outcome in words (`note`, which is how a duplicate charge
+  reads), and `tries`: for each try the stored response holds, the method, card
+  network, last four, issuing bank and country, the bank's answer and the
+  authorisation and reference numbers;
+- `refunds`: each refund of one of the customer's orders, with the payment the
+  money went back to, and its reason **in words, in English and Arabic**
+  (`reason`, `reason_ar`). The stored reason is our code for how the
+  point-of-sale retries ended.
+
+**Derived, not retyped.** The new body is the live one with one insertion of
+216 lines after `notification_devices`; a `diff` of the two function statements
+shows nothing removed (`130a131,346`). Top-level keys go from 7 to 10. The new
+body is md5(prosrc) `26eba36676bac42a4c8d7cda09bc6424`, 15 861 characters, and
+md5(pg_get_functiondef) `35981a7c975874d4ca87ad37fd5277d3` on the chain; the
+first was pre-computed from the file and matched.
+
+**A payment record is returned only when every link it has points at the
+caller.** A record links to an order, a checkout, or both, and has no customer
+column. One that touches another customer through either link is never
+returned. **An order whose customer deleted their account** keeps its row with
+`customer_id` NULL (`orders_customer_id_fkey` is `ON DELETE SET NULL`), and an
+order-first payment record or a refund stays on it. Every test is an equality
+with the caller, which NULL never meets, so such a record reaches nobody.
+
+**Records are found from the caller's own orders and checkouts, through their
+indexes.** Measured on a local copy with 200 000 orders, checkouts and payment
+records (10 per customer): the payments lookup runs as index scans on
+`orders_customer_created_idx`, `checkout_sessions_customer_idx`,
+`payment_records_order_idx`, `payment_records_session_idx` and the primary
+keys, 0.7 ms. A whole export took 3 to 8 ms, against 314 to 339 ms for this
+file's first version, which scanned every payment record. Refunds join through
+`orders`; `order_refunds` has no plain index on `order_id` (only the partial
+unique one), which is fine while it holds few rows.
+
+**Left out, each with its reason in the file's header:** the payment-page link
+(a capability, not data about the customer); our per-attempt lookup key and our
+id-derived reference; our failure codes and the refund worker's error text
+(which can name our own configuration); the refund reason's code (its words
+are in); the raw provider response, with Moyasar's fee and its amounts in
+halalas; the checkout's raw coupon text as typed (the priced code is in); the
+address row's id and the customer's own id inside a checkout's address; the
+snapshot's other internal ids; and every idempotency key, claim token and retry
+count. **One older key is left as it was:** an order's `delivered_to` still
+carries its address row id and the customer's own id. It existed before this
+file and is kept byte-identical; both ids are the customer's own.
+
+### Share size, measured
+
+The app shares the copy as text and refuses one over 256 KB
+(`SHARE_TEXT_LIMIT_BYTES`), because Android can drop large share text. Each
+card order now carries a payment record of about 800 bytes. Method, 2026-11-14:
+on a local copy of the chain, 80 two-line pickup card orders for one customer,
+built through `begin_checkout_session` (as the customer),
+`begin_session_attempt` and `finalize_checkout_session` (with a stored response
+shaped by `sanitizeMoyasarPayment`); the old body, this file's first version and
+this file exported side by side; bytes counted with Node's `JSON.stringify`.
+
+| Copy | Bytes per card order | Card orders that fit |
+| --- | --- | --- |
+| Before this file, shared indented (no payment data) | about 1 316 | about 199 |
+| This file's first version, shared indented | about 3 634 | about 72 |
+| This file's first version, shared compact | about 2 466 | about 106 |
+| **This file, shared compact (this change)** | **about 1 980** | **about 132** |
+| This file, shared indented (phones on the installed build, until the §47.17 EAS build) | about 2 817 | about 93 |
+| A cash order, shared compact (this change) | about 868 | about 301 |
+
+So **a card customer with more than about 132 orders is told to contact us,
+where before it was about 199**; a cash customer's ceiling rises from about 199
+to about 301. The app shares compact JSON from this change on
+(`exportShareText`, `apps/mobile/src/features/profile/dataExport.ts`); that
+ships at `/app` on merge and on phones with the next EAS build. Until that
+build reaches them, phones still share indented JSON, so once this file is
+applied a card customer on the installed build is told to contact us at about
+93 orders; apply after the build if that ceiling matters. The real fix,
+a file attachment, still needs a native build. Real orders vary (add-ons,
+delivery addresses, several tries), so read these as estimates.
+
+### What the file checks
+
+- One overload, cardinality first; no arguments; `SECURITY DEFINER`; `STABLE`;
+  `search_path=public`.
+- The grants as outcomes: no default ACL, no PUBLIC, `anon` no; `authenticated`
+  and `service_role` yes.
+- `anon` refused with `42501 permission denied for function export_my_data`, and
+  a signed-in caller with no subject refused by the function's own guard, both
+  read back as SQLSTATE and text.
+- The money-path pair, one overload each first.
+- **A fixture probe that is rolled back.** Two throwaway customers (two
+  `auth.users` rows, their profiles by trigger, a checkout and a payment record
+  each) inside a sub-transaction it aborts. Each gets exactly their own rows,
+  nothing of the other's, the exact key set at every level, the issuer read out
+  of the stored response, the priced coupon code rather than the typed text, an
+  address without its ids, and none of the planted values of a left-out column.
+  It creates no order, because an order advances the order-number sequence,
+  which no rollback returns. Afterwards it proves the rows are gone and the role
+  and caller identity are what they were.
+- **It never runs `reset role`.** Every role change sits inside a sub-transaction
+  that ends by raising, so the abort restores it.
+
+### Validation
+
+- **Paired suite** `supabase/tests/export_my_data_test.sql`, cases 8 to 16 added
+  to the seven it had, over two customers with three tables of rows each, a
+  third with none, and a fourth whose account is really deleted:
+  - 8: Alice gets exactly her 3 payment records, 3 checkouts and 1 refund,
+    counted from the rows by the same rule and matched by id; Bob the same from
+    his side; nothing of the other's by content;
+  - 9: a record linked to Alice's checkout and Bob's order reaches neither;
+  - 10: the exact key set of every object, and none of 24 planted values of the
+    columns left out;
+  - 11: the card that paid, a paid try, two declined tries on an expired invoice,
+    and a Tap charge, field by field;
+  - 12: an abandoned checkout's lines, which add up to its subtotal;
+  - 13: no payments gives three empty lists, and every older key keeps its
+    shape. Cases 3a and 3b, the anonymous refusals, run against the new body;
+  - 14: Dave places a card order, gets a refund, and deletes his account
+    (`auth.users` row deleted, so his profile and checkouts go and his order
+    keeps `customer_id` NULL); his payment record and refund reach none of
+    Alice, Bob or Carol;
+  - 15: a checkout that became her order gives its references only; one linked
+    to Bob's order gives no order number; the coupon is the priced code, never
+    the typed text; the address has no ids;
+  - 16: a refund's reason in words, in both languages, and the code nowhere.
+- **Fail-before:** the extended suite against the chain built from `52a3976`
+  stops at `FAIL 8: <NULL> payment records exported, 3 are hers`; against this
+  file's first version it stops at `FAIL 16` (the reason was our code).
+- **Full private chain:** see the pull request for the final run. The file
+  re-applies cleanly.
+- **Mutation testing, 14 mutants, all killed by the suite; 5 also refused by
+  the file's own block** (the raw payload exported, the typed coupon exported,
+  the address ids kept, EXECUTE granted to `anon`, the null-subject guard
+  removed). **Nine apply cleanly and only the suite catches them,** because each
+  needs an order, a refund or a Tap record and the probe creates none: payments
+  or refunds of a deleted customer's order leaking, the checkout's order number
+  without its owner check, the invoice id falling back to the page link, the
+  Tap card brand read instead of its scheme, the refund reason exported as our
+  code or without Arabic, completed checkouts left untrimmed, and "any link"
+  instead of "every link".
+
+### What review changed (2026-11-14)
+
+The first version (sha256 `b19521e5…`, 815 lines) was reviewed before merge.
+Measured findings, each fixed here: the share limit was reached at about 72
+card orders instead of about 199; no test pinned a deleted customer's records;
+the header said the raw coupon text and the address ids were left out while the
+export carried both; a refund's reason exported our point-of-sale retry code,
+which the copy's own `about` text says is not included; and the payments lookup
+scanned every payment record (about 316 ms on 200 000 records).
+
+### Applying it (owner, §5, named by version)
+
+1. Merge first. Re-hash the merged copy against the sha256 above.
+2. **Read-only, as the applying role:**
+   `select has_table_privilege('auth.users', 'insert');` must be true. This is
+   the first file whose check writes `auth.users`, so it has never been
+   measured. If it is false, do not apply. The file would refuse anyway, and
+   nothing would land.
+3. Apply `20261014120000` by name. Never "the outstanding migrations".
+4. Afterwards, read-only: one overload with no arguments; `anon` false and
+   `authenticated` true; the money-path pair unchanged; md5(prosrc) of
+   `export_my_data` is `26eba366…`; `auth.users` and `payment_records` hold the
+   same number of rows as before step 3. Steps: `docs/OWNER_ACTIONS.md` §56.
+5. Rollback is a new file that re-applies the function statement and the two
+   grant statements of `20260912120000`.

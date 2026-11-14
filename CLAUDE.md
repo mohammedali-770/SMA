@@ -323,6 +323,17 @@ the money path is self-asserted. **Apply it BEFORE deploying `payment-refund`**,
 each on its own approval: the new worker passes a parameter only this file
 defines. **Name the target by version.** Detail: `docs/MIGRATIONS.md` §65.
 
+**AMENDED 2026-11-14 — `20261014120000_export_my_data_payments` is written,
+validated and awaiting approval** (branch `fix/export-my-data-payments-20261114`,
+gap PG-26). It redefines `export_my_data()` only, adding the caller's
+checkouts, payment records and refunds. No data, no deploy; money path
+untouched and self-asserted (`12b6816d…` / `22e2d429…`). **Its self-check is
+the first file to write `auth.users`**, two throwaway rows inside a
+sub-transaction it aborts, so read `has_table_privilege('auth.users',
+'insert')` as the applying role first. Once merged it is outstanding, and other
+gap-fix files written the same day may be too: **name the target by version.**
+Detail: `docs/MIGRATIONS.md` §66; steps: `docs/OWNER_ACTIONS.md` §56.
+
 **`20261003120000` IS NOT THE FIRST INLINE APPLY WHERE THE TRANSPORT DECODED `\u`
 ESCAPES (row 111 was), and it is the first where it decoded only SOME.** Of its 50 escapes,
 the 40 at or above U+0020 arrived as the characters they name; the ten

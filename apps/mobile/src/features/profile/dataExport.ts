@@ -42,6 +42,22 @@ export type ExportState = 'idle' | 'working' | 'shared' | 'error' | 'too_large';
  */
 export const SHARE_TEXT_LIMIT_BYTES = 256 * 1024;
 
+/**
+ * The text that is shared: the server's JSON, COMPACT.
+ *
+ * Compact rather than indented because the share has a size ceiling (above),
+ * and since `20261014120000_export_my_data_payments` every card order also
+ * carries a payment record. Indentation was about a third of the bytes.
+ * Measured on the local chain on 2026-11-14 with 80 two-line card orders:
+ * indented, about 2 817 bytes a card order, so about 93 fit; compact, about
+ * 1 980, so about 132. A cash order goes from about 1 316 to about 868, so
+ * about 301 fit instead of 199. JSON is the portable form either way, and any
+ * JSON viewer indents it again. `docs/MIGRATIONS.md` §66 has the method.
+ */
+export function exportShareText(payload: unknown): string {
+  return JSON.stringify(payload);
+}
+
 /** Byte length, not string length — Arabic and emoji are multi-byte in UTF-8. */
 export function exportByteLength(json: string): number {
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(json).length;
@@ -79,6 +95,17 @@ export interface ExportSummary {
   addresses: number;
   loyaltyEntries: number;
   devices: number;
+  /**
+   * Payment records, the only part of the copy that carries card details
+   * (gap PG-26, `20261014120000_export_my_data_payments.sql`).
+   *
+   * ABSENT IS NOT ZERO. The web app at `/app` ships on merge, and the server
+   * sends a `payments` list only once that migration is applied. A copy made in
+   * between has no list at all, and "0 payment records" would tell the customer
+   * something untrue about a file that never looked. So the count is present
+   * only when the list is.
+   */
+  payments?: number;
 }
 
 /**
@@ -90,19 +117,24 @@ export interface ExportSummary {
 export function summarizeExport(payload: unknown): ExportSummary {
   const len = (v: unknown): number => (Array.isArray(v) ? v.length : 0);
   const p = (payload ?? {}) as Record<string, unknown>;
-  return {
+  const summary: ExportSummary = {
     orders: len(p.orders),
     addresses: len(p.saved_addresses),
     loyaltyEntries: len(p.loyalty_history),
     devices: len(p.notification_devices),
   };
+  if (Array.isArray(p.payments)) summary.payments = p.payments.length;
+  return summary;
 }
 
 /** One line the customer can sanity-check before they send the file anywhere. */
 export function summaryLine(s: ExportSummary, lang: 'en' | 'ar'): string {
-  return lang === 'ar'
-    ? `${s.orders} طلب · ${s.addresses} عنوان · ${s.loyaltyEntries} حركة نقاط · ${s.devices} جهاز`
-    : `${s.orders} orders · ${s.addresses} addresses · ${s.loyaltyEntries} loyalty entries · ${s.devices} devices`;
+  const base =
+    lang === 'ar'
+      ? `${s.orders} طلب · ${s.addresses} عنوان · ${s.loyaltyEntries} حركة نقاط · ${s.devices} جهاز`
+      : `${s.orders} orders · ${s.addresses} addresses · ${s.loyaltyEntries} loyalty entries · ${s.devices} devices`;
+  if (s.payments === undefined) return base;
+  return lang === 'ar' ? `${base} · ${s.payments} سجل دفع` : `${base} · ${s.payments} payment records`;
 }
 
 /**
