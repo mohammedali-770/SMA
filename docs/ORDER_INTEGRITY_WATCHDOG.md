@@ -17,7 +17,10 @@ Admin UI: **Admin → Order Integrity** (`src/components/admin/OrderIntegrityPan
 
 **MAY (the only side effects that exist):**
 - READ operational state: `orders`, `payment_records`, `checkout_sessions`,
-  `cron.job` (own job only).
+  `cron.job` (own job only). Since `20261013120000` (written 2026-11-14, not
+  live until applied) also `order_refunds`, and the failed Moyasar
+  confirmation rows of `integration_sync_logs` through a partial index that
+  holds nothing else.
 - WRITE only to its own four isolated tables: `order_integrity_config`,
   `order_integrity_runs`, `order_integrity_incidents`,
   `order_integrity_alert_outbox`.
@@ -59,7 +62,11 @@ are considered safe operational identifiers and are shown.
 
 ---
 
-## 3. Rules (13 supported)
+## 3. Rules (17 supported)
+
+Rules 14-17 are added by `20261013120000_payment_refund_visibility.sql`
+(`MIGRATIONS.md` §65). **Written 2026-11-14 and not live until that file is
+applied;** until then Production evaluates 13.
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
@@ -80,6 +87,10 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
 | 12 | `UNPAID_ORDER_NOT_SYNCED` | critical | **not** paid, not cancelled, older than 15 min, `lazywait_sync_state ∈ {syncing,blocked}`, and not intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
 | 13 | `UNPAID_ORDER_DEAD_LETTER` | critical | **not** paid, not cancelled, `lazywait_sync_state='dead_letter'`. |
+| 14 | `REFUND_FAILED` | critical | the newest `failed` `order_refunds` row of an order (the automatic refund gave up), unless a refund for that order is `pending`, `processing` or `succeeded`, or the order's `refund_state` is `refunded`. One incident per **order**. `safe_details` carries the failure code, attempts, amount and age, and only a yes/no for the error text. |
+| 15 | `DUPLICATE_PAYMENT_RECORDED` | critical | a `payment_records` row `failed` with `failure_code='duplicate_payment'`: a second payment for something already paid (`PAYMENTS.md` §10). Nothing refunds it automatically. |
+| 16 | `PAYMENT_VERIFICATION_MISMATCH` | critical | a `payment_records` row `failed` with `failure_code='verification_mismatch'`: Moyasar reports it settled, but it matched no attempt, so it confirmed nothing. |
+| 17 | `PAYMENT_CONFIRMATION_FAILED` | critical | a Moyasar payment logged in `integration_sync_logs` as `failed` with `error` `finalize_failed` (no order was created) or `confirm_failed` (the order was not marked paid), while no `payment_records` row for that payment id is `paid` or `refunded`, or is a duplicate or mismatch record. One incident per **payment**, fingerprinted by `md5('moyasar:'\|\|payment id)` like R5, so the payment id itself never enters the watchdog's tables. |
 
 > ### ✅ CLOSED by R12/R13 — R1 and R7 could not see a cash order, and every real order is cash
 >
@@ -183,10 +194,30 @@ raises nothing today.
 scope note inside the function: it is the designed human-verification resting
 place and already has `list_pos_confirmation_required()` and the admin feed.
 
-**Not implemented — `REFUND_STUCK`:** there is no refunds table or refund
-lifecycle anywhere in the schema, so the rule is intentionally omitted (a
-provider-side stuck refund is not determinable from our database). Documented
-here so the omission is explicit, not an oversight.
+**R14-R17 have no threshold, on purpose.** Each fires on a definite event the
+payment code already records. Whether a person must act, and how soon, is not
+decided by the rule. Each incident ends only when the record itself moves on: a
+newer refund, a later verify that confirms the payment, a row no longer failed.
+Acknowledging is not fixing (§7), so an incident stays counted until then.
+**Nothing records a refund made by hand in Moyasar's dashboard** (gap PG-14, an
+owner decision), so after one the incident stays open until that is decided.
+
+**How they reach a person.** Like every incident, they count in
+`order_integrity_health_summary()`, which turns the Order Integrity card in
+Operations Health to failing and raises the critical
+`order_integrity:incidents` alert in the console's inbox. The payment card
+counts its own list of rule codes, and R14-R17 are added to it, so it reads
+failing too. Outside the console they reach nobody until external alert email
+is turned on (gap PG-10). The same records are listed on Live Orders, in the
+admin-only card "Refunds and payments needing attention".
+
+**Not implemented — `REFUND_STUCK`, a refund still being retried.** The reason
+recorded here until 2026-11-14, "there is no refunds table", stopped being true
+when `order_refunds` was added (`20260724120000`). A refund that gave up is now
+R14. A refund still `pending` raises nothing: the age after which it counts as
+stuck is the owner's number (gap PG-01, `OWNER_ACTIONS.md` §55). Until it is
+set, the console card lists every pending refund already tried once, with its
+attempts and last reason.
 
 It is deliberately **not numbered**. It was written as "R12" while only 11 rules
 existed; R12 is now `UNPAID_ORDER_NOT_SYNCED`, and a document using one ordinal
@@ -218,7 +249,9 @@ pending owner approval.
 All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 **no Production order IDs are hard-coded in the scanner logic.**
 
-- `rule_enabled` — per-rule on/off map (all 13 supported rules default `true`).
+- `rule_enabled` — per-rule on/off map (all 17 supported rules default `true`;
+  a rule code missing from the map counts as enabled, which is how R14-R17
+  start enabled without a config row).
   Setting a rule to `false` freezes it: its active incidents stop being updated
   **and stop being resolved** (they neither advance clean-counts nor close).
 - `abandoned_awaiting_payment_since` — seeded to `now()` at apply time, so all

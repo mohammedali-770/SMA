@@ -120,6 +120,29 @@ configuration error has the highest precedence.
   recent stale initiated attempts, latest paid time, and payment-related Order
   Integrity incident counts. No provider availability probe exists in v1.
 
+  *Changed 2026-11-14, not live until `20261013120000` is applied*
+  (`MIGRATIONS.md` §65, gap PG-25). **A stale attempt now means money taken
+  without a confirmed order.** Live today, the card reads `degraded` for any
+  attempt created in the last 24 hours and still `initiated` 30 minutes after
+  it opened, and every customer who closes the card page leaves exactly that.
+  After the apply, an attempt counts only if a payment settled on it
+  (`provider_ref` set). `provider_ref` is written in one place,
+  `stampPaymentRef` in `supabase/functions/_shared/moyasarVerify.ts`, for a
+  paid payment that binds to the attempt, just before the order is confirmed,
+  and a confirmation moves the row on. So an attempt still `initiated` with it
+  is a payment Moyasar took whose confirmation did not finish. The card's line
+  for it reads "A payment went through at Moyasar, but its order was not
+  confirmed within 30 minutes."
+
+  The other option, ignoring attempts past their invoice expiry, was not
+  taken. The invoice expiry is 30 minutes (read live 2026-11-13), so an attempt
+  open past 30 minutes is almost always past its expiry, and so is the
+  money-taken case. That option would have hidden the one case worth a warning.
+
+  The same file adds the four refund and payment rules R14-R17
+  (`ORDER_INTEGRITY_WATCHDOG.md` §3) to the payment-related incident count, so
+  the card reads `failing` for them as it does for R2-R6.
+
   *Changed 2026-11-12.* The card was **Payment / Tap**. On the branch
   `feat/moyasar-only-20261111` the console labels it **Payment / Moyasar**
   (**الدفع / Moyasar**), and that reaches the console on merge. The database half
@@ -219,7 +242,7 @@ Admin and accountant/staff users receive the same safe read-only Health Center
 view. Existing admin-only controls remain in their original management panels.
 Customers have no access.
 
-## Duplicate Moyasar payments — not shown here
+## Duplicate Moyasar payments — shown only after `20261013120000`
 
 **Added 2026-11-12.** If a customer pays twice for one order or checkout session,
 the Moyasar-only payment code records the second payment as a `failed`
@@ -227,11 +250,18 @@ the Moyasar-only payment code records the second payment as a `failed`
 `integration_sync_logs` row with `error = 'duplicate_payment'`. It is never
 reported paid.
 
-**Nothing on this page, and no alert, shows it.** The watchdog's
+**Live today, nothing on this page, and no alert, shows it.** The watchdog's
 `MULTIPLE_SUCCESSFUL_CAPTURES` rule counts paid rows only, and a duplicate is
 `failed`. An order's receipt shows only its newest payment record, so it may show
 the duplicate or hide it. Nothing refunds a duplicate automatically; making that
 automatic needs an owner decision (`OWNER_ACTIONS.md` §47.20).
+
+**Changed 2026-11-14, not live until `20261013120000` is applied** (gap PG-02).
+Each duplicate raises the critical watchdog rule R15, which turns the Order
+Integrity and payment cards here to failing and opens the critical
+`order_integrity:incidents` alert. A payment that matched nothing (R16) and a
+payment whose order was not confirmed (R17) do the same. Live Orders lists all
+three in the admin-only card "Refunds and payments needing attention".
 
 **How to find and refund one** — the read-only queries and the refund in the
 Moyasar dashboard, which is a live money action and an owner approval — is owned

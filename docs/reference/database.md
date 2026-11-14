@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **155**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261011120000_drop_push_devices_admin_select.sql`.
+Migration files in the repository: **156**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261013120000_payment_refund_visibility.sql`.
 
 ## Tables
 
@@ -146,7 +146,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |
 | `claim_lazywait_sync_one` | 3 | `20260813143000_manual_only_pos_resend.sql` |
 | `claim_operations_alert_emails` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
-| `claim_order_refund` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
+| `claim_order_refund` | 2 | `20261013120000_payment_refund_visibility.sql` |
 | `claim_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `clear_branch_delivery_pause` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `clear_branch_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
@@ -218,6 +218,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `lazywait_sync_health_summary` | 1 | `20260721150000_lazywait_sync_health_summary.sql` |
 | `list_failed_order_refunds` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `list_integration_settings` | 1 | `20260707121000_integration_settings.sql` |
+| `list_payments_needing_attention` | 1 | `20261013120000_payment_refund_visibility.sql` |
 | `list_pos_confirmation_required` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `loyalty_multiplier_for` | 1 | `20260910120000_loyalty_multipliers.sql` |
 | `loyalty_next_expiry_on` | 1 | `20260909120000_loyalty_expiry.sql` |
@@ -254,7 +255,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `operations_digest_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_digest_preview` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_health_overall_state` | 2 | `20260807150000_order_flow_health_card.sql` |
-| `operations_health_snapshot_internal` | 7 | `20261003120000_moyasar_only_payments.sql` |
+| `operations_health_snapshot_internal` | 8 | `20261013120000_payment_refund_visibility.sql` |
 | `operations_health_summary` | 2 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `order_integrity_acknowledge_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_admin_summary` | 1 | `20260721170000_order_integrity_watchdog.sql` |
@@ -262,7 +263,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_integrity_incident_timeline` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_list_incidents` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_suppress_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
-| `order_integrity_watchdog` | 3 | `20260831120000_watchdog_cash_order_coverage.sql` |
+| `order_integrity_watchdog` | 4 | `20261013120000_payment_refund_visibility.sql` |
 | `order_item_note_is_acceptable` | 1 | `20260821170000_order_item_notes.sql` |
 | `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_note_normalized` | 1 | `20260819120000_order_note_length_limit.sql` |
@@ -273,6 +274,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_increment_attempt` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
+| `payments_needing_attention_internal` | 1 | `20261013120000_payment_refund_visibility.sql` |
 | `place_customer_order` | 2 | `20261005120000_server_input_bounds.sql` |
 | `place_order` | 18 | `20260924120000_place_order_variant_availability.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |

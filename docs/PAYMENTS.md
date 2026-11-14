@@ -352,6 +352,29 @@ not the worker.
 Either one is refunded by hand in Moyasar's dashboard today. That is a live
 money action and an owner approval (§5 of CLAUDE.md).
 
+### Where staff see a refund problem
+
+**Written 2026-11-14, not live until `20261013120000` is applied** (on the
+branch `fix/payment-refund-visibility-20261114`, `MIGRATIONS.md` §65). Until
+then, no screen and no alert reads `order_refunds`.
+
+After it:
+
+- a refund that gave up (`failed`) raises the critical watchdog incident R14
+  `REFUND_FAILED`, unless a newer refund for the order is pending, processing
+  or succeeded, or the order reads refunded. The incident reaches the alert
+  inbox through the Order Integrity card, and turns the payment card in
+  Operations Health to failing;
+- Live Orders shows the card "Refunds and payments needing attention" to an
+  admin at AAL2. It lists those refunds under "Automatic refunds that stopped",
+  and every refund tried at least once and still pending under "Refunds still
+  being retried", with its attempts and the reason for its last release. It has
+  no refund button: the instruction on each section is to check the payment in
+  Moyasar's dashboard and refund it there by hand (§10).
+
+Nothing records a refund made by hand (gap PG-14), so after one the incident
+and the card row stay until that is decided.
+
 ### How the worker runs
 
 1. The `payment-refund-worker` cron job (every 5 minutes, **disabled since
@@ -366,6 +389,28 @@ money action and an owner approval (§5 of CLAUDE.md).
    function answers 503 and does nothing.
 4. The worker claims up to 5 refunds, one at a time, and sends
    `POST /v1/payments/{payment id}/refund` with the amount in halalas.
+
+**The queue order, written 2026-11-14 (gap PG-01).** Live today, a claim takes
+the OLDEST pending refund by `created_at`. A refund released as `pending` stays
+the oldest, so the next claim of the same run takes it straight back: one stuck
+refund uses all 5 claims of every run, up to 1,440 a day, and every newer refund
+waits. On the branch `fix/payment-refund-visibility-20261114`:
+
+- `claim_order_refund` takes the least recently touched pending refund first
+  (`updated_at`, then `created_at`), so a refund just released goes to the back
+  of the queue. This needs only `20261013120000` applied;
+- `payment-refund` passes the ids it has already claimed in the run, and the
+  claim skips them, so a refund is tried at most once per run: one stuck refund
+  then costs one claim a run, up to 288 a day. This needs the apply AND then the
+  deploy, in that order: the new worker deployed first claims nothing;
+- a refund released as `pending` now records why: `provider_no_answer` (a
+  network, proxy or timeout failure), `http_429`, a server error such as
+  `http_503`, `refund_not_final`, `key_unavailable` or `reconcile_unavailable`.
+  The last two say nothing was sent.
+
+There is still **no attempt cap and no back-off**, and no age after which a
+pending refund counts as stuck. Those numbers are the owner's
+(`OWNER_ACTIONS.md` §55).
 
 **Settled 2026-11-13: `refund_trigger_secret` is present on the payment row**
 (read by length only: 64). The paragraph below is the 2026-11-11 position.
@@ -396,9 +441,12 @@ A 401 whose message names the IP allow-list is classified `pending` with
 `failure_code = 'moyasar_ip_not_allowed'`, and the claim is released, the same
 path as a 429 or a 5xx. The order stays `refund_state = 'pending'` and does not
 appear in `list_failed_order_refunds()`. **There is no attempt cap**: until the
-proxy and Allowed IPs are fixed, every cron run claims and releases it again.
-Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a bad
-key) is a definitive failure.
+proxy and Allowed IPs are fixed, every cron run claims and releases it again,
+five times a run today and once a run after `20261013120000` and the
+`payment-refund` deploy (above). After the apply it is listed under "Refunds
+still being retried" with the reason "Moyasar refused our address (Allowed
+IPs)". Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a
+bad key) is a definitive failure.
 
 ---
 
@@ -700,13 +748,39 @@ The order-first race is decided under the order's row lock
 record.
 
 **Nothing refunds a duplicate automatically.** Making it automatic needs an owner
-decision. Nothing alerts on it either: no watchdog rule or alert reads
-`duplicate_payment` (the watchdog's double-capture rule counts `paid` rows, and a
-duplicate is `failed`).
+decision (refund draft D2). **Live today, nothing alerts on it either:** no
+watchdog rule or alert reads `duplicate_payment` (the watchdog's double-capture
+rule counts `paid` rows, and a duplicate is `failed`).
 
-**Finding them.** The console has no list of them. The order receipt shows only
-the **newest** payment row for an order, so it may show the duplicate or hide it,
-and a duplicate with no order id appears on no receipt. Use a read-only query:
+**Written 2026-11-14, not live until `20261013120000` is applied** (gap PG-02,
+`MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
+`DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and turns the
+payment card to failing. The Live Orders card "Refunds and payments needing
+attention" lists it under "Payments to refund", with the Moyasar payment id to
+search for.
+
+**Two neighbours are handled the same way, and are money taken for nothing:**
+
+- **a payment that settled but matched nothing** (wrong invoice, amount,
+  currency or mode). Its attempt is `failed` with
+  `failure_code = 'verification_mismatch'` and confirms nothing. The payment id
+  is in the sanitized `raw`, not in `provider_ref`. After the apply: R16
+  `PAYMENT_VERIFICATION_MISMATCH`, and the same "Payments to refund" list.
+  Check it in Moyasar's dashboard, then refund it;
+- **a payment whose order was not created or not marked paid.** Only an
+  `integration_sync_logs` row records it: `error = 'finalize_failed'` (session
+  flow, no order exists) or `'confirm_failed'` (order flow, the order is not
+  marked paid), with the payment id in `request`. After the apply: R17
+  `PAYMENT_CONFIRMATION_FAILED`, one incident per payment, and the list "Paid,
+  but no confirmed order". If an order is named, open it and use "Re-verify via
+  Moyasar" on the receipt first. If there is no order, or it stays unpaid,
+  refund the payment by hand. The incident ends when a later verify confirms the
+  payment.
+
+**Finding them.** Until the apply, the console has no list of them. The order
+receipt shows only the **newest** payment row for an order, so it may show the
+duplicate or hide it, and a duplicate with no order id appears on no receipt.
+Use a read-only query:
 
 ```sql
 select id, order_id, checkout_session_id, provider_ref as moyasar_payment_id,
@@ -726,6 +800,11 @@ the amount shown. That is a live money action and needs owner approval each
 time. Afterwards there is no column to mark the row refunded; record what was
 done (date, payment id, who) in the incident notes. Never refund the payment on
 the `paid` row.
+
+**After a hand refund the incident and the card row stay** (gap PG-14): nothing
+records the refund, and acknowledging an incident marks it seen without
+removing it from the counts. Until PG-14 is decided, the written record is the
+only proof the money went back.
 
 ---
 
@@ -757,8 +836,10 @@ For the owner:
 
 - automatic refund of a duplicate payment (§10), and of a cancelled paid order
   the branch accepted (§6);
-- whether a refund refused by Allowed IPs should stop after some number of
-  attempts;
+- how many times a refund is tried, the wait between tries, and when a pending
+  refund counts as stuck (PG-01; any cause, not only Allowed IPs);
+- who receives payment alerts outside the console (PG-10), and how a hand
+  refund is recorded (PG-14);
 - whether `set_payment_settings` should also refuse Online Payment unless the
   row is live (a migration);
 - whether the webhook verification code may stay readable by accountants;
@@ -781,7 +862,18 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   same session, the second is recorded as a duplicate and must be refunded by
   hand.
 - **Duplicates are manual.** See §10.
-- **Allowed IPs refusal has no attempt cap** (§6).
+- **Refunds have no attempt cap and no back-off** (§6, PG-01). Until
+  `20261013120000` is applied and `payment-refund` redeployed, one stuck refund
+  takes all five claims of every run. After both, it takes one.
+- **Until `20261013120000` is applied, no refund or payment problem reaches a
+  screen or an alert** (PG-01, PG-02). After it they reach the console's alert
+  inbox; outside the console they reach nobody until external alert email is on
+  (PG-10).
+- **A hand refund is recorded nowhere** (PG-14), so its incident and card row
+  stay listed after the money has gone back.
+- **Until `20261013120000` is applied, an abandoned card checkout makes the
+  payment card read "degraded"** for up to 24 hours (PG-25). After it, only a
+  payment that settled without a confirmed order does.
 - **The Online Payment guard is console-only** (§3).
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the
@@ -818,3 +910,8 @@ Customer-facing:
 Staff-facing: the Moyasar panel, payment card, receipt and Settings strings
 added on 2026-11-11 (in `MoyasarPaymentPanel.tsx`, `PaymentDetails.tsx`,
 `SettingsPanel.tsx` and the alert and health labels).
+
+Staff-facing, added 2026-11-14: the Live Orders card "Refunds and payments
+needing attention" (36 `payattn_*` strings in
+`src/components/admin/adminLocales.ts`) and the Operations Health line for a
+stale payment. Each is listed in `OWNER_ACTIONS.md` §35.

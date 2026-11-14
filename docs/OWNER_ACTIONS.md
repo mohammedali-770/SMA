@@ -2888,6 +2888,71 @@ is customer legal text, so rank it with the consent copy above. Read the Arabic
 the publishing session in §47.15: until then, nothing is published in either
 language.
 
+**Widened 2026-11-14 — "Refunds and payments needing attention" (§55).**
+Staff-facing, in the console's Live Orders. All engineering-drafted, none read
+by a native speaker. It goes live with the merge but shows only after
+`20261013120000` is applied. The English sits under the same key in
+`src/components/admin/adminLocales.ts`. Read the four instructions first: they
+tell a person what to do with a customer's money.
+
+The four instructions:
+
+- `payattn_unconfirmed_do` — «خصم Moyasar المبلغ، لكن الطلب لم يُنشأ أو لم يُعلَّم مدفوعاً. إن ظهر رقم طلب فافتحه واستخدم «إعادة التحقق من الدفع عبر Moyasar». وإن لم يوجد طلب، أو بقي غير مدفوع، فاسترد المبلغ يدوياً من لوحة Moyasar.»
+- `payattn_payments_do` — «هذه المدفوعات لم تدفع ثمن أي طلب: دفعة ثانية لعملية دفع واحدة، أو دفعة لا تطابق عملية الدفع. ابحث عن كل منها في لوحة Moyasar برقم الدفعة، وتحقّق منها، ثم استردها يدوياً. لا تسترد أبداً الدفعة المدفوعة للطلب نفسه.»
+- `payattn_failed_do` — «توقف الاسترداد التلقائي. ابحث عن الدفعة في لوحة Moyasar برقمها. إذا لم تُسترد بعد، فاستردها يدوياً من هناك.»
+- `payattn_retrying_do` — «ستعيد مهمة الاسترداد المحاولة في تشغيلها التالي. يوضح السبب ما أوقف المحاولة الأخيرة. إذا ذكر قائمة عناوين IP المسموح بها أو المفتاح أو عدم استجابة Moyasar، فراجع إعدادات Moyasar والوسيط (البروكسي).»
+
+The card's title, subtitle, error and section titles:
+
+- `payattn_title` — «استردادات ومدفوعات تحتاج متابعة»
+- `payattn_sub` — «مبالغ قد تكون مستحقة للعملاء، الأقدم أولاً. الاسترداد اليدوي من لوحة Moyasar لا يُسجَّل هنا: دوّن التاريخ ورقم الدفعة ومن قام به.»
+- `payattn_error` — «تعذّر تحميل الاستردادات والمدفوعات التي تحتاج متابعة. حاول مرة أخرى بعد قليل.»
+- `payattn_unconfirmed_title` — «مدفوع دون طلب مؤكَّد»
+- `payattn_payments_title` — «مدفوعات يجب استردادها»
+- `payattn_failed_title` — «استردادات تلقائية توقفت»
+- `payattn_retrying_title` — «استردادات قيد إعادة المحاولة»
+
+Row labels:
+
+- `payattn_kind_duplicate` — «خُصم مرتين»
+- `payattn_kind_mismatch` — «لا تطابق عملية الدفع»
+- `payattn_no_order` — «بلا طلب»
+- `payattn_payment_id` — «رقم الدفعة»
+- `payattn_attempts` — «المحاولات»
+- `payattn_since` — «منذ»
+- `payattn_last_try` — «آخر محاولة»
+- `payattn_logged_times` — «مرات التسجيل»
+- `payattn_more` — «أخرى غير معروضة», shown after a number, as in «+2 أخرى غير معروضة»
+
+The reasons, one per stored failure code:
+
+- `payattn_reason_provider_no_answer` — «لا استجابة من Moyasar (الشبكة أو الوسيط أو انتهاء المهلة)»
+- `payattn_reason_reconcile_unavailable` — «تعذّر سؤال Moyasar عن المحاولة الأخيرة»
+- `payattn_reason_key_unavailable` — «لا يوجد مفتاح Moyasar صالح لهذه الدفعة»
+- `payattn_reason_ip_not_allowed` — «رفض Moyasar عنواننا (قائمة عناوين IP المسموح بها)»
+- `payattn_reason_rate_limited` — «طلب Moyasar إبطاء الطلبات»
+- `payattn_reason_not_final` — «لم يُكمل Moyasar الاسترداد بعد»
+- `payattn_reason_lease_expired` — «توقفت مهمة الاسترداد في منتصفها؛ راجع Moyasar أولاً»
+- `payattn_reason_no_payment_id` — «لا يوجد رقم دفعة مسجّل لهذا الطلب»
+- `payattn_reason_old_provider` — «دُفع عبر مزوّد دفع لم يعد مستخدماً»
+- `payattn_reason_ambiguous` — «رد Moyasar غير متسق؛ تحقّق منه يدوياً»
+- `payattn_reason_not_refundable` — «يفيد Moyasar بأن هذه الدفعة لا يمكن استردادها»
+- `payattn_reason_order_not_created` — «تعذّر إنشاء الطلب»
+- `payattn_reason_order_not_paid` — «تعذّر تعليم الطلب مدفوعاً»
+- `payattn_reason_server_error` — «خطأ في خادم Moyasar»
+- `payattn_reason_refused` — «رفض Moyasar الاسترداد»
+- `payattn_reason_other` — «أخرى», followed by the raw code in brackets
+
+And one Operations Health line, `STALE_PAYMENT_INITIATIONS` in
+`src/components/admin/view/health/healthView.ts`, which now describes money
+taken rather than an abandoned checkout (PG-25): «تمت دفعة لدى Moyasar، لكن
+طلبها لم يُؤكَّد خلال 30 دقيقة.» — English: *"A payment went through at
+Moyasar, but its order was not confirmed within 30 minutes."*
+
+Words to check first: «الوسيط (البروكسي)» for the outbound proxy, «قائمة عناوين
+IP المسموح بها» for Moyasar's Allowed IPs, and «يُعلَّم مدفوعاً» for "marked
+paid".
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -4886,6 +4951,75 @@ There is no number to decide and no function to deploy.
 
 **Done looks like:** all three applies recorded as ledger rows in
 `docs/MIGRATIONS.md`, and §61 and §62 marked APPLIED.
+
+## 55. Refunds and payments needing attention — one apply, then one deploy
+
+**Opened 2026-11-14.** The branch `fix/payment-refund-visibility-20261114`
+fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
+([the card-payment gaps](readiness/20261113-card-payments-gaps.md)):
+
+- **One stuck refund no longer takes every refund claim.** A refund the job
+  could not finish goes to the back of the queue, and the job tries each refund
+  at most once per run. Before, one stuck refund was claimed 5 times a run, up
+  to 1,440 times a day, and every newer refund waited behind it.
+- **Refund and payment problems reach staff.** A refund that gave up, a
+  customer charged twice, a payment that matched nothing, and a payment whose
+  order was not confirmed each raise a critical incident. The incident reaches
+  the alert inbox and turns the payment card in Operations Health to failing.
+  They are also listed on a new Live Orders card, "Refunds and payments needing
+  attention", with what to do: refund by hand in Moyasar's dashboard
+  ([`PAYMENTS.md`](PAYMENTS.md) §10). The card has no refund button.
+- **Abandoned card checkouts no longer read as "payment degraded"** (PG-25).
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** The console card ships with the merge and hides
+   itself until step 2, because its function does not exist yet.
+2. **Apply `20261013120000` by name**, after the read-only checks in
+   [`MIGRATIONS.md`](MIGRATIONS.md) §65 step 1 and after re-hashing the merged
+   copy. Never "the outstanding migrations": other files may be outstanding.
+   Apply it soon after the merge. Until then the Operations Health line for a
+   stale payment already says "A payment went through at Moyasar…" while it
+   still counts abandoned checkouts too. With online payment off (read
+   2026-11-14), only a team sandbox test can produce one.
+3. **Check afterwards**, read-only, as §65 step 3 lists.
+4. **Deploy `payment-refund`**, only after step 2. Deployed first, the new job
+   claims nothing until the apply. Its cron job was inactive when read on
+   2026-11-14, so the deploy alone sends nothing.
+5. **Open Live Orders once at AAL2.** With nothing owed the card is absent,
+   which is what to expect today: `order_refunds` was empty and no Moyasar
+   payment record existed when read on 2026-11-14.
+
+**Done looks like:** §65 marked APPLIED with a ledger row, and the deploy
+recorded.
+
+**Your decisions. None of these is made by this change; each is a
+recommendation:**
+
+- **How many tries, and the wait between them (PG-01).** Today a refund that
+  cannot finish is tried once every run (every 5 minutes) for ever: about 288
+  claims a day, each one or two Moyasar requests through the metered proxy.
+  *Recommended:* double the wait after each failed try, from 5 minutes up to 6
+  hours, and stop after 10 tries. Mark the refund failed with its last reason,
+  so it moves to "Automatic refunds that stopped" and raises R14. That is a
+  migration and a `payment-refund` change of its own.
+- **When a pending refund counts as stuck (PG-01).** The card lists every
+  refund already tried once, with its attempts and last reason, but nothing
+  raises an incident for a refund that is still being retried. *Recommended:* a
+  warning after one hour pending with at least one try, critical after 24 hours.
+- **Who receives these alerts outside the console (PG-10).** All four new rules
+  are critical, so they would pass the current `dispatch_min_severity`.
+  *Recommended:* turn external alert email on before §47.18 and name at least
+  two people who can refund in Moyasar's dashboard.
+- **Refund duplicates automatically, or by hand (refund draft D2).**
+  *Recommended:* by hand from this card until the first real duplicates have
+  been seen, then decide.
+- **How a hand refund is recorded (PG-14). This one now matters more.** Nothing
+  records a refund made in Moyasar's dashboard, so after one the incident stays
+  open, the payment card stays failing and the card row stays listed.
+  Acknowledging marks it seen and it still counts, by design. Today the only way
+  to end one is a database write, itself a §5 action. *Recommended:* the PG-14
+  code fix, and a written refund log until then.
 
 ## Owner-action closeout rule
 
