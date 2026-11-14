@@ -157,9 +157,7 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
     // With `loyalty?.pickupOnly` here, an administrator relaxing the rule
     // mid-checkout would leave the summary withholding a delivery redemption
     // the server grants.
-    expect(screen).toContain(
-      'const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;',
-    );
+    expect(screen).toContain('const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;');
     expect(screen).toContain("const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';");
     expect(call).toMatch(/^\s+loyaltyPickupOnly,$/m);
     expect(call).not.toContain('loyalty?.pickupOnly');
