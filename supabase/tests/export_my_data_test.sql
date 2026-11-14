@@ -33,7 +33,15 @@
 --  12. a checkout that never became an order carries its lines, and they
 --      reconcile with its subtotal;
 --  13. the honest flows keep working: no payments gives three empty lists,
---      and every key that existed before keeps its shape.
+--      and every key that existed before keeps its shape;
+--  14. an order whose customer DELETED their account (customer_id NULL, as
+--      ON DELETE SET NULL leaves it) gives its payment record and its refund
+--      to nobody, not even to every other customer;
+--  15. a checkout that became one of the caller's orders gives only its
+--      references, because the order lists the rest; one linked to somebody
+--      else's order gives no order number; the coupon is the priced code, not
+--      the raw text typed; the address has no row id or customer id;
+--  16. a refund's reason is words in both languages, never our machine code.
 -- ============================================================================
 
 begin;
@@ -282,8 +290,9 @@ declare
   c_alice constant uuid := '0e100000-0000-0000-0000-0000000000a1';
   c_bob   constant uuid := '0e100000-0000-0000-0000-0000000000b2';
   v_branch uuid;
-  v_ord_a2 uuid; v_ord_a3 uuid; v_ord_b2 uuid;
-  v_pay_a1 uuid; v_pay_b1 uuid;
+  c_dave  constant uuid := '0e100000-0000-0000-0000-0000000000d4';
+  v_ord_a2 uuid; v_ord_a3 uuid; v_ord_b2 uuid; v_ord_d1 uuid;
+  v_pay_a1 uuid; v_pay_b1 uuid; v_pay_d1 uuid;
 begin
   -- Carol has an account and nothing else: the honest empty case.
   insert into auth.users (id) values ('0e100000-0000-0000-0000-0000000000c3');
@@ -329,7 +338,7 @@ begin
     (id, customer_id, status, order_type, payment_method, branch_id, snapshot,
      subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount,
      total, currency, idempotency_key, order_id, notes, created_at, expires_at,
-     consumed_at)
+     consumed_at, coupon_code)
   values
     ('a1000000-0000-4000-8000-0000000000a1', c_alice, 'consumed', 'pickup', 'online',
      v_branch,
@@ -338,13 +347,22 @@ begin
          'name_en', 'Spicy wrap', 'unit_price', 25.00, 'quantity', 1, 'line_total', 25.00,
          'modifiers', '[]'::jsonb)),
        'loyalty_points_redeemed', 0, 'is_comped', false, 'comp_discount_amount', 0),
-     25.00, 0, 0, 0, 3.26, 25.00, 'SAR', null, v_ord_a2, null,
-     now() + interval '1 minute', now() + interval '31 minutes', now() + interval '2 minutes'),
-    ('a1000000-0000-4000-8000-0000000000a2', c_alice, 'expired', 'pickup', 'online',
+     25.00, 0, 0, 0, 3.26, 25.00, 'SAR', null, v_ord_a2, 'Alice consumed note',
+     now() + interval '1 minute', now() + interval '31 minutes', now() + interval '2 minutes',
+     null),
+    ('a1000000-0000-4000-8000-0000000000a2', c_alice, 'expired', 'delivery', 'online',
      v_branch,
      jsonb_build_object(
        'branch_name_en', 'Export branch',
+       -- As compute_order_snapshot writes them: the priced code upper-cased and
+       -- trimmed, the typed text beside it, and the whole address row.
+       'coupon_code', 'ALICE15',
        'coupon_code_raw', 'ALICE-RAW-COUPON',
+       'address_snapshot', jsonb_build_object(
+         'id', 'ad100000-0000-4000-8000-0000000000a9', 'customer_id', c_alice,
+         'label', 'Alice home', 'description', 'Building 7, Olaya',
+         'national_short_address', 'RAAA1234', 'latitude', 24.7, 'longitude', 46.6,
+         'is_default', true),
        'loyalty_points_redeemed', 0, 'is_comped', false, 'comp_discount_amount', 0,
        'items', jsonb_build_array(
          jsonb_build_object('product_id', 'f1000000-0000-4000-8000-0000000000f2',
@@ -357,15 +375,26 @@ begin
            'name_en', 'Lemon mint', 'unit_price', 9.50, 'quantity', 1, 'line_total', 9.50,
            'modifiers', '[]'::jsonb))),
      49.50, 0, 0, 0, 6.46, 49.50, 'SAR', 'd1000000-0000-4000-8000-00000000d1d1', null,
-     'Alice checkout note', now() + interval '4 minutes', now() + interval '34 minutes', null),
+     'Alice checkout note', now() + interval '4 minutes', now() + interval '34 minutes', null,
+     -- The raw text as typed, which begin_checkout_session stores unchanged.
+     ' alice-typed-coupon '),
+    -- A3: Alice's checkout pointing at BOB's order. The code never writes one;
+    -- it is here so the order number's owner check has something to refuse.
+    ('a1000000-0000-4000-8000-0000000000a3', c_alice, 'consumed', 'pickup', 'online',
+     v_branch, jsonb_build_object('items', '[]'::jsonb),
+     7.00, 0, 0, 0, 0.91, 7.00, 'SAR', null, v_ord_b2, null,
+     now() + interval '8 minutes', now() + interval '38 minutes', now() + interval '9 minutes',
+     null),
     ('b1000000-0000-4000-8000-0000000000b1', c_bob, 'consumed', 'pickup', 'online',
      v_branch, jsonb_build_object('items', '[]'::jsonb),
      31.00, 0, 0, 0, 4.04, 31.00, 'SAR', null, v_ord_b2, 'Bob checkout note',
-     now() + interval '1 minute', now() + interval '31 minutes', now() + interval '2 minutes'),
+     now() + interval '1 minute', now() + interval '31 minutes', now() + interval '2 minutes',
+     null),
     ('b1000000-0000-4000-8000-0000000000b2', c_bob, 'expired', 'pickup', 'online',
      v_branch, jsonb_build_object('items', '[]'::jsonb),
      18.00, 0, 0, 0, 2.35, 18.00, 'SAR', null, null, null,
-     now() + interval '4 minutes', now() + interval '34 minutes', null);
+     now() + interval '4 minutes', now() + interval '34 minutes', null,
+     ' bob-typed-coupon ');
 
   -- Payment records.
   -- A1: Alice's paid card payment, linked to her checkout AND her order, its
@@ -422,11 +451,15 @@ begin
              'issuer_name', 'Alice Mada Bank', 'issuer_country', 'SA')))));
 
   -- A3: an order-first attempt from the retired provider, in Tap's shape.
+  -- It has a payment-page link and no invoice id, so a link cannot pass for an
+  -- invoice id; and its card brand differs from its scheme, so the scheme is
+  -- what is read.
   insert into public.payment_records
     (order_id, provider, status, amount, currency, mode, provider_ref,
-     failure_code, created_at, raw)
+     checkout_url, failure_code, created_at, raw)
   values
-    (v_ord_a3, 'tap', 'failed', 12.00, 'SAR', 'test', 'chg_alice_tap', 'DECLINED',
+    (v_ord_a3, 'tap', 'failed', 12.00, 'SAR', 'test', 'chg_alice_tap',
+     'https://tap.example/pay/ALICE-URL-PLANT-3', 'DECLINED',
      now() + interval '3 minutes',
      jsonb_build_object(
        'id', 'chg_alice_tap', 'status', 'DECLINED', 'amount', 12, 'currency', 'SAR',
@@ -434,7 +467,7 @@ begin
        'reference', jsonb_build_object('transaction', 'ALICE-TAP-REF-PLANT',
                                        'order', 'ALICE-TAP-ORDER-PLANT'),
        'response', jsonb_build_object('code', '05', 'message', 'Do not honor'),
-       'card', jsonb_build_object('scheme', 'VISA', 'brand', 'VISA', 'last_four', '0007'),
+       'card', jsonb_build_object('scheme', 'VISA', 'brand', 'TAP-BRAND-PLANT', 'last_four', '0007'),
        'merchant', jsonb_build_object('id', 'ALICE-MERCHANT-PLANT')));
 
   -- Bob's: a paid card payment on his order, and an abandoned attempt.
@@ -482,8 +515,51 @@ begin
      amount, currency, status, attempt_count, claim_token, reason, created_at, completed_at)
   values
     (v_ord_b2, v_pay_b1, 'moyasar', 'pay_bob_paid', 'pay_bob_paid', 'refund_BOBIDEMPLANT',
-     31.00, 'SAR', 'succeeded', 1, 'BOB-CLAIM-PLANT', 'pos_delivery_failed_after_customer_retries',
+     31.00, 'SAR', 'succeeded', 1, 'BOB-CLAIM-PLANT', 'bob_other_reason_plant',
      now() + interval '5 minutes', now() + interval '7 minutes');
+
+  -- 14. Dave's card order, then Dave deletes his account. Deleting the
+  -- auth.users row removes his profile (ON DELETE CASCADE), which removes his
+  -- checkouts and every payment record tied to one (both cascade), and sets
+  -- his order's customer_id to NULL (ON DELETE SET NULL). What survives is
+  -- exactly what account deletion leaves behind: an order with no owner, its
+  -- order-first payment record and its refund.
+  insert into auth.users (id) values (c_dave);
+  insert into public.orders
+    (customer_id, order_number, customer_name, customer_phone, branch_id,
+     branch_name_en, branch_name_ar, status, order_type,
+     subtotal, delivery_fee, vat_amount, total, payment_method, payment_status,
+     paid_at, created_at)
+  select c_dave, 'SM-TEST-EXPORT-ORPHAN', 'Dave Test', '+966500000000', b.id, b.name_en,
+         b.name_ar, 'received', 'pickup', 44.00, 0, 5.74, 44.00, 'online', 'paid',
+         now() + interval '1 minute', now() + interval '1 minute'
+    from public.branches b where b.id = v_branch
+  returning id into v_ord_d1;
+  insert into public.payment_records
+    (order_id, provider, status, amount, currency, mode, provider_ref,
+     card_scheme, card_last_four, confirmed_at, created_at, raw)
+  values
+    (v_ord_d1, 'moyasar', 'paid', 44.00, 'SAR', 'live', 'pay_orphan', 'visa', '9999',
+     now() + interval '2 minutes', now() + interval '1 minute',
+     jsonb_build_object('id', 'pay_orphan', 'status', 'paid',
+       'source', jsonb_build_object('company', 'visa', 'last_four', '9999',
+         'issuer_name', 'Orphan Bank')))
+  returning id into v_pay_d1;
+  insert into public.order_refunds
+    (order_id, payment_record_id, provider, charge_ref, provider_ref, idempotency_key,
+     amount, currency, status, attempt_count, claim_token, reason, created_at)
+  values
+    (v_ord_d1, v_pay_d1, 'moyasar', 'pay_orphan', 'pay_orphan', 'refund_ORPHANIDEMPLANT',
+     44.00, 'SAR', 'pending', 0, 'ORPHAN-CLAIM-PLANT', 'pos_delivery_failed_after_customer_retries',
+     now() + interval '5 minutes');
+  delete from auth.users where id = c_dave;
+  -- The test proves nothing unless the leftovers are really there, owner-less.
+  if (select count(*) from public.orders where id = v_ord_d1 and customer_id is null) <> 1
+     or (select count(*) from public.payment_records where id = v_pay_d1) <> 1
+     or (select count(*) from public.order_refunds where order_id = v_ord_d1) <> 1
+     or exists (select 1 from public.profiles where id = c_dave) then
+    raise exception 'FAIL 14: the fixture is not what account deletion leaves behind';
+  end if;
 
   -- What the export should return, counted from the rows by the rule itself:
   -- a record is a customer's when every link it has points at them.
@@ -535,16 +611,21 @@ begin
   end if;
   if (select array_agg(e ->> 'checkout_id' order by e ->> 'started_at')
         from jsonb_array_elements(v -> 'checkouts') e)
-     is distinct from array['a1000000-0000-4000-8000-0000000000a1', 'a1000000-0000-4000-8000-0000000000a2'] then
+     is distinct from array['a1000000-0000-4000-8000-0000000000a1', 'a1000000-0000-4000-8000-0000000000a2',
+                            'a1000000-0000-4000-8000-0000000000a3'] then
     raise exception 'FAIL 8: the checkouts are not exactly hers: %', v -> 'checkouts';
   end if;
   v_r := v #> '{refunds,0}';
   if v_r ->> 'order_number' is distinct from 'SM-TEST-EXPORT-2'
      or v_r ->> 'payment_id' is distinct from 'pay_alice_paid'
      or (v_r ->> 'amount')::numeric is distinct from 25.00
-     or v_r ->> 'status' is distinct from 'failed'
-     or v_r ->> 'reason' is distinct from 'pos_delivery_failed_after_customer_retries' then
+     or v_r ->> 'status' is distinct from 'failed' then
     raise exception 'FAIL 8: her refund reads %', v_r;
+  end if;
+  -- 16. The reason in words, both languages; the code itself nowhere.
+  if v_r ->> 'reason' is distinct from 'Your order could not be sent to the branch, so we are returning your payment.'
+     or v_r ->> 'reason_ar' is distinct from 'تعذّر إرسال طلبك إلى الفرع، لذلك نعيد إليك المبلغ الذي دفعته.' then
+    raise exception 'FAIL 16: her refund''s reason reads % / %', v_r ->> 'reason', v_r ->> 'reason_ar';
   end if;
 
   -- 8, by content. Nothing of Bob's, from any of the three tables. 'Bob' alone
@@ -562,6 +643,12 @@ begin
   -- 9. The record that touches both customers is in neither export.
   if position('pay_crosslinked' in v_txt) > 0 then
     raise exception 'FAIL 9: a payment record linked to another customer''s order was exported';
+  end if;
+
+  -- 14. Nothing of the deleted customer's.
+  if position('pay_orphan' in v_txt) > 0 or position('SM-TEST-EXPORT-ORPHAN' in v_txt) > 0
+     or position('Orphan Bank' in v_txt) > 0 or position('"9999"' in v_txt) > 0 then
+    raise exception 'FAIL 14: a deleted customer''s payment or refund reached another customer''s export';
   end if;
 
   -- 10. What is left out, as keys...
@@ -588,9 +675,16 @@ begin
       end if;
     end loop;
   end loop;
+  -- 10 and 15. A checkout that became her order gives its references only;
+  -- every other checkout gives the full set.
   for v_c in select e from jsonb_array_elements(v -> 'checkouts') e loop
     select array_agg(k order by k collate "C") into v_keys from jsonb_object_keys(v_c) k;
-    if v_keys is distinct from array['branch', 'checkout_id', 'comp_discount', 'comped',
+    if v_c ->> 'order_number' is not null then
+      if v_keys is distinct from array['checkout_id', 'completed_at', 'expires_at',
+           'order_number', 'order_type', 'payment_method', 'started_at', 'status'] then
+        raise exception 'FAIL 15: a checkout that became her order exports %', v_keys;
+      end if;
+    elsif v_keys is distinct from array['branch', 'checkout_id', 'comp_discount', 'comped',
          'completed_at', 'coupon_code', 'coupon_discount', 'currency', 'deliver_to',
          'delivery_fee', 'expires_at', 'items', 'loyalty_discount', 'order_number',
          'order_type', 'payment_method', 'points_redeemed', 'started_at', 'status',
@@ -600,7 +694,7 @@ begin
   end loop;
   select array_agg(k order by k collate "C") into v_keys from jsonb_object_keys(v #> '{refunds,0}') k;
   if v_keys is distinct from array['amount', 'completed_at', 'currency', 'order_number',
-       'payment_id', 'provider', 'reason', 'requested_at', 'status'] then
+       'payment_id', 'provider', 'reason', 'reason_ar', 'requested_at', 'status'] then
     raise exception 'FAIL 10: a refund exports %', v_keys;
   end if;
 
@@ -613,6 +707,11 @@ begin
       'ALICE-BIN-PLANT', 'ALICE-TOKEN-PLANT',  -- raw: anything unlisted in source
       'ALICE-TAP-REF-PLANT', 'ALICE-TAP-ORDER-PLANT', 'ALICE-MERCHANT-PLANT',  -- raw: Tap's internals
       'ALICE-RAW-COUPON', 'f1000000-0000-4000-8000',                           -- snapshot internals
+      'alice-typed-coupon',                    -- the session's raw coupon column
+      'ad100000-0000-4000-8000-0000000000a9',  -- the address row id inside the snapshot
+      'TAP-BRAND-PLANT',                       -- Tap's brand, where its scheme is read
+      'pos_delivery_failed_after_customer_retries',                            -- refund reason code
+      'Alice consumed note',                   -- a completed checkout's copy of its order's note
       'd1000000-0000-4000-8000-00000000d1d1',  -- the checkout's idempotency key
       'refund_ALICEIDEMPLANT', 'ALICE-CLAIM-PLANT',                            -- refund idempotency key, lease token
       'ALICE-FAILCODE-PLANT', 'ALICE-LASTERROR-PLANT']                         -- refund error code and text
@@ -688,8 +787,20 @@ begin
      or v_c ->> 'completed_at' is not null or v_c ->> 'branch' is distinct from 'Export branch'
      or v_c ->> 'your_note' is distinct from 'Alice checkout note'
      or v_c ->> 'payment_method' is distinct from 'online'
+     or v_c ->> 'order_type' is distinct from 'delivery'
      or jsonb_array_length(v_c -> 'items') is distinct from 2 then
     raise exception 'FAIL 12: the abandoned checkout reads %', v_c;
+  end if;
+  -- 15. The coupon as priced, not as typed; the address as it was, without
+  -- the address row's id or her own customer id.
+  if v_c ->> 'coupon_code' is distinct from 'ALICE15' then
+    raise exception 'FAIL 15: the coupon reads %, expected the priced ALICE15', v_c ->> 'coupon_code';
+  end if;
+  select array_agg(k order by k collate "C") into v_keys from jsonb_object_keys(v_c -> 'deliver_to') k;
+  if v_keys is distinct from array['description', 'is_default', 'label', 'latitude', 'longitude',
+       'national_short_address']
+     or v_c #>> '{deliver_to,label}' is distinct from 'Alice home' then
+    raise exception 'FAIL 15: the address reads %', v_c -> 'deliver_to';
   end if;
   select sum((e ->> 'line_total')::numeric) into v_sum from jsonb_array_elements(v_c -> 'items') e;
   if v_sum is distinct from (v_c ->> 'subtotal')::numeric then
@@ -708,8 +819,16 @@ begin
    where e ->> 'checkout_id' = 'a1000000-0000-4000-8000-0000000000a1';
   if v_c ->> 'status' is distinct from 'consumed'
      or v_c ->> 'order_number' is distinct from 'SM-TEST-EXPORT-2'
-     or v_c ->> 'completed_at' is null then
-    raise exception 'FAIL 12: the completed checkout reads %', v_c;
+     or v_c ->> 'completed_at' is null
+     or v_c ? 'items' or v_c ? 'total' then
+    raise exception 'FAIL 15: the completed checkout reads %', v_c;
+  end if;
+  -- 15. Her checkout that points at Bob's order: no order number, so its own
+  -- details stand instead.
+  select e into v_c from jsonb_array_elements(v -> 'checkouts') e
+   where e ->> 'checkout_id' = 'a1000000-0000-4000-8000-0000000000a3';
+  if v_c ->> 'order_number' is not null or (v_c ->> 'total')::numeric is distinct from 7.00 then
+    raise exception 'FAIL 15: the checkout linked to another customer''s order reads %', v_c;
   end if;
 
   -- 13 (Alice's half). Every key that existed before is still there, with its
@@ -725,7 +844,7 @@ begin
     raise exception 'FAIL 13: % orders exported, expected her 3', jsonb_array_length(v -> 'orders');
   end if;
 
-  raise notice 'cases 8-12 ok -- her payment records, checkouts and refunds, nothing of anyone else''s, nothing left out leaked';
+  raise notice 'cases 8-12, 14-16 ok -- her payment records, checkouts and refunds, nothing of anyone else''s or of a deleted customer''s, nothing left out leaked';
 end $$;
 reset role;
 
@@ -748,6 +867,20 @@ begin
      or v #>> '{refunds,0,payment_id}' is distinct from 'pay_bob_paid'
      or v #>> '{payments,0,tries,0,card_issuer}' is distinct from 'Bob Card Bank' then
     raise exception 'FAIL 8b: Bob''s checkouts or refunds are wrong';
+  end if;
+  -- 16. A code with no words of its own reads as a plain refund, in both
+  -- languages; the code itself is not exported.
+  if v #>> '{refunds,0,reason}' is distinct from 'A refund of your payment.'
+     or v #>> '{refunds,0,reason_ar}' is distinct from 'استرداد المبلغ الذي دفعته.'
+     or position('bob_other_reason_plant' in v_txt) > 0 then
+    raise exception 'FAIL 16: Bob''s refund reason reads %', v -> 'refunds';
+  end if;
+  if position('bob-typed-coupon' in v_txt) > 0 then
+    raise exception 'FAIL 15: Bob''s raw typed coupon was exported';
+  end if;
+  if position('pay_orphan' in v_txt) > 0 or position('SM-TEST-EXPORT-ORPHAN' in v_txt) > 0
+     or position('Orphan Bank' in v_txt) > 0 then
+    raise exception 'FAIL 14: a deleted customer''s payment or refund reached Bob''s export';
   end if;
   if v_txt ilike '%alice%' or position('pay_crosslinked' in v_txt) > 0
      or position('a1000000-0000-4000-8000' in v_txt) > 0
@@ -775,7 +908,12 @@ begin
   if jsonb_typeof(v -> 'account') is distinct from 'object' then
     raise exception 'FAIL 13: the account of a customer with no payments is missing';
   end if;
-  raise notice 'case 13 ok -- no payments, three empty lists, the rest unchanged';
+  -- 14, the plainest form: a customer with no rows at all still gets none of
+  -- the deleted customer's.
+  if position('pay_orphan' in v::text) > 0 or position('SM-TEST-EXPORT-ORPHAN' in v::text) > 0 then
+    raise exception 'FAIL 14: a deleted customer''s payment or refund reached Carol''s export';
+  end if;
+  raise notice 'cases 13-14 ok -- no payments, three empty lists, nothing of a deleted customer''s';
 end $$;
 reset role;
 

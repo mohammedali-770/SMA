@@ -14,8 +14,9 @@
 -- WHAT THIS DOES. It redefines `export_my_data()` and nothing else. The new
 -- body is the live one with ONE insertion: three new collections after
 -- `notification_devices`. Every existing key is byte-identical, and so is the
--- `about` text, which stays true: it already says that how our own systems
--- handled an order is not included.
+-- `about` text. It stays true because nothing below exports how our own
+-- systems handled an order: the one stored code that says so, a refund's
+-- reason, is turned into words (below).
 --
 --   checkouts  every online checkout the customer started (checkout_sessions);
 --   payments   every payment record that belongs to them (payment_records),
@@ -35,6 +36,18 @@
 -- CHECK requires one), and it is returned only when EVERY link it has points
 -- at the caller. A record that touches another customer through either link is
 -- never returned, even if the other link is the caller's.
+--
+-- An order whose customer deleted their account keeps its row with
+-- `customer_id` NULL (`orders_customer_id_fkey` is ON DELETE SET NULL), and an
+-- order-first payment record or a refund stays on it. NULL is nobody: every
+-- test above is an equality with the caller, which NULL never satisfies, so
+-- such a record reaches no export. The paired suite pins it with an account
+-- that is really deleted.
+--
+-- Payment records are found FROM the caller's own orders and checkouts, by
+-- their indexes (`orders_customer_created_idx`, `checkout_sessions_customer_idx`,
+-- `payment_records_order_idx`, `payment_records_session_idx`), so one export
+-- costs what that customer's history costs, not a scan of every payment.
 --
 -- EACH COLUMN, DECIDED WITH EVIDENCE. The test is the one the original header
 -- set: the customer's own data is in, how our systems behaved is out, and every
@@ -94,18 +107,36 @@
 --          our bookkeeping.
 --
 --   checkout_sessions (one entry per checkout)
---     IN   status, order_type, payment_method, notes as `your_note`,
---          coupon_code, subtotal, delivery_fee, discount_amount as
---          `coupon_discount`, loyalty_discount_amount as `loyalty_discount`,
---          vat_amount as `vat`, total, currency, created_at as `started_at`,
---          expires_at, consumed_at as `completed_at`, the order's
---          `order_number`, and id as `checkout_id`.
---     IN   from `snapshot`, named fields only: the branch name, the delivery
---          address as it was, the points redeemed, the comp flag and amount,
---          and each line (item, size, unit price, quantity, line total, note,
---          add-ons with their prices). The same fields an order exports.
+--     IN   always: id as `checkout_id`, created_at as `started_at`, status,
+--          the order's `order_number` (only when the order is the caller's),
+--          consumed_at as `completed_at`, expires_at, order_type,
+--          payment_method.
+--     IN   only for a checkout that did NOT become one of the caller's
+--          orders: notes as `your_note`, subtotal, delivery_fee,
+--          discount_amount as `coupon_discount`, loyalty_discount_amount as
+--          `loyalty_discount`, vat_amount as `vat`, total, currency, and from
+--          `snapshot`, named fields only: the branch name, the coupon code as
+--          priced (`coupon_code`, upper-cased and trimmed, the way an order
+--          stores it), the delivery address as it was, the points redeemed,
+--          the comp flag and amount, and each line (item, size, unit price,
+--          quantity, line total, note, add-ons with their prices).
+--          For a checkout that became an order these were copied into that
+--          order (`insert_order_from_snapshot`), and `orders` lists them.
+--          Repeating them cost about 1 KB per card order and pushed long
+--          histories over the app's share limit (see SIZE below).
+--     OUT  the session's own coupon_code column: the raw text as the
+--          customer typed it (`begin_checkout_session` stores
+--          `p_coupon_code` unchanged), spaces and case included. The priced
+--          code above is the same code, in the form an order uses.
 --     OUT  snapshot itself: internal pricing state (product, size and add-on
---          ids, the raw coupon text, the points projection).
+--          ids, `coupon_code_raw`, the points projection).
+--     OUT  from the address: its row `id` and `customer_id` (the caller's own
+--          id). The snapshot stores the whole `addresses` row
+--          (`to_jsonb(v_address)` in compute_order_snapshot); the rest of it
+--          is the address as it was, so it stays. Note that an ORDER's
+--          `delivered_to`, a key that existed before this file, is the same
+--          kind of copy and still carries both ids: it is left byte-identical
+--          on purpose, and both ids are the caller's own.
 --     OUT  idempotency_key: an idempotency key.
 --     OUT  loyalty_points: the number the app asked to use. The snapshot's
 --          `loyalty_points_redeemed` is the number priced, which is what the
@@ -114,9 +145,17 @@
 --          the branch name and the address are exported), updated_at.
 --
 --   order_refunds (one entry per refund)
---     IN   provider, status, amount, currency, reason, created_at as
+--     IN   provider, status, amount, currency, created_at as
 --          `requested_at`, completed_at, the order's `order_number`, and
 --          charge_ref as `payment_id`: the payment the money went back to.
+--     IN   reason, in words, as `reason` (English) and `reason_ar` (Arabic).
+--          The stored value is a machine code. Its only writer,
+--          `open_order_refund_record`, always writes
+--          'pos_delivery_failed_after_customer_retries': point-of-sale retry
+--          bookkeeping, which the `about` text says is not included. So that
+--          code reads "Your order could not be sent to the branch, so we are
+--          returning your payment.", and any other code reads "A refund of
+--          your payment.". The code itself is not exported.
 --     OUT  provider_ref: for a Moyasar refund it is the same payment id,
 --          because Moyasar's refund call answers with the payment
 --          (docs/integrations/Moyasar_API_Reference.md §3.2).
@@ -127,6 +166,23 @@
 --          setting). `status` says whether the money came back.
 --     OUT  id, order_id, payment_record_id, updated_at: internal ids and
 --          bookkeeping.
+--
+-- SIZE. The app shares the copy as text and refuses one over 256 KB
+-- (`SHARE_TEXT_LIMIT_BYTES`, apps/mobile/src/features/profile/dataExport.ts),
+-- because Android can drop large share text. Each card order now also carries
+-- a payment record with its try, about 800 bytes, so a card customer's copy
+-- grows. Measured on the local chain on 2026-11-14, with 80 two-line pickup
+-- card orders built through begin_checkout_session, begin_session_attempt and
+-- finalize_checkout_session (docs/MIGRATIONS.md §66 has the method):
+--   before this file, shared indented: about 1 316 bytes a card order, so
+--     about 199 orders fit (its payment data was simply missing);
+--   this file as first written, shared indented: about 3 634, so about 72;
+--   this file, with completed checkouts trimmed and the app sharing compact
+--     JSON (same change): about 1 980, so about 132.
+-- So a card customer with more than about 132 orders is told to contact us,
+-- where before it was about 199. A cash customer gains: compact JSON alone
+-- takes a cash order from about 1 316 bytes to about 868, so about 301 fit.
+-- The real fix is a file attachment, which needs a native build.
 --
 -- NO MONEY-PATH CHANGE, and the file asserts it: place_order and
 -- compute_order_snapshot must still hash 12b6816d256c29b76edf947ae1a7ea77 and
@@ -300,23 +356,32 @@ begin
     -- never became an order, the priced snapshot is the only record of what
     -- they tried to buy, so its lines are read out of it field by field, the
     -- same fields an order's lines give. The snapshot itself is not exported.
+    -- A checkout that became one of the caller's orders gives only its
+    -- references and times: its lines, totals, address and note were copied
+    -- into that order, which `orders` already lists, and repeating them would
+    -- shrink the history that fits in one share (see the header).
     'checkouts', coalesce((
       select jsonb_agg(jsonb_build_object(
         'checkout_id', s.id,
         'started_at', s.created_at,
         'status', s.status,
-        'order_number', (select o.order_number from public.orders o
-                          where o.id = s.order_id and o.customer_id = v_uid),
+        'order_number', so.order_number,
         'completed_at', s.consumed_at,
         'expires_at', s.expires_at,
         'order_type', s.order_type,
-        'payment_method', s.payment_method,
+        'payment_method', s.payment_method
+      ) || case when so.order_number is not null then '{}'::jsonb else jsonb_build_object(
         'branch', s.snapshot ->> 'branch_name_en',
-        'deliver_to', s.snapshot -> 'address_snapshot',
+        -- The address as it was, without its row id and the caller's own id.
+        'deliver_to', case when jsonb_typeof(s.snapshot -> 'address_snapshot') = 'object'
+                           then (s.snapshot -> 'address_snapshot') - 'id' - 'customer_id'
+                           else s.snapshot -> 'address_snapshot' end,
         'your_note', s.notes,
         'subtotal', s.subtotal,
         'delivery_fee', s.delivery_fee,
-        'coupon_code', s.coupon_code,
+        -- The code as priced, normalised the way an order stores it. The
+        -- session's own column holds the raw text as typed, spaces and all.
+        'coupon_code', s.snapshot ->> 'coupon_code',
         'coupon_discount', s.discount_amount,
         'loyalty_discount', s.loyalty_discount_amount,
         'points_redeemed', s.snapshot -> 'loyalty_points_redeemed',
@@ -349,8 +414,10 @@ begin
                       then s.snapshot -> 'items' else '[]'::jsonb end
                ) with ordinality as li(value, ordinality)
         ), '[]'::jsonb)
-      ) order by s.created_at, s.id)
-      from public.checkout_sessions s where s.customer_id = v_uid
+      ) end order by s.created_at, s.id)
+      from public.checkout_sessions s
+      left join public.orders so on so.id = s.order_id and so.customer_id = v_uid
+      where s.customer_id = v_uid
     ), '[]'::jsonb),
 
     -- Every payment record that belongs to the caller. A record links to an
@@ -443,7 +510,19 @@ begin
       from public.payment_records r
       left join public.orders o on o.id = r.order_id
       left join public.checkout_sessions cs on cs.id = r.checkout_session_id
-      where (r.order_id is not null or r.checkout_session_id is not null)
+      -- Found FROM the caller's own orders and checkouts, through their
+      -- indexes, so the cost follows this customer's history rather than
+      -- every payment ever recorded. Then every link is checked.
+      where r.id in (
+              select pr.id
+                from public.orders mo
+                join public.payment_records pr on pr.order_id = mo.id
+               where mo.customer_id = v_uid
+              union
+              select pr.id
+                from public.checkout_sessions ms
+                join public.payment_records pr on pr.checkout_session_id = ms.id
+               where ms.customer_id = v_uid)
         and (r.order_id is null or o.customer_id = v_uid)
         and (r.checkout_session_id is null or cs.customer_id = v_uid)
     ), '[]'::jsonb),
@@ -459,7 +538,17 @@ begin
         'status', f.status,
         'amount', f.amount,
         'currency', f.currency,
-        'reason', f.reason,
+        -- The reason in words, in both languages. The stored value is our
+        -- machine code for how the point-of-sale retries ended, which the
+        -- `about` text says is not included.
+        'reason', case f.reason
+                    when 'pos_delivery_failed_after_customer_retries'
+                      then 'Your order could not be sent to the branch, so we are returning your payment.'
+                    else 'A refund of your payment.' end,
+        'reason_ar', case f.reason
+                    when 'pos_delivery_failed_after_customer_retries'
+                      then 'تعذّر إرسال طلبك إلى الفرع، لذلك نعيد إليك المبلغ الذي دفعته.'
+                    else 'استرداد المبلغ الذي دفعته.' end,
         'payment_id', f.charge_ref,
         'requested_at', f.created_at,
         'completed_at', f.completed_at
@@ -652,18 +741,23 @@ begin
     insert into auth.users (id) values (v_a), (v_b);
 
     insert into public.checkout_sessions
-      (customer_id, status, order_type, branch_id, snapshot, subtotal, total, notes)
+      (customer_id, status, order_type, branch_id, snapshot, subtotal, total, notes,
+       coupon_code)
     values
       (v_a, 'expired', 'pickup', v_branch,
        jsonb_build_object(
          'branch_name_en', 'Probe branch',
+         'coupon_code', 'PROBECOUPON',
          'coupon_code_raw', 'rawcoupon_a' || v_tag,
+         -- The whole address row, as compute_order_snapshot stores it.
+         'address_snapshot', jsonb_build_object(
+           'id', 'addr_a' || v_tag, 'customer_id', v_a, 'label', 'Probe home'),
          'items', jsonb_build_array(jsonb_build_object(
            'product_id', 'prod_a' || v_tag, 'name_en', 'Probe item A',
            'unit_price', 12.5, 'quantity', 2, 'line_total', 25.0,
            'modifiers', jsonb_build_array(jsonb_build_object(
              'modifier_id', 'mod_a' || v_tag, 'name_en', 'Probe add-on', 'price', 0))))),
-       25.00, 25.00, 'Probe note A')
+       25.00, 25.00, 'Probe note A', ' typed_a' || v_tag || ' ')
     returning id into v_sa;
     insert into public.checkout_sessions
       (customer_id, status, order_type, branch_id, snapshot, subtotal, total)
@@ -729,6 +823,14 @@ begin
        or v_out #>> '{checkouts,0,items,0,item}' is distinct from 'Probe item A' then
       raise exception 'export_my_data verification failed: the fixture customer did not get exactly their own checkout';
     end if;
+    -- The coupon as priced, not as typed; the address without its ids.
+    if v_out #>> '{checkouts,0,coupon_code}' is distinct from 'PROBECOUPON'
+       or v_out #>> '{checkouts,0,deliver_to,label}' is distinct from 'Probe home'
+       or (v_out #> '{checkouts,0,deliver_to}') ? 'id'
+       or (v_out #> '{checkouts,0,deliver_to}') ? 'customer_id' then
+      raise exception 'export_my_data verification failed: a checkout''s coupon or address reads %',
+        coalesce((v_out #> '{checkouts,0}')::text, 'NULL');
+    end if;
     if v_out -> 'refunds' is distinct from '[]'::jsonb then
       raise exception 'export_my_data verification failed: refunds is %, expected []', coalesce((v_out -> 'refunds')::text, 'NULL');
     end if;
@@ -770,7 +872,9 @@ begin
       raise exception 'export_my_data verification failed: the raw provider payload, or our failure code, was exported';
     end if;
     if position(('prod_a' || v_tag) in v_txt) > 0 or position(('mod_a' || v_tag) in v_txt) > 0
-       or position(('rawcoupon_a' || v_tag) in v_txt) > 0 then
+       or position(('rawcoupon_a' || v_tag) in v_txt) > 0
+       or position(('typed_a' || v_tag) in v_txt) > 0
+       or position(('addr_a' || v_tag) in v_txt) > 0 then
       raise exception 'export_my_data verification failed: internal snapshot state was exported';
     end if;
 
