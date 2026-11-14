@@ -500,7 +500,8 @@ begin
   -- only; the refund ledger is never readable by a plain customer.
   if has_function_privilege('anon', 'public.request_customer_pos_resend(uuid)', 'execute') then
     raise exception 'SECURITY FAILED: anon may request a resend'; end if;
-  if has_function_privilege('authenticated', 'public.claim_order_refund(text)', 'execute') then
+  -- (text, uuid[]) since 20261013120000, which added the per-run exclusion list.
+  if has_function_privilege('authenticated', 'public.claim_order_refund(text, uuid[])', 'execute') then
     raise exception 'SECURITY FAILED: authenticated may claim refunds'; end if;
   if has_function_privilege('authenticated',
        'public.finalize_order_refund(uuid,text,text,text,text,text)', 'execute') then
