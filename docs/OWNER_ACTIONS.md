@@ -4912,8 +4912,9 @@ their refunds. Detail: `docs/MIGRATIONS.md` §66.
 team accounts. From the first live card payment, every customer's copy would
 miss their card payments.
 
-**Every step is its own approval (CLAUDE.md §5).** There is no number to decide
-and no function to deploy.
+**The merge and the apply are each their own approval (CLAUDE.md §5).** The
+two checks are read-only. There is no number to decide and no function to
+deploy.
 
 ### The steps
 
