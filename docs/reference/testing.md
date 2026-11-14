@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**271 TypeScript test files declaring 4036 test blocks, plus 93 SQL suites.**
+**271 TypeScript test files declaring 4040 test blocks, plus 93 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -262,7 +262,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-133 files, 1804 declared test blocks.
+133 files, 1808 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -285,7 +285,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 14 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
-| `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
+| `src/components/admin/OperationsHealthPanel.test.tsx` | 7 | OperationsHealthPanel — push failure metrics |
 | `src/components/admin/PushToolsPanel.test.tsx` | 2 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
@@ -300,7 +300,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
 | `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
 | `src/components/admin/view/health/HealthSystemCard.test.tsx` | 6 | branch_availability health card |
-| `src/components/admin/view/health/healthView.test.ts` | 23 | polling contract |
+| `src/components/admin/view/health/healthView.test.ts` | 25 | polling contract |
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 5 | admin rule filter ↔ watchdog rule set |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
