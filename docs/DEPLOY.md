@@ -22,7 +22,10 @@ does not satisfy either store. Its rewrites are listed in `vercel.json` **before
 shell instead, which is exactly the state that made this page necessary. The page reads
 the active `legal_documents` rows anonymously (the `legal_documents_select_public` RLS
 policy grants `anon` SELECT on `is_active` rows only), so editing a document in the
-admin console updates the public page with no redeploy, and a draft can never leak.
+admin console updates the page at once for every reader running JavaScript, and a draft
+can never leak. The copy served to a no-JavaScript reader, which is what store policy
+checkers read, is baked in at build time and changes only on the next production build
+(`OWNER_ACTIONS.md` §34).
 
 The root app determines the signed-in role and exposes the staff/admin experience only through the current server-authorized role/MFA path.
 

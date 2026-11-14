@@ -61,14 +61,26 @@ string #425 ships, so the permission prompt and the policy say the same thing.
 
 ## Publishing
 
+**Decide the timing first** (`docs/OWNER_ACTIONS.md` §43;
+`docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`, Open owner decisions, item
+1). The proposed card-payment plan carries this line into the card-payment
+version of `privacy_policy`, in both languages, as a separate replacement.
+Publishing it first, as below, is still possible, but the card-payment version
+then moves on (2.5 or 3.0) and that draft's anchors and hashes must be
+re-checked.
+
 1. Admin console → Legal → `privacy_policy`, replace the line in both languages.
 2. Bump the version to **v2.4** and set the effective date to the publication
    date. Adding a purpose is a substantive change, not a typo fix.
-3. The public pages update with no redeploy (`docs/GO_LIVE_READINESS.md` B7).
+3. Rebuild production (today a merge to the default branch, `docs/DEPLOY.md` §9)
+   and check `https://app.spicymeal.com.sa/privacy` with scripts stripped. The
+   app and JavaScript readers see the edit at once; the no-JavaScript copy that
+   store checkers read changes only on a rebuild (`docs/OWNER_ACTIONS.md` §34).
 4. Record it in `docs/OWNER_ACTIONS.md` §43 and close that item.
 
-**Do not publish the Arabic without a native read.** The English is safe to
-publish on its own if the Arabic has to wait — a correct English disclosure
+**Do not publish the Arabic without a native read.** If you publish this
+correction on its own, ahead of the card-payment version, the English is safe to
+publish alone if the Arabic has to wait — a correct English disclosure
 beside an unchanged Arabic one is strictly better than leaving both incomplete.
 
 **The order does not depend on #425.** Both uses this adds are in the app
