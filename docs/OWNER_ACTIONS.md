@@ -2900,6 +2900,21 @@ It follows the line's existing pattern of a number before a singular noun
 («2 طلب», «1 عنوان»). Check that «سجل دفع» reads as "payment record" next to
 those, and whether a number above 2 wants the plural.
 
+**Widened again 2026-11-14 — two refund reasons inside the copy itself**
+(`supabase/migrations/20261014120000_export_my_data_payments.sql`, key
+`reason_ar` of each refund). The customer reads them in the file they share.
+Engineering-drafted; live only once that file is applied (§56):
+
+- «تعذّر إرسال طلبك إلى الفرع، لذلك نعيد إليك المبلغ الذي دفعته.» — English
+  *"Your order could not be sent to the branch, so we are returning your
+  payment."*: the reason every refund carries today.
+- «استرداد المبلغ الذي دفعته.» — English *"A refund of your payment."*: for any
+  other reason code, none of which the code writes today.
+
+Check that the first reads as a plain, reassuring statement rather than an
+apology for something the customer did, and that «نعيد إليك» does not promise
+that the money has already arrived (the refund's `status` says that).
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -4934,8 +4949,20 @@ deploy.
    needs its own approval.
 4. **Check afterwards, read-only:** one `export_my_data` overload, with no
    arguments; `anon` cannot execute it and `authenticated` can; the money-path
-   pair unchanged (`12b6816d…` / `22e2d429…`); `auth.users` and
-   `payment_records` hold the same number of rows as before step 3.
+   pair unchanged (`12b6816d…` / `22e2d429…`); md5(prosrc) of `export_my_data`
+   is `26eba366…`; `auth.users` and `payment_records` hold the same number of
+   rows as before step 3.
+
+**What the customer may notice, measured on a local copy on 2026-11-14.** From
+the merge, the app shares the copy as compact JSON instead of indented: the
+same data, without line breaks. That lets more history fit in one share. Once
+the file is applied, each card order also carries its payment record, so a
+card customer with more than about **132** orders is asked to contact us for
+their copy, where before it was about **199**. A cash customer's limit rises to
+about **301**. Method and figures: `docs/MIGRATIONS.md` §66. Live there were
+82 orders in all on 2026-11-14 (read-only count), so nobody is near either
+figure. If someone reaches one, sending the copy by hand is the answer until
+the app can attach a file, which needs a native build.
 
 **Done looks like:** a ledger row in `docs/MIGRATIONS.md`, §66 marked APPLIED,
 and PG-26 marked live in the gaps list. The phone's summary line arrives with

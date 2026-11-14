@@ -10,6 +10,7 @@ import { makeStyles } from '../../theme/makeStyles';
 import { dataExport } from '../../services/api';
 import {
   exportErrorMessage,
+  exportShareText,
   exportTitle,
   isTooLargeToShare,
   shouldStartExport,
@@ -30,7 +31,7 @@ export function AccountSettingsScreen() {
     try {
       const payload = await dataExport.mine();
       const summary = summarizeExport(payload);
-      const json = JSON.stringify(payload, null, 2);
+      const json = exportShareText(payload);
       // Refuse loudly rather than hand Android an Intent extra it may drop. The
       // share text crosses Binder, whose buffer is shared and about 1 MB, so an
       // oversized payload fails — sometimes silently — for exactly the customers

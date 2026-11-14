@@ -42,6 +42,22 @@ export type ExportState = 'idle' | 'working' | 'shared' | 'error' | 'too_large';
  */
 export const SHARE_TEXT_LIMIT_BYTES = 256 * 1024;
 
+/**
+ * The text that is shared: the server's JSON, COMPACT.
+ *
+ * Compact rather than indented because the share has a size ceiling (above),
+ * and since `20261014120000_export_my_data_payments` every card order also
+ * carries a payment record. Indentation was about a third of the bytes.
+ * Measured on the local chain on 2026-11-14 with 80 two-line card orders:
+ * indented, about 2 817 bytes a card order, so about 93 fit; compact, about
+ * 1 980, so about 132. A cash order goes from about 1 316 to about 868, so
+ * about 301 fit instead of 199. JSON is the portable form either way, and any
+ * JSON viewer indents it again. `docs/MIGRATIONS.md` §66 has the method.
+ */
+export function exportShareText(payload: unknown): string {
+  return JSON.stringify(payload);
+}
+
 /** Byte length, not string length — Arabic and emoji are multi-byte in UTF-8. */
 export function exportByteLength(json: string): number {
   if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(json).length;
