@@ -10,7 +10,7 @@
 --
 --   CASE 1   guard   PG-03  Resend: a cancelled order is refused, with a reason and
 --                           a message, and nothing about the order moves
---   CASE 2   honest  PG-03  Resend: an eligible received order is still re-queued
+--   CASE 2   honest  PG-03  Resend: an eligible order in each non-cancelled status is still re-queued
 --   CASE 3   guard   PG-03  Resend: an order nobody owns any more is refused
 --                           (the NULL-safe ownership test)
 --   CASE 4   guard   PG-03  Resend: a cancelled order whose refund exists keeps the
@@ -212,25 +212,30 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- CASE 2 — honest: an eligible received order is still re-queued
+-- CASE 2 — honest: an eligible order in every status but cancelled is still
+-- re-queued. Every status is probed, so a guard that also refused a later
+-- status (a paid order that failed to send while it was being prepared) fails.
 -- ---------------------------------------------------------------------------
 do $$
 declare
   v_c   uuid := pg_temp.new_customer();
   v_id  uuid;
   v_res jsonb;
+  v_st  public.order_status;
   o     public.orders;
 begin
-  v_id := pg_temp.new_order(v_c, 'received', 'cash', 'pending', 'failed');
-  v_res := pg_temp.resend_as(v_c, v_id);
-  if v_res->>'outcome' is distinct from 'accepted' then
-    raise exception 'CASE 2 FAILED: an eligible received order was refused: %', v_res;
-  end if;
-  select * into o from public.orders where id = v_id;
-  if o.lazywait_sync_state <> 'pending' or o.pos_customer_retry_count <> 1 then
-    raise exception 'CASE 2 FAILED: the resend did not queue exactly one send (% / %)', o.lazywait_sync_state, o.pos_customer_retry_count;
-  end if;
-  raise notice 'CASE 2 ok: an eligible received order is re-queued once';
+  foreach v_st in array array['received', 'preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_id := pg_temp.new_order(v_c, v_st, 'cash', 'pending', 'failed');
+    v_res := pg_temp.resend_as(v_c, v_id);
+    if v_res->>'outcome' is distinct from 'accepted' then
+      raise exception 'CASE 2 FAILED: an eligible % order was refused: %', v_st, v_res;
+    end if;
+    select * into o from public.orders where id = v_id;
+    if o.lazywait_sync_state <> 'pending' or o.pos_customer_retry_count <> 1 then
+      raise exception 'CASE 2 FAILED: the % resend did not queue exactly one send (% / %)', v_st, o.lazywait_sync_state, o.pos_customer_retry_count;
+    end if;
+  end loop;
+  raise notice 'CASE 2 ok: an eligible order in each of the five non-cancelled statuses is re-queued once';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -534,6 +539,17 @@ begin
   if a.attempt_id is null or a.reused or not b.reused or b.attempt_id <> a.attempt_id then
     raise exception 'CASE 12 FAILED: the order flow no longer opens and reuses one attempt';
   end if;
+  -- Later statuses too, so a guard that also refused them fails here.
+  declare v_st public.order_status; v_o uuid;
+  begin
+    foreach v_st in array array['preparing', 'ready', 'out_for_delivery']::public.order_status[] loop
+      v_o := pg_temp.new_order(null, v_st, 'online', 'pending', 'awaiting_payment');
+      select * into a from public.begin_payment_attempt(v_o, 'moyasar', 'test', 30);
+      if a.attempt_id is null or a.reused then
+        raise exception 'CASE 12 FAILED: no attempt was opened for an unpaid online % order', v_st;
+      end if;
+    end loop;
+  end;
 
   insert into public.checkout_sessions (customer_id, order_type, branch_id, snapshot, subtotal, total)
     values (v_c, 'pickup', (select fx_id from t_fx where k = 'branch'), '{}'::jsonb, 25, 25)

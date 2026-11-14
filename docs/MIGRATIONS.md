@@ -63,8 +63,9 @@ to Production.**
 > file merged unapplied since the read above. It replaces six function bodies so
 > that a cancelled order is never resent, claimed for the POS, enrolled for an
 > automatic refund or invoiced, and `place_customer_order` places no online
-> order. No deploy is implied; the money path is self-asserted. Apply it before
-> `docs/OWNER_ACTIONS.md` §47.13 step 1. **Name the target by version.**
+> order. No deploy is implied; the money path is self-asserted. Applying it
+> before `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended; §47.13 lists the
+> owner's other two choices. **Name the target by version.**
 
 > **Updated 2026-11-13 (night) — `20261006120000` is APPLIED** (16:59:39 UTC,
 > live `20261113165939`, ledger row 113, §58), on the owner's approval naming it

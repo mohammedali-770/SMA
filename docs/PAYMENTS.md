@@ -128,7 +128,9 @@ closes it from both ends, with no deploy:
   Please try again.*, and never reaches the invoice create
   (`paymentWiring.test.ts` pins it). This is what makes the
   `OWNER_ACTIONS.md` §47.13 warning about the three July orders go away, once
-  the file is applied, which must happen **before §47.13 step 1**. Until then, the
+  the file is applied. Applying it before §47.13 step 1 is recommended, not
+  required: §47.13 also lists a live write to the three orders, or accepting the
+  risk, and which to take is the owner's. Until one of them is done, the
   TEST-mode refusal is what keeps them unpayable.
 
 `place_order` and `compute_order_snapshot` are unchanged
