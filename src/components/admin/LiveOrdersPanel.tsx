@@ -140,9 +140,12 @@ export const LiveOrdersPanel: React.FC = () => {
     <>
       <div className="space-y-4">
         {/* Read-only money-owed feed: failed and retrying refunds, duplicate and
-            mismatched payments, payments with no confirmed order. Admin-only;
+            mismatched payments, payments with no confirmed order. Rendered
+            for the admin role only (the RPC refuses everyone else), and
             self-hides when empty or before its migration is applied. */}
-        <PaymentsNeedingAttentionCard adminLang={adminLang} onView={viewById} />
+        {currentUser.role === 'admin' && (
+          <PaymentsNeedingAttentionCard adminLang={adminLang} onView={viewById} />
+        )}
 
         {/* Read-only ambiguous-POS feed. Self-hides when the queue is empty. */}
         <OrdersRequiringVerificationCard adminLang={adminLang} onView={viewById} />

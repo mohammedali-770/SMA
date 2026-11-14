@@ -244,6 +244,55 @@ describe('when the card is not shown', () => {
     expect(container.textContent).toBe('');
   });
 
+  it.each([
+    ['a refusal', '42501'],
+    ['a missing RPC', 'PGRST202'],
+  ])('%s stops the 60s refresh instead of re-sending it every minute', async (_label, code) => {
+    vi.useFakeTimers();
+    try {
+      gateway.attention.mockRejectedValue(new RpcError('refused', code));
+      render(<PaymentsNeedingAttentionCard adminLang="en" onView={() => {}} />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(gateway.attention).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(10 * 60_000);
+      expect(gateway.attention).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('an admin who can read it keeps refreshing every minute', async () => {
+    vi.useFakeTimers();
+    try {
+      gateway.attention.mockResolvedValue(nothing());
+      render(<PaymentsNeedingAttentionCard adminLang="en" onView={() => {}} />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(gateway.attention).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(3 * 60_000);
+      expect(gateway.attention).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a failed read that is shown keeps refreshing, so it can recover', async () => {
+    vi.useFakeTimers();
+    try {
+      gateway.attention.mockRejectedValueOnce(new RpcError('timeout', '57014'));
+      gateway.attention.mockResolvedValue(owed());
+      render(<PaymentsNeedingAttentionCard adminLang="en" onView={() => {}} />);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(screen.getByRole('alert')).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(gateway.attention).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(screen.queryByText(ADMIN_LOCALES.en.payattn_error)).toBeNull();
+      expect(screen.getByText('pay_failed_1')).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('any other failure is said, not hidden', async () => {
     gateway.attention.mockRejectedValue(
       new RpcError('canceling statement due to statement timeout', '57014'),

@@ -18,6 +18,12 @@
  * other failed read is SHOWN, because an empty card must never mean "nothing
  * to refund" when it really means "could not look". Refreshes on mount and
  * every 60s; `alive` stops a late answer writing into an unmounted card.
+ *
+ * A hiding answer (42501 or PGRST202) also STOPS the 60s refresh: neither
+ * changes by itself within a minute, and asking again every minute only fills
+ * the API logs with refusals. Reopening Live Orders asks once more. The panel
+ * renders this card only for the admin role, so most non-admins never send
+ * the request at all.
  */
 import React, { useEffect, useState } from 'react';
 import { Eye, HandCoins } from 'lucide-react';
@@ -73,19 +79,30 @@ export function PaymentsNeedingAttentionCard({
 
   useEffect(() => {
     let alive = true;
+    let id: ReturnType<typeof setInterval> | undefined;
+    const stop = () => {
+      if (id !== undefined) clearInterval(id);
+      id = undefined;
+    };
     const load = async () => {
       try {
         const data = await paymentGateway.attention(PAYMENTS_ATTENTION_LIMIT);
         if (alive) setState({ kind: 'ready', data });
       } catch (e) {
-        if (alive) setState({ kind: attentionFailure(e) });
+        if (!alive) return;
+        const failure = attentionFailure(e);
+        setState({ kind: failure });
+        // A refusal (42501) or a missing RPC (PGRST202) will not change on its
+        // own in the next minute, so stop asking: re-sending it every 60s only
+        // fills the API logs with refusals that can bury a real error.
+        if (failure === 'hidden') stop();
       }
     };
     void load();
-    const id = setInterval(() => void load(), PAYMENTS_ATTENTION_REFRESH_MS);
+    id = setInterval(() => void load(), PAYMENTS_ATTENTION_REFRESH_MS);
     return () => {
       alive = false;
-      clearInterval(id);
+      stop();
     };
   }, []);
 

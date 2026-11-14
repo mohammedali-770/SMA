@@ -238,6 +238,22 @@ describe('refunds and payments needing attention', () => {
     expect(screen.queryByText('Refunds and payments needing attention')).toBeNull();
   });
 
+  it.each(['accountant', 'call_center', 'branch_staff'])(
+    'is not rendered for %s, so the refused request is never sent',
+    async (role) => {
+      mockContext({ currentUser: { role } });
+      render(<LiveOrdersPanel />);
+      await screen.findByText('SM-1042');
+      expect(paymentsAttention).not.toHaveBeenCalled();
+    },
+  );
+
+  it('is asked for an admin', async () => {
+    render(<LiveOrdersPanel />);
+    await screen.findByText('SM-1042');
+    await waitFor(() => expect(paymentsAttention).toHaveBeenCalled());
+  });
+
   it('sits on Live Orders with what is owed, and View opens the FULL in-memory order', async () => {
     paymentsAttention.mockResolvedValue({
       ...NOTHING_OWED,
