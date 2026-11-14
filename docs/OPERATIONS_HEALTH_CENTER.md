@@ -132,7 +132,10 @@ configuration error has the highest precedence.
   and a confirmation moves the row on. So an attempt still `initiated` with it
   is a payment Moyasar took whose confirmation did not finish. The card's line
   for it reads "A payment went through at Moyasar, but its order was not
-  confirmed within 30 minutes."
+  confirmed within 30 minutes." The console chooses that wording only when the
+  payment card carries `open_unverified_24h`, the key only the new body emits,
+  so a console deployed before the apply keeps the old wording ("Payment
+  attempts remained initiated for more than 30 minutes.") for the old count.
 
   **What this gives up, stated rather than buried.** `provider_ref` is stamped
   only when a verify runs: the webhook, or the customer's return to the app.

@@ -8735,11 +8735,11 @@ The console card ships with the merge (CLAUDE.md §13). Until step 1 its RPC doe
 not exist (PGRST202), and the card hides itself and stops asking until Live
 Orders is opened again (it is rendered for the admin role only, so other staff
 never send the request). The Operations Health line for
-a stale payment also changes on merge, to "A payment went through at Moyasar,
-but its order was not confirmed within 30 minutes." Until step 1 it describes
-the old count, which still includes abandoned checkouts, so apply soon after
-the merge. With online payment off (read 2026-11-14), only a team sandbox test
-can produce such an attempt.
+a stale payment does **not** change on merge. It reads "A payment went through
+at Moyasar, but its order was not confirmed within 30 minutes." only when the
+payment card's snapshot carries `open_unverified_24h`, which only this file's
+body emits (`staleCountsSettledOnly` in `healthView.ts`). Until step 1 it keeps
+the old wording, which matches the old count.
 
 ### Pre-images, and the one that is not proven
 

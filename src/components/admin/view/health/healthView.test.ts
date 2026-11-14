@@ -21,9 +21,10 @@ import {
   numberValue,
   relativeAge,
   sourceLabel,
+  staleCountsSettledOnly,
   stringValue,
 } from './healthView';
-import type { OperationsHealthAttention } from '../../../../lib/operationsHealthApi';
+import type { OperationsHealthAttention, OperationsHealthSystem } from '../../../../lib/operationsHealthApi';
 
 /** 2026-01-01T00:00:00Z */
 const NOW = 1767225600000;
@@ -178,14 +179,41 @@ describe('attentionText', () => {
       .toContain('مراجعة للإتاحة');
   });
 
-  it('says a stale payment is money taken without a confirmed order, not an abandoned checkout (PG-25)', () => {
+  it('says a stale payment is money taken without a confirmed order, once the server counts settled attempts only (PG-25)', () => {
     // Since 20261013120000 the count reads only attempts a payment settled on.
     // The old copy, "remained initiated for more than 30 minutes", described
     // every customer who closed the card page.
-    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en'))
+    const settled = { staleCountsSettledOnly: true };
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en', settled))
       .toBe('A payment went through at Moyasar, but its order was not confirmed within 30 minutes.');
-    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en')).not.toMatch(/remained initiated/);
-    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'ar')).toContain('لم يُؤكَّد');
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en', settled)).not.toMatch(/remained initiated/);
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'ar', settled)).toContain('لم يُؤكَّد');
+  });
+
+  it('keeps the old stale-payment copy until the snapshot proves the new count (console ships before the apply)', () => {
+    // The console deploys on merge. Before 20261013120000 is applied the count
+    // still includes abandoned checkouts, so the settled-only claim would be false.
+    for (const opts of [undefined, {}, { staleCountsSettledOnly: false }]) {
+      expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en', opts))
+        .toBe('Payment attempts remained initiated for more than 30 minutes.');
+      expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'ar', opts))
+        .toBe('عمليات دفع بقيت في حالة البدء لأكثر من 30 دقيقة.');
+    }
+    // The flag changes only this one code.
+    expect(attentionText(item('PAYMENT_INTEGRITY_INCIDENTS'), 'en', { staleCountsSettledOnly: true }))
+      .toBe(attentionText(item('PAYMENT_INTEGRITY_INCIDENTS'), 'en'));
+  });
+
+  it('detects the migrated snapshot by the open_unverified_24h key on the payment card', () => {
+    const sys = (id: string, details: Record<string, unknown>) => ({ id, details } as unknown as OperationsHealthSystem);
+    expect(staleCountsSettledOnly([sys('payment', { stale_initiated_24h: 0, open_unverified_24h: 0 })])).toBe(true);
+    // Present with a null value still proves the new body: presence is the proof.
+    expect(staleCountsSettledOnly([sys('payment', { open_unverified_24h: null })])).toBe(true);
+    expect(staleCountsSettledOnly([sys('payment', { stale_initiated_24h: 3 })])).toBe(false);
+    // The key on another card proves nothing about the payment count.
+    expect(staleCountsSettledOnly([sys('push', { open_unverified_24h: 0 })])).toBe(false);
+    expect(staleCountsSettledOnly([])).toBe(false);
+    expect(staleCountsSettledOnly(undefined)).toBe(false);
   });
 
   it('falls back to the raw code for an unknown incident', () => {

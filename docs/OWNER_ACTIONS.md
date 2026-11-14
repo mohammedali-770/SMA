@@ -5005,10 +5005,9 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
 2. **Apply `20261013120000` by name**, after the read-only checks in
    [`MIGRATIONS.md`](MIGRATIONS.md) §65 step 1 and after re-hashing the merged
    copy. Never "the outstanding migrations": other files may be outstanding.
-   Apply it soon after the merge. Until then the Operations Health line for a
-   stale payment already says "A payment went through at Moyasar…" while it
-   still counts abandoned checkouts too. With online payment off (read
-   2026-11-14), only a team sandbox test can produce one.
+   The Operations Health line for a stale payment keeps its old wording until
+   this step: the console switches to "A payment went through at Moyasar…" only
+   when the server's snapshot shows the new count.
 3. **Check afterwards**, read-only, as §65 step 3 lists.
 4. **Deploy `payment-refund`**, only after step 2. Deployed first, the new job
    claims nothing until the apply. Its cron job was inactive when read on
