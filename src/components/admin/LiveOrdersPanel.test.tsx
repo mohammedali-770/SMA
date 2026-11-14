@@ -21,7 +21,7 @@
  * REAL `canTransitionOrder` is kept, because which options/actions are offered
  * is part of what is being checked.
  */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -35,11 +35,13 @@ vi.mock('../../context/AppContext', async (importOriginal) => {
 
 const posConfirmationRequired = vi.fn();
 const paymentRecord = vi.fn();
+const paymentsAttention = vi.fn();
 vi.mock('../../lib/api', () => ({
   orders: { posConfirmationRequired: () => posConfirmationRequired() },
   paymentGateway: {
     record: (id: string) => paymentRecord(id),
     adminVerify: vi.fn(),
+    attention: () => paymentsAttention(),
   },
 }));
 
@@ -89,9 +91,17 @@ const openReceipt = async () => {
   return screen.findByRole('dialog');
 };
 
+const NOTHING_OWED = {
+  failed_refunds: { total: 0, items: [] },
+  retrying_refunds: { total: 0, items: [] },
+  payments_to_refund: { total: 0, items: [] },
+  unconfirmed_payments: { total: 0, items: [] },
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   posConfirmationRequired.mockResolvedValue({ total: 0, items: [] });
+  paymentsAttention.mockResolvedValue(NOTHING_OWED);
   paymentRecord.mockResolvedValue(null);
   mockContext();
 });
@@ -218,6 +228,37 @@ describe('the verification queue', () => {
     await screen.findByText('SM-1042');
     await waitFor(() =>
       expect(screen.queryByText('Orders Requiring Verification')).toBeNull());
+  });
+});
+
+describe('refunds and payments needing attention', () => {
+  it('self-hides when nothing is owed', async () => {
+    render(<LiveOrdersPanel />);
+    await screen.findByText('SM-1042');
+    expect(screen.queryByText('Refunds and payments needing attention')).toBeNull();
+  });
+
+  it('sits on Live Orders with what is owed, and View opens the FULL in-memory order', async () => {
+    paymentsAttention.mockResolvedValue({
+      ...NOTHING_OWED,
+      failed_refunds: {
+        total: 1,
+        items: [{
+          id: 'r1', order_id: 'o1', order_number: 'SM-1042', amount: 100, currency: 'SAR',
+          attempt_count: 3, failure_code: 'http_400', last_error_safe: 'refused',
+          created_at: '2026-03-14T09:00:00.000Z', updated_at: '2026-03-14T10:00:00.000Z',
+          payment_ref: 'pay_fixture_1',
+        }],
+      },
+    });
+    render(<LiveOrdersPanel />);
+    expect(await screen.findByText('Refunds and payments needing attention')).toBeTruthy();
+    expect(screen.getByText('pay_fixture_1')).toBeTruthy();
+
+    const card = screen.getByRole('region', { name: 'Refunds and payments needing attention' });
+    fireEvent.click(within(card).getByText('View Receipt'));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('Nora Al-Harbi');
   });
 });
 

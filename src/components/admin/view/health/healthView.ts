@@ -120,9 +120,12 @@ const ATTENTION_TEXT: Record<string, { en: string; ar: string }> = {
     en: 'Payment integrity incidents require investigation.',
     ar: 'توجد حوادث في سلامة الدفع تحتاج إلى مراجعة.',
   },
+  // Since 20261013120000 (gap PG-25) the count reads only attempts a payment
+  // SETTLED on, so an abandoned checkout no longer raises it. It now means money
+  // Moyasar took whose order was not confirmed within 30 minutes.
   STALE_PAYMENT_INITIATIONS: {
-    en: 'Payment attempts remained initiated for more than 30 minutes.',
-    ar: 'عمليات دفع بقيت في حالة البدء لأكثر من 30 دقيقة.',
+    en: 'A payment went through at Moyasar, but its order was not confirmed within 30 minutes.',
+    ar: 'تمت دفعة لدى Moyasar، لكن طلبها لم يُؤكَّد خلال 30 دقيقة.',
   },
   PUSH_SEND_FAILURES_24H: {
     en: 'Push send failures were recorded in the last 24 hours.',

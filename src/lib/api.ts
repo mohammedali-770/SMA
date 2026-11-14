@@ -588,6 +588,67 @@ export interface DbPaymentRecord {
   last_verified_at: string | null;
   created_at: string;
 }
+/**
+ * "Refunds and payments needing attention" (`list_payments_needing_attention`,
+ * 20261013120000). Admin-only; safe columns only. `payment_ref` is the Moyasar
+ * payment id, which is what staff search for in Moyasar's dashboard.
+ */
+export interface AttentionRefund {
+  id: string;
+  order_id: string;
+  order_number: string;
+  amount: number;
+  currency: string;
+  attempt_count: number;
+  failure_code: string | null;
+  last_error_safe: string | null;
+  created_at: string;
+  updated_at: string;
+  payment_ref: string | null;
+}
+export interface AttentionPayment {
+  id: string;
+  kind: 'duplicate_payment' | 'verification_mismatch';
+  order_id: string | null;
+  order_number: string | null;
+  amount: number;
+  currency: string;
+  mode: 'test' | 'live' | null;
+  failure_message_safe: string | null;
+  payment_ref: string | null;
+  created_at: string;
+  last_verified_at: string | null;
+}
+export interface AttentionUnconfirmed {
+  payment_ref: string;
+  error: 'finalize_failed' | 'confirm_failed';
+  order_id: string | null;
+  order_number: string | null;
+  payment_record_id: string | null;
+  amount: number | null;
+  currency: string | null;
+  mode: 'test' | 'live' | null;
+  log_count: number;
+  first_logged_at: string;
+  last_logged_at: string;
+}
+export interface AttentionList<T> {
+  total: number;
+  items: T[];
+}
+export interface PaymentsNeedingAttention {
+  failed_refunds: AttentionList<AttentionRefund>;
+  retrying_refunds: AttentionList<AttentionRefund>;
+  payments_to_refund: AttentionList<AttentionPayment>;
+  unconfirmed_payments: AttentionList<AttentionUnconfirmed>;
+}
+/** An RPC failure that keeps PostgREST's code, so a caller can tell "not applied yet" from a real error. */
+export class RpcError extends Error {
+  constructor(message: string, readonly code: string | null) {
+    super(message);
+    this.name = 'RpcError';
+  }
+}
 /** The newest Moyasar webhook-verification code, as `latestWebhookVerification` reads it. */
 export interface DbWebhookVerification {
   created_at: string;
@@ -644,6 +705,17 @@ export const paymentGateway = {
       .order('created_at', { ascending: false })
       .limit(1));
     return rows[0] ?? null;
+  },
+  /**
+   * Admin-only (role and AAL2): failed refunds, refunds still being retried,
+   * duplicate and mismatch payments, and payments whose order was never
+   * confirmed. Throws an RpcError carrying PostgREST's code: PGRST202 until
+   * 20261013120000 is applied, 42501 for anyone who is not an admin at AAL2.
+   */
+  async attention(limit = 20): Promise<PaymentsNeedingAttention> {
+    const { data, error } = await supabase.rpc('list_payments_needing_attention', { p_limit: limit });
+    if (error) throw new RpcError(error.message, (error as { code?: string }).code ?? null);
+    return data as PaymentsNeedingAttention;
   },
   /** Staff read of the latest safe payment record for an order (no raw/secret). */
   async record(orderId: string): Promise<DbPaymentRecord | null> {

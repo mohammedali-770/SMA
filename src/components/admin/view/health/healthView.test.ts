@@ -178,6 +178,16 @@ describe('attentionText', () => {
       .toContain('مراجعة للإتاحة');
   });
 
+  it('says a stale payment is money taken without a confirmed order, not an abandoned checkout (PG-25)', () => {
+    // Since 20261013120000 the count reads only attempts a payment settled on.
+    // The old copy, "remained initiated for more than 30 minutes", described
+    // every customer who closed the card page.
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en'))
+      .toBe('A payment went through at Moyasar, but its order was not confirmed within 30 minutes.');
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'en')).not.toMatch(/remained initiated/);
+    expect(attentionText(item('STALE_PAYMENT_INITIATIONS'), 'ar')).toContain('لم يُؤكَّد');
+  });
+
   it('falls back to the raw code for an unknown incident', () => {
     // A NEW backend code the UI has not learned yet must still appear. Dropping
     // unknown codes would hide exactly the incidents nobody has seen before.

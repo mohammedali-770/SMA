@@ -10,6 +10,7 @@ import { Order, OrderStatus } from '../../types';
 import { ADMIN_LOCALES } from './adminLocales';
 import { OrderReceiptModal } from './view/orders/OrderReceiptModal';
 import { OrdersRequiringVerificationCard } from './view/orders/OrdersRequiringVerificationCard';
+import { PaymentsNeedingAttentionCard } from './view/orders/PaymentsNeedingAttentionCard';
 import { OrdersTable } from './view/orders/OrdersTable';
 import {
   DEFAULT_ORDER_FILTER, LIVE_ORDERS_PAGE, ORDER_FILTERS,
@@ -26,8 +27,10 @@ import {
  * always been a consumer of that list and still is — no subscription, no timer
  * and no ordering logic was added, moved or removed here.
  *
- * The one timer the panel side owns is inside
- * `OrdersRequiringVerificationCard`: a 60s re-read of the ambiguous-POS queue.
+ * The timers the panel side owns are inside the two attention cards:
+ * `OrdersRequiringVerificationCard`, a 60s re-read of the ambiguous-POS queue,
+ * and `PaymentsNeedingAttentionCard`, a 60s re-read of refunds and payments a
+ * person has to deal with (admin-only; hidden for everyone else).
  *
  * This file owns FILTERING, THE RECEIPT SELECTION AND THE STATUS CHANGE.
  * Presentation is in `./view/orders/*` and the derived state in `ordersView.ts`.
@@ -136,6 +139,11 @@ export const LiveOrdersPanel: React.FC = () => {
   return (
     <>
       <div className="space-y-4">
+        {/* Read-only money-owed feed: failed and retrying refunds, duplicate and
+            mismatched payments, payments with no confirmed order. Admin-only;
+            self-hides when empty or before its migration is applied. */}
+        <PaymentsNeedingAttentionCard adminLang={adminLang} onView={viewById} />
+
         {/* Read-only ambiguous-POS feed. Self-hides when the queue is empty. */}
         <OrdersRequiringVerificationCard adminLang={adminLang} onView={viewById} />
 
