@@ -25,6 +25,7 @@ const ALL: CustomerOrderState[] = [
   'final_failure_refunded',
   'final_failure_refund_failed',
   'unpaid_final_failure',
+  'order_cancelled',
 ];
 function paid(over: Partial<OrderConfirmationInput> = {}): OrderConfirmationInput {
   return {
@@ -206,5 +207,97 @@ describe('refund lifecycle and adapter', () => {
         refundState: 'none',
       }),
     ).toBe('confirmed_by_branch');
+  });
+});
+
+// Gap PG-03. A paid order that never reached the branch, cancelled and refunded
+// by hand, still showed "Resend order", because the state ignored `status`.
+// Each shape below would otherwise offer Resend, say "sending" or promise an
+// automatic refund.
+describe('cancelled orders (gap PG-03)', () => {
+  type OrderShape = Parameters<typeof orderConfirmationState>[0];
+  const order = (over: Partial<OrderShape> = {}): OrderShape => ({
+    status: 'cancelled',
+    orderType: 'pickup',
+    paymentMethod: 'online',
+    paymentStatus: 'paid',
+    lazywaitSyncState: 'failed',
+    lazywaitRef: null,
+    syncBlockedReason: null,
+    syncNextAttemptAt: null,
+    posCreateAttemptedAt: null,
+    posCustomerRetryCount: 0,
+    refundState: 'none',
+    ...over,
+  });
+  const SHAPES: Partial<OrderShape>[] = [
+    {}, // paid, proven not sent: was branch_failed_retry_available
+    { paymentMethod: 'cash', paymentStatus: 'pending' }, // cash, proven not sent: was unpaid_branch_failed_retry_available
+    { lazywaitSyncState: 'dead_letter', posCustomerRetryCount: 3 }, // budget spent: was final_failure_refund_pending
+    { lazywaitSyncState: 'pending' }, // queued: was sending_to_branch
+    { lazywaitSyncState: 'synced', lazywaitRef: '#12' }, // at the branch: was confirmed_by_branch
+    { paymentStatus: 'pending', lazywaitSyncState: 'awaiting_payment' }, // the July order-first orders: was payment_pending
+    { lazywaitSyncState: 'blocked', syncBlockedReason: 'delivery_schema_unconfirmed' },
+  ];
+  it('is order_cancelled in every sync shape, and offers no Resend', () => {
+    for (const s of SHAPES) {
+      const state = orderConfirmationState(order(s));
+      expect(state, JSON.stringify(s)).toBe('order_cancelled');
+      expect(confirmationPresentation(state).canResend).toBe(false);
+    }
+  });
+  it('reads as cancelled, never as success, and promises no branch number', () => {
+    const p = confirmationPresentation('order_cancelled');
+    expect(p.titleKey).toBe('oc_cancelled');
+    expect(p.bodyKey).toBe('oc_cancelled_body');
+    expect(p.tone).toBe('danger');
+    expect(p.success).toBe(false);
+    expect(p.showBranchNumber).toBe(false);
+  });
+  it('never promises an automatic refund the server will not make', () => {
+    const state = orderConfirmationState(
+      order({ lazywaitSyncState: 'dead_letter', posCustomerRetryCount: 3 }),
+    );
+    expect(state).not.toBe('final_failure_refund_pending');
+    expect(confirmationPresentation(state).bodyKey).not.toBe('oc_failed_refund_pending_body');
+  });
+  it('keeps a refund that exists as the story, as the server does', () => {
+    expect(orderConfirmationState(order({ refundState: 'pending' }))).toBe('final_failure_refund_pending');
+    expect(orderConfirmationState(order({ refundState: 'processing' }))).toBe('final_failure_refund_pending');
+    expect(orderConfirmationState(order({ refundState: 'refunded' }))).toBe('final_failure_refunded');
+    expect(orderConfirmationState(order({ refundState: 'failed' }))).toBe('final_failure_refund_failed');
+  });
+  it('changes nothing for an order that is not cancelled', () => {
+    for (const status of [
+      'received',
+      'preparing',
+      'ready',
+      'out_for_delivery',
+      'delivered',
+      null,
+      undefined,
+    ]) {
+      for (const s of SHAPES) {
+        const o = order({ ...s, status });
+        expect(orderConfirmationState(o), `${status} ${JSON.stringify(s)}`).toBe(
+          deriveCustomerOrderState({
+            orderType: o.orderType,
+            paymentMethod: o.paymentMethod,
+            paymentStatus: o.paymentStatus,
+            syncState: o.lazywaitSyncState,
+            ref: o.lazywaitRef,
+            blockedReason: o.syncBlockedReason,
+            nextAttemptAt: o.syncNextAttemptAt,
+            posCreateAttemptedAt: o.posCreateAttemptedAt,
+            customerRetryCount: o.posCustomerRetryCount,
+            refundState: o.refundState,
+          }),
+        );
+      }
+    }
+    expect(orderConfirmationState(order({ status: 'received' }))).toBe('branch_failed_retry_available');
+  });
+  it('leaves the SQL mirror itself status-blind', () => {
+    expect(deriveCustomerOrderState(paid({ syncState: 'failed' }))).toBe('branch_failed_retry_available');
   });
 });

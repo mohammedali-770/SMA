@@ -56,7 +56,16 @@ checkout shows it in the customer's language (`userMessage.ts`):
 A retry with the idempotency key of an order that already exists still returns
 that order. The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in
 `MIGRATIONS.md` §57. These cover cash orders only: the online checkout-session
-path is frozen and does not go through `place_customer_order`.
+path does not go through `place_customer_order`.
+
+**A fifth refusal, written 2026-11-14 and not applied** (`20261012120000`, gap
+PG-27): `place_customer_order` refuses an online order, whether the call asks
+for `online` or sends no method and the default would resolve to online
+(SQLSTATE P0001, *Card payment orders cannot be placed here. Pay by card at
+checkout.*, hint `online_orders_use_checkout`). The app never sends one: it
+pays by card through the checkout session (§6a) and sends `cash` here, so there
+is no app key for it. Until this, a direct API call could create an unpaid
+online order that waits for a payment and blocks its owner's account deletion.
 
 ## 3. The states
 
@@ -74,6 +83,7 @@ path is frozen and does not go through `place_customer_order`.
 | `final_failure_refunded` | Refund provider-CONFIRMED | no | no | no |
 | `final_failure_refund_failed` | Refund could not complete; manual review | no | no | no |
 | `unpaid_final_failure` | CASH, budget spent; no refund language | no | no | no |
+| `order_cancelled` | The order was cancelled (app only, from `orders.status`; see below) | no | **no** | no |
 
 `confirmed_by_branch` requires `lazywait_sync_state = 'synced'` **and**
 `lazywait_pos_ref_is_usable(lazywait_ref)`. A `'synced'` row without a usable
@@ -117,6 +127,42 @@ Customer copy for the no-POS-channel states:
 
 The split exists because cash-on-delivery orders also land here; telling an unpaid
 customer "Payment received" would be false.
+
+### A cancelled order (gap PG-03, branch `fix/cancelled-orders-guard-20261114`)
+
+Until this change the state ignored `orders.status`. A paid order that never
+reached the branch, cancelled by staff and refunded by hand, still showed
+**Resend order**, and pressing it printed a ticket for food nobody wanted.
+
+Now the app shows a cancelled order as `order_cancelled`: the title **Order
+cancelled**, the body *Your order was cancelled. Contact support if this is
+unexpected.*, no Resend, no branch-number card and no refund promise. The words
+are the live "cancelled" push's own (`push-dispatch` `STATUS_COPY`), and
+`cancelledOrderWiring.test.ts` keeps the two identical.
+
+| | English | Arabic |
+|---|---|---|
+| title | Order cancelled | تم إلغاء الطلب |
+| body | Your order was cancelled. Contact support if this is unexpected. | تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع. |
+
+**One exception: a refund that already exists stays the story.** If the order
+has a refund (`refund_state` pending, processing, refunded or failed), the
+refund state is shown, because it says what is happening to the money. The
+server's resend refusal reports the same.
+
+**Where it is decided.** In `orderConfirmationState`, the function the receipt
+and the order card call with the whole order. `deriveCustomerOrderState` is
+untouched: it mirrors `customer_order_state`, which takes no status, and
+`orderConfirmationSqlParity.test.ts` still pins the two clause for clause. On
+the order card the status pill already says Cancelled, so the second pill is
+not drawn for this state.
+
+**When customers see it.** On the web build `/app` as soon as the change is
+merged, because every merge ships it (CLAUDE.md §13); it reads only the order's
+status, so it does not wait for the migration. On phones, only in the next EAS
+build (`OWNER_ACTIONS.md` §47.17). Builds already installed still show Resend
+on a cancelled order, but once `20261012120000` is applied the server refuses
+the resend (§5), so the button does nothing.
 
 ## 4. Order numbers
 
@@ -1202,8 +1248,28 @@ without a provider idempotency key.
 
 Three manual attempts are allowed. The count lives in
 `orders.pos_customer_retry_count` and is incremented only by the server. The RPC
-returns `{ outcome, state }` and nothing else — **no reason code, no counter, no
-limit** — so the budget is not disclosed in any client-visible payload.
+returns `{ outcome, state }` and nothing else — **no counter, no limit** — so
+the budget is not disclosed in any client-visible payload. One refusal adds a
+reason, below, and it discloses only what the customer can already see.
+
+**A cancelled order is never resent** (`20261012120000`, gap PG-03, written
+2026-11-14 and not applied). The check sits after the order lock and the
+ownership test and before the eligibility predicate, so no other state can let
+a cancelled order through. The answer is `{outcome: 'unavailable', reason:
+'order_cancelled', message, state}`: the English message is *This order was
+cancelled, so it was not sent to the branch.*, `state` is `order_cancelled`
+(or the refund state when a refund exists), and the refusal is logged as
+`resend_rejected_order_cancelled`. Nothing about the order moves and no resend
+is spent. The new build shows `oc_resend_cancelled` («تم إلغاء هذا الطلب، لذلك
+لم يُرسل إلى الفرع.») if Resend was pressed on a receipt loaded before the
+cancellation; its re-read then shows the order as cancelled. Older builds
+ignore the answer and re-read, so the button does nothing.
+
+**The ownership test is NULL-safe since the same file.** An order whose
+customer deleted their account has `customer_id = NULL` (ON DELETE SET NULL),
+and `customer_id <> auth.uid()` is then NULL rather than true, so any signed-in
+caller who held the order's id passed it. It is now `is distinct from`, and
+such an order is "not found" to everyone.
 
 Each accepted resend extends `pos_sync_deadline_at`. Without that the row would
 be re-queued but then refused by the deadline-bounded claim RPCs, reporting a
@@ -1225,6 +1291,16 @@ Enrollment is automatic, path-independent and decided in Postgres by
 Ambiguous orders fail the third and fourth clauses, so **an order Lazywait may
 have accepted is never auto-refunded**. Cash orders fail the first, so a
 non-prepaid final failure shows the same apology with no refund language.
+
+**A cancelled order is never enrolled** (`20261012120000`, written 2026-11-14,
+not applied). The trigger that enrols refunds, `set_order_refund_enrollment`,
+now checks `status <> 'cancelled'` before it asks `order_refund_due()`, which
+is unchanged and takes no status. The reason: a cancelled paid order is refunded
+by hand in Moyasar's dashboard while that is the procedure (`OWNER_ACTIONS.md`
+§47.20; whether it should be automatic is gap PG-13, an owner decision), so an
+automatic refund after three failed resends would be a second one. A refund
+enrolled before the order was cancelled is not stopped: it is already a refund
+in progress, and the customer is shown it.
 
 A BEFORE trigger stamps `refund_state = 'pending'` atomically with whatever drove
 the order terminal; an AFTER trigger opens one `order_refunds` ledger row with a
@@ -2378,6 +2454,19 @@ will not submit until a method is chosen.
   is `order_items[].details`, the order-level note is `order_details`, and both
   are forwarded by `lazywait-sync`. The assumed `delivery_notes` name this bullet
   worried about turned out not to exist at all.
+- **A cancelled order that was waiting in the POS queue gets a "could not send"
+  push when its POS deadline passes** (found 2026-11-14 while writing
+  `20261012120000`, not fixed). The sync claims now skip a cancelled order, so
+  one cancelled while `pending` stays in the queue until its deadline, normally
+  ten minutes after it entered the queue. The existing deadline sweep then marks it `dead_letter` and queues
+  the `pos_failed` push, which `push-dispatch` sends because its check reads the
+  sync state, not the order status. A cancelled order that was already `failed`
+  got the same push before this change. Before it, a cancelled `pending` order
+  was sent to the kitchen and got the "confirmed" push instead, so the change
+  removes the ticket and keeps a misleading message. The admin **Retry** in the
+  Lazywait panel can put a cancelled order back in the queue the same way: the
+  worker no longer sends it, but the panel does not refuse it either. Both are
+  customer-messaging and console changes for their own pull request.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Moyasar sandbox** (until
   2026-11-11 this said Tap). The pure

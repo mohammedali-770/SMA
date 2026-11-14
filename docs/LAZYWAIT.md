@@ -331,7 +331,12 @@ no blocked orders).
    **online** order that is not yet paid parks at `'awaiting_payment'`.
 2. `lazywait-sync` (cron/scheduled) calls `claim_lazywait_sync_batch(N)` —
    `FOR UPDATE SKIP LOCKED` so concurrent workers never double-send — flipping
-   claimed rows to `'syncing'`.
+   claimed rows to `'syncing'`. **Neither claim takes a cancelled order**
+   (`status <> 'cancelled'`, `20261012120000`, gap PG-03; written 2026-11-14,
+   not applied). Cancelling does not touch the sync state, so until this a
+   cancelled order that was queued, re-queued by a customer resend or re-queued
+   by an admin Retry was sent to the kitchen. It now stays in the queue unsent;
+   see the cancelled-order note under *Retry / backoff / dead-letter*.
 3. Per order: load branch mapping + items via `ORDER_ITEM_SELECT` — the
    server-trusted snapshots (`name_en`, `name_ar`, `note`, qty, `unit_price`)
    joined to `products.lazywait_item_id` / `lazywait_price_id`, the product's
@@ -838,6 +843,14 @@ by a printed ticket rather than by the vendor.
 - The queue index `orders_lazywait_queue_idx` pulls due `pending`/`failed` rows
   oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
   **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
+- **A cancelled order is never sent, and never resent by the customer**
+  (`20261012120000`, gap PG-03; written 2026-11-14, not applied). Both claims
+  skip it and `request_customer_pos_resend` refuses it with reason
+  `order_cancelled`. Two things are left as they were, on purpose, and are
+  recorded in `ORDER_CONFIRMATION_FLOW.md` §11: an admin **Retry** on a cancelled
+  order still moves it to `pending` (the worker then leaves it there), and a
+  cancelled order left in `pending` or `failed` is swept to `dead_letter` at its
+  deadline, which queues the customer's `pos_failed` push.
 - **There are currently TWO of that index, and this line named only one.** The
   2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
   (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition
@@ -929,7 +942,9 @@ link.
 
 `lazywait-sync` behaves differently depending on who invoked it. Nothing about
 the payload, the claim predicate or the retry rules differs — only *how much* it
-does before returning.
+does before returning. The two claims keep byte-identical predicates apart from
+the id filter and the ordering; `20261012120000` added the same
+`status <> 'cancelled'` line to both.
 
 | | **Targeted** (`{orderId}`) | **Untargeted** (`{limit: n}`) |
 | --- | --- | --- |

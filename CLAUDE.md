@@ -301,6 +301,15 @@ and read back byte-identical, `20261004120000_drop_tap_payment_rpcs` (17:45:00,
 (rows 8-9), 0 unapplied. Money-path pair unchanged. **This changes no customer
 behaviour yet:** the payment row is disabled and online payment is off.
 
+**AMENDED 2026-11-14 — `20261012120000_cancelled_orders_guard` is written,
+validated and awaiting approval, so on merge it is outstanding** (with any other
+file merged unapplied since the read above). Six function bodies: a cancelled
+order is never resent, claimed for the POS, enrolled for an automatic refund or
+invoiced, and `place_customer_order` places no online order (gaps PG-03 and
+PG-27). No signature, table or row; no deploy; money path self-asserted
+(`12b6816d…` / `22e2d429…`). Apply it before `docs/OWNER_ACTIONS.md` §47.13
+step 1 (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
+
 **`20261003120000` IS NOT THE FIRST INLINE APPLY WHERE THE TRANSPORT DECODED `\u`
 ESCAPES (row 111 was), and it is the first where it decoded only SOME.** Of its 50 escapes,
 the 40 at or above U+0020 arrived as the characters they name; the ten

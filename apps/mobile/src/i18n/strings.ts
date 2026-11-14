@@ -379,6 +379,15 @@ export const STRINGS = {
     oc_resend: 'Resend order',
     oc_resending: 'Sending…',
     oc_resend_failed: 'We could not send it just now. Please try again in a moment.',
+    // A cancelled order (gap PG-03). The title and body are the "cancelled"
+    // push's own words (push-dispatch STATUS_COPY), so the app and the
+    // notification say the same thing. No refund is promised: whether a
+    // cancelled card order is refunded automatically is an open owner decision.
+    oc_cancelled: 'Order cancelled',
+    oc_cancelled_body: 'Your order was cancelled. Contact support if this is unexpected.',
+    // Shown when Resend is pressed on a screen loaded before the cancellation.
+    // The server's refusal message says the same in English.
+    oc_resend_cancelled: 'This order was cancelled, so it was not sent to the branch.',
     oc_refund_status: 'Refund status',
     oc_refund_pending: 'Refund pending',
     oc_refunded: 'Refunded',
@@ -723,6 +732,9 @@ export const STRINGS = {
     oc_resend: 'إعادة إرسال الطلب',
     oc_resending: 'جارٍ الإرسال…',
     oc_resend_failed: 'تعذر الإرسال في الوقت الحالي. فضلاً حاول مرة أخرى بعد قليل.',
+    oc_cancelled: 'تم إلغاء الطلب',
+    oc_cancelled_body: 'تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع.',
+    oc_resend_cancelled: 'تم إلغاء هذا الطلب، لذلك لم يُرسل إلى الفرع.',
     oc_refund_status: 'حالة الاسترداد',
     oc_refund_pending: 'الاسترداد قيد المعالجة',
     oc_refunded: 'تم الاسترداد',

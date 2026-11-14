@@ -34,7 +34,8 @@ export function OrderCard({
   const colors = useThemeColors();
   const { t, pick, lang, isRTL, rtlRow } = useI18n();
   const branchNo = visibleBranchNumber(order);
-  const confirmation = confirmationPresentation(orderConfirmationState(order));
+  const state = orderConfirmationState(order);
+  const confirmation = confirmationPresentation(state);
   const itemCount = order.items.reduce((n, it) => n + it.quantity, 0);
   const totalLabel = priceAccessibilityLabel(order.total, lang);
   const orderType = order.orderType === 'delivery' ? t('delivery') : t('pickup');
@@ -57,9 +58,13 @@ export function OrderCard({
         </View>
         <StatusPill label={statusLabel} tone={statusTone(order.status)} />
       </View>
-      <View style={styles.confirmationBlock}>
-        <StatusPill label={t(confirmation.titleKey)} tone={TONE_CHIP[confirmation.tone]} />
-      </View>
+      {/* A cancelled order shows its status pill alone: a second "Order
+          cancelled" pill would only repeat it (gap PG-03). */}
+      {state !== 'order_cancelled' ? (
+        <View style={styles.confirmationBlock}>
+          <StatusPill label={t(confirmation.titleKey)} tone={TONE_CHIP[confirmation.tone]} />
+        </View>
+      ) : null}
       <View style={styles.details}>
         <View style={[styles.detailRow, rtlRow]}>
           <Text variant="caption" tone="secondary">
