@@ -16,7 +16,7 @@
 import { FakeMoyasar, FakePaymentDb } from './paymentFakes.ts';
 
 export type Handler = (req: Request) => Promise<Response>;
-type Name = 'payment-initiate' | 'payment-verify' | 'payment-webhook';
+type Name = 'payment-initiate' | 'payment-verify' | 'payment-webhook' | 'payment-refund';
 
 const g = globalThis as Record<string, unknown>;
 const handlers = new Map<Name, Handler>();
@@ -51,6 +51,7 @@ async function load(name: Name): Promise<Handler> {
   captured = null;
   if (name === 'payment-initiate') await import('../../payment-initiate/index.ts');
   else if (name === 'payment-verify') await import('../../payment-verify/index.ts');
+  else if (name === 'payment-refund') await import('../../payment-refund/index.ts');
   else await import('../../payment-webhook/index.ts');
   const h = captured as Handler | null;
   if (!h) throw new Error(`${name} did not call Deno.serve`);
@@ -86,4 +87,17 @@ export function webhook(payment: Record<string, unknown>, type = 'payment_paid')
     secret_token: 'whsec_live_fixture',
     data: payment,
   });
+}
+
+/** One run of the refund worker, as the pg_cron driver sends it. */
+export async function refundRun(secret: string, limit = 5): Promise<Reply> {
+  const h = await load('payment-refund');
+  const res = await h(
+    new Request('https://project.example/functions/v1/payment-refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-refund-secret': secret },
+      body: JSON.stringify({ limit }),
+    }),
+  );
+  return { status: res.status, body: await res.json() };
 }

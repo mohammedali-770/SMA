@@ -76,4 +76,12 @@ describe('admin rule filter ↔ watchdog rule set', () => {
     expect(RULE_CODES).toContain('UNPAID_ORDER_NOT_SYNCED');
     expect(RULE_CODES).toContain('UNPAID_ORDER_DEAD_LETTER');
   });
+
+  it('includes the four refund and payment rules of 20261013120000', () => {
+    for (const code of ['REFUND_FAILED', 'DUPLICATE_PAYMENT_RECORDED',
+      'PAYMENT_VERIFICATION_MISMATCH', 'PAYMENT_CONFIRMATION_FAILED']) {
+      expect(RULE_CODES).toContain(code);
+    }
+    expect(sqlRules.length).toBe(17);
+  });
 });

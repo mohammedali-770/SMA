@@ -117,4 +117,25 @@ describe('payment health card', () => {
     render(<HealthSystemCard system={payment} lang="ar" />);
     expect(screen.getByText('الدفع / Moyasar')).toBeTruthy();
   });
+
+  /*
+   * PG-25 (20261013120000). The stale count now reads only attempts a payment
+   * was verified on, so an abandoned checkout no longer reads "degraded". The
+   * open attempts it no longer counts are still shown, because a payment whose
+   * webhook never arrived and whose customer never came back looks exactly like
+   * one of them. Values, not only labels, so a card wired to the wrong key fails.
+   */
+  it('shows the stale count and the unverified open attempts, each from its own key', () => {
+    const counts: OperationsHealthSystem = {
+      ...payment,
+      state: 'not_monitored',
+      details: { stale_initiated_24h: 2, open_unverified_24h: 9 },
+    };
+    render(<HealthSystemCard system={counts} lang="en" />);
+    expect(screen.getByText('Stale 24h').parentElement?.textContent).toContain('2');
+    expect(screen.getByText('Open unverified 24h').parentElement?.textContent).toContain('9');
+    cleanup();
+    render(<HealthSystemCard system={counts} lang="ar" />);
+    expect(screen.getByText('عمليات مفتوحة دون تحقق 24س').parentElement?.textContent).toContain('9');
+  });
 });

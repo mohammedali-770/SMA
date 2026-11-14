@@ -610,8 +610,29 @@ describe('payment-refund', () => {
     expect(reconcileFirst).toBeGreaterThan(-1);
     expect(post).toBeGreaterThan(reconcileFirst);
     expect(src).toContain('if (needsHumanReview(verdict)) {');
-    expect(src).toContain('p_status: refundFinalStatus(verdict),');
+    expect(src).toContain('const finalStatus = refundFinalStatus(verdict);');
+    expect(src).toContain('p_status: finalStatus,');
     expect(src).toContain('const decision = decideRefundLogging(finalized, verdict.outcome);');
+  });
+
+  // Gap PG-01: one refund the worker cannot finish took every claim of a run,
+  // because a refund released as 'pending' was claimed straight back.
+  it('passes every refund it has claimed this run to the next claim (20261013120000)', () => {
+    const claim = block(src, "admin.rpc('claim_order_refund', {");
+    expect(claim).toContain('p_claim_token: claimToken,');
+    expect(claim).toContain('p_exclude_refund_ids: claimedThisRun,');
+    // Recorded straight after the claim, before any branch can `continue`.
+    const push = src.indexOf('claimedThisRun.push(String(row.refund_id));');
+    expect(push).toBeGreaterThan(src.indexOf('if (!row) break;'));
+    expect(push).toBeLessThan(src.indexOf("if (rowProvider !== 'moyasar') {"));
+    expect(src.match(/claimedThisRun\.push\(/g)).toHaveLength(1);
+  });
+
+  it('records why a refund is released as pending', () => {
+    expect(src).toContain("const why = releaseReasonWithoutPosting('key_unavailable');");
+    expect(src).toContain('const why = releaseReasonWithoutPosting(decision.reason);');
+    expect(src).toContain('? pendingReleaseDetail(verdict, postHttpStatus)');
+    expect(src).not.toMatch(/p_status: 'pending',\s*p_provider_ref: null, p_failure_code: null/);
   });
 
   it('takes its two provider-neutral helpers from the Moyasar modules', () => {

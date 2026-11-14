@@ -1316,7 +1316,12 @@ refunded twice.
 `supabase/functions/payment-refund` drains the queue:
 
 1. `claim_order_refund()` leases one refund (`FOR UPDATE SKIP LOCKED`) and moves
-   the order to `refund_state = 'processing'` in the same transaction.
+   the order to `refund_state = 'processing'` in the same transaction. Live
+   today it takes the oldest pending refund. `20261013120000` (written
+   2026-11-14, not live until applied) makes it take the least recently touched
+   one and skip the ids the run has already claimed, so a released refund goes
+   to the back of the queue and is tried at most once per run
+   ([`PAYMENTS.md`](PAYMENTS.md) §6).
 2. The Moyasar refund request is sent: `POST /v1/payments/{payment id}/refund`
    with the amount in halalas. Moyasar documents no refund idempotency key, so
    any re-attempt first reads the payment (`status`, `refunded`, `refunded_at`)
@@ -1338,7 +1343,10 @@ refunded twice.
 `Refunded` is shown only on a provider-confirmed `succeeded`. `Refund pending`
 covers `pending`/`processing`. A `failed` refund surfaces in
 `list_failed_order_refunds()` for manual review, with the charge reference
-reduced to an md5 fingerprint and no provider payload stored anywhere.
+reduced to an md5 fingerprint and no provider payload stored anywhere. No
+screen calls that function. After `20261013120000` is applied, a failed refund
+also raises the critical watchdog rule R14 and is listed on the admin-only Live
+Orders card "Refunds and payments needing attention" ([`PAYMENTS.md`](PAYMENTS.md) §6).
 
 **What this does not cover (measured 2026-11-12, on a local chain, during review).**
 A paid online order that the branch **accepted** and staff then cancelled is

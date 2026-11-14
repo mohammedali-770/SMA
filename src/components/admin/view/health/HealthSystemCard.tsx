@@ -200,6 +200,11 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
         <HealthMetric label={isAr ? 'المزود' : 'Provider'} value={stringValue(d, 'provider') ?? '—'} />
         <HealthMetric label={isAr ? 'الوضع' : 'Mode'} value={stringValue(d, 'mode') ?? '—'} />
         <HealthMetric label={isAr ? 'عمليات عالقة 24س' : 'Stale 24h'} value={numberValue(d, 'stale_initiated_24h')} />
+        {/* 20261013120000 (PG-25): open attempts no payment was verified on.
+            Mostly abandoned checkouts, so it does not move the state, but a
+            payment whose webhook never arrived and whose customer never came
+            back reads the same, and nothing else counts it. */}
+        <HealthMetric label={isAr ? 'عمليات مفتوحة دون تحقق 24س' : 'Open unverified 24h'} value={numberValue(d, 'open_unverified_24h')} />
       </>
     );
   }

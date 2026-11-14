@@ -3,6 +3,7 @@ import {
   buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, decideRefundLogging,
   moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview,
   refundFinalStatus, refundRequestIsValid, resolveRefundFromPayment, safeMessage,
+  pendingReleaseDetail, releaseReasonWithoutPosting,
 } from './moyasarRefund.ts';
 
 describe('moyasarRefundUrl / moyasarPaymentUrl', () => {
@@ -283,5 +284,53 @@ describe('refundFinalStatus', () => {
 
   it('never parks an ordinary pending verdict, which carries no such code', () => {
     expect(refundFinalStatus(mk('pending', null))).toBe('pending');
+  });
+});
+
+// Gap PG-01: a refund released as 'pending' recorded no reason in most cases,
+// so a refund retried for days showed attempts and an empty "last error".
+describe('releaseReasonWithoutPosting', () => {
+  it('names a missing key and a lookup that could not be made, and says nothing was sent', () => {
+    expect(releaseReasonWithoutPosting('key_unavailable')).toEqual({
+      failureCode: 'key_unavailable',
+      errorSafe: "No usable Moyasar secret key for this payment's mode. Nothing was sent.",
+    });
+    expect(releaseReasonWithoutPosting('reconcile_unavailable')).toEqual({
+      failureCode: 'reconcile_unavailable',
+      errorSafe: 'Could not ask Moyasar what the previous attempt did. Nothing was sent.',
+    });
+  });
+});
+
+describe('pendingReleaseDetail', () => {
+  const pending = { outcome: 'pending' as const, providerRef: null, failureCode: null, errorSafe: null };
+
+  it('keeps a reason the classifier already gave (Allowed IPs)', () => {
+    const v = classifyMoyasarRefundResponse(false, 401, {
+      type: 'authentication_error', message: 'This IP Address is not whitelisted to do this operation',
+    });
+    expect(v.failureCode).toBe('moyasar_ip_not_allowed');
+    expect(pendingReleaseDetail(v, 401)).toEqual({ failureCode: 'moyasar_ip_not_allowed', errorSafe: v.errorSafe });
+    expect(pendingReleaseDetail({ ...pending, failureCode: 'x', errorSafe: 'y' }, 503)).toEqual({ failureCode: 'x', errorSafe: 'y' });
+  });
+
+  it('names no answer, a rate limit, a server error and a refund not final yet', () => {
+    expect(pendingReleaseDetail(pending, 0).failureCode).toBe('provider_no_answer');
+    expect(pendingReleaseDetail(pending, 0).errorSafe).toMatch(/No answer from Moyasar/);
+    expect(pendingReleaseDetail(pending, 429).failureCode).toBe('http_429');
+    expect(pendingReleaseDetail(pending, 503)).toEqual({
+      failureCode: 'http_503',
+      errorSafe: 'Moyasar answered with a server error (HTTP 503). The next attempt asks Moyasar before sending again.',
+    });
+    expect(pendingReleaseDetail(pending, 200).failureCode).toBe('refund_not_final');
+    expect(pendingReleaseDetail(pending, null).failureCode).toBe('refund_not_final');
+  });
+
+  it('changes no decision: the outcome stays pending', () => {
+    for (const status of [0, 429, 500, 503, 200]) {
+      const v = classifyMoyasarRefundResponse(status >= 200 && status < 300, status, status === 200 ? { status: 'initiated' } : {});
+      expect(refundFinalStatus(v)).toBe('pending');
+      expect(needsHumanReview(v)).toBe(false);
+    }
   });
 });

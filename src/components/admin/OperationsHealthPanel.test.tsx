@@ -104,3 +104,37 @@ describe('OperationsHealthPanel — push failure metrics', () => {
     expect(container.querySelector('[dir="rtl"]')).toBeTruthy();
   });
 });
+
+describe('OperationsHealthPanel — stale payment wording follows the server (PG-25)', () => {
+  // The console ships on merge, before 20261013120000 is applied. The
+  // settled-only wording may appear only when the snapshot proves that count.
+  function summaryWithStale(paymentDetails: Record<string, unknown>): OperationsHealthSummary {
+    const base = unavailableOperationsHealthSummary('2026-07-22T00:00:00.000Z');
+    return {
+      ...base,
+      overall_state: 'degraded',
+      systems: base.systems.map((s) =>
+        s.id === 'payment'
+          ? { ...s, state: 'degraded', source: 'configuration_and_ledger', details: { stale_initiated_24h: 1, ...paymentDetails } }
+          : s,
+      ),
+      attention: [{ code: 'STALE_PAYMENT_INITIATIONS', subsystem: 'payment', severity: 'warning', count: 1, oldest_at: null }],
+    };
+  }
+
+  it('keeps the old wording for a server without the migration', async () => {
+    vi.spyOn(operationsHealth, 'summary').mockResolvedValue(summaryWithStale({}));
+    render(<OperationsHealthPanel lang="en" />);
+    expect(await screen.findByText('Payment attempts remained initiated for more than 30 minutes.')).toBeTruthy();
+    expect(screen.queryByText(/went through at Moyasar/)).toBeNull();
+  });
+
+  it('uses the settled-only wording once the payment card carries open_unverified_24h', async () => {
+    vi.spyOn(operationsHealth, 'summary').mockResolvedValue(summaryWithStale({ open_unverified_24h: 4 }));
+    render(<OperationsHealthPanel lang="en" />);
+    expect(
+      await screen.findByText('A payment went through at Moyasar, but its order was not confirmed within 30 minutes.'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/remained initiated/)).toBeNull();
+  });
+});

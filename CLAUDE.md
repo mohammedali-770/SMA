@@ -310,6 +310,19 @@ PG-27). No signature, table or row; no deploy; money path self-asserted
 (`12b6816d…` / `22e2d429…`). Applying it before `docs/OWNER_ACTIONS.md` §47.13
 step 1 closes that section's warning (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
 
+**AMENDED 2026-11-14 — `20261013120000_payment_refund_visibility` is written,
+validated and awaiting approval, so on merge it is outstanding.** Other gap-fix
+branches written the same day may add files too: read the count live. It
+changes the refund claim order, adds four critical watchdog rules (failed
+refunds, double charges, mismatched payments, payments whose order was not
+confirmed) and an `is_admin()`-gated console feed, and stops abandoned checkouts
+reading as "payment degraded" (gap PG-25) while still reporting those
+attempts, without moving the state, because a payment nobody verified looks the
+same. It sends, refunds and writes nothing;
+the money path is self-asserted. **Apply it BEFORE deploying `payment-refund`**,
+each on its own approval: the new worker passes a parameter only this file
+defines. **Name the target by version.** Detail: `docs/MIGRATIONS.md` §65.
+
 **`20261003120000` IS NOT THE FIRST INLINE APPLY WHERE THE TRANSPORT DECODED `\u`
 ESCAPES (row 111 was), and it is the first where it decoded only SOME.** Of its 50 escapes,
 the 40 at or above U+0020 arrived as the characters they name; the ten

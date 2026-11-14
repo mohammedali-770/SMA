@@ -345,6 +345,78 @@ export function decideAfterReconcile(prior: RefundClassification | null): RetryD
   return { action: 'post' };
 }
 
+// ---------------------------------------------------------------------------
+// Why a refund is released, in the words staff read (gap PG-01).
+// ---------------------------------------------------------------------------
+
+/** The failure code and safe message recorded on a refund released as 'pending'. */
+export interface ReleaseReason {
+  failureCode: string;
+  errorSafe: string;
+}
+
+/**
+ * The worker released this refund without sending anything: there is no
+ * usable Moyasar key for the payment's mode, or it could not ask Moyasar what
+ * an earlier attempt did. Recorded on the row so the console card can say
+ * why a refund is still waiting. Before 2026-11-14 both wrote nothing, so a
+ * refund held up by a missing key or an unreachable Moyasar showed attempts
+ * with no reason at all.
+ */
+export function releaseReasonWithoutPosting(
+  kind: 'key_unavailable' | 'reconcile_unavailable',
+): ReleaseReason {
+  return kind === 'key_unavailable'
+    ? {
+      failureCode: 'key_unavailable',
+      errorSafe: 'No usable Moyasar secret key for this payment\'s mode. Nothing was sent.',
+    }
+    : {
+      failureCode: 'reconcile_unavailable',
+      errorSafe: 'Could not ask Moyasar what the previous attempt did. Nothing was sent.',
+    };
+}
+
+/**
+ * The failure code and message to record when a SENT refund ends 'pending'.
+ *
+ * classifyMoyasarRefundResponse names only the Allowed IPs refusal; a timeout,
+ * a network or proxy error, a 429, a 5xx and a status that is not final all
+ * come back with no code. Recording nothing left a refund retried for days
+ * with an empty "last error". This names each from what the worker saw, and
+ * changes no decision: the outcome stays 'pending', refundFinalStatus() reads
+ * only the verdict, and the order's refund_failure_code is written for
+ * 'failed' alone.
+ *
+ * `httpStatus` is the refund POST's status: 0 when no answer arrived, null
+ * when nothing was posted in this run.
+ */
+export function pendingReleaseDetail(
+  verdict: RefundClassification,
+  httpStatus: number | null,
+): { failureCode: string | null; errorSafe: string | null } {
+  if (verdict.failureCode) return { failureCode: verdict.failureCode, errorSafe: verdict.errorSafe };
+  if (httpStatus === 0) {
+    return {
+      failureCode: 'provider_no_answer',
+      errorSafe: 'No answer from Moyasar: a network, proxy or timeout error. The next attempt asks Moyasar before sending again.',
+    };
+  }
+  if (httpStatus === 429) {
+    return { failureCode: 'http_429', errorSafe: 'Moyasar asked us to slow down (HTTP 429). It will be tried again.' };
+  }
+  if (httpStatus != null && httpStatus >= 500) {
+    return {
+      failureCode: `http_${httpStatus}`,
+      errorSafe: `Moyasar answered with a server error (HTTP ${httpStatus}). The next attempt asks Moyasar before sending again.`,
+    };
+  }
+  return {
+    failureCode: 'refund_not_final',
+    errorSafe: 'Moyasar has not reported this refund as complete yet. It will be checked again.',
+  };
+}
+
 /**
  * The `order_refunds.status` to write for a finished attempt.
  *
