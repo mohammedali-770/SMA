@@ -18,10 +18,10 @@ The owner's answers the same day:
 - Moyasar's live Allowed IPs list is met with a static-IP outbound proxy
   service.
 
-**Nothing is switched on.** The decision covers repository code, tests and
-documents. Every step that reaches Production is a separate owner approval
-under [CLAUDE.md §5](../CLAUDE.md), named when it is due (§7 below). None of
-them has been done.
+**Card payments are not switched on.** The decision covers repository code,
+tests and documents. Every step that reaches Production is a separate owner
+approval under [CLAUDE.md §5](../CLAUDE.md), named when it is due (§7 below).
+The steps up to and including the sandbox test are done (§1); the rest are not.
 
 Other documents:
 
@@ -37,6 +37,18 @@ Other documents:
 
 ## 1. Live state, read-only, 2026-11-11
 
+> **Updated 2026-11-13, evening: the sandbox test is DONE** (§7 step 6,
+> `OWNER_ACTIONS.md` §47.7-47.9). The payment row is now **enabled, in TEST
+> mode**, since 18:17:02 UTC, because the sandbox refuses a disabled row; this
+> supersedes the row state in the note below. **Card payments are still off:**
+> `online_payment_enabled` is false, and customer checkout is refused in TEST
+> mode. What remains is the card-payment gap fixes and decisions
+> ([the card-payment gaps](readiness/20261113-card-payments-gaps.md): 31 verified
+> gaps, 12 to fix before card payments go live and 9 to decide; the app-side
+> fixes before §47.17) and `OWNER_ACTIONS.md` §47.10 onwards: the two emails and
+> the proxy, live mode, the customer documents, the refund job, the EAS build,
+> then online payment on.
+>
 > **Updated 2026-11-13: the database and function half is DONE.** The three
 > payment migrations are applied (ledger rows 114-116) and the seven payment
 > functions are deployed and verified byte-identical (`OWNER_ACTIONS.md` §47.4).
@@ -151,6 +163,10 @@ invoice is still payable, so the customer can try another card, or Apple Pay, on
 the same page, and a resumed session reuses the same invoice. Only an
 **invoice** that Moyasar has closed (`expired` or `canceled`) ends an attempt,
 or the attempt's own expiry.
+
+So after a decline the invoice still reads `initiated`; only the payment inside
+it reads `failed`. The sandbox showed exactly this on 2026-11-13: the decline
+card left its invoice `initiated` (`OWNER_ACTIONS.md` §47.9).
 
 ### The checkout URL handed to the app
 
@@ -389,51 +405,95 @@ key) is a definitive failure.
 ## 7. Going live: the order of steps
 
 Each numbered step is a **separate owner approval**, named when it is due.
-Approval for one is not approval for the next. Nothing here has been done.
+Approval for one is not approval for the next. Steps 1 to 6 are done
+(2026-11-13, `OWNER_ACTIONS.md` §47.2-47.9); steps 7 to 16 are not.
 
-1. **Apply `20260824100000_moyasar_payment_provider`**, named by version.
+1. **Apply `20260824100000_moyasar_payment_provider`**, named by version. Done
+   2026-11-13 (live `20261113171942`).
 2. **Apply `20261003120000_moyasar_only_payments`**, named by version. It refuses
    to apply before step 1. It adds the loyalty multi-spend guard and the
    1.00 SAR minimum to the attempt RPCs, switches the refund driver's gate to
    Moyasar, refuses a second paying payment for an order under the order lock,
    and relabels the health card and alerts. Detail: [Migrations §55](MIGRATIONS.md).
+   Done 2026-11-13 (live `20261113172609`).
 3. **Deploy the seven payment functions as one set**: `payment-initiate`,
    `payment-verify`, `payment-webhook`, `payment-return`, `payment-refund`,
    `payment-test-config`, `payment-admin-test-return`. An old bundle beside a new
    one can open an invoice that nothing confirms. The deploy workflow's `all`
    preset is this set ([Deploy](DEPLOY.md), [Owner actions §15](OWNER_ACTIONS.md)).
    Until this step, the console's Moyasar panel says "Deploy the Moyasar payment
-   functions first."
+   functions first." Done 2026-11-13, all seven from `b17ee00`.
 4. **Apply `20261004120000_drop_tap_payment_rpcs`**, named by version, **only
    after** step 3. It refuses to apply before step 2. Detail: [Migrations §56](MIGRATIONS.md).
+   Done 2026-11-13 (live `20261113174500`).
 5. **Delete the retired `tap-admin-test-return` function.** Done 2026-11-13.
-6. **Sandbox test** (§9, part A), with test keys and the test webhook.
+6. **Sandbox test** (§9, part A), with test keys and the test webhook. Done
+   2026-11-13 (`OWNER_ACTIONS.md` §47.7-47.9).
 7. **Choose the proxy service and set `MOYASAR_PROXY_URL`** (§8.1), after the
    sandbox test, so a bad value cannot be mistaken for a sandbox failure. An
-   **invalid** value refuses every Moyasar call, TEST included.
-8. **List the proxy's IPs in Moyasar's Allowed IPs** (§8.1).
+   **invalid** value refuses every Moyasar call, TEST included. Send the two
+   emails in the [proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) §7
+   first, then prove the proxy in TEST while Moyasar's TEST list still accepts
+   any address: Test connection, then the wrong-password check (§8.1, steps 1
+   to 3).
+8. **List the proxy's IPs in Moyasar's LIVE Allowed IPs** (§8.1, step 5), only
+   after Moyasar's written answers to questions 1 and 3 of that email. The live
+   list can never be set back to any address.
 9. **Switch the payment row to live, then enter the live keys and the live
    webhook token** in the console, register the live webhook, enter its
    verification code (§8.2), and run Test connection in LIVE mode. The card asks
    for confirmation before switching.
 10. **Keep the payment row enabled.**
-11. **Update the customer documents, before customers can pay by card:** name
-    Moyasar in `privacy_policy`; update `payment_policy` and
+11. **Update the customer documents, before customers can pay by card**
+    ([Owner actions §47.15](OWNER_ACTIONS.md); its publishing plan is proposed,
+    and the owner decides it). First settle every `[OWNER DECISION …]` marker
+    and placeholder in the drafts, and get the native Arabic read. Then, in one
+    owner-approved session and in both languages, write all four: name Moyasar
+    in `privacy_policy`; update `payment_policy` and
     `cancellation_refund_policy`, which both still say payment is cash only and
-    promise to change before an online option appears; re-decide the App Store
-    "Financial Info" and Play "Payment info" answers; change the cash-only
-    listing claim C-CASH; and stop the App Review notes saying card payment is
-    off ([Owner actions §47.15](OWNER_ACTIONS.md)).
+    promise to change before an online option appears; and correct
+    `terms_conditions`, whose payment clause also says cash only. Then rebuild
+    the site (today a merge to the default branch, [Deploy §9](DEPLOY.md)) and
+    check that the no-JavaScript copy of `https://app.spicymeal.com.sa/privacy`,
+    which store checkers read and which changes only on a rebuild, shows the new
+    versions. After that check, re-decide the App Store "Financial Info" and
+    Play "Payment info" answers.
 12. **Make sure `refund_trigger_secret` exists (generate it if not) and
     re-enable the `payment-refund-worker` cron job** (§6).
-13. **Ship the EAS build** that carries the app half (§5).
-14. **Turn on Online Payment** (Settings → Payment Methods).
+13. **Ship the EAS build** that carries the app half (§5), with the app-side
+    gap fixes in it: PG-03, PG-04, PG-05, PG-20 if the owner chooses the code
+    fix, and PG-31 ([the card-payment gaps](readiness/20261113-card-payments-gaps.md)).
+    A fix that misses this build needs another build and another store review.
+14. **Turn on Online Payment** (Settings → Payment Methods). Not before
+    Moyasar's written answer on which payment methods and card schemes its
+    hosted page offers on our account (`OWNER_ACTIONS.md` §47.19; gap PG-11, a
+    gate); each of the 12 gaps that must be fixed before card payments go live
+    (PG-01 to PG-11 and PG-31 in
+    [the card-payment gaps](readiness/20261113-card-payments-gaps.md)) closed as
+    its row says (PG-04 may be disclosed instead of fixed; PG-07 may be closed
+    by the ticket check on step 15's first payment, with Online Payment switched
+    off again if the ticket does not show it paid); and the 9 that need the
+    owner's decision (PG-12 to PG-17, PG-19, PG-20, PG-30) decided.
 15. **The small live payment and its automatic refund** (§9, part B). That is a
-    real payment and a real refund.
+    real payment and a real refund. One automatic refund, produced in a way
+    agreed with the owner beforehand, is watched until it reads refunded. If none
+    can be produced, or it does not complete, switch Online Payment off and
+    publish the [refund draft](legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md)'s
+    D7 fallback wording before switching on again.
+16. **Once step 15 has ended with card payment still on**, and its device checks
+    have passed (a check of which methods Moyasar's live page offers, gap PG-11,
+    belongs among them, but must first be added to `OWNER_ACTIONS.md` §47.18 step
+    2 and `RELEASE_CHECKLIST.md` §7): change the cash-only listing claim C-CASH and add C-CARD, and
+    send the release notes, the TestFlight description and any App Store text
+    that says card payment is available
+    ([store answers draft](store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md), Open
+    owner decisions, item 6). The App Review notes use the ON or OFF variant
+    that matches the switch when a build is submitted.
 
 This is the order of [Owner actions §47](OWNER_ACTIONS.md), which has the detail
 of each step. Step 15 needs step 12, or the refund will not run, and every step
-before 14 must be done before customers can pay.
+before 14 must be done before customers can pay. Step 16 comes only after step
+15.
 
 ---
 
@@ -464,21 +524,47 @@ tunnels and never sees the secret key. Unset, calls are direct.
 - The proxy URL is never logged or returned. Prefer an `https://` proxy URL:
   the proxy's own credentials travel as `Proxy-Authorization`, in clear to an
   `http://` proxy.
-- **Unknown:** Supabase does not document `createHttpClient` on hosted
-  functions. Support was read from the edge-runtime source (released in 1.68.0).
-  Which version hosted Supabase runs is not known. The proof is the admin **Test
-  connection** in LIVE mode with the proxy set: "Connection OK" proves the
-  route; an Allowed-IPs message names whether the proxy or the server's own
-  address was refused.
+- **Not yet proven:** Supabase does not document `createHttpClient` on hosted
+  functions. The edge-runtime source has it from 1.69.0 (the comment in
+  `moyasarHttp.ts` says 1.68.0, one release early). On 2026-11-13 every Edge
+  Function log line of the previous 24 hours, across five regions, came from
+  runtime 1.77.9. The proof is **Test connection** with the proxy set, first in
+  TEST while Moyasar's TEST list still accepts any address, with a
+  wrong-password check that shows the proxy carried the call
+  ([Moyasar static-IP proxy](integrations/Moyasar_Static_IP_Proxy.md) §3-§4).
+  An Allowed-IPs message says which route our code took (proxy, or direct
+  because no proxy is set), not which address Moyasar saw.
 
-**Owner steps** (each an approval):
+**Owner steps** (each an approval, in this order; the
+[proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) §3 has the detail):
 
-1. Choose the proxy service. Get its URL and the full list of its outbound IPs.
-2. Set `MOYASAR_PROXY_URL` (Supabase dashboard → Edge Functions → Secrets).
-   Never paste it in chat.
-3. List every outbound IP of the proxy under Moyasar Allowed IPs. Saving asks
-   for a 6-digit code.
-4. After the deploy and the live keys, run Test connection in LIVE mode.
+1. Send the two emails in the proxy comparison's §7, to QuotaGuard and to
+   Moyasar. Moyasar's answers to its questions 1 (shared addresses) and 3 (can
+   the TEST list go back to "any address") must be in writing before any
+   Allowed IPs list is changed. Wait for the replies before step 2: QuotaGuard's
+   answer to its question 1 decides the plan, and Moyasar's answer to its
+   question 1 decides whether shared addresses are acceptable at all.
+2. Choose the proxy service (`OWNER_ACTIONS.md` §47.10; the comparison
+   recommends QuotaGuard Shield in Frankfurt) and start its trial. Get its URL
+   and every outbound IP.
+3. Set `MOYASAR_PROXY_URL` (Supabase dashboard → Edge Functions → Secrets;
+   never in chat), leaving Moyasar's TEST Allowed IPs as they are. Run Test
+   connection in TEST: "Connection OK". Change one character of the proxy
+   password and run it again: it must say "Could not reach Moyasar". Put the
+   right value back and run it once more: "Connection OK" again. If the wrong
+   password still gives "Connection OK", the calls are not going through the
+   proxy: put the right value back and tell engineering.
+4. Optional, the last TEST step, and possibly irreversible: restrict the TEST
+   list, only once you have decided to keep the service and Moyasar has
+   answered question 3 (comparison §3, step 3).
+5. Only after the written answers to questions 1 and 3: in Moyasar's
+   dashboard, switch to LIVE first, open Settings → API Keys, and add every
+   outbound IP to the Allowed IPs list under the live keys only. Saving it asks
+   for a 6-digit code; the test list saves at once, with no code, so check the
+   heading above the list before you press Save. The live list can never be set
+   back to any address.
+6. After the live keys are saved (`OWNER_ACTIONS.md` §47.13), run Test
+   connection in LIVE mode.
 
 ### 8.2 Webhook registration and the one-time verification code
 
@@ -528,16 +614,24 @@ including Moyasar's own spelling `payment_faild`.
 Done in the console, with the payment row enabled, provider `moyasar`, mode
 `test`, Online Payment **off**.
 
-- [ ] Steps 1 to 4 of §7 are done.
-- [ ] Moyasar panel: "Key for mode (test)", "Key prefix (sk_test_)" and "Webhook
+**Run 2026-11-13, 18:17-18:58 UTC** (`OWNER_ACTIONS.md` §47.9). Every box is
+ticked except the 3-D Secure one: Moyasar's challenge page was completed with
+the decline card, not with an approving challenge card. That path is exercised
+again on real phones at go-live (part B).
+
+- [x] Steps 1 to 4 of §7 are done.
+- [x] Moyasar panel: "Key for mode (test)", "Key prefix (sk_test_)" and "Webhook
       secret (test)" all read Yes.
-- [ ] Test connection: "Moyasar accepted the test key. Connection OK."
-- [ ] Test webhook registered and its verification code entered (§8.2).
-- [ ] Run a sandbox invoice and pay it with the success card; Check reads it
+- [x] Test connection: "Moyasar accepted the test key. Connection OK."
+- [x] Test webhook registered and its verification code entered (§8.2).
+- [x] Run a sandbox invoice and pay it with the success card; Check reads it
       paid.
-- [ ] Run another and pay it with the decline card; Check reads it failed.
+- [x] Run another and pay it with the decline card; Check still reads
+      `initiated`, because a decline leaves the invoice payable (§2). The failed
+      payment shows in Moyasar's dashboard. (Until 2026-11-13 this line said
+      "Check reads it failed", which was wrong.)
 - [ ] Run one with the 3-D Secure challenge card and complete the challenge.
-- [ ] The test webhook events arrive. A sandbox invoice has no attempt row, so
+- [x] The test webhook events arrive. A sandbox invoice has no attempt row, so
       each is acknowledged and logged in `integration_sync_logs` as
       `unknown payment` (or `admin_test payment ignored`). The console does not
       show these rows; read them with a read-only query.
@@ -551,6 +645,15 @@ succeeds only for 200.00 to 300.00 SAR, and the admin test invoice is fixed at
 
 ### B. Live (a small real payment and its automatic refund)
 
+- [ ] Before step 14 of §7: Moyasar's written answer on which payment methods
+      and card schemes its hosted page offers on our account
+      (`OWNER_ACTIONS.md` §47.19; gap PG-11, a gate); each of the 12 gaps that
+      must be fixed before card payments go live (PG-01 to PG-11 and PG-31 in
+      [the card-payment gaps](readiness/20261113-card-payments-gaps.md)) closed
+      as its row says (PG-04 may be disclosed instead of fixed; PG-07 may be
+      closed by the ticket check on the first live payment below); and the 9
+      that need the owner's decision (PG-12 to PG-17, PG-19, PG-20, PG-30)
+      decided.
 - [ ] Steps 7 to 13 of §7 are done.
 - [ ] Test connection in LIVE mode: "Connection OK".
 - [ ] On a real iPhone, with a Wallet card: the Apple Pay sheet appears inside
@@ -559,10 +662,15 @@ succeeds only for 200.00 to 300.00 SAR, and the admin test invoice is fixed at
       the WebView.
 - [ ] The Arabic hosted page appears when the app language is Arabic (whether
       `lang=ar` is honoured is unknown).
-- [ ] A small live pickup order: paid, receipt shown, order reaches the POS.
-- [ ] A small live order that is refunded automatically. Only an order that was
-      paid and provably never reached the branch is enrolled (§6). Agree with
-      the owner how to produce one before trying.
+- [ ] A small live pickup order: paid, receipt shown, order reaches the POS,
+      and the branch's ticket shows it as paid (gap PG-07).
+- [ ] One automatic refund, seen end to end. Only an order that was paid and
+      provably never reached the branch is enrolled (§6), so agree with the
+      owner how to produce one before trying, then watch it reach refunded. If
+      none can be produced, or it does not complete, switch Online Payment off
+      and publish the
+      [refund draft](legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md)'s
+      D7 fallback wording before switching on again.
 - [ ] `payment_records` holds exactly one `paid` row for each test order, and no
       `duplicate_payment` row.
 
@@ -632,9 +740,10 @@ For Moyasar support:
    The app allows any `https` page and keeps `setSupportMultipleWindows={false}`.
 3. What query parameters are appended to **`success_url` and `back_url`**? They
    are not documented. `payment-return` tolerates a second `?`.
-4. Is **SADAD** enabled for invoices on this account? It must be off: a SADAD
-   bill leaves the invoice `on_hold` for days (read as pending) and cannot be
-   refunded.
+4. Is **SADAD** enabled for invoices on this account? It must be off: on an
+   invoice a SADAD bill stays payable, read as pending, for as long as the
+   invoice does (Moyasar's SADAD guide: "On an invoice, matches the invoice";
+   ours last 30 minutes), and it cannot be refunded.
 5. Is **`lang=ar`** on the invoice URL honoured?
 6. Can a 3-D Secure payment still in flight when an invoice **expires** complete
    afterwards?
@@ -677,8 +786,9 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the
   console show a fake code.
-- **Proxy support is unproven on hosted Supabase** until the live Test
-  connection (§8.1). If it is missing, every Moyasar call fails closed with
+- **Proxy support is unproven on hosted Supabase** until Test connection runs
+  with the proxy set (§8.1), although the runtime measured on 2026-11-13 (1.77.9)
+  has it in its source. If it is missing, every Moyasar call fails closed with
   `moyasar_proxy_unsupported`.
 - **Apple Pay in the WebView is unconfirmed** (§11 Q1).
 - **The WebView allows any `https` page** (§5).
