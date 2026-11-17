@@ -58,6 +58,18 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-17 — `20261014120000` and `20261013120000` are APPLIED,
+> and NOTHING is outstanding.** On the owner's approval naming each by version,
+> one call each: `20261014120000_export_my_data_payments` (11:49:22 UTC, live
+> `20261117114922`, ledger row 118, §66), then
+> `20261013120000_payment_refund_visibility` (11:49:24, live `20261117114924`,
+> row 119, §65). `payment-refund` was then deployed as version 5, after the
+> second apply was verified. Live history **162 → 164**. Reconciled by name
+> against the default branch at `8aac448`: 158 files = 156 applied + 2
+> superseded (rows 8-9) + **0 unapplied**. Money-path pair unchanged. The
+> refund worker's cron job is still inactive. **Name the target by version.**
+> The notes below are kept as they were written.
+
 > **Updated 2026-11-14 (evening) — `20261012120000_cancelled_orders_guard` is
 > APPLIED** (17:27:37 UTC, live `20261114172737`, ledger row 117, §64), on the
 > owner's approval naming it by version. Live history **161 → 162**. Reconciled
@@ -1695,9 +1707,12 @@ production.
 | 115 | 20261003120000 | moyasar_only_payments | `c0fe06f4a45f` | 20261113172609 | moyasar_only_payments | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 17:26:09 UTC** on explicit owner approval ("Apply 20261003120000", named by version, in the same multi-select), via MCP `apply_migration`, **one call, target named explicitly**. §47.3, detail in §55. §9-B.7: the merged copy was re-hashed (sha256 `c0fe06f4a45fda3fb67c0b5515c46d137d9c6c6acba983ea4b84e50bd594453f`, 2 299 lines / 112 061 bytes) and matched. **Pre-images read live first:** the three recorded exact pairs (`invoke_payment_refund_processor` `52a3faab…`/`9e31bb04…`, `operations_health_snapshot_internal` `10265270…`/`47c7553a…`, `operations_alerts_render_event` `605c1ada…`/`85d67661…`), `open_order_refund_record` normalized `6925d1a4…`, and `confirm_order_payment` normalized `6a0ae6eb…`, the value its own pre-check requires; no later migration in the tree redefines any of the seven. **The file's own blocks all passed**, including the snapshot CALL (payment card `disabled`) and both rendered labels. **ONE TRANSPORT DEVIATION, measured and harmless (row 111's kind):** of the file's 50 `\uXXXX` escapes, the 40 at or above U+0020 reached the database as the characters they name; the 10 control-character escapes (U+0009-U+000D) arrived as written. The stored statement (`c286b88ed7a96aad40505ab6fa262ce0`, 111 549 characters) and all seven bodies equal the merged file with exactly those escapes decoded and nothing else, each hash reproduced from the file. In an `E''` literal an escape and its character are the same string, and that was measured: the trim set the live snapshot holds is **exactly the 25 intended code points**, in order. The file's own trim-set assertion compared like with like and passed. **Two expected hashes recorded in §55 were stale, and the record, not the database, was wrong:** `begin_session_attempt` `c856cdd3…` (4 509) is the body WITHOUT the 50-item line cap, which #446 added after the table was written; the file's body and the live one are `49fd86c5…` (4 862). `operations_health_snapshot_internal` `1e300b3d…` (49 281) is the escapes-as-written body; live is `2545639f…` (49 181), the same text decoded. The other five match §55 exactly, on both `md5(prosrc)` and `md5(pg_get_functiondef)`. **MONEY PATH UNTOUCHED** (asserted three times by the file). Writes nothing: 9 `payment_records`, 81 orders. Live history **159 → 160**. **Version NOT aligned** (§9-D). |
 | 116 | 20261004120000 | drop_tap_payment_rpcs | `c95d950a7a1c` | 20261113174500 | drop_tap_payment_rpcs | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-13 17:45:00 UTC** on explicit owner approval ("Apply 20261004120000", named by version, in the same multi-select), via MCP `apply_migration`, after §47.4. §56. §9-B.7: the merged copy was re-hashed (sha256 `c95d950a7a1cd18401a5c94fc2aba459adfb33a5ebeddbae447b423e42a168ce`, 159 lines / 7 873 bytes) and matched; no `\u` escape. **The deploy came first, and was proven before this was sent:** all seven payment functions deployed 17:29:50-17:38:54 UTC from the default branch at `b17ee00` (`payment-initiate` v9, `-verify` v5, `-webhook` v7, `-return` v9, `-refund` v4, `-test-config` v6, `-admin-test-return` v1; `verify_jwt` as `supabase/config.toml`), every bundle read back from Supabase and byte-identical, 54 files in all, re-checked independently per function; none names a `tap_begin_` function. **THE FIRST ATTEMPT LANDED NOTHING:** the connector's confirmation prompt for a `DROP` expired after two minutes; a read then found history 160 and both functions present. The second landed. **The text that landed is the file:** `statements` md5 `590d76f18f646c33343623658587810a` (7 870 characters). **Outcomes:** `tap_begin_%` functions **0**; both replacements present and `service_role` only; 9 `tap` history rows kept. **MONEY PATH UNTOUCHED** (asserted). Live history **160 → 161**. **Version NOT aligned** (§9-D). Reconciled by name against the default branch: 155 files = 153 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 117 | 20261012120000 | cancelled_orders_guard | `77e4e3a7386a` | 20261114172737 | cancelled_orders_guard | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-14 17:27:37 UTC** on explicit owner approval ("Apply 20261012120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**. §64. §9-B.7: the merged copy was re-hashed (sha256 `77e4e3a7386af77fecf3a7ef206501a76f80c056e4b41b07c77a60c74e40eba7`, 842 lines / 47 152 bytes) and matched; no `\u` escape. All six pre-images matched live before sending; all six stored bodies are byte-identical to hashes pre-computed from the merged file. **Outcomes:** anon executes none of the six; authenticated keeps the resend and `place_customer_order`; no probe row survived. **MONEY PATH UNTOUCHED** (asserted, and re-read). Live history **161 → 162**. **Version NOT aligned** (§9-D). Reconciled by name against the default branch at `de7edbe`: 158 files = 154 applied + 2 superseded (rows 8-9) + **2 unapplied** (`20261013120000`, `20261014120000`). |
+| 118 | 20261014120000 | export_my_data_payments | `3eb020d2837a` | 20261117114922 | export_my_data_payments | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:22 UTC** on explicit owner approval ("Apply 20261014120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**. §66, `OWNER_ACTIONS.md` §56. §9-B.7: the merged copy (sha256 `3eb020d2837a48ec4655de5d86d1947345aa024329e1a94b671bd3ab52bb8a8d`, 920 lines / 49 240 bytes) carries no `\u` escape. **The text that landed is the file:** the stored statement is byte-identical to it (md5 `e02c4d2a2bf463afcd4ee48233a9b69d`, 49 240 bytes, equal to `md5sum` of the merged file). **Outcomes:** one `export_my_data` overload, 0 arguments; md5(prosrc) `26eba36676bac42a4c8d7cda09bc6424`, 15 861 characters (md5(pg_get_functiondef) `35981a7c…`); `anon` cannot execute it, `authenticated` can. The file's self-check writes two throwaway `auth.users` rows and aborts them: 16 `auth.users` and 9 `payment_records` before and after. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **162 → 163**. **Version NOT aligned** (§9-D). |
+| 119 | 20261013120000 | payment_refund_visibility | `cb2c8d704610` | 20261117114924 | payment_refund_visibility | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:24 UTC** on explicit owner approval ("Apply 20261013120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**, after row 118 was verified. §65, `OWNER_ACTIONS.md` §55. §9-B.7: the merged copy is sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **ONE TRANSPORT DEVIATION, the same caveat as row 102:** comment-only lines OUTSIDE function bodies were stripped for transport, so 131 170 bytes were sent and the applied TEXT is not the repository file. The stored statement is 131 107 bytes (md5 `cfbe6fd6d87338301ec4b67154cff764`): exactly the 63 bytes saved by the 20 `\u` escapes at or above U+0020 arriving decoded (row 115's kind; the five control-character escapes arrived as written). **Every stored function body matches the merged file's**, the snapshot in its decoded form. **Outcomes, md5(prosrc) / length:** `claim_order_refund(text, uuid[])` `999471eed604d690da4e61675b89a02e` / 2 151, `service_role` only; `order_integrity_watchdog` `fb4fc4e2bdcee6ec46ced01029269cb0` / 34 998; `operations_health_snapshot_internal` `3847b5f3e18713bb0b322cacf9ce46ab` / 50 621 (the stored form §65 predicts); `list_payments_needing_attention` `9f4ceb05a05dba19169454d7c5dfff91` / 222, `anon` NO, `authenticated` YES; `payments_needing_attention_internal` `6dd733ccc74ef5f7f8888aa817fe7a95` / 4 744, `service_role` only. All equal §65's post-image table. `integration_sync_logs_moyasar_unconfirmed_idx` present; `to_regprocedure('public.claim_order_refund(text)')` is null. 0 open incidents, 0 `order_refunds`, 82 orders. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **163 → 164**. **Version NOT aligned** (§9-D). **`payment-refund` was then deployed** on its own approval, after this row was verified: version 4 → **5** at 12:03:44 UTC, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `1aad3d00…` → `380ce300…`; its 8 bundle files, from the default branch at `8aac448`, read back from Supabase byte-identical. The `payment-refund-worker` cron job (`*/5 * * * *`) is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `8aac448`: 158 files = 156 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 
-Reconciliation check: the rows above detail **116 repository rows, 114 of which
-carry a live version** — rows 8 and 9 are the two that do not, and both are
+Reconciliation check: the rows above detail **119 repository rows, 117 of which
+carry a live version** (recomputed 2026-11-17 when rows 118-119 were added; the
+line had read 116 / 114 since row 117) — rows 8 and 9 are the two that do not, and both are
 class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
 5 hold a 14-digit version.
@@ -1716,7 +1731,7 @@ carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
 from the artifact, never adopt from a working note — applied to this file's own
 summary line.
 
-Rows **89–116** are not described in the narrative below, which stops at 88.
+Rows **89–119** are not described in the narrative below, which stops at 88.
 Each is recorded in its own row and in the section it names; the live totals for
 the whole repository are in `CLAUDE.md` §8, not here.
 
@@ -8883,7 +8898,41 @@ explicit order numbers, so no SM- number is drawn.
    `place_customer_order`; the money-path pair unchanged; no
    `VERIFY-20261012120000-` order or branch.
 
-## 65. Refund and payment problems reach staff — WRITTEN 2026-11-14, NOT APPLIED
+## 65. Refund and payment problems reach staff — APPLIED 2026-11-17 (ledger row 119)
+
+**Applied 2026-11-17 11:49:24 UTC**, live version `20261117114924`, ledger row
+119, on the owner's approval ("Apply 20261013120000", named by version), via
+MCP `apply_migration`, one call, after `20261014120000` (row 118) was verified.
+`payment-refund` was deployed afterwards, as step 5 below requires.
+
+- **Transport, the same caveat as row 102:** the file is 149 646 bytes, and
+  comment-only lines OUTSIDE function bodies were stripped for transport
+  (131 170 bytes sent). The stored statement is 131 107 bytes, which is the sent
+  text with the 20 `\u` escapes at or above U+0020 decoded (63 bytes), as this
+  section predicts. So the applied TEXT differs from the repository file, while
+  every stored function body matches the merged file's.
+- **After:** every post-image in the table below matched on md5(prosrc) and
+  length, the snapshot in its stored (decoded) form `3847b5f3…` / 50 621.
+  `claim_order_refund(text, uuid[])` and `payments_needing_attention_internal`
+  are `service_role` only; `list_payments_needing_attention` is `anon` false,
+  `authenticated` true. `integration_sync_logs_moyasar_unconfirmed_idx` is
+  present, and the one-argument `claim_order_refund(text)` is gone. 0 open
+  incidents, 0 `order_refunds`, 82 orders. Money-path pair unchanged. History
+  **163 → 164**. **Version NOT aligned** (§9-D).
+- **Then the deploy (step 5), on its own approval:** `payment-refund` version
+  4 → **5** at 12:03:44 UTC, ACTIVE, `verify_jwt` false (as
+  `supabase/config.toml`), ezbr_sha256 `1aad3d00…` →
+  `380ce300…`. The 8
+  bundle files (`payment-refund/index.ts` and `_shared/apiKeys.ts`, `cors.ts`,
+  `moyasar.ts`, `moyasarHttp.ts`, `moyasarRefund.ts`, `secrets.ts`,
+  `supabaseClient.ts`), from the default branch at `8aac448`, were read back
+  from Supabase byte-identical. Live `claim_order_refund` then had exactly one
+  signature (`p_claim_token text, p_exclude_refund_ids uuid[]`).
+- **Automated refunds are still OFF:** the `payment-refund-worker` cron job
+  (`*/5 * * * *`) is inactive, and 0 `order_refunds` exist. Turning it on is a
+  separate §5 action.
+
+The text below is kept as it was written before the apply.
 
 `20261013120000_payment_refund_visibility.sql`. **Written 2026-11-14 on the
 branch `fix/payment-refund-visibility-20261114`, validated on a local chain,
@@ -9097,7 +9146,23 @@ waits for it, so a scan already running is waited for, not overlapped.
 
 Rollback is the notes at the foot of the file.
 
-## 66. Payment records in "Get a copy of my data" — WRITTEN 2026-11-14, awaiting approval (no ledger row)
+## 66. Payment records in "Get a copy of my data" — APPLIED 2026-11-17 (ledger row 118)
+
+**Applied 2026-11-17 11:49:22 UTC**, live version `20261117114922`, ledger row
+118, on the owner's approval ("Apply 20261014120000", named by version), via
+MCP `apply_migration`, one call.
+
+- **The text that landed is the file:** the stored statement hashes to the
+  merged file's own md5, `e02c4d2a2bf463afcd4ee48233a9b69d` (49 240 bytes). The
+  file has no `\u` escape.
+- **After:** one `export_my_data` overload, 0 arguments; md5(prosrc)
+  `26eba36676bac42a4c8d7cda09bc6424`, 15 861 characters, as step 4 below
+  expects; `anon` cannot execute it and `authenticated` can. The file's
+  `auth.users` probe left nothing behind: 16 `auth.users` and 9
+  `payment_records`, as before. Money-path pair unchanged. History
+  **162 → 163**. **Version NOT aligned** (§9-D).
+
+The text below is kept as it was written before the apply.
 
 `20261014120000_export_my_data_payments.sql`. **Written 2026-11-14 on branch
 `fix/export-my-data-payments-20261114`, validated, awaiting owner approval.**

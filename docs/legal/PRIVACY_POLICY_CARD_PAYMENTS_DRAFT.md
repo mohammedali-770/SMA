@@ -655,9 +655,9 @@ change would allow different wording, the alternative is in an
    you can "ask us to … give you a copy", which stays true, because a request to
    support can include them. No wording change either way; the in-app copy
    should include payment records. **Fixed on branch
-   `fix/export-my-data-payments-20261114` (2026-11-14); not live until
-   `20261014120000` is applied** (`OWNER_ACTIONS.md` §56). The in-app copy then
-   includes the customer's checkouts, payment records, with the card details
+   `fix/export-my-data-payments-20261114` (2026-11-14); live since
+   2026-11-17, when `20261014120000` was applied** (`OWNER_ACTIONS.md` §56).
+   The in-app copy now includes the customer's checkouts, payment records, with the card details
    listed in WHAT WE COLLECT for each try, and refunds. YOUR RIGHTS stays true
    either way.
 4. **PRIV-4 (gap PG-23). A session stuck in `pending_payment` blocks self-service deletion**

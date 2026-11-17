@@ -2953,8 +2953,8 @@ and engineering-drafted. Check «لذلك» reads naturally there.
 
 **Widened 2026-11-14 — "Refunds and payments needing attention" (§55).**
 Staff-facing, in the console's Live Orders. All engineering-drafted, none read
-by a native speaker. It goes live with the merge but shows only after
-`20261013120000` is applied. The English sits under the same key in
+by a native speaker. It went live with the merge and shows since
+`20261013120000` was applied (2026-11-17). The English sits under the same key in
 `src/components/admin/adminLocales.ts`. Read the four instructions first: they
 tell a person what to do with a customer's money.
 
@@ -3039,7 +3039,7 @@ those, and whether a number above 2 wants the plural.
 **Widened again 2026-11-14 — two refund reasons inside the copy itself**
 (`supabase/migrations/20261014120000_export_my_data_payments.sql`, key
 `reason_ar` of each refund). The customer reads them in the file they share.
-Engineering-drafted; live only once that file is applied (§56):
+Engineering-drafted; live since that file was applied on 2026-11-17 (§56):
 
 - «تعذّر إرسال طلبك إلى الفرع، لذلك نعيد إليك المبلغ الذي دفعته.» — English
   *"Your order could not be sent to the branch, so we are returning your
@@ -5157,6 +5157,14 @@ fixes the parts of gaps PG-01, PG-02 and PG-25 that need no decision from you
   needs a sweep that asks Moyasar about each open invoice. That is not built;
   it is listed as open in [`PAYMENTS.md`](PAYMENTS.md) §12.
 
+**Steps 1-4 DONE.** Merged as `d976f8c` (#472) on 2026-11-14. On 2026-11-17:
+applied 11:49:24 UTC, live `20261117114924`, ledger row 119; step 3's checks
+all held (detail in `MIGRATIONS.md` §65); then `payment-refund` deployed as
+version 5 at 12:03:44 UTC, from the default branch at `8aac448`, every bundle
+file read back byte-identical. The `payment-refund-worker` cron job is still
+inactive, so the deploy sent nothing; turning it on is its own §5 action.
+What remains is step 5, and the decisions below.
+
 **The steps, each its own approval (CLAUDE.md §5):**
 
 1. **Merge the pull request.** The console card ships with the merge and hides
@@ -5225,6 +5233,13 @@ two checks are read-only. There is no number to decide and no function to
 deploy.
 
 ### The steps
+
+**Steps 1-4 DONE.** Merged as `de7edbe` (#473) on 2026-11-14. On 2026-11-17:
+applied 11:49:22 UTC, live `20261117114922`, ledger row 118. Step 2's
+privilege held by construction: the file's check writes `auth.users`, and the
+apply landed; step 4's checks all held (16 `auth.users`
+and 9 `payment_records` before and after; detail in `MIGRATIONS.md` §66). The
+phone's summary line still arrives with the §47.17 EAS build.
 
 1. **Merge the pull request.** Merging changes only the format of the copy
    shared from `/app`, which becomes compact JSON (below). The web app ships on

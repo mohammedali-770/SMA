@@ -17,8 +17,8 @@ Admin UI: **Admin → Order Integrity** (`src/components/admin/OrderIntegrityPan
 
 **MAY (the only side effects that exist):**
 - READ operational state: `orders`, `payment_records`, `checkout_sessions`,
-  `cron.job` (own job only). Since `20261013120000` (written 2026-11-14, not
-  live until applied) also `order_refunds`, and the failed Moyasar
+  `cron.job` (own job only). Since `20261013120000` (written 2026-11-14,
+  applied 2026-11-17) also `order_refunds`, and the failed Moyasar
   confirmation rows of `integration_sync_logs` through a partial index that
   holds nothing else.
 - WRITE only to its own four isolated tables: `order_integrity_config`,
@@ -65,8 +65,8 @@ are considered safe operational identifiers and are shown.
 ## 3. Rules (17 supported)
 
 Rules 14-17 are added by `20261013120000_payment_refund_visibility.sql`
-(`MIGRATIONS.md` §65). **Written 2026-11-14 and not live until that file is
-applied;** until then Production evaluates 13.
+(`MIGRATIONS.md` §65). **Written 2026-11-14, applied 2026-11-17;** until
+then Production evaluated 13.
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
