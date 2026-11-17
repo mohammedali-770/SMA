@@ -11,7 +11,7 @@ import type {
   DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile,
 } from '../types/db';
 import type {
-  Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LegalDoc, LoyaltySettings, Modifier, ModifierGroup,
+  Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LegalDoc, LoyaltyRedemptionSettings, LoyaltySettings, Modifier, ModifierGroup,
   Order, OrderItem, OrderItemModifier, Product, ProductVariant, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
@@ -382,6 +382,39 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     // invent one — the safe direction here is silence.
     expiryEnabled: s.loyalty_expiry_enabled ?? false,
     expiryNextRunOn: s.loyalty_expiry_next_run_on ?? null,
+  };
+}
+
+/**
+ * The redemption settings as checkout re-reads them, or `null` when the row
+ * cannot be trusted. `null` means "use what the app already has": the caller
+ * falls back to the launch-time `LoyaltySettings`, so a bad read is never
+ * looser than no read at all.
+ *
+ * A missing or non-numeric minimum or point value makes the WHOLE row `null`
+ * rather than defaulting one field. `Number(null)` is 0, and a minimum of 0
+ * would promise a discount on orders the server gives none on.
+ */
+export function mapLoyaltyRedemption(row: {
+  loyalty_enabled?: boolean | null;
+  loyalty_pickup_only?: boolean | null;
+  min_points_to_redeem?: number | string | null;
+  discount_per_point?: number | string | null;
+}): LoyaltyRedemptionSettings | null {
+  const count = (v: number | string | null | undefined): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
+  const minPointsToRedeem = count(row.min_points_to_redeem);
+  const discountPerPoint = count(row.discount_per_point);
+  if (minPointsToRedeem === null || discountPerPoint === null) return null;
+  return {
+    // The column defaults, as `mapLoyaltySettings` and the server read them.
+    isEnabled: row.loyalty_enabled ?? false,
+    pickupOnly: row.loyalty_pickup_only ?? true,
+    minPointsToRedeem,
+    discountPerPoint,
   };
 }
 

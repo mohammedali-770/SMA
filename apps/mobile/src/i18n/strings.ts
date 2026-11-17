@@ -187,6 +187,7 @@ export const STRINGS = {
     // coupon had taken to 9.35.
     loyaltyOrderTooSmall: 'Points can be used when the total before points is {amount} SAR or more.',
     loyaltyChannelChanged: 'Points can no longer be redeemed on delivery orders. Your points are safe — check the new total and confirm again.',
+    loyaltyRedemptionChanged: 'The points rules changed while you were checking out, so your points discount has changed. Your points are safe — check the new total and confirm again.',
     pointsEarnedNote: "You'll earn {points} points with this order.",
     pointsExpireOn: 'Your points expire on {date}.',
     discount: 'Discount',
@@ -562,6 +563,7 @@ export const STRINGS = {
     loyaltyPickupOnlyBalance: 'نقاطك محفوظة — اختر الاستلام لاستخدامها.',
     loyaltyOrderTooSmall: 'يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.',
     loyaltyChannelChanged: 'لم يعد استبدال النقاط متاحاً في طلبات التوصيل. نقاطك محفوظة — راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
+    loyaltyRedemptionChanged: 'تغيّرت شروط استخدام النقاط أثناء إتمام طلبك، فتغيّر خصم النقاط. نقاطك محفوظة — راجع الإجمالي الجديد ثم أكّد مرة أخرى.',
     pointsEarnedNote: 'ستحصل على {points} نقطة مع هذا الطلب.',
     pointsExpireOn: 'تنتهي صلاحية نقاطك في {date}.',
     discount: 'الخصم',
