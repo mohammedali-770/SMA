@@ -27,7 +27,8 @@
 --                    exactly as it is, and no pos_* event is ever queued
 --   CASE 6   guard   the admin Retry refuses a cancelled order in every state it
 --                    would otherwise re-queue, with order_cancelled: and P0001,
---                    and changes nothing
+--                    and changes nothing; one it would refuse anyway is refused
+--                    as cancelled first
 --   CASE 7   honest  the admin Retry still re-queues an eligible order in each of
 --                    the other five statuses
 --   CASE 8   honest  the admin Retry: the admin gate still comes first (42501 for
@@ -334,8 +335,20 @@ begin
       raise exception 'CASE 6 FAILED: the refused Retry changed the order: % -> %', v_before, pg_temp.shape(v_id);
     end if;
   end loop;
+  -- And a cancelled order the predicate would refuse anyway is refused AS
+  -- cancelled, ahead of the predicate, so the console names the real reason
+  -- rather than "retry window has expired".
+  foreach v_id in array array[
+    pg_temp.new_order('cancelled', 'failed', now() - interval '1 minute'),
+    pg_temp.new_order('cancelled', 'failed', p_marker => now()),
+    pg_temp.new_order('cancelled', 'failed', p_attempts => 5)] loop
+    v_res := pg_temp.requeue(v_id);
+    if v_res not like 'P0001 order_cancelled:%' then
+      raise exception 'CASE 6 FAILED: a cancelled order the predicate refuses was answered % (expected order_cancelled first)', v_res;
+    end if;
+  end loop;
   perform pg_temp.as_nobody();
-  raise notice 'CASE 6 ok: the admin Retry refuses a cancelled order in every state it would re-queue';
+  raise notice 'CASE 6 ok: the admin Retry refuses a cancelled order in every state it would re-queue, and names cancellation first';
 end $$;
 
 -- ---------------------------------------------------------------------------

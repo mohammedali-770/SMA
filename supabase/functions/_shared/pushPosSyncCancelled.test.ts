@@ -169,6 +169,24 @@ describe('push-dispatch pos_sync: a cancelled order is told nothing about the PO
     expect(row.claim_token).toBe('someone-else');
     expect(expo).toHaveLength(0);
   });
+
+  it('closes only its own claim: the write is fenced by the claim token', async () => {
+    // Not reachable today, because a 'processing' pos_sync row is never
+    // reclaimed. Pinned anyway: every other write on this row is token-fenced,
+    // and an unfenced one would close a claim a later reclaim path handed on.
+    const orderId = seed('cancelled', 'pos_failed');
+    const claim = db.rpcs.claim_pos_sync_notification;
+    db.rpcs.claim_pos_sync_notification = (d, args) => {
+      const answer = claim(d, args);
+      event(d, orderId, 'pos_failed')!.claim_token = 'someone-else';
+      return answer;
+    };
+    await dispatch(orderId, 'pos_failed');
+    const row = event(db, orderId, 'pos_failed')!;
+    expect(row.send_status).toBe('processing');
+    expect(row.claim_token).toBe('someone-else');
+    expect(expo).toHaveLength(0);
+  });
 });
 
 describe('push-dispatch pos_sync: every other order is sent exactly as before', () => {

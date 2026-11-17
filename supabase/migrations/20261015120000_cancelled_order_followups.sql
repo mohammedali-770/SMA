@@ -318,7 +318,7 @@ declare
   v_tag     constant text := 'VERIFY-20261015120000-';
   v_branch  uuid := gen_random_uuid();
   v_c1      uuid := gen_random_uuid();   -- cancelled, inside the deadline
-  v_c2      uuid := gen_random_uuid();   -- cancelled, past the deadline
+  v_c2      uuid := gen_random_uuid();   -- cancelled delivery, past the deadline
   v_c3      uuid := gen_random_uuid();   -- cancelled, another attempt owns the send phase
   v_c4      uuid := gen_random_uuid();   -- cancelled, POS ref present
   v_l1      uuid := gen_random_uuid();   -- received, past the deadline
@@ -347,7 +347,7 @@ begin
                                payment_method, payment_status)
     values
       (v_c1, v_tag || 'c1', v_branch, 'pickup',   'cancelled', 10, 10, 'cash', 'pending'),
-      (v_c2, v_tag || 'c2', v_branch, 'pickup',   'cancelled', 10, 10, 'cash', 'pending'),
+      (v_c2, v_tag || 'c2', v_branch, 'delivery', 'cancelled', 10, 10, 'cash', 'pending'),
       (v_c3, v_tag || 'c3', v_branch, 'pickup',   'cancelled', 10, 10, 'cash', 'pending'),
       (v_c4, v_tag || 'c4', v_branch, 'delivery', 'cancelled', 10, 10, 'cash', 'pending'),
       (v_l1, v_tag || 'l1', v_branch, 'pickup',   'received',  10, 10, 'cash', 'pending');
@@ -392,6 +392,8 @@ begin
 
     -- (b) Past the deadline the cancelled order is still order_cancelled, so no
     -- pos_failed is ever queued for it; a received one is deadline_expired as before.
+    -- c2 is a delivery order and c1 a pickup one, so a refusal narrowed to one
+    -- order type fails one of (a) and (b).
     v_ans := public.begin_lazywait_create_attempt(v_c2, 'verify-token');
     if v_ans is distinct from 'order_cancelled' then
       raise exception 'VERIFY: a cancelled order past its deadline answered % (expected order_cancelled)', coalesce(v_ans, '<null>');
