@@ -101,8 +101,8 @@
 -- lazywait-sync is unchanged and already treats the new answer as "not ready".
 -- push-dispatch's half reads orders.status, a column that has always existed,
 -- so it can be deployed before or after this file, independently. Apply by
--- version, never as "the outstanding migrations": 20260824100000 (Moyasar,
--- frozen) still sorts ahead of everything (CLAUDE.md §8).
+-- version, never as "the outstanding migrations" (CLAUDE.md §8): an
+-- instruction that names no file is not an instruction to apply anything.
 
 -- ---------------------------------------------------------------------------
 -- 0. Preconditions

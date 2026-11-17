@@ -9323,7 +9323,7 @@ owner approval.** No ledger row: nothing is applied. It closes the two
 database follow-ups §64 listed and left. The third, the "could not send" push,
 is a `push-dispatch` change in the same pull request (below).
 
-sha256 `af094456b1f2b2d1c1dd31b58bc4d190782928eef1fe33c3141bc992dc3aebc2`, 521 lines / 29 032 bytes. **Re-hash the MERGED copy before
+sha256 `133245864b0a80edeedc3e7d272cb2ccaf42ebcab838367ee2585d268000185b`, 521 lines / 29 041 bytes. **Re-hash the MERGED copy before
 applying**, per §15. The file has no `\u` escape. Its only non-ASCII
 characters are in comments outside the two function bodies.
 
