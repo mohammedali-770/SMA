@@ -86,12 +86,13 @@ sustained use, which its soft limits do not cover (§2), so expect QuotaGuard to
 ask you to upgrade. Whichever you choose, send the vendor's usage alerts to an
 inbox someone reads (gap PG-19).
 
-**Updated 2026-11-14: half of this is fixed on a branch, not live yet.** On
+**Updated 2026-11-14, live since 2026-11-17: half of this is fixed.** With
 `fix/payment-refund-visibility-20261114` (`OWNER_ACTIONS.md` §55) a refund is
 tried at most once per run, so one stuck refund makes at least 288 calls a day,
 about 8,600 a month. That is still over 40% of the Starter plan, from one
-refund. It holds only after `20261013120000` is applied and `payment-refund` is
-then redeployed. Only an attempt cap or a back-off bounds it, and those numbers
+refund. It holds since 2026-11-17, when `20261013120000` was applied and
+`payment-refund` then redeployed as version 5 (the refund job's cron is
+still inactive, so no refund runs yet). Only an attempt cap or a back-off bounds it, and those numbers
 are yours (gap PG-01).
 
 **Location.** Neither QuotaGuard (12 AWS regions, none in the Middle East) nor
