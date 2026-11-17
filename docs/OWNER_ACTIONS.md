@@ -5250,6 +5250,66 @@ the app can attach a file, which needs a native build.
 and PG-26 marked live in the gaps list. The phone's summary line arrives with
 the §47.17 EAS build; nothing extra is needed for it.
 
+## 57. A cancelled order is not started at the POS, re-queued by Retry, or told it failed — one apply, one deploy
+
+**Opened 2026-11-17.** The three engineering follow-ups §54's change listed and
+left (`MIGRATIONS.md` §64). Branch `fix/cancelled-order-followups-20261117`.
+Nothing about it is a decision: there is no number to choose, no copy is added
+or changed, and no Arabic needs a read.
+
+**What it stops, in one line each.**
+
+- An order cancelled in the seconds after the worker claimed it printing a
+  ticket anyway. The last check before the send now parks it as
+  `blocked` / `order_cancelled` instead.
+- The Lazywait panel's **Retry** putting a cancelled order back in the queue.
+  It now refuses with "order_cancelled: This order was cancelled. A cancelled
+  order is never sent to the branch.", shown in the panel as it is.
+- A cancelled order's customer being pushed "We could not send your order to
+  the restaurant" when its POS deadline runs out, or "confirmed" if it was
+  cancelled just after it reached the POS. `push-dispatch` now sends none of
+  the four POS-outcome messages for a cancelled order.
+
+Detail: `docs/MIGRATIONS.md` §67.
+
+### The steps, each its own approval (CLAUDE.md §5)
+
+1. **Merge the pull request.** Nothing reaches a customer: the console code is
+   not changed, and the web build `/app` that ships on merge (CLAUDE.md §13)
+   has nothing new in it.
+2. **Apply `20261015120000_cancelled_order_followups` by name**, after
+   re-hashing the merged copy against `docs/MIGRATIONS.md` §67. Never "the
+   outstanding migrations": other files may be outstanding beside it, each on
+   its own approval. The file refuses to apply if either function it replaces
+   is not the definition it was written against, or if the money-path pair has
+   moved; if it refuses, nothing has changed, and the file must be re-derived,
+   not forced. **No deploy is needed for this step:** `lazywait-sync` is
+   unchanged and already treats the gate's new answer as "not ready" (it sends
+   nothing and writes nothing).
+3. **Check afterwards, read-only:** the post-image hashes in §67; one overload
+   of each function; `anon` executes neither and `authenticated` only
+   `requeue_lazywait_order`; the money-path pair unchanged (`12b6816d…` /
+   `22e2d429…`); no order or branch whose name starts
+   `VERIFY-20261015120000-`.
+4. **Deploy `push-dispatch`** (live is version 9, byte-identical to the default
+   branch before this change). Read the deployed bundle back and compare it
+   with the merged file, as for every deploy.
+
+**Steps 2 and 4 are independent, so either order is safe.** The deploy reads
+`orders.status`, a column that has always existed, and needs nothing from the
+migration. Each closes something the other does not. The apply alone stops the
+ticket and the re-queue, and an order the gate parks is never dead-lettered, so
+it never gets `pos_failed`. But the gate only sees orders the worker claimed.
+An order cancelled while it waits in the queue is skipped by the claims, still
+reaches the deadline sweep, and still has `pos_failed` queued for it. Only the
+deploy stops that push, and the one for an order cancelled after its event was
+queued. Doing both closes all three.
+
+**Done looks like:** a ledger row in `docs/MIGRATIONS.md`, §67 marked APPLIED,
+`push-dispatch` recorded at its new version, and the three bullets marked fixed
+in `docs/ORDER_CONFIRMATION_FLOW.md` §11, `docs/LAZYWAIT.md` and
+`docs/PAYMENTS.md` §12.
+
 ## Owner-action closeout rule
 
 When an item is completed:

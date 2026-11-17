@@ -58,6 +58,16 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-17 — `20261015120000_cancelled_order_followups` is written,
+> validated and NOT applied (§67).** On merge it is outstanding beside any other
+> file merged unapplied since the read below: read the count live. It replaces
+> two function bodies, so that an order cancelled after the worker claimed it is
+> parked instead of sent (`begin_lazywait_create_attempt`) and the admin Retry
+> refuses a cancelled order (`requeue_lazywait_order`). No signature, table or
+> row; no deploy implied; the money path is self-asserted. Its third half is a
+> `push-dispatch` change, deployed on its own approval in either order
+> (`docs/OWNER_ACTIONS.md` §57). **Name the target by version.**
+
 > **Updated 2026-11-14 (evening) — `20261012120000_cancelled_orders_guard` is
 > APPLIED** (17:27:37 UTC, live `20261114172737`, ledger row 117, §64), on the
 > owner's approval naming it by version. Live history **161 → 162**. Reconciled
@@ -8776,8 +8786,9 @@ table.
 sequences are pinned by `orderConfirmationSqlParity.test.ts`);
 `confirm_order_payment` (a captured payment is never refused);
 `requeue_lazywait_order`, the admin Retry, whose live hash was not part of the
-read; `begin_session_attempt`; and PG-13, the owner's decision on refunding a
-cancelled paid order.
+read (**fixed on branch `fix/cancelled-order-followups-20261117`, §67; not live
+until `20261015120000` is applied**); `begin_session_attempt`; and PG-13, the
+owner's decision on refunding a cancelled paid order.
 
 **What it does not close.** An order cancelled **after** the worker has claimed
 it is still sent. The claim moves it to `syncing`, and the pre-send gate
@@ -8786,7 +8797,10 @@ chain with this file applied, a claimed-then-cancelled order got
 `ready_to_send`. The window is the seconds between claim and POST. A check
 there is left for the admin-Retry follow-up, because that function's live hash
 was not part of the 2026-11-14 read (`docs/LAZYWAIT.md`,
-`docs/ORDER_CONFIRMATION_FLOW.md` §11).
+`docs/ORDER_CONFIRMATION_FLOW.md` §11). **Fixed on branch
+`fix/cancelled-order-followups-20261117` (§67), with the "could not send" push
+for a cancelled order; not live until `20261015120000` is applied and
+`push-dispatch` is deployed.**
 
 ### What the file checks
 
@@ -9300,3 +9314,203 @@ scanned every payment record (about 316 ms on 200 000 records).
    same number of rows as before step 3. Steps: `docs/OWNER_ACTIONS.md` §56.
 5. Rollback is a new file that re-applies the function statement and the two
    grant statements of `20260912120000`.
+
+## 67. A cancelled order is not started at the POS or re-queued by Retry — WRITTEN 2026-11-17, NOT APPLIED (no ledger row)
+
+`20261015120000_cancelled_order_followups.sql`. **Written 2026-11-17 on branch
+`fix/cancelled-order-followups-20261117`, validated on a local chain, awaiting
+owner approval.** No ledger row: nothing is applied. It closes the two
+database follow-ups §64 listed and left. The third, the "could not send" push,
+is a `push-dispatch` change in the same pull request (below).
+
+sha256 `af094456b1f2b2d1c1dd31b58bc4d190782928eef1fe33c3141bc992dc3aebc2`, 521 lines / 29 032 bytes. **Re-hash the MERGED copy before
+applying**, per §15. The file has no `\u` escape. Its only non-ASCII
+characters are in comments outside the two function bodies.
+
+**It replaces two function bodies and nothing else.** No signature, table,
+column, grant or row changes. **MONEY PATH UNTOUCHED, and the file asserts it**
+before and after (`12b6816d…` / `22e2d429…`). **No deploy is implied.**
+
+### What was wrong
+
+- **An order cancelled after the worker claimed it was still sent.** The claim
+  moves the order to `syncing`. The worker then loads its items, builds the
+  ticket and, on the cron path, searches the CRM, which takes seconds. The last
+  check before the POST, `begin_lazywait_create_attempt`, read the ref, the sync
+  state, the attempt marker and the deadline, never `status`. An order claimed
+  while `received` and then cancelled got `ready_to_send`, and the ticket printed.
+- **The admin Retry re-queued a cancelled order.** `requeue_lazywait_order`
+  asks `lazywait_requeue_eligibility`, which takes no status. Since §64 the
+  claims skip it, so it sat `pending` until the deadline sweep dead-lettered it
+  and queued `pos_failed`.
+- **That push**, "We could not send your order to the restaurant", went to a
+  customer whose order had been cancelled, because `push-dispatch` checks the
+  event against the sync state (`pos_sync_status_matches`), never `status`.
+
+### What changes
+
+| Function | Change |
+| --- | --- |
+| `begin_lazywait_create_attempt` | A cancelled order is answered `order_cancelled` and parked in the same locked statement: `blocked`, `sync_blocked_reason = 'order_cancelled'`, `sync_last_error = 'order_cancelled_before_send'`, `sync_next_attempt_at` null, one `skipped` sync-log row, no notification |
+| `requeue_lazywait_order` | Refuses a cancelled order with P0001 `order_cancelled: This order was cancelled. A cancelled order is never sent to the branch.`, after the admin gate and the lock, before the eligibility predicate |
+
+**Where the gate's refusal sits is the design.** It sits exactly where an
+attempt would start: after the ref check, the `syncing` check and the
+attempt-marker check, and before the two deadline checks. Each neighbour was
+measured:
+
+- a cancelled order with a POS ref still answers `already_synced` or
+  `ref_present_unverified`, which is the truth about the POS;
+- a cancelled order the worker does not hold (not `syncing`) is `invalid_state`
+  and untouched;
+- a cancelled order whose send phase another attempt owns (marker set, another
+  token) is `invalid_state` and untouched. Parking it would take the row from
+  under a request that may be in flight, and hide it from the verification feed;
+- a cancelled order past its deadline is `order_cancelled`, not
+  `deadline_expired`, so no `pos_failed` is queued for it.
+
+**The worker is unchanged.** `lazywait-sync` acts on five gate answers and
+treats any other as "not ready": it logs one JSON line naming the order and the
+answer, counts the order `skipped`, sends nothing and writes nothing. The gate
+has already parked the row, so nothing is left `syncing`, and the stale reaper
+never touches `blocked`. `_shared/lazywaitCancelledGate.test.ts` drives the
+real handler to prove it, with a control case that does POST.
+
+**`push-dispatch`, the third half.** Its `pos_sync` action now skips an order
+whose `status` is `cancelled`, for all four POS-outcome statuses (`pos_failed`,
+`pos_retrying`, `pos_confirmation_required`, `pos_confirmed`), after the claim,
+and closes the event as `superseded` under its own claim token. The row must
+end terminal: `lazywait-sync` drains `pending` rows oldest first, 20 a run, so
+a row left `pending` would be re-sent every minute and, with enough of them,
+hold back newer messages. The order read gains `status`, a column `orders` has
+always had, so **the function deploys independently of this file, in either
+order**. Nothing else about dispatch, targeting or copy changed. **Only the
+deploy covers an order cancelled while it waits in the queue:** the claims skip
+it (§64), so the gate never sees it, and the deadline sweep still dead-letters
+it and queues `pos_failed`. This file leaves that sweep alone on purpose: the
+order's sync state is harmless there (the watchdog rules exclude cancelled
+orders), and the message is the only thing wrong with it.
+`_shared/pushPosSyncCancelled.test.ts` drives the real handler.
+
+**What it does not change.** `lazywait_requeue_eligibility` and its client
+mirror (`src/lib/lazywaitRequeue.ts`), the claims, the reaper,
+`record_lazywait_sync`, `pos_sync_status_matches` and every notification RPC.
+It writes no existing row: an order already parked, dead-lettered or failed is
+left as it is. A cancelled order whose attempt began under the SAME token still
+answers `ready_to_send`; the worker calls the gate once and never retries it, so
+a cancellation cannot reach that branch between claim and POST. The console's
+Retry button is still offered for a parked cancelled order, because the monitor
+feed does not carry `status`. The server refuses it and the panel shows the
+sentence above (`LazywaitPanel.test.tsx`).
+
+### Pre-images and post-images
+
+Pre-images, `md5(prosrc)`, asserted by the file before it changes anything
+(each must be one of these or the file's own version):
+
+| Function | Pre-image | Source |
+| --- | --- | --- |
+| `begin_lazywait_create_attempt` | `c67adf40dece53accd70637f07fd5ae3` (1 235) | live, read 2026-11-17 |
+| `begin_lazywait_create_attempt` | `b8b8e3b9583c42021750182dd54a6bf9` (2 387) | `20260721120000` as the chain replays it |
+| `requeue_lazywait_order` | `45d8e8a0d08a1d4f75d4dba84c744452` (1 869) | live and `20260827120000`, identical |
+
+**`begin_lazywait_create_attempt` has two because the live body is the
+repository body with its whole-line comments removed.** Dropping every line
+whose first non-blank characters are `--` from `20260721120000`'s body gives
+1 235 chars and `c67adf40…` exactly, which is how the derivation basis was
+proven rather than assumed (the same shape as `admin_set_order_status`, ledger
+row 92). The new bodies carry **no** comment line inside their dollar quotes,
+so an apply that trims comments for transport stores the same text, and each
+post-image below is one value either way.
+
+Post-images, computed from the file text between the dollar quotes and
+measured on the local chain:
+
+| Function | md5(prosrc) | Length | md5(pg_get_functiondef), local |
+| --- | --- | --- | --- |
+| `begin_lazywait_create_attempt` | `365fcc1b8d82a95eac196076740bd957` | 1 854 | `5e3151f105c01d173054e19691122101` |
+| `requeue_lazywait_order` | `5b83a99cb110ec14bb99deb2c839e0fc` | 2 062 | `6dcc1d10c1c40a31f84b867875694f4f` |
+
+### What the file checks
+
+- **Before anything:** one overload of each money-path function, and the pair
+  `12b6816d…` / `22e2d429…`; one overload of each replaced function, and its
+  pre-image or this file's marker.
+- **Outcomes**, on probe orders written inside a sub-transaction that a final
+  raise aborts, then the rollback is proven (no probe order, branch, sync-log
+  or notification row left). Probe orders carry explicit order numbers, so no
+  `SM-` number is drawn. A cancelled pickup order inside its deadline is
+  answered `order_cancelled` and parked, with one skipped log row and no
+  notification; a cancelled DELIVERY order past its deadline is
+  `order_cancelled`, and a received one past it `deadline_expired`; a cancelled
+  order another attempt holds is `invalid_state` and untouched; one with a POS
+  ref is `already_synced`; and an order in each of `received`, `preparing`,
+  `ready`, `out_for_delivery` and `delivered` is `ready_to_send` with the
+  marker stamped.
+- **What it cannot drive:** `requeue_lazywait_order` past its admin gate,
+  because `is_admin()` needs an administrator's AAL2 session and building one
+  would mean writing to `auth.users` in Production. It is called as far as the
+  gate (42501), and its new statement is checked in the comment-stripped body:
+  present, after the gate and the lock, before the eligibility predicate and
+  the update. Its outcomes are proven by the paired suite.
+- **Grants** and the money-path pair again, after.
+
+### Validation
+
+- **Local chain**, a private copy of `.github/sql-ci/run.sh` on Postgres 16:
+  159 migrations applied; this file re-applies cleanly on the replay (the
+  five files the replay reports were reported before this change too); 96
+  suites, 94 passed, 2 quarantined (`lazywait_mapping`,
+  `lazywait_sync_scheduler`), **0 new failures**; the existing-data stage
+  held, with no existing row changed.
+- **Paired suite** `cancelled_order_followups_test.sql`, 10 cases. The guard
+  cases 1, 3, 5, 6 and 9 fail on `708e5fd` and pass on this branch; the honest
+  cases 2, 4, 7, 8 and 10 pass on both. Case 9 is the story end to end: the
+  worker claims an order, an administrator cancels it, the gate parks it, and
+  the reaper and the Retry leave it alone.
+- **Vitest:** `pushPosSyncCancelled.test.ts` (28 tests) fails 5 on
+  `push-dispatch` v9 and passes on this branch; its 20 honest cases send every
+  POS status for every other order status. `lazywaitCancelledGate.test.ts`
+  (2) and the new `LazywaitPanel.test.tsx` case pass before and after, by
+  design: they pin that the worker and the console need no change.
+- **Mutation testing:** 14 SQL mutants, every one refused at apply by the
+  file's own block (in one transaction, as Production applies it): the gate
+  refusal removed, moved ahead of the ref check, moved ahead of the marker
+  check, moved after the deadline checks, narrowed to pickup, widened to
+  delivered, refusing without parking, parking and queuing `pos_failed`; the
+  Retry refusal removed, moved ahead of the admin gate, moved after the
+  eligibility check, narrowed to `failed`, widened to delivered; and the
+  rollback raise dropped. Every function mutant is also failed by the paired
+  suite. 11 TypeScript mutants, all killed: the skip removed, `status` not
+  selected, the skip before the claim (row left pending), the event closed as
+  pending, the skip narrowed to `pos_failed`, widened to delivered, the
+  claim-token fence dropped; the worker writing a dead letter or sending on
+  `order_cancelled`; the panel showing a generic error or a success. Every
+  mutated file was restored and sha256-compared. The guards were exercised
+  too: the live comment-stripped pre-image applies, a one-character drift is
+  refused (and applies once that guard is removed), and a moved `place_order`
+  is refused before and again after.
+
+### Applying it (owner, §5, named by version)
+
+1. Merge first. Re-hash the merged copy against the sha256 above.
+2. Read-only, before:
+   ```sql
+   select md5(prosrc), length(prosrc) from pg_proc
+    where oid = 'public.begin_lazywait_create_attempt(uuid, text)'::regprocedure;
+   -- c67adf40dece53accd70637f07fd5ae3  1235
+   select md5(prosrc), length(prosrc) from pg_proc
+    where oid = 'public.requeue_lazywait_order(uuid)'::regprocedure;
+   -- 45d8e8a0d08a1d4f75d4dba84c744452  1869
+   ```
+3. Apply `20261015120000` by name. Never "the outstanding migrations".
+4. Afterwards, read-only: the post-image `md5(prosrc)` values above; one
+   overload of each; `anon` executes neither, `authenticated` executes only
+   `requeue_lazywait_order`; the money-path pair unchanged; no order or branch
+   whose name starts `VERIFY-20261015120000-`.
+5. Separately, on its own approval, deploy `push-dispatch` (§57). Either order
+   is safe.
+
+Rollback is a new file that re-applies the `begin_lazywait_create_attempt`
+statement of `20260721120000` and the `requeue_lazywait_order` statement of
+`20260827120000`, with their grants. Steps: `docs/OWNER_ACTIONS.md` §57.

@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **158**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261014120000_export_my_data_payments.sql`.
+Migration files in the repository: **159**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261015120000_cancelled_order_followups.sql`.
 
 ## Tables
 
@@ -133,7 +133,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `audit_order_status_change` | 1 | `20261007120000_audit_trail.sql` |
 | `audit_rows_are_append_only` | 1 | `20261007120000_audit_trail.sql` |
 | `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
-| `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
+| `begin_lazywait_create_attempt` | 2 | `20261015120000_cancelled_order_followups.sql` |
 | `begin_payment_attempt` | 3 | `20261012120000_cancelled_orders_guard.sql` |
 | `begin_session_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
 | `branch_availability_sweep` | 5 | `20260923120000_branch_variant_availability.sql` |
@@ -298,7 +298,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `reorder_products` | 1 | `20260827150000_menu_display_order.sql` |
 | `request_branch_delivery_pause` | 1 | `20260916120000_branch_delivery_requests.sql` |
 | `request_customer_pos_resend` | 3 | `20261012120000_cancelled_orders_guard.sql` |
-| `requeue_lazywait_order` | 4 | `20260827120000_lazywait_delivery_sync.sql` |
+| `requeue_lazywait_order` | 5 | `20261015120000_cancelled_order_followups.sql` |
 | `resolve_account_deletion_request` | 1 | `20260810120000_account_deletion_manual_review_resolution.sql` |
 | `resolve_branch_delivery_request` | 1 | `20260916120000_branch_delivery_requests.sql` |
 | `run_loyalty_expiry` | 1 | `20260909120000_loyalty_expiry.sql` |
