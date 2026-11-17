@@ -1316,9 +1316,10 @@ refunded twice.
 `supabase/functions/payment-refund` drains the queue:
 
 1. `claim_order_refund()` leases one refund (`FOR UPDATE SKIP LOCKED`) and moves
-   the order to `refund_state = 'processing'` in the same transaction. Live
-   today it takes the oldest pending refund. `20261013120000` (written
-   2026-11-14, not live until applied) makes it take the least recently touched
+   the order to `refund_state = 'processing'` in the same transaction. Until
+   2026-11-17 it took the oldest pending refund. `20261013120000` (written
+   2026-11-14, applied 2026-11-17, with `payment-refund` v5 deployed after it)
+   makes it take the least recently touched
    one and skip the ids the run has already claimed, so a released refund goes
    to the back of the queue and is tried at most once per run
    ([`PAYMENTS.md`](PAYMENTS.md) §6).
@@ -1344,7 +1345,7 @@ refunded twice.
 covers `pending`/`processing`. A `failed` refund surfaces in
 `list_failed_order_refunds()` for manual review, with the charge reference
 reduced to an md5 fingerprint and no provider payload stored anywhere. No
-screen calls that function. After `20261013120000` is applied, a failed refund
+screen calls that function. Since `20261013120000` was applied (2026-11-17), a failed refund
 also raises the critical watchdog rule R14 and is listed on the admin-only Live
 Orders card "Refunds and payments needing attention" ([`PAYMENTS.md`](PAYMENTS.md) §6).
 

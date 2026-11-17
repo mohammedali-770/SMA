@@ -291,7 +291,24 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
-**Current position 2026-11-13 (late night), read live AFTER the Moyasar go-live
+**Current position 2026-11-17, read live AFTER the refund-visibility apply: 158
+repository files on the default branch / 164 live history rows / NOTHING
+unapplied.** Latest live version `20261117114924`. On the owner's approval
+naming each by version, one call each, each verified before the next:
+`20261014120000_export_my_data_payments` (11:49:22 UTC, live `20261117114922`,
+ledger row 118) and `20261013120000_payment_refund_visibility` (11:49:24, live
+`20261117114924`, row 119). `payment-refund` was then deployed as version 5
+(12:03:44 UTC), after the second apply was verified, as `docs/OWNER_ACTIONS.md`
+§55 requires. Reconciled **by name** against the default branch at `8aac448`:
+156 applied, 2 superseded (rows 8-9), 0 unapplied. Money-path pair unchanged
+(`12b6816d…` / `22e2d429…`). **Automated refunds are still OFF:** the
+`payment-refund-worker` cron job is inactive, and turning it on is its own §5
+action. With nothing outstanding the rule does not relax: the next file written
+is the next referent. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §65 and §66.
+
+**Superseded, kept because the count is the point — the position 2026-11-13
+(late night), read live AFTER the Moyasar go-live
 chain: 155 repository files on the default branch / 161 live history rows /
 NOTHING unapplied.** On the owner's approval naming each by version:
 `20260824100000_moyasar_payment_provider` (17:19:42 UTC, live `20261113171942`,
@@ -324,6 +341,10 @@ money path self-asserted (`12b6816d…` / `22e2d429…`). Its `push-dispatch` ha
 deploys on its own approval, in either order. Once merged it is outstanding
 beside any other unapplied file: read the count live and **name the target by
 version.** Detail: `docs/MIGRATIONS.md` §67; steps: `docs/OWNER_ACTIONS.md` §57.
+
+**Superseded 2026-11-17 — both files in the two amendments below are APPLIED**
+(ledger rows 118 and 119) and `payment-refund` is deployed. The amendments are
+kept as written.
 
 **AMENDED 2026-11-14 — `20261013120000_payment_refund_visibility` is written,
 validated and awaiting approval, so on merge it is outstanding.** Other gap-fix

@@ -422,11 +422,11 @@ money action and an owner approval (§5 of CLAUDE.md).
 
 ### Where staff see a refund problem
 
-**Written 2026-11-14, not live until `20261013120000` is applied** (on the
-branch `fix/payment-refund-visibility-20261114`, `MIGRATIONS.md` §65). Until
-then, no screen and no alert reads `order_refunds`.
+**Written 2026-11-14, live since 2026-11-17**, when `20261013120000` was
+applied (`MIGRATIONS.md` §65, ledger row 119). Until then, no screen and no
+alert read `order_refunds`.
 
-After it:
+Since then:
 
 - a refund that gave up (`failed`) raises the critical watchdog incident R14
   `REFUND_FAILED`, unless another refund for the same order is pending,
@@ -463,11 +463,12 @@ and the card row stay until that is decided.
 4. The worker claims up to 5 refunds, one at a time, and sends
    `POST /v1/payments/{payment id}/refund` with the amount in halalas.
 
-**The queue order, written 2026-11-14 (gap PG-01).** Live today, a claim takes
-the OLDEST pending refund by `created_at`. A refund released as `pending` stays
-the oldest, so the next claim of the same run takes it straight back: one stuck
-refund uses all 5 claims of every run, up to 1,440 a day, and every newer refund
-waits. On the branch `fix/payment-refund-visibility-20261114`:
+**The queue order, written 2026-11-14 (gap PG-01), live since 2026-11-17.**
+Until then a claim took the OLDEST pending refund by `created_at`. A refund
+released as `pending` stayed the oldest, so the next claim of the same run took
+it straight back: one stuck refund used all 5 claims of every run, up to 1,440 a
+day, and every newer refund waited. Since `20261013120000` was applied and
+`payment-refund` deployed as version 5 (2026-11-17):
 
 - `claim_order_refund` takes the least recently touched pending refund first
   (`updated_at`, then `created_at`), so a refund just released goes to the back
@@ -515,8 +516,8 @@ A 401 whose message names the IP allow-list is classified `pending` with
 path as a 429 or a 5xx. The order stays `refund_state = 'pending'` and does not
 appear in `list_failed_order_refunds()`. **There is no attempt cap**: until the
 proxy and Allowed IPs are fixed, every cron run claims and releases it again,
-five times a run today and once a run after `20261013120000` and the
-`payment-refund` deploy (above). After the apply it is listed under "Refunds
+once a run since `20261013120000` and the `payment-refund` deploy of
+2026-11-17 (above; five times a run before). It is listed under "Refunds
 still being retried" with the reason "Moyasar refused our address (Allowed
 IPs)". Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a
 bad key) is a definitive failure.
@@ -825,8 +826,8 @@ decision (refund draft D2). **Live today, nothing alerts on it either:** no
 watchdog rule or alert reads `duplicate_payment` (the watchdog's double-capture
 rule counts `paid` rows, and a duplicate is `failed`).
 
-**Written 2026-11-14, not live until `20261013120000` is applied** (gap PG-02,
-`MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
+**Written 2026-11-14, live since 2026-11-17**, when `20261013120000` was
+applied (gap PG-02, `MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
 `DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and, while the
 payment row is enabled and configured, turns the payment card to failing. The
 Live Orders card "Refunds and payments needing
@@ -936,23 +937,23 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   same session, the second is recorded as a duplicate and must be refunded by
   hand.
 - **Duplicates are manual.** See §10.
-- **Refunds have no attempt cap and no back-off** (§6, PG-01). Until
-  `20261013120000` is applied and `payment-refund` redeployed, one stuck refund
-  takes all five claims of every run. After both, it takes one.
-- **Until `20261013120000` is applied, no refund or payment problem reaches a
-  screen or an alert** (PG-01, PG-02). After it they reach the console's alert
-  inbox; outside the console they reach nobody until external alert email is on
+- **Refunds have no attempt cap and no back-off** (§6, PG-01). Since
+  `20261013120000` was applied and `payment-refund` redeployed (2026-11-17),
+  one stuck refund takes one claim a run, not all five. The refund job's cron
+  is still inactive, so no refund runs until it is turned on.
+- **Refund and payment problems reach the console's alert inbox** since
+  `20261013120000` was applied on 2026-11-17 (PG-01, PG-02); outside the console they reach nobody until external alert email is on
   (PG-10).
 - **A hand refund is recorded nowhere** (PG-14), so its incident and card row
   stay listed after the money has gone back.
-- **Until `20261013120000` is applied, an abandoned card checkout makes the
-  payment card read "degraded"** for up to 24 hours (PG-25). After it, only a
+- **An abandoned card checkout no longer makes the payment card read
+  "degraded"** since `20261013120000` was applied on 2026-11-17 (PG-25). Only a
   payment that settled without a confirmed order does, **provided a verify
   ran on it**: the webhook, or the customer's return to the app.
 - **A payment nobody verified is not detected.** If a customer pays and closes
   the tab, and the webhook also never arrives, the attempt stays `initiated`
   with no payment id, exactly like an abandoned checkout. No watchdog rule and,
-  after `20261013120000`, no health state reads it; the payment card shows it
+  since `20261013120000`, no health state reads it; the payment card shows it
   only inside the figure "Open unverified 24h", which counts abandoned
   checkouts too and does not move the state. **Open, not built:** a sweep that
   asks Moyasar about each attempt still open after its invoice expired, and
