@@ -791,7 +791,7 @@ now redirects, the address given is where it lands.
 
 ---
 
-## 7. Two emails to send before starting the trial
+## 7. Emails to send before starting the trial
 
 Added 2026-11-13, after the research into how Saudi apps meet allow-lists
 (`Saudi_Apps_Static_Egress_20261113.md`). Send both before starting the trial,
@@ -880,6 +880,55 @@ changed, TEST or LIVE (§3 steps 3 and 4, §47.12). Question 4's answer is a gat
 (gap PG-11): no method list is published, and §47.18 is not reached, until
 Moyasar confirms in writing that only mada, Visa, Mastercard and Apple Pay are
 on.
+
+### To Lazywait (optional, added 2026-11-17)
+
+Lazywait, our POS partner, takes payments in its own app through Moyasar, so it
+has already met the Allowed IPs list. Its answers to questions 1 and 2 give a
+working example; they do not replace Moyasar's own written answers to its
+questions 1 and 3 above, which still gate any change to an Allowed IPs list.
+Like the other two, this email contains no key, password or address of ours. If
+you would rather not mention our hosting, cut the sentence that starts "Our
+backend runs on serverless functions"; questions 1 to 4 still work without it.
+
+**Subject:** How Lazywait meets Moyasar's Allowed IPs, so Spicy Meal can do the same
+
+> Hello [Name],
+>
+> We're getting card payments ready in the Spicy Meal app, using Moyasar. We
+> understand the Lazywait app takes payments through Moyasar too, so we'd value
+> your experience on one part of the setup.
+>
+> Moyasar's live keys only accept API calls from addresses on its Allowed IPs
+> list, and once that list is saved it can't be set back to "any address". Our
+> backend runs on serverless functions hosted by a cloud provider, with no fixed
+> outbound address. We're weighing a static-IP proxy service, and before we
+> commit we'd like to know how you handled it:
+>
+> 1. Do your servers call api.moyasar.com from fixed addresses? If so, how do you
+>    get them: your own servers with static IPs, a cloud NAT gateway, or a
+>    static-IP proxy service? Which provider do you use?
+> 2. Did Moyasar accept those addresses for your live keys without trouble? Did
+>    they ask whether the addresses were yours alone or shared with other
+>    customers of the provider?
+> 3. If you use a proxy, does it only tunnel the encrypted connection (HTTPS
+>    CONNECT), or does it decrypt traffic? Have you had problems with its speed
+>    or uptime?
+> 4. Do you have a second address or a fallback in case the proxy or gateway is
+>    down? What happens to payments if it is?
+> 5. Which Moyasar flow does the Lazywait app use: the hosted invoice or payment
+>    page, the card form inside the app, or native Apple Pay? Did the Allowed IPs
+>    list affect anything beyond your server-to-Moyasar calls, such as refunds?
+> 6. For webhooks from Moyasar, do you check the sender's IP address, the shared
+>    secret token, or both?
+> 7. Is there anything you wish you had known before switching on live payments?
+>
+> If it's easier to talk it through, we'd be glad to set up a short call at a
+> time that suits you.
+>
+> Thank you,
+> [Name]
+> Spicy Meal
 
 ---
 
