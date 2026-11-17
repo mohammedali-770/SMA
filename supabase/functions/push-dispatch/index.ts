@@ -565,8 +565,10 @@ Deno.serve(async (req: Request) => {
       return json({ error: 'invalid orderId' }, 400);
     }
 
+    // `status` is read for the cancelled skip below; it is a column orders has
+    // always had, so this deploys independently of any migration.
     const { data: order } = await admin.from('orders')
-      .select('id, customer_id').eq('id', orderId).maybeSingle();
+      .select('id, customer_id, status').eq('id', orderId).maybeSingle();
     if (!order) return json({ error: 'order not found' }, 404);
 
     // FENCED CLAIM (Finding 3): an atomic RPC flips the deduped 'pending' event
@@ -589,6 +591,28 @@ Deno.serve(async (req: Request) => {
     if (claimResult === 'duplicate') return json({ status: 'duplicate', reason: 'already delivered' }, 200);
     if (claimResult === 'in_progress') return json({ status: 'in_progress', reason: 'another dispatcher owns this send' }, 200);
     if (claimResult !== 'claimed') return json({ status: 'error', reason: `unexpected claim result: ${claimResult}` }, 500);
+
+    // A CANCELLED order is told nothing about the POS (OWNER_ACTIONS §57). The
+    // claim's match (`pos_sync_status_matches`) reads the sync state only, so
+    // without this an order cancelled after its POS deadline ran out was sent
+    // "We could not send your order to the restaurant", and one cancelled
+    // moments after it reached the POS could be sent "confirmed". Every status
+    // in POS_SYNC_COPY is about a ticket the customer no longer has.
+    //
+    // The event is closed as 'superseded', the state the claim itself writes
+    // for an event that no longer matches the order, fenced by this claim's
+    // token. It must be TERMINAL: lazywait-sync drains 'pending' rows oldest
+    // first, 20 a run, so a row left pending would be re-sent here every
+    // minute and, with enough of them, hold back every newer message. If the
+    // write fails the row stays 'processing', which is never reclaimed, so it
+    // is never sent either.
+    if (order.status === 'cancelled') {
+      await admin.from('notification_log')
+        .update({ send_status: 'superseded', updated_at: new Date().toISOString() })
+        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
+        .eq('send_status', 'processing').eq('claim_token', claimToken);
+      return json({ status: 'superseded', reason: 'order cancelled; not sent' }, 200);
+    }
 
     const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
