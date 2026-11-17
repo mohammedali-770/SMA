@@ -58,6 +58,13 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-18 (later) — `20261016120000_refund_retry_backoff` is
+> written, validated and NOT applied (§68, ledger row 121).** On merge it is the
+> ONLY unapplied file: 160 files = 157 applied + 2 superseded (rows 8-9) + 1
+> unapplied, against 165 live history rows (read live 2026-11-18, latest
+> `20261118045145`). Database only; no deploy implied; money path asserted by
+> the file. **Name the target by version.**
+
 > **Updated 2026-11-18 — `20261015120000_cancelled_order_followups` is
 > APPLIED, `push-dispatch` is deployed as version 10, and NOTHING is
 > outstanding.** On the owner's approval naming both ("Apply 20261015120000 and
@@ -1734,11 +1741,13 @@ production.
 | 118 | 20261014120000 | export_my_data_payments | `3eb020d2837a` | 20261117114922 | export_my_data_payments | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:22 UTC** on explicit owner approval ("Apply 20261014120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**. §66, `OWNER_ACTIONS.md` §56. §9-B.7: the merged copy (sha256 `3eb020d2837a48ec4655de5d86d1947345aa024329e1a94b671bd3ab52bb8a8d`, 920 lines / 49 240 bytes) carries no `\u` escape. **The text that landed is the file:** the stored statement is byte-identical to it (md5 `e02c4d2a2bf463afcd4ee48233a9b69d`, 49 240 bytes, equal to `md5sum` of the merged file). **Outcomes:** one `export_my_data` overload, 0 arguments; md5(prosrc) `26eba36676bac42a4c8d7cda09bc6424`, 15 861 characters (md5(pg_get_functiondef) `35981a7c…`); `anon` cannot execute it, `authenticated` can. The file's self-check writes two throwaway `auth.users` rows and aborts them: 16 `auth.users` and 9 `payment_records` before and after. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **162 → 163**. **Version NOT aligned** (§9-D). |
 | 119 | 20261013120000 | payment_refund_visibility | `cb2c8d704610` | 20261117114924 | payment_refund_visibility | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:24 UTC** on explicit owner approval ("Apply 20261013120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**, after row 118 was verified. §65, `OWNER_ACTIONS.md` §55. §9-B.7: the merged copy is sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **ONE TRANSPORT DEVIATION, the same caveat as row 102:** comment-only lines OUTSIDE function bodies were stripped for transport, so 131 170 bytes were sent and the applied TEXT is not the repository file. The stored statement is 131 107 bytes (md5 `cfbe6fd6d87338301ec4b67154cff764`): exactly the 63 bytes saved by the 20 `\u` escapes at or above U+0020 arriving decoded (row 115's kind; the five control-character escapes arrived as written). **Every stored function body matches the merged file's**, the snapshot in its decoded form. **Outcomes, md5(prosrc) / length:** `claim_order_refund(text, uuid[])` `999471eed604d690da4e61675b89a02e` / 2 151, `service_role` only; `order_integrity_watchdog` `fb4fc4e2bdcee6ec46ced01029269cb0` / 34 998; `operations_health_snapshot_internal` `3847b5f3e18713bb0b322cacf9ce46ab` / 50 621 (the stored form §65 predicts); `list_payments_needing_attention` `9f4ceb05a05dba19169454d7c5dfff91` / 222, `anon` NO, `authenticated` YES; `payments_needing_attention_internal` `6dd733ccc74ef5f7f8888aa817fe7a95` / 4 744, `service_role` only. All equal §65's post-image table. `integration_sync_logs_moyasar_unconfirmed_idx` present; `to_regprocedure('public.claim_order_refund(text)')` is null. 0 open incidents, 0 `order_refunds`, 82 orders. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **163 → 164**. **Version NOT aligned** (§9-D). **`payment-refund` was then deployed** on its own approval, after this row was verified: version 4 → **5** at 12:03:44 UTC, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `1aad3d00…` → `380ce300…`; its 8 bundle files, from the default branch at `8aac448`, read back from Supabase byte-identical. The `payment-refund-worker` cron job (`*/5 * * * *`) is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `8aac448`: 158 files = 156 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 120 | 20261015120000 | cancelled_order_followups | `133245864b0a` | 20261118045145 | cancelled_order_followups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 04:51:45 UTC** on explicit owner approval ("Apply 20261015120000 and deploy push-dispatch", naming the file by version), via MCP `apply_migration`, **one call, target named explicitly**. §67, `OWNER_ACTIONS.md` §57. §9-B.7: the merged copy (merged in #478 as `0dd6a20`; sha256 `133245864b0a80edeedc3e7d272cb2ccaf42ebcab838367ee2585d268000185b`, 521 lines / 29 041 bytes) was sent verbatim. It carries no `\u` escape, and there was no transport deviation. **THE FIRST ATTEMPT, ON 2026-11-17, LANDED NOTHING:** it was interrupted by a container restart. A read-only check afterwards found history still at 164 and both pre-images in place (`begin_lazywait_create_attempt` `c67adf40dece53accd70637f07fd5ae3` / 1 235, `requeue_lazywait_order` `45d8e8a0d08a1d4f75d4dba84c744452` / 1 869). The second call landed. **Outcomes, md5(prosrc) / length, equal to the hashes pre-computed from the merged file before sending:** `begin_lazywait_create_attempt` `365fcc1b8d82a95eac196076740bd957` / 1 854; `requeue_lazywait_order` `5b83a99cb110ec14bb99deb2c839e0fc` / 2 062; one overload each. **Grants, read afterwards:** `anon` executes neither; `authenticated` executes only `requeue_lazywait_order`; `service_role` executes `begin_lazywait_create_attempt`. **Rolled-back fixtures:** 0 branches (`name_en`) and 0 orders (`order_number`) starting `VERIFY-20261015120000-` survive. 0 orders were in a `syncing`, `pending` or `retrying` sync state at the time; 82 orders in all. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **164 → 165**. **Version NOT aligned** (§9-D). **`push-dispatch` was deployed** after this row was verified, the same day under the same approval: version 9 → **10**, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `ba959385…`. Its 8 bundle files, from the default branch at `0dd6a20`, read back from Supabase byte-identical, and only `push-dispatch/index.ts` differs from v9. A `pos_sync` event for a cancelled order is now closed `superseded` and sends none of the four POS-outcome pushes. No smoke request was sent. Reconciled by name against the default branch at `0dd6a20`: 159 files = 157 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
+| 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row, no `next_attempt_at` column, no `refund_retry_delay`) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-17, UNAPPLIED.** §68. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). Database only; no deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 
-Reconciliation check: the rows above detail **120 repository rows, 118 of which
-carry a live version** (recomputed 2026-11-18 when row 120 was added; it had
-read 119 / 117 since rows 118-119, and 116 / 114 before that) — rows 8 and 9 are the two that do not, and both are
-class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
+Reconciliation check: the rows above detail **121 repository rows, 118 of which
+carry a live version** (recomputed 2026-11-18 when row 121 was added; it read
+120 / 118 after row 120, 119 / 117 after rows 118-119, and 116 / 114 before
+that) — rows 8 and 9 do not, and both are class **H** (superseded); row 121
+does not, because it is written and **not applied** (class **E**). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
 5 hold a 14-digit version.
 
@@ -9630,3 +9639,185 @@ measured on the local chain:
 Rollback is a new file that re-applies the `begin_lazywait_create_attempt`
 statement of `20260721120000` and the `requeue_lazywait_order` statement of
 `20260827120000`, with their grants. Steps: `docs/OWNER_ACTIONS.md` §57.
+
+## 68. Refund retries back off, stop after 10, and a stuck refund raises an alert — WRITTEN 2026-11-17, NOT APPLIED (ledger row 121)
+
+`20261016120000_refund_retry_backoff.sql`. **Written 2026-11-17 on branch
+`fix/refund-retry-backoff-20261117`, validated on a local chain, awaiting owner
+approval.** It implements the owner's decisions of 2026-11-17 on gap PG-01 in
+[the card-payment gaps](readiness/20261113-card-payments-gaps.md). Section
+number 68 follows §67, `20261015120000`, applied 2026-11-18 (ledger row 120).
+
+sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries the same six
+`\u` escapes as `20261013120000`, all inside the health snapshot's payment
+configuration read (see the post-image table).
+
+**What it changes, database only.**
+
+- `order_refunds.next_attempt_at` (timestamptz, NULL = due now).
+- `refund_retry_delay(integer)`, new, `service_role` only: 5 minutes ×
+  2^(attempts − 1), capped at 6 hours. After attempts 1 to 9: 5, 10, 20, 40,
+  80, 160, 320, 360 and 360 minutes. The seventh is 320 minutes because 160
+  doubled is still under the cap.
+- `finalize_order_refund`: a release as `pending` stamps
+  `next_attempt_at = now() + refund_retry_delay(attempt_count)`; the release of
+  a refund claimed for the tenth time is written `failed` instead, with the
+  release's failure code (or `retry_limit_reached`) and "Automatic refund
+  stopped after 10 attempts. Last reason: …", and the order's `refund_state`
+  becomes `failed`. Succeeded and failed outcomes are unchanged except that
+  they clear `next_attempt_at`.
+- `claim_order_refund`: takes only due refunds, in the candidate scan and again
+  under the lock.
+- `order_integrity_watchdog`: R18 `REFUND_STUCK` (`ORDER_INTEGRITY_WATCHDOG.md`
+  §3) — a refund `pending` with at least one attempt, warning when opened more
+  than 1 hour ago, critical when more than 24 hours. The incident update now
+  copies the detection's severity (one line; a no-op for R1-R17, whose severity
+  is fixed by rule code), and an incident whose `opened` alert was written at
+  warning gets one `escalated` outbox row when it turns critical.
+- `operations_health_snapshot_internal`: the payment card's incident list gains
+  `REFUND_STUCK`; it counts critical incidents only.
+
+**No deploy is implied.** `payment-refund` calls both functions with the same
+arguments as before. The admin console's rule filter (`integrityView.ts`)
+offers `REFUND_STUCK` from the merge and matches nothing until the apply.
+
+**MONEY PATH UNTOUCHED, and the file asserts it**, one overload each first:
+`place_order` `12b6816d256c29b76edf947ae1a7ea77`, `compute_order_snapshot`
+`22e2d42935459e7bf93abb2941b56325` (`md5(pg_get_functiondef)`).
+
+### Pre-images, read live 2026-11-17 (read-only)
+
+The hashes handed over for this work were `md5(prosrc)`, not
+`md5(pg_get_functiondef)`; both were read, and the guard uses each prior
+file's own basis.
+
+| Function | Live md5(prosrc) | Guard compares |
+| --- | --- | --- |
+| `claim_order_refund(text, uuid[])` | `999471eed604d690da4e61675b89a02e` (2 151) | content hash `e20c906d9a4d39cdb585bafe0460b0c3` (the 20261013120000 body) |
+| `finalize_order_refund(...)` | `83088a16b6bbe06bc9768a879d9f3c9e` (1 368, condensed) | content hash `0d64407adc77188b7f4f2767e41df945` (the 20260724120000 body; equal live) |
+| `order_integrity_watchdog()` | `fb4fc4e2bdcee6ec46ced01029269cb0` (34 998) | md5(prosrc), same value |
+| `operations_health_snapshot_internal()` | `3847b5f3e18713bb0b322cacf9ce46ab` (50 621) | md5(prosrc), that value or the as-written `2ad226c3754ba03ff9f6f4986a99db65` |
+
+The generator that derived this file reproduced all four from the repository
+files before trusting its substitutions, the decoded snapshot hash included.
+Live also read 2026-11-17: `order_refunds` 0 rows, no `next_attempt_at`
+column, no `refund_retry_delay`, `payment-refund-worker` inactive,
+`order-integrity-watchdog` active every 2 minutes.
+
+**Re-read 2026-11-18, after `20261015120000` was applied:** all four pre-images
+unchanged, money-path pair unchanged, `order_refunds` 0 rows, the worker still
+inactive, no history row for this file. `20261015120000` replaces
+`begin_lazywait_create_attempt` and `requeue_lazywait_order` only, and nothing
+this file guards; the file reads no migration history.
+
+**The chain-replay state.** On a whole-chain replay (the SQL CI idempotence
+step) `20260724120000` re-creates `claim_order_refund(text)`, and
+`20261013120000` then refuses at its own guard, because it does not know this
+file's claim body, before writing anything. That leaves the watchdog, the
+snapshot and `finalize_order_refund` at their `20260831120000`,
+`20261003120000` and `20260724120000` bodies. The guard recognises that state
+by the one-argument claim holding its `20260724120000` body, which cannot
+exist where `20261013120000` has applied, and only then also accepts those two
+older bodies (`a05add09…`, `1e300b3d…`). Every function here is re-emitted
+whole, so applying from that state leaves exactly this file's post-image; the
+one-argument claim is dropped first. Without that, the CI suites would run
+against the mixed state: measured, `order_confirmation_state_machine_test.sql`
+failed on an ambiguous `claim_order_refund(text)`. `20261013120000` is still
+reported "not idempotent" by that step, which is report only.
+
+### Post-image hashes, measured on the local chain
+
+| Function | md5(prosrc) | Length | md5(pg_get_functiondef) |
+| --- | --- | --- | --- |
+| `claim_order_refund(text, uuid[])` | `a97954d897596a3c052888e8ef9689d5` | 2 627 | `e40710890ba78262a35e7b9718f53d69` |
+| `finalize_order_refund(uuid, text, text, text, text, text)` | `0605d1dae897c0752b5d47c6f385e97e` | 3 184 | `6f6dcad0a2f5e2e00d30534f371ca579` |
+| `refund_retry_delay(integer)` | `4d49c1987b096639c57bf76a1bbec900` | 140 | `b2e16b1ce3e88404b08c68c368556b61` |
+| `order_integrity_watchdog()` | `93de2aaacc8d94b8638ada91841bc27b` | 38 612 | `c32dcbef7e34e03dcb8cf84e411225a1` |
+| `operations_health_snapshot_internal()`, as written | `a7d35d65657b1d32431ce1513b7f5239` | 50 878 | `f05b56e7a72e96788549db50531bef11` |
+| `operations_health_snapshot_internal()`, as the transport stores it | `0f8f08f9d128536b61f908f885c66d7c` | 50 778 | not measured |
+
+Content hashes the guard accepts on a re-apply: claim
+`73b8c4e3a095324840078d953cd2a5ff`, finalize
+`1524d484d6781027018514dda263ad70`.
+
+### What the file checks
+
+- **Before anything:** each replaced body is a known pre-image, this file's
+  own post-image, or the chain-replay state above; the new name is free.
+- **Structure:** the column's type; one overload of each function; the grants
+  (`service_role` only for the three refund functions); the whole schedule
+  read from `refund_retry_delay` as values, 1 to 12 and both clamps; the due
+  filter present exactly twice in the claim; the cap and the back-off in
+  finalize; 18 guarded rules, R18's guard, the severity line and the escalated
+  insert in the watchdog; `REFUND_STUCK` in the payment card's list. Token
+  checks run on bodies with `--` comments stripped.
+- **The money-path pair**, one overload each first.
+- **Outcomes**, on fixtures written inside a sub-transaction that a sentinel
+  aborts, with the rollback then checked: ten claim-and-release rounds through
+  the real functions (each release backs off by exactly `refund_retry_delay`,
+  a refund not yet due is not claimed, the tenth is `failed` with the last
+  reason and the order `failed`); R14 then reports it; R18 silent at exactly
+  1 hour, with no attempt and while processing, a warning at 61 minutes,
+  23 h 59 and exactly 24 hours, critical at 24 h 01; the warning incident
+  turns critical in place with exactly one escalated alert; the payment card
+  counts the critical R18. Real pending refunds are passed to every claim as
+  exclusions.
+
+### Validation
+
+- **Local chain**, a private copy of `.github/sql-ci/run.sh` on Postgres 16:
+  160 migrations applied (re-run 2026-11-18 on the default branch at
+  `12e137c`, `20261015120000` included); this file re-applies on the replay; 97 suites, 95 passed, 2
+  quarantined (`lazywait_mapping`, `lazywait_sync_scheduler`), **0 new
+  failures**; the existing-data stage applied this file onto existing rows and
+  every check held.
+- **Paired suite** `refund_retry_backoff_test.sql`, 9 cases: the schedule; the
+  waits the worker's releases write and nothing claimed early; due refunds
+  only, oldest touched first, and 50 refunds backing off do not hide a due one;
+  the cap, its reason, the order state and R14; success, definite failure and
+  the token fence unchanged; R18's thresholds and the payment card; escalation
+  in place; R18 giving way to R14; grants and the money path. It fails on the
+  base chain.
+- **Existing suites changed on purpose:** `order_integrity_watchdog_test.sql`
+  (18 rules evaluated, was 17) and `payment_refund_visibility_test.sql`, whose
+  cases release a refund and claim it again in the same transaction to test
+  queue order; they now treat the wait as over (`prv_due`). The console's
+  `integrityRuleParity.test.ts` expects 18.
+- **Mutation testing:** 25 mutants over the schedule (base, ratio, cap,
+  exponent), the back-off (none, off by one), the cap (9, 11, stays pending,
+  reason lost, order state), the due filter (scan, re-check, strict), both
+  thresholds (moved, inclusive, never critical), zero attempts, processing, the
+  frozen severity, no escalation, the payment card, and a change to the money
+  path. **25 of 25 refused at apply by the file's own checks; 24 of 25 failed
+  by the paired suite with both check blocks stripped.** The one the suite
+  cannot see is the re-check filter alone, which needs a release between the
+  scan and the lock; the file's check counts both filters.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must match, or stop and read the live body:
+   ```sql
+   select md5(lower(regexp_replace(regexp_replace(prosrc, '--[^\n]*', '', 'g'),
+                                   '[[:space:];]+', '', 'g')))
+     from pg_proc where oid = 'public.claim_order_refund(text, uuid[])'::regprocedure;
+   -- e20c906d9a4d39cdb585bafe0460b0c3
+   select md5(lower(regexp_replace(regexp_replace(prosrc, '--[^\n]*', '', 'g'),
+                                   '[[:space:];]+', '', 'g')))
+     from pg_proc where oid = 'public.finalize_order_refund(uuid, text, text, text, text, text)'::regprocedure;
+   -- 0d64407adc77188b7f4f2767e41df945
+   select md5(prosrc) from pg_proc where oid = 'public.order_integrity_watchdog()'::regprocedure;
+   -- fb4fc4e2bdcee6ec46ced01029269cb0
+   select md5(prosrc) from pg_proc where oid = 'public.operations_health_snapshot_internal()'::regprocedure;
+   -- 3847b5f3e18713bb0b322cacf9ce46ab
+   ```
+2. Apply `20261016120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the post-image hashes above (the snapshot's in its
+   transport form); the column present; `refund_retry_delay(7)` is
+   `05:20:00` and `(8)` is `06:00:00`; `anon` and `authenticated` cannot
+   execute any of the three refund functions; the money-path pair unchanged;
+   `order_refunds` and `order_integrity_incidents` row counts as before.
+4. Rollback: the file's closing comment. A refund the cap has already written
+   `failed` stays failed.
+
+Steps: `docs/OWNER_ACTIONS.md` §58.

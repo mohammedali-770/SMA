@@ -82,6 +82,12 @@ describe('admin rule filter ↔ watchdog rule set', () => {
       'PAYMENT_VERIFICATION_MISMATCH', 'PAYMENT_CONFIRMATION_FAILED']) {
       expect(RULE_CODES).toContain(code);
     }
-    expect(sqlRules.length).toBe(17);
+    expect(sqlRules.length).toBeGreaterThanOrEqual(17);
+  });
+
+  it('includes the stuck-refund rule of 20261016120000', () => {
+    expect(RULE_CODES).toContain('REFUND_STUCK');
+    expect(sqlRules).toContain('REFUND_STUCK');
+    expect(sqlRules.length).toBe(18);
   });
 });

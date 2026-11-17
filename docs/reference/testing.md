@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**280 TypeScript test files declaring 4162 test blocks, plus 96 SQL suites.**
+**280 TypeScript test files declaring 4163 test blocks, plus 97 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -121,6 +121,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/product_variants_guest_read_test.sql`
 - `supabase/tests/promo_disclosure_test.sql`
 - `supabase/tests/prune_operational_run_history_test.sql`
+- `supabase/tests/refund_retry_backoff_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/rls_initplan_live_board_order_year_test.sql`
@@ -268,7 +269,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-135 files, 1840 declared test blocks.
+135 files, 1841 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -307,7 +308,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/consoleClock.test.tsx` | 5 | a banner row shows its window as Riyadh calendar dates |
 | `src/components/admin/view/health/HealthSystemCard.test.tsx` | 6 | branch_availability health card |
 | `src/components/admin/view/health/healthView.test.ts` | 25 | polling contract |
-| `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 5 | admin rule filter ↔ watchdog rule set |
+| `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 6 | admin rule filter ↔ watchdog rule set |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 4 | OrderReceiptModal — customer note |

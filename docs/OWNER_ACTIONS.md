@@ -5211,7 +5211,10 @@ What remains is step 5, and the decisions below.
 recorded.
 
 **Your decisions. None of these is made by this change; each is a
-recommendation:**
+recommendation.** *Three were decided on 2026-11-17, all as recommended
+except PG-14:* the tries, the wait and the stuck age (§58, a migration only, no
+`payment-refund` change after all); D2, by hand; PG-14, automatic, in a change
+of its own. Who receives the alerts (PG-10) is still open.
 
 - **How many tries, and the wait between them (PG-01).** Today a refund that
   cannot finish is tried once every run (every 5 minutes) for ever: about 288
@@ -5378,6 +5381,57 @@ queued. Doing both closes all three.
 `push-dispatch` recorded at its new version, and the three bullets marked fixed
 in `docs/ORDER_CONFIRMATION_FLOW.md` §11, `docs/LAZYWAIT.md` and
 `docs/PAYMENTS.md` §12.
+
+## 58. Refund retries back off, stop after 10, and a stuck refund raises an alert — one apply
+
+**Opened 2026-11-17.** Your decisions on gap PG-01, D2 and PG-14
+([the card-payment gaps](readiness/20261113-card-payments-gaps.md)), the ones
+§55 listed as yours:
+
+- **PG-01, built here.** After each unsuccessful try a refund waits 5 minutes,
+  then 10, 20, 40, 80, 160, 320, and then 6 hours (doubling from 5 minutes,
+  capped at 6 hours). The seventh wait is 320 minutes, 5 h 20, because 160
+  doubled is still under the cap; if you meant 6 hours from the seventh wait
+  on, say so and it is a one-line change. After the tenth unsuccessful try the
+  refund is marked failed with its last reason, so it raises R14 and moves to
+  "Automatic refunds that stopped" on the Live Orders card. A refund tried at
+  least once and still pending raises a new watchdog rule, R18 `REFUND_STUCK`:
+  a warning once it has been open more than 1 hour, a critical once more than
+  24 hours. The ten tries take about 23 hours on the 5-minute schedule, so a
+  critical R18 normally means the refund job is not running.
+- **D2, decided: duplicate payments are refunded by hand** from Moyasar's
+  dashboard, from the R15 row on the same card. Nothing to build.
+- **PG-14, decided: a refund made in Moyasar's dashboard is to be recorded
+  automatically** from Moyasar's `refunded` notification. That is a separate,
+  later pull request with its own migration and deploy; it is not in this one.
+  Until it lands, keep the written refund log.
+
+`20261016120000_refund_retry_backoff` is a database change only:
+`payment-refund` already reports every attempt through the function that now
+decides the wait and the cap. **No deploy is implied.** Detail:
+[`MIGRATIONS.md`](MIGRATIONS.md) §68; the runbook for a refund the cap stopped:
+[`PAYMENTS.md`](PAYMENTS.md) §6.
+
+**It changes nothing today, measured read-only on 2026-11-17:** `order_refunds`
+holds **0** rows and the `payment-refund-worker` cron job is **inactive**. It
+decides what happens to the first refund that cannot finish.
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** The admin console's rule filter offers
+   `REFUND_STUCK` from the merge; it matches nothing until step 2.
+2. **Apply `20261016120000` by name**, after re-hashing the merged copy against
+   [`MIGRATIONS.md`](MIGRATIONS.md) §68 and after the read-only checks listed
+   there. Never "the outstanding migrations": once merged it is the only
+   unapplied file (read live 2026-11-18), and an instruction that names no
+   version is still not an instruction to apply it.
+3. **Check afterwards**, read-only, as §68 lists.
+
+**Done looks like:** §68 marked APPLIED with its ledger row filled in, and
+PG-01 marked live in the gaps list.
+
+**Not decided here, still yours:** who receives refund alerts outside the
+console (PG-10), and turning the refund job on (§47.16).
 
 ## Owner-action closeout rule
 
