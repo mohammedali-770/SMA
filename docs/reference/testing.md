@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**276 TypeScript test files declaring 4122 test blocks, plus 95 SQL suites.**
+**278 TypeScript test files declaring 4131 test blocks, plus 96 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -56,6 +56,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/branch_delivery_requests_test.sql`
 - `supabase/tests/branch_reference_entries_test.sql`
 - `supabase/tests/branch_variant_availability_test.sql`
+- `supabase/tests/cancelled_order_followups_test.sql`
 - `supabase/tests/cancelled_orders_guard_test.sql`
 - `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
@@ -267,7 +268,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-133 files, 1808 declared test blocks.
+133 files, 1809 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -281,7 +282,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
-| `src/components/admin/LazywaitPanel.test.tsx` | 5 | LazywaitPanel |
+| `src/components/admin/LazywaitPanel.test.tsx` | 6 | LazywaitPanel |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
@@ -407,7 +408,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-42 files, 949 declared test blocks.
+44 files, 957 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -425,6 +426,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
+| `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | lazywait-sync, told order_cancelled by the gate |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/moyasar.test.ts` | 118 | minor units (halalas) |
@@ -439,6 +441,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
 | `supabase/functions/_shared/paymentWiring.test.ts` | 71 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
+| `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |

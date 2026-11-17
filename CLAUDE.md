@@ -141,6 +141,7 @@ Push is an **active production customer channel**. Both gates are open:
 - **`ready` is order-type aware as of `push-dispatch` v6, deployed 2026-09-03.** Every delivery order passes through `ready` on the way to `out_for_delivery`, and until v6 it was sent the PICKUP body in both languages — *"Your order is ready for pickup."* / «طلبك جاهز للاستلام.» — then contradicted minutes later by "On the way". `ready` now branches on `orders.order_type`, read from the order row the function already fetches; pickup copy is byte-identical to what it always was. It is the only status whose meaning differs by fulfilment, and `_shared/pushReadyCopyWiring.test.ts` pins the branch, the widened select and both bodies. **The delivery Arabic is engineering-drafted and has not had a native read** (`docs/OWNER_ACTIONS.md` §26);
 - admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true` — which since 2026-08-20 means **every device that granted OS notification permission and has not switched offers off**, not the small hand-raised subset it used to be. The confirm line's count is now close to the whole active base; read it before clicking;
 - **a broadcast's `notification_log` row records who sent it and what it said** (`sent_by`, and `content` with the four strings) once `20261007120000` is applied and `push-dispatch` redeployed; written 2026-11-12, neither done yet. Only the log row changed: targeting, copy, the gate and the response did not (`_shared/auditTrailWiring.test.ts`);
+- **a cancelled order gets no POS-outcome push** (`pos_confirmed`, `pos_retrying`, `pos_confirmation_required`, `pos_failed`) once `push-dispatch` is redeployed from branch `fix/cancelled-order-followups-20261117` (written 2026-11-17, not deployed; live is v9). The `pos_sync` claim's match reads the sync state, never `orders.status`, so a cancelled order still waiting in the POS queue was told "We could not send your order to the restaurant" when its deadline ran out. The handler now reads `status` on the order row it already fetches and closes such an event as `superseded`, token-fenced and terminal so the drain never retries it. Targeting, copy, the claim and every other order are unchanged (`_shared/pushPosSyncCancelled.test.ts`; `docs/OWNER_ACTIONS.md` §57);
 - signing out no longer silences a device. Sign-out used to deactivate the `push_devices` row while the first-run permission flag is device-scoped and never re-raised, so push stayed dead after signing back in. The row is now left alone and the token is re-claimed at the next sign-in (`usePushDeviceSync`). Account **deletion** still deactivates;
 - a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code;
 - **`push-dispatch` sends Expo's access token once `EXPO_ACCESS_TOKEN` is set** (added 2026-11-12, checklist S03#1; not yet deployed or set). Until the secret exists the request is byte-for-byte unchanged. Expo's Enhanced Security must be enabled only AFTER a deploy that sends the token and a confirmed real order push, or every customer push stops (`docs/OWNER_ACTIONS.md` §52);
@@ -330,6 +331,16 @@ invoiced, and `place_customer_order` places no online order (gaps PG-03 and
 PG-27). No signature, table or row; no deploy; money path self-asserted
 (`12b6816d…` / `22e2d429…`). Applying it before `docs/OWNER_ACTIONS.md` §47.13
 step 1 closes that section's warning (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
+
+**AMENDED 2026-11-17 — `20261015120000_cancelled_order_followups` is written,
+validated and awaiting approval** (branch `fix/cancelled-order-followups-20261117`).
+Two function bodies: `begin_lazywait_create_attempt` parks an order cancelled
+after its claim instead of sending it, and `requeue_lazywait_order` (the admin
+Retry) refuses a cancelled order. No signature, table or row; no deploy implied;
+money path self-asserted (`12b6816d…` / `22e2d429…`). Its `push-dispatch` half
+deploys on its own approval, in either order. Once merged it is outstanding
+beside any other unapplied file: read the count live and **name the target by
+version.** Detail: `docs/MIGRATIONS.md` §67; steps: `docs/OWNER_ACTIONS.md` §57.
 
 **Superseded 2026-11-17 — both files in the two amendments below are APPLIED**
 (ledger rows 118 and 119) and `payment-refund` is deployed. The amendments are

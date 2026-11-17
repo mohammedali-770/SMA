@@ -844,23 +844,30 @@ by a printed ticket rather than by the vendor.
   oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
   **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
 - **A cancelled order is never claimed, and never resent by the customer**
-  (`20261012120000`, gap PG-03; written 2026-11-14, not applied). Both claims
-  skip it and `request_customer_pos_resend` refuses it with reason
-  `order_cancelled`. Three things are left as they were, and are recorded in
-  `ORDER_CONFIRMATION_FLOW.md` §11:
+  (`20261012120000`, gap PG-03; applied 2026-11-14, ledger row 117). Both
+  claims skip it and `request_customer_pos_resend` refuses it with reason
+  `order_cancelled`. Three things were left as they were, and are recorded in
+  `ORDER_CONFIRMATION_FLOW.md` §11. **All three are fixed on branch
+  `fix/cancelled-order-followups-20261117`** (`MIGRATIONS.md` §67,
+  `OWNER_ACTIONS.md` §57), **not live until `20261015120000` is applied and
+  `push-dispatch` is deployed**:
   - an admin **Retry** on a cancelled order still moves it to `pending` (the
-    worker then leaves it there);
+    worker then leaves it there). *Fix:* `requeue_lazywait_order` refuses it
+    with P0001 `order_cancelled: …`, which the panel shows as it is;
   - a cancelled order left in `pending` or `failed` is swept to `dead_letter`
-    at its deadline, which queues the customer's `pos_failed` push;
+    at its deadline, which queues the customer's `pos_failed` push. *Fix:*
+    `push-dispatch` sends no POS-outcome push for a cancelled order and closes
+    the event as `superseded`. The sweep itself is unchanged;
   - **an order cancelled after the worker has claimed it is still sent.** The
     claim moves it to `syncing`, and the pre-send gate
     `begin_lazywait_create_attempt` reads the sync state, the marker and the
     deadline, never `status`. So a cancel that lands in the seconds between
     the claim and the POST still prints a ticket. Measured 2026-11-14 on a
     local chain with this file applied: an order claimed while `received`,
-    then cancelled, got `ready_to_send` from the gate. A status check there is
-    left for the same follow-up as the admin Retry, because that function's
-    live hash has not been read.
+    then cancelled, got `ready_to_send` from the gate. *Fix:* the gate answers
+    `order_cancelled` and parks the order `blocked` /
+    `sync_blocked_reason = 'order_cancelled'` in the same locked statement.
+    The worker is unchanged: it treats the answer as "not ready" (below).
 - **There are currently TWO of that index, and this line named only one.** The
   2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
   (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition
@@ -1303,7 +1310,18 @@ The POS bearer token, the webhook HMAC and the `x-sync-secret` are untouched.
 `begin_lazywait_create_attempt` is the fenced gate just before the Create Order
 POST. Two of its outcomes write nothing: the RPC itself failing, and a status
 the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
-send nothing, and leave it 'syncing' for the stale reaper. Neither calls
+send nothing, and leave it 'syncing' for the stale reaper.
+
+**`order_cancelled` takes the same branch, and is not left 'syncing'**
+(`20261015120000`, written 2026-11-17, not applied). The gate answers it for a
+cancelled order at the point an attempt would start, after the ref, state and
+marker checks and before the deadline checks, and parks the order itself, in
+the same locked statement, as `blocked` / `order_cancelled` with one `skipped`
+sync-log row (`order_cancelled_before_send`). The worker logs the line below
+with `"gate_status":"order_cancelled"`, counts the order skipped and writes
+nothing, so it cannot overwrite the park. The reaper never touches `blocked`.
+`_shared/lazywaitCancelledGate.test.ts` drives the real handler to pin this,
+with a control case that does POST. Neither calls
 `record_lazywait_sync`, so no `integration_sync_logs` row exists for that
 attempt. Until this change the log line was free text without the order id, so
 a responder chasing a stuck order could not find the attempt.

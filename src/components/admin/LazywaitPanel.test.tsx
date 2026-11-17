@@ -9,7 +9,7 @@
  * refuse. Before 20261009120000 the deadline never reached the browser, so that
  * order showed Retry.
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -94,6 +94,24 @@ describe('LazywaitPanel', () => {
     render(<LazywaitPanel disabled />);
     expect(await screen.findByText('SM-2026-000100')).toBeTruthy();
     expect(screen.queryByText('Retry')).toBeNull();
+  });
+
+  it('shows the server refusal of a cancelled order as it is, and reports no re-queue', async () => {
+    // A cancelled order the worker parked reads as blocked / order_cancelled,
+    // which the client mirror still calls retryable: the mirror does not see
+    // orders.status. requeue_lazywait_order refuses it (20261015120000), and
+    // the panel must show that sentence rather than a success.
+    const refusal = 'order_cancelled: This order was cancelled. A cancelled order is never sent to the branch.';
+    lazywaitMonitor.mockResolvedValue([
+      row({ lazywait_sync_state: 'blocked', sync_blocked_reason: 'order_cancelled', sync_last_error: 'order_cancelled_before_send' }),
+    ]);
+    requeueLazywait.mockRejectedValue(new Error(refusal));
+    render(<LazywaitPanel disabled={false} />);
+    fireEvent.click(await screen.findByText('Retry'));
+    expect(await screen.findByText(refusal)).toBeTruthy();
+    expect(requeueLazywait).toHaveBeenCalledWith('o1');
+    expect(screen.queryByText('Order re-queued for Lazywait sync')).toBeNull();
+    expect(lazywaitMonitor).toHaveBeenCalledTimes(1);
   });
 
   it('shows the server error when the feed is refused', async () => {
