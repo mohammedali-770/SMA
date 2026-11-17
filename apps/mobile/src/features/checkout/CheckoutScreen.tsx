@@ -17,7 +17,7 @@
  */
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,11 +33,11 @@ import {
   orderNoteRemainingMessage,
 } from '../order/orderNote';
 import {
-  appliedCouponSurvives, decideCompChange, decideLoyaltyChannelChange, decideQuantityChange,
-  resolveBlockReason, type BlockReason,
+  appliedCouponSurvives, decideCompChange, decideLoyaltyChannelChange, decideLoyaltyRedemptionChange,
+  decideQuantityChange, effectiveLoyaltyRedemption, resolveBlockReason, type BlockReason,
 } from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
-import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
+import { canSubmitOrder, computePreviewTotals, lineTotal, type PreviewInput } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
 import { catalog as catalogApi, checkout, compMembership, coupons, loyaltyPreview, orders, payments } from '../../services/api';
@@ -50,7 +50,7 @@ import {
 import { pointInPolygon } from '../../lib/geo';
 import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
-import type { CartItem, OrderType, SavedAddress } from '../../types/models';
+import type { CartItem, LoyaltyRedemptionSettings, OrderType, SavedAddress } from '../../types/models';
 import { cartLineLabel } from '../../utils/format';
 import { describeVerifyResult, recoverPendingSession, refusalDropsSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
@@ -92,7 +92,7 @@ export function CheckoutScreen() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   // `brand.vatPercentage` IS read now. The VAT row is still a label-only note
   // with no amount — prices are VAT-inclusive, so there is nothing to add — but
   // the copy used to hardcode "15%" while the rate is admin-configurable, so a
@@ -379,9 +379,10 @@ export function CheckoutScreen() {
   // It never gates submission: a stale `false` simply shows the ordinary price
   // and the server still charges nothing, which is the safe direction to fail.
   const [comped, setComped] = useState(false);
-  // The submission-time re-read of `app_settings.loyalty_pickup_only`; null
-  // until one has been taken. See the derivation below.
-  const [pickupOnlyOverride, setPickupOnlyOverride] = useState<boolean | null>(null);
+  // The redemption settings as re-read during this checkout
+  // (`catalog.readLoyaltyRedemption`); null until one read has succeeded. See
+  // `loyaltySettings` below.
+  const [loyaltyOverride, setLoyaltyOverride] = useState<LoyaltyRedemptionSettings | null>(null);
   // What this order will EARN, as the server computes it. `null` renders
   // nothing — see the effect below for why it is fetched rather than derived.
   const [pointsEarned, setPointsEarned] = useState<number | null>(null);
@@ -391,8 +392,41 @@ export function CheckoutScreen() {
     return () => { alive = false; };
   }, [profile?.id]);
 
+  // FRESH REDEMPTION SETTINGS AND BALANCE. `CatalogProvider` maps the settings
+  // row once at launch and never re-reads it, and the balance is the cached
+  // profile, so without this an administrator changing `min_points_to_redeem`
+  // or `discount_per_point` (or a balance spent elsewhere) would leave the
+  // summary showing a points discount the server does not give.
+  //
+  // Read when checkout opens and when the points switch is turned on, so the
+  // summary the customer sees before Place order is computed from fresh values,
+  // and again at submission (placeOrder). A failed read changes nothing: the
+  // override stays as it was and the launch-time values stay in use, exactly as
+  // before this read existed. `loyaltyReadSeq` drops a late answer so an older
+  // read cannot overwrite a newer one.
+  const loyaltyReadSeq = useRef(0);
+  const readFreshLoyalty = useCallback(async (): Promise<LoyaltyRedemptionSettings | null> => {
+    const seq = ++loyaltyReadSeq.current;
+    const fresh = await catalogApi.readLoyaltyRedemption();
+    if (fresh && seq === loyaltyReadSeq.current) setLoyaltyOverride(fresh);
+    return fresh;
+  }, []);
+  const refreshLoyalty = useCallback(() => {
+    void readFreshLoyalty();
+    // The existing profile refresh: it keeps the cached profile on failure.
+    void (async () => { try { await refreshProfile(); } catch { /* keep the cached balance */ } })();
+  }, [readFreshLoyalty, refreshProfile]);
+  useEffect(() => {
+    refreshLoyalty();
+    return () => { loyaltyReadSeq.current += 1; };
+    // Not `refreshLoyalty`'s identity: once per checkout and per signed-in customer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+
+  // The fresh copy when one has been read, the launch-time snapshot otherwise.
+  const loyaltySettings = effectiveLoyaltyRedemption(loyalty, loyaltyOverride);
   const availablePoints = profile?.loyaltyPoints ?? 0;
-  const loyaltyEnabled = Boolean(loyalty?.isEnabled) && availablePoints >= (loyalty?.minPointsToRedeem ?? Infinity);
+  const loyaltyEnabled = loyaltySettings.isEnabled && availablePoints >= loyaltySettings.minPointsToRedeem;
   // Loyalty is a PICKUP incentive. `place_order` and `compute_order_snapshot`
   // both refuse to redeem on a delivery order while
   // `app_settings.loyalty_pickup_only` is on (20260907120000), so the toggle is
@@ -400,38 +434,45 @@ export function CheckoutScreen() {
   // will not grant. `pickupOnly` defaults TRUE in `mapLoyaltySettings`, so an
   // unloaded settings row withholds the offer rather than making a false one.
   //
-  // `pickupOnlyOverride` is the fresher answer read at submission, when there is
-  // one. CatalogProvider maps the settings row once at launch and its foreground
-  // refresh does not re-read it, so without this an administrator toggling the
-  // rule mid-checkout would leave the screen offering a redemption the server
-  // refuses. Local state, exactly like `comped` above, for the same reason: the
-  // catalog value is a launch-time snapshot and this screen is the only place
-  // that needs the fresher one. `null` means "nothing fresher has been read".
-  const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;
+  // `loyaltySettings` carries the fresher answer read during this checkout,
+  // when there is one. CatalogProvider maps the settings row once at launch and
+  // its foreground refresh does not re-read it, so without this an
+  // administrator toggling the rule mid-checkout would leave the screen
+  // offering a redemption the server refuses. Local state, exactly like
+  // `comped` above, for the same reason: the catalog value is a launch-time
+  // snapshot and this screen is the only place that needs the fresher one.
+  const loyaltyPickupOnly = loyaltySettings.pickupOnly;
   const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';
   // Read at BOTH use sites below, so switching from pickup to delivery with the
   // toggle already on cannot leave a stale redemption in the preview or, worse,
-  // in what is submitted.
-  const redeemingPoints = redeemPoints && loyaltyChannelOk ? availablePoints : 0;
+  // in what is submitted. `loyaltyEnabled` too, so that loyalty switched off,
+  // or a minimum raised above the balance, mid-checkout cannot leave points in
+  // either.
+  const redeemingPoints = redeemPoints && loyaltyEnabled && loyaltyChannelOk ? availablePoints : 0;
   const couponDiscount = couponResult?.ok ? couponResult.discount : 0;
 
-  const totals = useMemo(() => computePreviewTotals({
+  // The input is kept, not only the result, so submission can recompute the
+  // same summary with the settings it re-reads (decideLoyaltyRedemptionChange).
+  const previewInput = useMemo<PreviewInput>(() => ({
     items: cart.items,
     orderType,
     deliveryFee: selectedBranch?.deliveryFee ?? 0,
     minDeliveryOrder: selectedBranch?.minDeliveryOrder ?? 0,
     couponDiscount,
     loyaltyPoints: redeemingPoints,
-    discountPerPoint: loyalty?.discountPerPoint ?? 0,
+    // Both from `loyaltySettings`: the fresh copy when one has been read.
+    discountPerPoint: loyaltySettings.discountPerPoint,
     // The server uses no points when fewer than this many fit the order, so the
     // preview needs it to show what will really be charged (PG-31). Unknown
     // withholds the discount, the same direction as `loyaltyEnabled` above.
-    minPointsToRedeem: loyalty?.minPointsToRedeem ?? Infinity,
+    minPointsToRedeem: loyaltySettings.minPointsToRedeem,
     // The same answer the switch and the submission use, the fresher one
     // included, so the three cannot disagree about the channel.
     loyaltyPickupOnly,
     comped,
-  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, loyaltyPickupOnly, comped]);
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints,
+    loyaltySettings.discountPerPoint, loyaltySettings.minPointsToRedeem, loyaltyPickupOnly, comped]);
+  const totals = useMemo(() => computePreviewTotals(previewInput), [previewInput]);
 
   // WHAT THIS ORDER WILL EARN — fetched, never computed here.
   //
@@ -708,7 +749,11 @@ export function CheckoutScreen() {
       // Only blocks when points were actually being spent: for a customer who
       // was not redeeming, nothing was promised and nothing is taken away.
       // Placed BEFORE the online/cash branch below so it covers both paths.
-      const freshPickupOnly = await catalogApi.readLoyaltyPickupOnly();
+      //
+      // One read serves this guard and the next: `readFreshLoyalty` also puts
+      // the fresh settings on screen, whatever either guard decides.
+      const freshLoyalty = await readFreshLoyalty();
+      const freshPickupOnly = freshLoyalty ? freshLoyalty.pickupOnly : null;
       const channelChange = decideLoyaltyChannelChange({
         redeeming: redeemingPoints > 0,
         displayedChannelOk: loyaltyChannelOk,
@@ -717,12 +762,26 @@ export function CheckoutScreen() {
         freshChannelOk:
           freshPickupOnly === null ? null : !freshPickupOnly || orderType === 'pickup',
       });
-      if (channelChange.action !== 'none') {
-        setPickupOnlyOverride(freshPickupOnly);
-        if (channelChange.action === 'block') {
-          setError(t('loyaltyChannelChanged'));
-          return;
-        }
+      if (channelChange.action === 'block') {
+        setError(t('loyaltyChannelChanged'));
+        return;
+      }
+
+      // The rest of the redemption: `min_points_to_redeem`, `discount_per_point`
+      // and `loyalty_enabled` can change mid-checkout too, and the server applies
+      // the new values to this order. The summary is recomputed with them; if
+      // the points discount, the points used or the total would differ, the
+      // screen now shows the new figures and this submission stops, in either
+      // direction, so nothing is charged or spent that was not on screen. A
+      // failed read (null) blocks nothing, as above.
+      const redemptionChange = decideLoyaltyRedemptionChange({
+        displayedInput: previewInput,
+        displayed: totals,
+        fresh: freshLoyalty,
+      });
+      if (redemptionChange.action === 'block') {
+        setError(t('loyaltyRedemptionChanged'));
+        return;
       }
 
       // Resolve any interrupted online payment FIRST — before creating ANY new
@@ -1048,7 +1107,9 @@ export function CheckoutScreen() {
               {loyaltyChannelOk ? (
                 <LoyaltyToggle
                   on={redeemPoints}
-                  onToggle={() => setRedeemPoints((v) => !v)}
+                  // Turning it on re-reads the settings and the balance, so the
+                  // figures it shows are fresh ones.
+                  onToggle={() => { if (!redeemPoints) refreshLoyalty(); setRedeemPoints((v) => !v); }}
                   label={t('useLoyalty')}
                   // Switched on with an order too small for the minimum, the
                   // server uses no points and the summary shows none. Say why,

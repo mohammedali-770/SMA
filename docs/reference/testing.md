@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**277 TypeScript test files declaring 4106 test blocks, plus 96 SQL suites.**
+**278 TypeScript test files declaring 4131 test blocks, plus 96 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -161,7 +161,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-99 files, 1331 declared test blocks.
+100 files, 1356 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -190,6 +190,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
+| `apps/mobile/src/features/checkout/loyaltySettingsReread.test.ts` | 25 | mapLoyaltyRedemption — a bad row is never looser than no row |
 | `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 26 | parsePendingSession |
 | `apps/mobile/src/features/checkout/previewParity.test.ts` | 8 | checkout preview matches compute_order_snapshot (PG-31) |

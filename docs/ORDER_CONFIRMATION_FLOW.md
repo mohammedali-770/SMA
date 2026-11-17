@@ -1658,6 +1658,16 @@ order's own figures. This change is on branch
 `OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
 branch is merged, because a merge deploys the web build (CLAUDE.md §13).
 
+**Fresh settings, 2026-11-17.** The rule was right but its inputs could be old:
+the minimum and the point value came from the settings row read once at launch.
+`CheckoutScreen.placeOrder` now re-reads the four redemption settings before
+anything that creates an order or a payment session, after the comp and
+pickup-only checks, and stops with the refreshed summary on screen if the points
+figures would change. A failed read blocks nothing, the same rule as the
+availability and comp re-checks above. The same read runs when checkout opens
+and when the points switch is turned on. Detail in [`LOYALTY.md`](LOYALTY.md)
+§1; on branch `fix/checkout-loyalty-settings-reread-20261117`.
+
 ## 10b. Tap `description` (closed)
 
 > **History, 2026-11-11.** The Tap code is gone. The Moyasar invoice's

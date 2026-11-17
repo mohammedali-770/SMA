@@ -71,6 +71,29 @@ Whether the minimum should apply to the balance held instead of the points used
 is an open owner decision (the payment draft's item 12); it is a server change,
 and this one does not make it.
 
+**The summary uses fresh settings (2026-11-17).** The figure above is only as
+good as the settings it is computed from, and `CatalogProvider` reads the
+settings row once at launch and never again. So until 2026-11-17 an
+administrator changing `min_points_to_redeem` or `discount_per_point` while a
+customer had the app open left the summary showing a discount the server would
+not give. Checkout now re-reads `loyalty_enabled`, `loyalty_pickup_only`,
+`min_points_to_redeem` and `discount_per_point` in one query
+(`catalog.readLoyaltyRedemption`) when it opens, when the points switch is
+turned on, and just before submission; opening and turning the switch on also
+refresh the balance (`refreshProfile`). At submission
+`decideLoyaltyRedemptionChange` (`checkoutGuards.ts`) recomputes the summary
+with the fresh settings for the same cart and the same points asked for. If the
+points discount, the points used or the total would differ, the screen takes
+the new settings and the order is refused with `loyaltyRedemptionChanged`, in
+**either** direction: a lower minimum would spend points the screen said would
+not be spent. A failed read changes nothing: `effectiveLoyaltyRedemption` falls
+back to the launch-time values exactly, and a row with a missing minimum or
+point value counts as a failed read, never as 0. Tests:
+`loyaltySettingsReread.test.ts`. The balance is not re-read at submission, so
+points spent on another device after the switch was turned on are still a
+narrow residual. On branch `fix/checkout-loyalty-settings-reread-20261117`; app customers get it with the
+`OWNER_ACTIONS.md` §47.17 EAS build, `/app` on merge (CLAUDE.md §13).
+
 **Effective rate.** Earning 1 point per riyal and redeeming each at 0.10 SAR is a
 **10% rebate**. The QSR norm is 1–5%. That is a pricing decision, not an
 engineering one, and it is one settings change whenever the owner wants it.
@@ -154,10 +177,13 @@ more than the screen showed — the one direction this codebase treats as never
 acceptable (see the comp equivalent in
 [`DISCOUNTS_CAMPAIGNS.md`](DISCOUNTS_CAMPAIGNS.md)).
 
-Checkout therefore re-reads the single column immediately before submitting
-(`catalog.readLoyaltyPickupOnly`) and hands the answer to
-`decideLoyaltyChannelChange` (`checkoutGuards.ts`), which mirrors
-`decideCompChange`'s asymmetry:
+Checkout therefore re-reads the setting immediately before submitting and
+hands the answer to `decideLoyaltyChannelChange` (`checkoutGuards.ts`), which
+mirrors `decideCompChange`'s asymmetry. Since 2026-11-17 the read is
+`catalog.readLoyaltyRedemption`, which takes the other three redemption settings
+in the same query and is also made when checkout opens and when the points
+switch is turned on; the rest of the redemption has its own guard (§1). It was
+`catalog.readLoyaltyPickupOnly`, one column at submission only:
 
 | Situation | Outcome |
 | --- | --- |
@@ -541,6 +567,7 @@ Production read-only and found 0 campaigns, so no live campaign was shown wrong.
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default, whole points and the redemption minimum |
 | `apps/mobile/src/features/checkout/previewParity.test.ts` · `previewParity.fixture.json` | The client mirror against the **real** `compute_order_snapshot`: 23 carts (points on and off, balances under and over the minimum, totals around SAR 10.00, a 15% coupon, delivery, a comp), every amount equal. Regenerate the fixture with `bash scripts/checkout-preview-parity.sh` |
+| `apps/mobile/src/features/checkout/loyaltySettingsReread.test.ts` | Checkout's fresh redemption settings: the four-column read, a row with a missing minimum or point value treated as unread (never as 0), the fallback to the launch-time values, the summary computed from the fresh values, and a submission refused when they would change the points figures in either direction |
 | `supabase/tests/checkout_preview_parity_test.sql` | The server half of that check: the same carts through `compute_order_snapshot` and `place_order`, which must agree, reduced to a digest that must match the fixture's. A server change that moves any of these totals fails here first |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
 | `src/lib/loyaltyRulesSummary.test.ts` | The admin "rules in force" summary: silent when the programme is off, flags only the rules that REMOVE value, never prints a bare `null` |
