@@ -120,12 +120,12 @@ configuration error has the highest precedence.
   recent stale initiated attempts, latest paid time, and payment-related Order
   Integrity incident counts. No provider availability probe exists in v1.
 
-  *Changed 2026-11-14, not live until `20261013120000` is applied*
-  (`MIGRATIONS.md` §65, gap PG-25). **A stale attempt now means money taken
-  without a confirmed order.** Live today, the card reads `degraded` for any
-  attempt created in the last 24 hours and still `initiated` 30 minutes after
-  it opened, and every customer who closes the card page leaves exactly that.
-  After the apply, an attempt counts only if a payment settled on it
+  *Changed 2026-11-14, live since 2026-11-17, when `20261013120000` was
+  applied* (`MIGRATIONS.md` §65, gap PG-25). **A stale attempt now means money
+  taken without a confirmed order.** Until the apply, the card read `degraded`
+  for any attempt created in the last 24 hours and still `initiated` 30 minutes
+  after it opened, and every customer who closes the card page leaves exactly
+  that. Since the apply, an attempt counts only if a payment settled on it
   (`provider_ref` set). `provider_ref` is written in one place,
   `stampPaymentRef` in `supabase/functions/_shared/moyasarVerify.ts`, for a
   paid payment that binds to the attempt, just before the order is confirmed,
@@ -262,7 +262,7 @@ Admin and accountant/staff users receive the same safe read-only Health Center
 view. Existing admin-only controls remain in their original management panels.
 Customers have no access.
 
-## Duplicate Moyasar payments — shown only after `20261013120000`
+## Duplicate Moyasar payments — shown since `20261013120000` (2026-11-17)
 
 **Added 2026-11-12.** If a customer pays twice for one order or checkout session,
 the Moyasar-only payment code records the second payment as a `failed`
@@ -270,13 +270,13 @@ the Moyasar-only payment code records the second payment as a `failed`
 `integration_sync_logs` row with `error = 'duplicate_payment'`. It is never
 reported paid.
 
-**Live today, nothing on this page, and no alert, shows it.** The watchdog's
+**Until 2026-11-17, nothing on this page, and no alert, showed it.** The watchdog's
 `MULTIPLE_SUCCESSFUL_CAPTURES` rule counts paid rows only, and a duplicate is
 `failed`. An order's receipt shows only its newest payment record, so it may show
 the duplicate or hide it. Nothing refunds a duplicate automatically; making that
 automatic needs an owner decision (`OWNER_ACTIONS.md` §47.20).
 
-**Changed 2026-11-14, not live until `20261013120000` is applied** (gap PG-02).
+**Changed 2026-11-14, live since 2026-11-17, when `20261013120000` was applied** (gap PG-02).
 Each duplicate raises the critical watchdog rule R15, which turns the Order
 Integrity card here to failing (and the payment card, while the payment row is
 enabled and configured) and opens the critical `order_integrity:incidents`
