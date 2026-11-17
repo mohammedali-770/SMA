@@ -2919,6 +2919,21 @@ before that merge:
   Check that «الإجمالي قبل خصم النقاط» reads naturally, and that a screen
   reader reading the switch's name and this note together sounds right.
 
+**Widened 2026-11-17 — fresh points settings at checkout.** One new
+customer-facing string in `apps/mobile/src/i18n/strings.ts`, engineering-drafted,
+on branch `fix/checkout-loyalty-settings-reread-20261117`. It appears in the web checkout at `/app` as soon as the branch
+is merged (CLAUDE.md §13), and in the app with the §47.17 build:
+
+- `loyaltyRedemptionChanged`, new. Shown when an administrator changed the
+  points minimum, the point value or loyalty itself while the customer was in
+  checkout, so the points discount changed and the order was not placed:
+  «تغيّرت شروط استخدام النقاط أثناء إتمام طلبك، فتغيّر خصم النقاط. نقاطك محفوظة —
+  راجع الإجمالي الجديد ثم أكّد مرة أخرى.» — English: *"The points rules changed
+  while you were checking out, so your points discount has changed. Your points
+  are safe — check the new total and confirm again."* The second sentence is the
+  one `loyaltyChannelChanged` already uses. Check that «شروط استخدام النقاط»
+  reads as the rules for using points and not as the legal terms.
+
 **Widened 2026-11-14 — a cancelled order** (gap PG-03, branch
 `fix/cancelled-orders-guard-20261114`; `apps/mobile/src/i18n/strings.ts`, ships
 with the §47.17 build). Customer-facing:

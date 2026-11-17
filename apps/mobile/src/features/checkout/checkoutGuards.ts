@@ -6,6 +6,8 @@
  * renderer — CheckoutScreen is a thin wrapper that maps these decisions onto
  * cart calls and localized copy.
  */
+import type { LoyaltyRedemptionSettings, LoyaltySettings } from '../../types/models';
+import { computePreviewTotals, type PreviewInput, type PreviewTotals } from './previewTotals';
 
 export type QuantityAction =
   | { kind: 'ignore' } // a change is already settling for this line — drop the tap
@@ -206,4 +208,79 @@ export function decideLoyaltyChannelChange(input: {
     action: lost && input.redeeming ? 'block' : 'update',
     channelOk: input.freshChannelOk,
   };
+}
+
+/**
+ * The redemption settings checkout computes with: the freshest copy read
+ * during this checkout when there is one, the launch-time snapshot otherwise.
+ *
+ * The fallback is the launch-time value EXACTLY, never something looser. A read
+ * that failed must leave the screen as it would have been without it, and the
+ * defaults for a settings row that never loaded are the ones that withhold:
+ * loyalty off, pickup only, no minimum known (`Infinity`), no point value.
+ */
+export function effectiveLoyaltyRedemption(
+  launch: LoyaltySettings | null | undefined,
+  fresh: LoyaltyRedemptionSettings | null,
+): LoyaltyRedemptionSettings {
+  if (fresh) return fresh;
+  return {
+    isEnabled: launch?.isEnabled ?? false,
+    pickupOnly: launch?.pickupOnly ?? true,
+    minPointsToRedeem: launch?.minPointsToRedeem ?? Infinity,
+    discountPerPoint: launch?.discountPerPoint ?? 0,
+  };
+}
+
+/**
+ * The summary's input, with these redemption settings in place of whatever it
+ * was built with. The points asked for are kept, because that is what is sent;
+ * with loyalty switched off the server uses none of them, so neither does this.
+ */
+export function withLoyaltyRedemption(input: PreviewInput, s: LoyaltyRedemptionSettings): PreviewInput {
+  return {
+    ...input,
+    loyaltyPoints: s.isEnabled ? input.loyaltyPoints : 0,
+    discountPerPoint: s.discountPerPoint,
+    minPointsToRedeem: s.minPointsToRedeem,
+    loyaltyPickupOnly: s.pickupOnly,
+  };
+}
+
+/**
+ * What to do when the redemption settings read at submission would change the
+ * points figures the summary is showing.
+ *
+ * `decideLoyaltyChannelChange` covers one of the four settings; this covers the
+ * whole redemption. An administrator can change `min_points_to_redeem`,
+ * `discount_per_point` or `loyalty_enabled` while checkout sits open, and the
+ * server applies the new values to this order. So the summary is recomputed
+ * with the fresh settings, for the same cart and the same points asked for, and
+ * compared with what is on screen.
+ *
+ *   'block'   the points discount or the points used would differ. The screen
+ *             takes the fresh settings and this submission is refused, so the
+ *             customer sees the real figures before committing to them.
+ *             EITHER direction blocks, unlike the comp: a lower minimum would
+ *             spend points the screen said would not be spent, and points are
+ *             the customer's money too.
+ *   'none'    the figures are the same, or the read could not answer (`null`).
+ *             An unknown answer never blocks: the server is the authority, and
+ *             a flaky network is not a reason to refuse a valid order.
+ */
+export function decideLoyaltyRedemptionChange(input: {
+  /** The input the summary on screen was computed from. */
+  displayedInput: PreviewInput;
+  /** The summary on screen. */
+  displayed: PreviewTotals;
+  /** The fresh settings; `null` when they could not be read. */
+  fresh: LoyaltyRedemptionSettings | null;
+}): { action: 'none' | 'block' } {
+  if (input.fresh === null) return { action: 'none' };
+  const next = computePreviewTotals(withLoyaltyRedemption(input.displayedInput, input.fresh));
+  const same =
+    next.loyaltyDiscount === input.displayed.loyaltyDiscount &&
+    next.loyaltyPointsRedeemed === input.displayed.loyaltyPointsRedeemed &&
+    next.total === input.displayed.total;
+  return { action: same ? 'none' : 'block' };
 }

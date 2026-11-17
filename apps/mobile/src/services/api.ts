@@ -18,6 +18,7 @@ import {
   APP_SETTINGS_SELECT, BRANCH_SELECT, CATEGORY_SELECT, MODIFIER_GROUP_SELECT, MODIFIER_SELECT,
   PRODUCT_SELECT, PRODUCT_VARIANT_SELECT,
 } from '../lib/catalogSelect';
+import { mapLoyaltyRedemption } from '../lib/mappers';
 import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
 import {
@@ -30,6 +31,7 @@ import type {
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
   DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
+import type { LoyaltyRedemptionSettings } from '../types/models';
 
 /** Return the data or throw the PostgREST error (never a silent null). */
 function ok<T>(res: { data: T | null; error: { message: string } | null }): T {
@@ -185,33 +187,40 @@ export const catalog = {
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select(APP_SETTINGS_SELECT).eq('id', true).single()),
   /**
-   * Is loyalty pickup-only right now? `boolean | null`, `null` when the answer
-   * could not be read.
+   * The settings the server's points redemption reads, right now:
+   * `loyalty_enabled`, `loyalty_pickup_only`, `min_points_to_redeem` and
+   * `discount_per_point`. `null` when they could not be read.
    *
-   * A narrow re-read of ONE column, deliberately, for the moment just before an
-   * order is submitted. `CatalogProvider` maps the whole settings row once at
-   * launch and its foreground refresh does not re-read it, so an administrator
-   * toggling this rule mid-checkout would otherwise leave the screen offering a
-   * redemption `place_order` refuses -- the customer charged more than they
-   * were shown. `decideLoyaltyChannelChange` (checkoutGuards.ts) decides what to
-   * do with the answer; this only fetches it.
+   * One narrow read of four columns, for checkout. `CatalogProvider` maps the
+   * whole settings row once at launch and its foreground refresh does not
+   * re-read it, so an administrator changing any of these mid-checkout would
+   * otherwise leave the summary showing a points discount `place_order` does
+   * not give -- the customer charged more than they were shown, or points
+   * spent that the screen said would not be. Checkout reads this when it opens,
+   * when the points switch is turned on, and just before an order is
+   * submitted; `decideLoyaltyChannelChange` and `decideLoyaltyRedemptionChange`
+   * (checkoutGuards.ts) decide what to do with the answer. This only fetches it.
+   *
+   * Until 2026-11-17 this read only `loyalty_pickup_only`
+   * (`readLoyaltyPickupOnly`). `app_settings` is readable by `authenticated`
+   * and `anon` at TABLE level with a `using (true)` policy
+   * (20260707120600_app_settings), and the launch read already selects all four.
    *
    * `null` rather than a thrown error, and rather than a safe default, because
-   * the guard must be able to tell "could not read" from "the rule changed":
-   * an unknown answer never blocks an order. Same contract, and same reasoning,
-   * as `compMembership.readComped()` below.
-   *
-   * Defaults TRUE when the column is absent, matching every other reader --
-   * an unmigrated project withholds the offer rather than making a false one.
+   * the guards must be able to tell "could not read" from "the rule changed":
+   * an unknown answer never blocks an order, and the screen keeps the
+   * launch-time values. Same contract as `compMembership.readComped()` below.
+   * `mapLoyaltyRedemption` returns `null` for a row whose minimum or point
+   * value is unusable, for the same reason.
    */
-  async readLoyaltyPickupOnly(): Promise<boolean | null> {
+  async readLoyaltyRedemption(): Promise<LoyaltyRedemptionSettings | null> {
     const { data, error } = await supabase
       .from('app_settings')
-      .select('loyalty_pickup_only')
+      .select('loyalty_enabled, loyalty_pickup_only, min_points_to_redeem, discount_per_point')
       .eq('id', true)
       .maybeSingle();
     if (error || !data) return null;
-    return (data as { loyalty_pickup_only?: boolean | null }).loyalty_pickup_only ?? true;
+    return mapLoyaltyRedemption(data as Parameters<typeof mapLoyaltyRedemption>[0]);
   },
   /**
    * The expiry schedule, re-read on demand.

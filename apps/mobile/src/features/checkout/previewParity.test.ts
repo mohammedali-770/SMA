@@ -144,12 +144,15 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
   // still wrong on screen if it is never given the minimum.
   const screen = readFileSync(new URL('./CheckoutScreen.tsx', import.meta.url), 'utf8');
   const call = screen.slice(
-    screen.indexOf('const totals = useMemo(() => computePreviewTotals({'),
+    screen.indexOf('const previewInput = useMemo<PreviewInput>(() => ({'),
     screen.indexOf('}), [cart.items, orderType'),
   );
 
   it('passes the redemption minimum, failing closed when it is unknown', () => {
-    expect(call).toContain('minPointsToRedeem: loyalty?.minPointsToRedeem ?? Infinity,');
+    // `loyaltySettings` is the fresh copy read during checkout, or the
+    // launch-time one, whose unknown minimum is Infinity
+    // (effectiveLoyaltyRedemption; loyaltySettingsReread.test.ts).
+    expect(call).toContain('minPointsToRedeem: loyaltySettings.minPointsToRedeem,');
   });
 
   it('gives the summary the same pickup-only answer as the switch and the submission', () => {
@@ -157,7 +160,7 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
     // With `loyalty?.pickupOnly` here, an administrator relaxing the rule
     // mid-checkout would leave the summary withholding a delivery redemption
     // the server grants.
-    expect(screen).toContain('const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;');
+    expect(screen).toContain('const loyaltyPickupOnly = loyaltySettings.pickupOnly;');
     expect(screen).toContain("const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';");
     expect(call).toMatch(/^\s+loyaltyPickupOnly,$/m);
     expect(call).not.toContain('loyalty?.pickupOnly');
@@ -168,7 +171,7 @@ describe('CheckoutScreen hands the preview what the server rule needs', () => {
   it('asks for the whole balance or nothing, which is what the parity carts assume', () => {
     expect(call).toContain('loyaltyPoints: redeemingPoints,');
     expect(screen).toContain(
-      'const redeemingPoints = redeemPoints && loyaltyChannelOk ? availablePoints : 0;',
+      'const redeemingPoints = redeemPoints && loyaltyEnabled && loyaltyChannelOk ? availablePoints : 0;',
     );
   });
 

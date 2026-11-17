@@ -668,6 +668,13 @@ value, capped at the goods. The comp is unaffected: a comped order uses no
 points either way, and `previewParity.test.ts` includes a comped cart that
 checks this against the server.
 
+Since 2026-11-17 checkout re-reads the redemption settings when it opens, when
+the points switch is turned on and at submission, and refuses a submission whose
+points figures the fresh settings would change ([`LOYALTY.md`](LOYALTY.md) §1).
+That guard never fires on a comped order, because a comped order uses no points
+on either side of the comparison; the comp has its own re-check
+(`decideCompChange`), unchanged.
+
 The **earning** estimate added by `20260908120000` is not computed in the client
 at all — `preview_loyalty_points` asks the server, which runs the same
 `compute_order_snapshot` that will grant the points, so a comped customer is

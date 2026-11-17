@@ -209,6 +209,18 @@ devices only; the console's sandbox test does not open the app.
       on 2026-11-13). Builds before
       2026-11-14 showed 0.00 in the summary here, while the server used no
       points and charged the full amount.
+- [ ] **A failed settings read does not stop checkout (added 2026-11-17).**
+      Turn the network off, open checkout and switch points on: the summary
+      still shows the points discount it showed before. Turn the network back
+      on and place a cash pickup order: it goes through with the points the
+      summary showed. Checkout re-reads the points settings when it opens, when
+      the switch is turned on and at Place order; a read that fails must keep
+      the values already on screen and must not block. The other half, an
+      administrator changing `min_points_to_redeem` or `discount_per_point`
+      while checkout is open, shows "The points rules changed while you were
+      checking out…" and places nothing. Checking it on a device means changing
+      a live setting every customer uses, which is a §5 owner action; it is
+      covered by `loyaltySettingsReread.test.ts` instead.
 - [ ] **Arabic.** The payment screen footer and Moyasar's own page read in Arabic
       when the app is in Arabic.
 - [ ] **The web build offers no online option.** Open `/app` in a browser with

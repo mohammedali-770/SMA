@@ -280,3 +280,12 @@ export interface LoyaltySettings {
   /** ISO date of the next reset, or null when expiry is off. */
   expiryNextRunOn: string | null;
 }
+
+/**
+ * The four settings the server's points redemption reads, as checkout re-reads
+ * them (`catalog.readLoyaltyRedemption`). The launch-time `LoyaltySettings` is a
+ * snapshot that is never refreshed; this is the fresher copy, and checkout uses
+ * it in place of that snapshot whenever one has been read.
+ */
+export type LoyaltyRedemptionSettings =
+  Pick<LoyaltySettings, 'isEnabled' | 'pickupOnly' | 'minPointsToRedeem' | 'discountPerPoint'>;
