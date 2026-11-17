@@ -4612,8 +4612,8 @@ guard that makes Place order do nothing while a payment run is in flight, and th
 **The app-side gap fixes must be in this build** (the gaps list, top of §47):
 PG-03, PG-04, PG-05, PG-20 if you choose the code fix, and PG-31. A fix that
 misses it needs another build and another store review. PG-05 and PG-31 are
-fixed on branch `fix/checkout-points-preview-20261114` (2026-11-14): this build
-carries them only if that pull request is merged before it starts. Their device
+fixed on branch `fix/checkout-points-preview-20261114` (2026-11-14), merged in
+#470 (`c430f97`), so any build started from the default branch since carries them. Their device
 checks are in `RELEASE_CHECKLIST.md` §7 ("A total under 1.00 SAR" and "Points
 on an order under SAR 10.00"). PG-03's app half (a
 cancelled order reads "Order cancelled" and offers no Resend) is on branch
