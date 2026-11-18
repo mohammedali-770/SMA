@@ -94,6 +94,16 @@ reference is an inconsistent DB state and is presented as `verifying_with_branch
 
 It is **whether the number card is shown**, not whether a number is known.
 
+**And the card appears only once there IS a number (owner, 2026-11-18,
+repeated).** A customer is never shown the "not issued yet" placeholder
+(«لم يصدر بعد» / «سيظهر هنا فور إصداره من الفرع»). It appeared at the top of the
+receipt for every card order while the order was being sent to the branch,
+which is the first thing the customer saw after paying. Until the number
+arrives, the state pill and its sentence say what is happening. The placeholder
+strings are deleted, and `branchNumberCard.test.ts` fails if the card renders
+without a number, or if either phrase reappears anywhere in the app's source.
+The `yes` rows below therefore mean "show the number **when it arrives**".
+
 The three `yes` rows are the states on an ACTIVE POS channel: the number is
 either already issued (`confirmed_by_branch`) or still expected
 (`sending_to_branch`, `verifying_with_branch`), so the card's "it will appear
