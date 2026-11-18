@@ -54,6 +54,12 @@ The app record is still a **Draft app** carrying the temporary name
 **What exists:** the app record, package `sa.com.spicymeal.app`, one AAB uploaded
 to internal testing, and the declarations in §§6-10 answered.
 
+**2026-11-18, iOS only:** the iOS bundle identifier changed to `sa.com.spicymeal.app`
+(the iOS app moved to the company Apple account, `OWNER_ACTIONS.md` §59), so both
+platforms now share this identifier. **Nothing on Play changes:** the Android
+package, the `submit.production.android` block in `eas.json` and every Android
+declaration in `app.json` are untouched.
+
 **What does not:** a completed store listing (§11), any closed test, and
 therefore any route to production.
 
