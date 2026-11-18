@@ -58,7 +58,20 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
-> **Updated 2026-11-18 (later) — `20261016120000_refund_retry_backoff` is
+> **Updated 2026-11-18 (refund back-off apply) — `20261016120000_refund_retry_backoff`
+> is APPLIED, and NOTHING is outstanding.** On the owner's approval naming it
+> by version ("Apply 20261016120000"): applied at 05:55:54 UTC, live
+> `20261118055554`, ledger row 121, §68, in one call named by version. Comment-only
+> lines outside the dollar-quoted bodies were stripped for transport (row 119's
+> kind), and every stored body equals §68's post-image. Live history
+> **165 → 166**. Reconciled by name against the default branch at `902cd1a`:
+> 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied**.
+> Money-path pair unchanged. No deploy implied; the `payment-refund-worker`
+> cron job is still inactive, so automated refunds remain off. **Name the
+> target by version.** The notes below are kept as they were written.
+
+> **Updated 2026-11-18 (later; superseded the same day: APPLIED, ledger row
+> 121) — `20261016120000_refund_retry_backoff` is
 > written, validated and NOT applied (§68, ledger row 121).** On merge it is the
 > ONLY unapplied file: 160 files = 157 applied + 2 superseded (rows 8-9) + 1
 > unapplied, against 165 live history rows (read live 2026-11-18, latest
@@ -1741,13 +1754,13 @@ production.
 | 118 | 20261014120000 | export_my_data_payments | `3eb020d2837a` | 20261117114922 | export_my_data_payments | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:22 UTC** on explicit owner approval ("Apply 20261014120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**. §66, `OWNER_ACTIONS.md` §56. §9-B.7: the merged copy (sha256 `3eb020d2837a48ec4655de5d86d1947345aa024329e1a94b671bd3ab52bb8a8d`, 920 lines / 49 240 bytes) carries no `\u` escape. **The text that landed is the file:** the stored statement is byte-identical to it (md5 `e02c4d2a2bf463afcd4ee48233a9b69d`, 49 240 bytes, equal to `md5sum` of the merged file). **Outcomes:** one `export_my_data` overload, 0 arguments; md5(prosrc) `26eba36676bac42a4c8d7cda09bc6424`, 15 861 characters (md5(pg_get_functiondef) `35981a7c…`); `anon` cannot execute it, `authenticated` can. The file's self-check writes two throwaway `auth.users` rows and aborts them: 16 `auth.users` and 9 `payment_records` before and after. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **162 → 163**. **Version NOT aligned** (§9-D). |
 | 119 | 20261013120000 | payment_refund_visibility | `cb2c8d704610` | 20261117114924 | payment_refund_visibility | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:24 UTC** on explicit owner approval ("Apply 20261013120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**, after row 118 was verified. §65, `OWNER_ACTIONS.md` §55. §9-B.7: the merged copy is sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **ONE TRANSPORT DEVIATION, the same caveat as row 102:** comment-only lines OUTSIDE function bodies were stripped for transport, so 131 170 bytes were sent and the applied TEXT is not the repository file. The stored statement is 131 107 bytes (md5 `cfbe6fd6d87338301ec4b67154cff764`): exactly the 63 bytes saved by the 20 `\u` escapes at or above U+0020 arriving decoded (row 115's kind; the five control-character escapes arrived as written). **Every stored function body matches the merged file's**, the snapshot in its decoded form. **Outcomes, md5(prosrc) / length:** `claim_order_refund(text, uuid[])` `999471eed604d690da4e61675b89a02e` / 2 151, `service_role` only; `order_integrity_watchdog` `fb4fc4e2bdcee6ec46ced01029269cb0` / 34 998; `operations_health_snapshot_internal` `3847b5f3e18713bb0b322cacf9ce46ab` / 50 621 (the stored form §65 predicts); `list_payments_needing_attention` `9f4ceb05a05dba19169454d7c5dfff91` / 222, `anon` NO, `authenticated` YES; `payments_needing_attention_internal` `6dd733ccc74ef5f7f8888aa817fe7a95` / 4 744, `service_role` only. All equal §65's post-image table. `integration_sync_logs_moyasar_unconfirmed_idx` present; `to_regprocedure('public.claim_order_refund(text)')` is null. 0 open incidents, 0 `order_refunds`, 82 orders. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **163 → 164**. **Version NOT aligned** (§9-D). **`payment-refund` was then deployed** on its own approval, after this row was verified: version 4 → **5** at 12:03:44 UTC, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `1aad3d00…` → `380ce300…`; its 8 bundle files, from the default branch at `8aac448`, read back from Supabase byte-identical. The `payment-refund-worker` cron job (`*/5 * * * *`) is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `8aac448`: 158 files = 156 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 120 | 20261015120000 | cancelled_order_followups | `133245864b0a` | 20261118045145 | cancelled_order_followups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 04:51:45 UTC** on explicit owner approval ("Apply 20261015120000 and deploy push-dispatch", naming the file by version), via MCP `apply_migration`, **one call, target named explicitly**. §67, `OWNER_ACTIONS.md` §57. §9-B.7: the merged copy (merged in #478 as `0dd6a20`; sha256 `133245864b0a80edeedc3e7d272cb2ccaf42ebcab838367ee2585d268000185b`, 521 lines / 29 041 bytes) was sent verbatim. It carries no `\u` escape, and there was no transport deviation. **THE FIRST ATTEMPT, ON 2026-11-17, LANDED NOTHING:** it was interrupted by a container restart. A read-only check afterwards found history still at 164 and both pre-images in place (`begin_lazywait_create_attempt` `c67adf40dece53accd70637f07fd5ae3` / 1 235, `requeue_lazywait_order` `45d8e8a0d08a1d4f75d4dba84c744452` / 1 869). The second call landed. **Outcomes, md5(prosrc) / length, equal to the hashes pre-computed from the merged file before sending:** `begin_lazywait_create_attempt` `365fcc1b8d82a95eac196076740bd957` / 1 854; `requeue_lazywait_order` `5b83a99cb110ec14bb99deb2c839e0fc` / 2 062; one overload each. **Grants, read afterwards:** `anon` executes neither; `authenticated` executes only `requeue_lazywait_order`; `service_role` executes `begin_lazywait_create_attempt`. **Rolled-back fixtures:** 0 branches (`name_en`) and 0 orders (`order_number`) starting `VERIFY-20261015120000-` survive. 0 orders were in a `syncing`, `pending` or `retrying` sync state at the time; 82 orders in all. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **164 → 165**. **Version NOT aligned** (§9-D). **`push-dispatch` was deployed** after this row was verified, the same day under the same approval: version 9 → **10**, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `ba959385…`. Its 8 bundle files, from the default branch at `0dd6a20`, read back from Supabase byte-identical, and only `push-dispatch/index.ts` differs from v9. A `pos_sync` event for a cancelled order is now closed `superseded` and sends none of the four POS-outcome pushes. No smoke request was sent. Reconciled by name against the default branch at `0dd6a20`: 159 files = 157 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
-| 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row, no `next_attempt_at` column, no `refund_retry_delay`) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-17, UNAPPLIED.** §68. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). Database only; no deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 
-Reconciliation check: the rows above detail **121 repository rows, 118 of which
-carry a live version** (recomputed 2026-11-18 when row 121 was added; it read
-120 / 118 after row 120, 119 / 117 after rows 118-119, and 116 / 114 before
-that) — rows 8 and 9 do not, and both are class **H** (superseded); row 121
-does not, because it is written and **not applied** (class **E**). **Counted from the table itself, so it is reproducible:** every data
+Reconciliation check: the rows above detail **121 repository rows, 119 of which
+carry a live version** (recomputed 2026-11-18 when row 121 was marked applied;
+it read 121 / 118 when row 121 was added unapplied, 120 / 118 after row 120,
+119 / 117 after rows 118-119, and 116 / 114 before that) — rows 8 and 9 do not,
+and both are class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
 5 hold a 14-digit version.
 
@@ -1765,7 +1778,7 @@ carrying it forward. That is §9-B.7's rule about recorded numbers — recompute
 from the artifact, never adopt from a working note — applied to this file's own
 summary line.
 
-Rows **89–120** are not described in the narrative below, which stops at 88.
+Rows **89–121** are not described in the narrative below, which stops at 88.
 Each is recorded in its own row and in the section it names; the live totals for
 the whole repository are in `CLAUDE.md` §8, not here.
 
@@ -9640,7 +9653,43 @@ Rollback is a new file that re-applies the `begin_lazywait_create_attempt`
 statement of `20260721120000` and the `requeue_lazywait_order` statement of
 `20260827120000`, with their grants. Steps: `docs/OWNER_ACTIONS.md` §57.
 
-## 68. Refund retries back off, stop after 10, and a stuck refund raises an alert — WRITTEN 2026-11-17, NOT APPLIED (ledger row 121)
+## 68. Refund retries back off, stop after 10, and a stuck refund raises an alert — APPLIED 2026-11-18 (ledger row 121)
+
+**Applied 2026-11-18 05:55:54 UTC**, live version `20261118055554`, ledger row
+121, on the owner's approval ("Apply 20261016120000", named by version), via
+MCP `apply_migration`, one call, which returned `{"success":true}`. Merged in
+#481 as `902cd1a`.
+
+- **Transport, the same kind as row 119:** the merged file is 140 815 bytes
+  (sha256 `96a17fd96dd7…`), and comment-only lines OUTSIDE dollar-quoted
+  bodies were stripped for transport size (125 880 bytes sent). All 8
+  dollar-quoted bodies were proven byte-identical to the merged file's before
+  sending. So the applied TEXT differs from the repository file, while every
+  stored body matches the merged file's.
+- **Before, read live just before sending:** all four step 1 values matched
+  (claim content `e20c906d…`, finalize content `0d64407a…`, watchdog
+  `fb4fc4e2…`, snapshot `3847b5f3…`); `refund_retry_delay` and
+  `order_refunds.next_attempt_at` absent; money-path pair `12b6816d…` /
+  `22e2d429…`; 0 `order_refunds`, 0 incidents, `payment-refund-worker`
+  inactive.
+- **After:** every post-image in the table below matched on md5(prosrc) and
+  length, the snapshot in its transport form (`0f8f08f9…` / 50 778); one
+  overload each. `order_refunds.next_attempt_at` is
+  `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7)
+  `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated`
+  execute none of the three refund functions. Money-path pair unchanged.
+  History **165 → 166**. **Version NOT aligned** (§9-D).
+- **The file's rolled-back probe left nothing:** `order_refunds` 0,
+  `order_integrity_incidents` 0, 82 orders, 40 branches, and
+  `order_number_seq` last_value 92, equal to the newest order
+  `SM-2026-000092`, so no order number was burned.
+- **No deploy is implied, and automated refunds are still OFF:** the
+  `payment-refund-worker` cron job is inactive. Turning it on is a separate §5
+  action (`OWNER_ACTIONS.md` §47.16).
+- Reconciled by name against the default branch at `902cd1a`: 160 files = 158
+  applied + 2 superseded (rows 8-9) + **0 unapplied**.
+
+The text below is kept as it was written before the apply.
 
 `20261016120000_refund_retry_backoff.sql`. **Written 2026-11-17 on branch
 `fix/refund-retry-backoff-20261117`, validated on a local chain, awaiting owner
