@@ -557,6 +557,18 @@ What the evidence shows: the database is in **`eu-central-1`** (Frankfurt), whil
 a customer in Saudi Arabia has the Edge Function executed in **`ap-south-1`**
 (Mumbai) or **`eu-central-2`** (Zurich).
 
+**Acted on 2026-11-18: the calls are now pinned to Frankfurt.** Nothing had
+changed since this was measured. Over the 24 h to 2026-11-18 14:40 UTC,
+`order-intake` averaged **7.9 s**, every run in Mumbai, while `lazywait-sync`
+averaged 0.65 s on its in-region cron runs and 5.7 s from Mumbai. The app now
+calls every function with Supabase's `forceFunctionRegion=eu-central-1` query
+parameter (`apps/mobile/src/lib/functionRegion.ts`). `order-intake`'s own kick
+of `lazywait-sync` carries it too (`_shared/functionRegion.ts`). The why, the
+CORS reason for using the query parameter rather than the SDK's `x-region`
+header, and the outage trade-off are in `PAYMENTS.md` §2. The app half ships
+with the next build (and the next web deploy for `/app`); the kick half ships
+with the next `order-intake` deploy.
+
 #### The control, measured per-request on 2026-08-30
 
 The gateway records `response.origin_time` on every REST call — how long the

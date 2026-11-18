@@ -720,6 +720,14 @@ bounded by an ~11 s timeout, so the confirmation screen can show the branch
 number immediately. The once-a-minute cron is the *backstop*, not the primary
 path.
 
+**Where the kick runs (2026-11-18).** A function-to-function call runs
+nearest its caller. Kicks from `order-intake` (called from Saudi Arabia) and
+from Moyasar's payment webhook ran `lazywait-sync` in Mumbai, far from the
+Frankfurt database: 5.7 s average there against 0.65 s for the in-region cron.
+The two kicks, and the worker's own `push-dispatch` drain, are now pinned to
+`eu-central-1` with `forceFunctionRegion` (`_shared/functionRegion.ts`).
+Nothing the worker does changes; only where it runs. Detail: `PAYMENTS.md` §2.
+
 **Delivery did not get that kick until 2026-08-27.** The block read
 `if (order_type === 'pickup')`, which was correct only while the insert trigger
 parked every delivery order at `blocked` — kicking the worker for an order it
