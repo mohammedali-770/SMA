@@ -238,6 +238,31 @@ redeployed, which is a separate live owner action
 (`SUPABASE_API_KEYS.md` §5). Until then the live bundles keep the old kick. With
 online payment on, the cron picks the paid order up within about a minute.
 
+**The POS handoff runs after the answer (2026-11-18).** Once a payment is
+confirmed, the POS kick and the online-payment attach used to run **before**
+`payment-verify` (and the webhook) answered. Measured on SM-2026-000099:
+
+- the order existed at 13:23:20.5 UTC;
+- the app got its answer at 13:23:35.6.
+
+So the customer watched a spinner for 15 s, waiting on the POS, although the
+receipt does not depend on it: it shows "sending to the branch" until the POS
+answers.
+
+`runAfterResponse` (`_shared/paymentSync.ts`) now hands that work to
+`EdgeRuntime.waitUntil`, the shape `lazywait-sync` and `account-delete-request`
+already use. The work still runs, in the same order and with the same
+best-effort handling. Where the platform has no `waitUntil`, it is awaited as
+before, never skipped. If it dies, the once-a-minute sync and the reaper pick
+the order up, exactly as they do for a POS hiccup today.
+
+`paymentPosTiming.test.ts` drives the real webhook with the POS held open and
+asserts that `paid` comes back first. It then asserts that the kick and the
+attach follow.
+
+This reaches Production only when `payment-verify` and `payment-webhook` are
+redeployed (a separate owner action).
+
 ---
 
 ## 3. TEST mode and LIVE mode

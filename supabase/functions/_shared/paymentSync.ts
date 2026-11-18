@@ -26,6 +26,29 @@ import { DEFAULT_BASE_URL, lazywaitFetch, round2, type LazywaitConfig } from './
  * kick is skipped: it is best-effort, and the once-a-minute cron picks the paid
  * order up.
  */
+/**
+ * Run work AFTER the response, where the platform allows it.
+ *
+ * Why (measured 2026-11-18, order SM-2026-000099): the order existed at
+ * 13:23:20.5, yet payment-verify answered the app only at 13:23:35.6, because
+ * it waited for the POS kick and the online-payment attach first. The customer
+ * looked at a spinner for those 15 s although nothing they see depends on the
+ * POS: the receipt shows "sending to the branch" until the POS answers.
+ *
+ * `EdgeRuntime.waitUntil` keeps the isolate alive past the Response; the
+ * guarded shape is the one lazywait-sync and account-delete-request use. On a
+ * platform without it, or in a local run or test, this degrades to awaiting,
+ * never to skipping. The work must catch its own errors.
+ */
+export async function runAfterResponse(work: () => Promise<void>): Promise<void> {
+  const p = work();
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil(x: Promise<unknown>): void } }).EdgeRuntime;
+  if (rt?.waitUntil) {
+    try { rt.waitUntil(p); return; } catch { /* fall through to await */ }
+  }
+  await p;
+}
+
 export async function triggerLazywaitSyncOnce(admin: SupabaseClient): Promise<void> {
   try {
     const cfg = await getProviderConfig(admin, 'lazywait');

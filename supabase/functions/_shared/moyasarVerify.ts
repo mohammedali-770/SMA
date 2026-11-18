@@ -46,7 +46,7 @@ import { moyasarFetch } from './moyasarHttp.ts';
 import { allowTestModeCheckout, logTestModeAllowed } from './paymentTestCheckout.ts';
 
 export { selectInvoicePayment } from './moyasar.ts';
-import { triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from './paymentSync.ts';
+import { runAfterResponse, triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from './paymentSync.ts';
 
 const FETCH_TIMEOUT_MS = 12_000;
 
@@ -502,13 +502,19 @@ export async function validateAndConfirmMoyasarPayment(
 
     // Paid -> hand the order to the POS, then attach the online payment. Best-effort;
     // a POS hiccup must never undo a confirmed payment (the worker/reaper reconcile).
-    await triggerLazywaitSyncOnce(admin);
-    const { data: fresh } = orderId
-      ? await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
-      : { data: null };
-    await pushLazywaitOnlinePayment(
-      admin, (fresh ?? confirmedOrder) as Record<string, unknown> | null, paymentId,
-    ).catch(() => {});
+    // AFTER the response (runAfterResponse): the order already exists, and the
+    // customer's receipt does not wait on the POS, so neither does this answer.
+    await runAfterResponse(async () => {
+      try {
+        await triggerLazywaitSyncOnce(admin);
+        const { data: fresh } = orderId
+          ? await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
+          : { data: null };
+        await pushLazywaitOnlinePayment(
+          admin, (fresh ?? confirmedOrder) as Record<string, unknown> | null, paymentId,
+        ).catch(() => {});
+      } catch { /* the once-a-minute sync and the reaper reconcile */ }
+    });
     return { outcome: 'paid', paid: true, orderId };
   }
 

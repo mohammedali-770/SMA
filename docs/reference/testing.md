@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**285 TypeScript test files declaring 4229 test blocks, plus 98 SQL suites.**
+**286 TypeScript test files declaring 4233 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -414,7 +414,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-47 files, 995 declared test blocks.
+48 files, 999 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -441,8 +441,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 42 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
+| `supabase/functions/_shared/paymentAfterResponse.test.ts` | 3 | runAfterResponse |
 | `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 11 | no invoice outlives its attempt (C1 part 4) |
-| `supabase/functions/_shared/paymentPosTiming.test.ts` | 2 | when the POS receives a card payment |
+| `supabase/functions/_shared/paymentPosTiming.test.ts` | 3 | when the POS receives a card payment |
 | `supabase/functions/_shared/paymentRefundQueue.test.ts` | 8 | one stuck refund no longer takes every claim of a run |
 | `supabase/functions/_shared/paymentSyncDisclosure.test.ts` | 7 | what the POS receives about a card payment |
 | `supabase/functions/_shared/paymentSyncKick.test.ts` | 4 | triggerLazywaitSyncOnce — the post-payment POS kick |
