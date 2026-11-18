@@ -135,18 +135,21 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # No HIGH/CRITICAL exceptions exist for the web/admin tree. The wrapper
-      # keeps the audit fail-closed and emits exact advisory/package annotations
-      # so failures remain diagnosable through the GitHub checks API.
+      # Fail-closed, with one bounded, expiring exception: picomatch
+      # GHSA-fc5q-39xc-vjpf, which has no patched release and is build/test-time
+      # only (docs/DEPENDENCY_ADVISORIES.md §3.3). Any other high, any critical,
+      # a new path to picomatch or a lapsed expiry still fails. It emits exact
+      # advisory/package annotations so failures remain diagnosable through the
+      # GitHub checks API.
       - name: Audit web dependencies
         run: node scripts/audit-web-high.mjs
 
       # Do not weaken this to `|| true`, `--omit`, or a lower audit level.
-      # The script is fail-closed and excepts no HIGH advisory today. The last
-      # exception, decode-uri-component, was retired by the Expo SDK 58 upgrade
-      # (docs/DEPENDENCY_ADVISORIES.md §4.15). A new one is reviewed in §3 first.
-      # It names every advisory before any verdict, and any high or critical
-      # advisory fails the job.
+      # The script is fail-closed and excepts exactly one HIGH advisory, the
+      # same picomatch GHSA-fc5q-39xc-vjpf as the web tree, under the same
+      # expiry (docs/DEPENDENCY_ADVISORIES.md §3.3). A new one is reviewed in §3
+      # first. It names every advisory before any verdict, and any other high
+      # or critical advisory fails the job.
       - name: Audit mobile dependencies
         run: node scripts/audit-mobile-high.mjs
 
