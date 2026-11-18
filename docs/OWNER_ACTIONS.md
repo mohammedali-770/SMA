@@ -909,6 +909,15 @@ Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
 
 ## 17. Lazywait add-on mapping — heat level has no POS counterpart
 
+> **Superseded 2026-11-18: the deploy is no longer held.** A read-only inventory
+> of the live Edge Functions found that `lazywait-sync` v14 already carried the
+> unmapped-modifier fold-in this section describes, so option 2 below was live
+> before today. `lazywait-sync` was then deployed as **v15** from the default
+> branch at `5c78d17`, for the API-key switch-over, on the owner's word ("deploy
+> the 9 key-switch functions"). Every file read back byte-identical
+> (`SUPABASE_API_KEYS.md` §3 "Progress"). The heat-level decision itself
+> (option 1, Lazywait add-ons) is still open. The text below is kept as written.
+
 **Status:** OWNER DECISION, narrowed. **The `lazywait-sync` deploy remains held —
 that is unchanged** — but the deploy is no longer *blocked* by this gap.
 
@@ -3804,10 +3813,26 @@ then, and receivers accept both. **The steps, in this order, each a separate
    (Production and Preview) + gated redeploy. Set **both**
    `VITE_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`;
    the second is what the `/app` web export reads.
+   *Steps 3–5 DONE 2026-11-18, each on the owner's word ("deploy the 9
+   key-switch functions"; "go ahead with 1 and 2" for the Vercel variables).
+   An inventory of all 25 live functions found 16 already on the new-key code,
+   including `push-dispatch`, `admin-push-dispatch` and
+   `operations-alert-dispatch`. The other 9 were deployed from `5c78d17`,
+   receiver first: `account-delete-process` v6, `lazywait-sync` v15,
+   `account-delete-scheduler` v5, `order-intake` v16, `lazywait-catalog` v7,
+   `lazywait-webhook` v6, `whatsapp-send-otp` v6, `whatsapp-verify-otp` v6 and
+   `whatsapp-webhook` v7. Every file read back byte-identical, and each
+   `verify_jwt` matches `config.toml`. Both Vercel variables were set for
+   Production and Preview, and Production was redeployed from `5c78d17`. The
+   live `/app` bundle now carries the publishable key and not the legacy JWT.
+   The console carries the publishable key, with the legacy key as its fallback
+   until step 9. Versions, hashes and checks: `SUPABASE_API_KEYS.md` §3
+   "Progress".*
 6. Add the key to `apps/mobile/eas.json` (small PR), then the **December** EAS
    build pair, to every tester.
-   *2026-11-18: step 2 done, §4's check passed, and the `eas.json` PR is open;
-   see `SUPABASE_API_KEYS.md` §3 "Progress".*
+   *2026-11-18: step 2 done, §4's check passed, and the `eas.json` change is
+   merged (#485); see `SUPABASE_API_KEYS.md` §3 "Progress". The build pair was
+   started 2026-11-18 (run 44258720558); installing it is the testers' step.*
 7. Confirm no legacy-key traffic remains.
 8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
    (reversible). **The five frozen payment functions stop working here — owner
@@ -3817,6 +3842,14 @@ then, and receivers accept both. **The steps, in this order, each a separate
    `userClient()`, which prefer the new keys, so the deploy in §47.4 moves them.
    `_shared/paymentSync.ts:25` still reads `SUPABASE_ANON_KEY` directly. Read
    `SUPABASE_API_KEYS.md` §2 before step 8 if online payment is on by then.
+   **Corrected 2026-11-18:** the July Tap-era bundles are no longer live. All 7
+   payment functions are Moyasar bundles deployed 2026-11-13 (`payment-refund`
+   2026-11-17), carry the new-key helper, and are byte-identical to the default
+   branch. The one direct legacy-key read left in any non-test code is
+   `_shared/paymentSync.ts:25`, the post-payment kick to `lazywait-sync`, bundled
+   into `payment-initiate`, `-verify`, `-webhook` and `-test-config`. It is idle
+   while online payment is off. This is a record of what is deployed, not a
+   payment decision.
 9. A cleanup PR removes the fallbacks.
 
 **Rollback:** reactivate the legacy keys; no redeploy needed.

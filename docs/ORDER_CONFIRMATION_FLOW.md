@@ -1137,6 +1137,12 @@ nothing:
   carries both. The equivalent check on a future deploy has to be a full readback
   against the merged branch, not this one-line ordering tell.
 
+  *Superseded 2026-11-18: `order-intake` is now **v16**, deployed from the
+  default branch at `5c78d17` for the API-key switch-over. The full readback
+  this paragraph asks for was done: every file was read back and compared
+  byte-identical, and `verify_jwt` is still `true` (`docs/SUPABASE_API_KEYS.md`
+  §3 "Progress").*
+
 **SM-2026-000075 — the fallback shipped without disturbing the happy path.**
 
     isolate_age_ms 4 · entry_ms 0 · parse_ms 1 · config_ms 982 · place_ms 1305

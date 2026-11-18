@@ -1282,6 +1282,15 @@ from one who pointed the integration somewhere it may not go.
 (`apiv2-dev.lazywait.com`) and the production host a move would use
 (`apiv2.lazywait.com`) are both `lazywait.com` subdomains.
 
+**Deployed 2026-11-18, two months after the merge.** Until then the live
+`lazywait-sync` and `lazywait-catalog` bundles carried the older
+`resolveLazywaitBaseUrl`, which accepted any `http:` or `https:` host
+(`docs/readiness/20261111-app-hardening-checklist.md`, S05). Both were deployed
+from the default branch at `5c78d17` for the API-key switch-over:
+`lazywait-sync` v15 and `lazywait-catalog` v7, every file byte-identical. The
+stored base URL was read live first (`https` on `apiv2-dev.lazywait.com`) and
+passes the allowlist.
+
 **One existing test was revised rather than deleted.** `lazywait.test.ts` had a
 case asserting the guard was "shape only", listing `some-new-pos.example.com`,
 `localhost:54321` and `10.0.0.4:8443` as values that MUST resolve. That was a
@@ -1351,3 +1360,10 @@ approval. The bundle is the whole current source, so the deploy also ships the
 2026-11-09 key handling above, and the 2026-09-14 base-URL allowlist, whose
 deploy is not recorded here. If `push-dispatch` is deployed in the same session,
 deploy it first (`docs/OWNER_ACTIONS.md` §42: receivers before senders).
+
+**Live since 2026-11-18.** `lazywait-sync` was deployed as **v15** (from v14)
+from the default branch at `5c78d17`, on the owner's word ("deploy the 9
+key-switch functions"), after `push-dispatch` (v10, the same day). Every file
+read back byte-identical to the bundle, and `verify_jwt` stays `false`. So the
+gate lines above, the 2026-11-09 key handling and the base-URL allowlist are now
+the running code. Detail: `docs/SUPABASE_API_KEYS.md` §3 "Progress".
