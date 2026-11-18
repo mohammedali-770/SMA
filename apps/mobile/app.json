@@ -51,7 +51,17 @@
         {
           "organization": "first-taste-trading-company",
           "project": "react-native",
-          "url": "https://sentry.io/"
+          "url": "https://sentry.io/",
+          "experimental_android": {
+            "enableAndroidGradlePlugin": true,
+            "includeProguardMapping": true,
+            "autoUploadProguardMapping": true,
+            "dexguardEnabled": false,
+            "uploadNativeSymbols": false,
+            "autoUploadNativeSymbols": false,
+            "includeNativeSources": false,
+            "includeSourceContext": false
+          }
         }
       ],
       [

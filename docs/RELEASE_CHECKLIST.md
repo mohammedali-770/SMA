@@ -305,10 +305,14 @@ builds. Before that build reaches testers, also check:
       Routes ship as one bundle (`asyncRoutes: false` in `app.json`), because
       Expo Router 58's lazy route chunks cannot be fetched by a tab opened before
       the deploy.
-- [ ] **Sentry and R8:** decide BEFORE this build ships whether Sentry must be able
-      to read its native Android frames (`SENTRY_OBSERVABILITY.md`, "Android
-      release builds are minified"). Turning the upload on later does not help
-      builds already shipped.
+- [ ] **Sentry and R8 (decided 2026-11-18: mapping upload on):** on the first
+      Android production build after that date, the build log shows
+      `uploadSentryProguardMappingsRelease` running and the mapping uploaded,
+      Sentry's `react-native` project lists the ProGuard mapping under Debug
+      Files, and an approved native test event shows real class names
+      (`SENTRY_OBSERVABILITY.md`, "Verify it on the first Android production
+      build"). A `sentry-android … was resolved` version warning in the log is a
+      failure. Builds shipped before it stay obfuscated.
 
 ### Customer-app resilience — added 2026-11-12
 
