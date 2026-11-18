@@ -1,51 +1,59 @@
 /**
- * Supabase API keys for Edge Functions — the legacy JWT keys AND the new opaque
- * keys, during the cut-over between them.
+ * Supabase API keys for Edge Functions — the opaque `sb_publishable_…` /
+ * `sb_secret_…` keys, and nothing else.
  *
- * WHY THIS EXISTS. Supabase deprecates the JWT-based `anon` / `service_role`
- * keys "by the end of 2026" and replaces them with opaque `sb_publishable_…` /
- * `sb_secret_…` keys (supabase.com/docs/guides/getting-started/migrating-to-new-api-keys).
- * The new keys are NOT JWTs, and that changes three things this codebase relied
- * on:
+ * WHY THIS EXISTS. Supabase retired the JWT-based `anon` / `service_role` keys
+ * (supabase.com/docs/guides/getting-started/migrating-to-new-api-keys). This
+ * module was written for the cut-over, when it preferred the new keys and fell
+ * back to the legacy ones; step 9 of `docs/SUPABASE_API_KEYS.md` §3 removed the
+ * fallback, after the legacy keys had been deactivated (step 8) and that had
+ * held. The new keys are NOT JWTs, and that changes three things:
  *
  *   1. They go on the `apikey` header ONLY. Supabase's migration guide: "Send
  *      publishable and secret keys on the `apikey` header only. If you also
  *      pass the key on the `Authorization: Bearer` header … the platform tries
- *      to parse it as a JWT and rejects the request". (The API-keys page makes an
- *      exception when the bearer exactly equals `apikey`, and the self-hosted
- *      gateway docs say it rebuilds `Authorization` in that case — but the hosted
- *      page also says such a request is "rejected as the value is not a JWT". The
- *      one behaviour every page agrees on is apikey-only, so that is what is sent.)
- *   2. The gateway's `verify_jwt` only understands the legacy keys, and "does
- *      not verify the `apikey` header" for the new ones. Every function that one
- *      of OUR functions calls is already `verify_jwt = false`, so a receiver has
- *      to check the key itself — `isServiceCall`.
+ *      to parse it as a JWT and rejects the request".
+ *   2. The gateway's `verify_jwt` does "not verify the `apikey` header" for the
+ *      new keys. Every function that one of OUR functions calls is
+ *      `verify_jwt = false`, so a receiver checks the key itself —
+ *      `isServiceCall`.
  *   3. supabase-js 2.x sends `Authorization: Bearer <key>` whenever there is no
  *      user session, so a client built with an opaque key would put it on both
  *      headers. `withoutOpaqueBearer` removes that one header and nothing else.
  *
- * THE FALLBACK IS THE POINT. Until the owner creates the new keys,
- * `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` are absent or empty, and
- * every function behaves EXACTLY as before — legacy key, same headers, byte for
- * byte. Creating the keys switches senders to the opaque format on their next
- * deploy, and receivers accept both, so deploys need not be atomic.
+ * FAIL CLOSED. `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` are the only
+ * sources. There is no legacy fallback: a missing, empty or malformed variable,
+ * or one whose entries are not opaque keys of the right kind, yields `null`, and
+ * every caller turns that into its own refusal (`MISSING_SECRET_KEY` /
+ * `MISSING_PUBLISHABLE_KEY` below). A legacy JWT is never accepted from either
+ * variable and never matched by the receiver.
+ *
+ * The one exception in the tree is `_shared/paymentSync.ts`, which reads
+ * `SUPABASE_ANON_KEY` directly and was left alone because payment code needs the
+ * owner's approval to change (CLAUDE.md §6). `legacyKeyGuard.test.ts` allows it
+ * by name and refuses any other legacy read.
  *
  * Pure: Web-standard APIs only, environment read through `globalThis.Deno` so
- * Vitest can execute it (see apiKeys.test.ts). Payment functions do not import
- * it — they are frozen (CLAUDE.md §6).
+ * Vitest can execute it (see apiKeys.test.ts).
  */
-
-export type KeyKind = 'opaque' | 'legacy';
 
 export interface ApiKey {
   value: string;
-  kind: KeyKind;
 }
+
+/** The error a function throws when it has no usable secret key. */
+export const MISSING_SECRET_KEY = 'Missing SUPABASE_URL / SUPABASE_SECRET_KEYS (no sb_secret_ key)';
+
+/** The error a function throws when it has no usable publishable key. */
+export const MISSING_PUBLISHABLE_KEY = 'Missing SUPABASE_URL / SUPABASE_PUBLISHABLE_KEYS (no sb_publishable_ key)';
 
 function env(name: string): string | undefined {
   const deno = (globalThis as { Deno?: { env?: { get(key: string): string | undefined } } }).Deno;
   return deno?.env?.get(name);
 }
+
+const SECRET_PREFIX = /^sb_secret_/;
+const PUBLISHABLE_PREFIX = /^sb_publishable_/;
 
 /** True for a new-style opaque key. A legacy key is a JWT and never starts with `sb_`. */
 export function isOpaqueKey(value: string | null | undefined): boolean {
@@ -53,11 +61,12 @@ export function isOpaqueKey(value: string | null | undefined): boolean {
 }
 
 /**
- * Every key in a `SUPABASE_*_KEYS` JSON map, `default` first. Malformed JSON,
- * a non-object, or non-string values yield nothing rather than throwing: a bad
- * new variable must fall back to the legacy key, not take the function down.
+ * Every key of the expected kind in a `SUPABASE_*_KEYS` JSON map, `default`
+ * first. Malformed JSON, a non-object, non-string values and values of the wrong
+ * kind (a legacy JWT, or a publishable key in the secret map) yield nothing
+ * rather than throwing, so the caller reports the key as missing.
  */
-function keyMap(name: string): string[] {
+function keyMap(name: string, kind: RegExp): string[] {
   const raw = env(name);
   if (!raw) return [];
   let parsed: unknown;
@@ -68,38 +77,33 @@ function keyMap(name: string): string[] {
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
   const entries = Object.entries(parsed as Record<string, unknown>).filter(
-    (e): e is [string, string] => typeof e[1] === 'string' && e[1].length > 0,
+    (e): e is [string, string] => typeof e[1] === 'string' && kind.test(e[1]),
   );
   entries.sort(([a], [b]) => (a === 'default' ? -1 : b === 'default' ? 1 : 0));
   return entries.map(([, v]) => v);
 }
 
-function pick(newVar: string, legacyVar: string): ApiKey | null {
-  const opaque = keyMap(newVar)[0];
-  if (opaque) return { value: opaque, kind: isOpaqueKey(opaque) ? 'opaque' : 'legacy' };
-  const legacy = env(legacyVar);
-  return legacy ? { value: legacy, kind: isOpaqueKey(legacy) ? 'opaque' : 'legacy' } : null;
+function pick(name: string, kind: RegExp): ApiKey | null {
+  const value = keyMap(name, kind)[0];
+  return value ? { value } : null;
 }
 
-/** The service identity: the `default` secret key, else the legacy service_role key. Bypasses RLS. */
+/** The service identity: the `default` secret key. Bypasses RLS. Null when none is configured. */
 export function secretKey(): ApiKey | null {
-  return pick('SUPABASE_SECRET_KEYS', 'SUPABASE_SERVICE_ROLE_KEY');
+  return pick('SUPABASE_SECRET_KEYS', SECRET_PREFIX);
 }
 
-/** The public identity: the `default` publishable key, else the legacy anon key. */
+/** The public identity: the `default` publishable key. Null when none is configured. */
 export function publishableKey(): ApiKey | null {
-  return pick('SUPABASE_PUBLISHABLE_KEYS', 'SUPABASE_ANON_KEY');
+  return pick('SUPABASE_PUBLISHABLE_KEYS', PUBLISHABLE_PREFIX);
 }
 
 /**
  * Headers that authenticate one of our functions calling another as the
- * service. Legacy: exactly what every sender sent before (`apikey` +
- * `Authorization: Bearer`). Opaque: `apikey` only, per point 1 above.
+ * service: `apikey` only, per point 1 above.
  */
 export function serviceCallHeaders(key: ApiKey): Record<string, string> {
-  return key.kind === 'opaque'
-    ? { apikey: key.value }
-    : { apikey: key.value, Authorization: `Bearer ${key.value}` };
+  return { apikey: key.value };
 }
 
 /** Constant-time string equality; same contract as `whatsapp.ts`'s. */
@@ -111,24 +115,19 @@ function sameSecret(a: string, b: string): boolean {
 }
 
 /**
- * Did one of OUR functions (or anything else holding the service key) make
- * this call? Accepts, during the cut-over:
- *   - the legacy form: `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>`;
- *   - the new form: `apikey` equal to ANY key in `SUPABASE_SECRET_KEYS` — any,
- *     not only `default`, so rotating a secret key never strands a sender.
- * A publishable key never matches: it is not in the secret map.
+ * Did one of OUR functions (or anything else holding the secret key) make this
+ * call? True only when `apikey` equals ANY key in `SUPABASE_SECRET_KEYS` — any,
+ * not only `default`, so rotating a secret key never strands a sender. The
+ * legacy `Authorization: Bearer <service_role>` form is no longer accepted, and
+ * a publishable key never matches: it is not in the secret map.
  */
 export function isServiceCall(req: Request): boolean {
-  const legacy = env('SUPABASE_SERVICE_ROLE_KEY');
-  const auth = req.headers.get('Authorization') ?? '';
-  if (legacy && sameSecret(auth, `Bearer ${legacy}`)) return true;
-
   const apikey = req.headers.get('apikey') ?? '';
-  if (!isOpaqueKey(apikey)) return false;
+  if (!SECRET_PREFIX.test(apikey)) return false;
   let match = false;
   // Compare against every key without returning early, so the time taken does
   // not reveal which entry (if any) matched.
-  for (const candidate of keyMap('SUPABASE_SECRET_KEYS')) {
+  for (const candidate of keyMap('SUPABASE_SECRET_KEYS', SECRET_PREFIX)) {
     if (sameSecret(apikey, candidate)) match = true;
   }
   return match;

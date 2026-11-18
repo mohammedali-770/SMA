@@ -3817,9 +3817,38 @@ then, and receivers accept both. **The steps, in this order, each a separate
    `userClient()`, which prefer the new keys, so the deploy in §47.4 moves them.
    `_shared/paymentSync.ts:25` still reads `SUPABASE_ANON_KEY` directly. Read
    `SUPABASE_API_KEYS.md` §2 before step 8 if online payment is on by then.
-9. A cleanup PR removes the fallbacks.
+9. A cleanup PR removes the fallbacks. *2026-11-18: written on
+   `security/legacy-key-cleanup-20261118`, not merged
+   (`SUPABASE_API_KEYS.md` §5).* **Merge only when all of these hold:**
+   - step 8 is done and has held;
+   - the logs show no legacy-key traffic;
+   - `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` are in the Edge
+     Function secrets;
+   - Vercel Production and Preview carry `VITE_SUPABASE_PUBLISHABLE_KEY`, since
+     a production build without it now fails rather than falling back.
 
-**Rollback:** reactivate the legacy keys; no redeploy needed.
+   The merge itself ships the web build (CLAUDE.md §13). After it, each of the
+   following is a separate action:
+   - **Redeploy the 17 non-payment functions** whose bundles change, as listed in
+     `SUPABASE_API_KEYS.md` §5, one at a time.
+   - **Leave the five payment functions alone.** Their bundles change only
+     through the shared client, and payment work is parked (CLAUDE.md §6). The
+     live bundles are Moyasar bundles that already prefer the new keys
+     (read-only inventory, 2026-11-18), so step 8 does not need them redeployed.
+     They pick up the fallback removal with the next approved payment deploy.
+   - **Remove `VITE_SUPABASE_ANON_KEY` from Vercel**, Production and Preview. No
+     code reads it any more.
+
+   **Left for the owner, and flagged:** `_shared/paymentSync.ts:25` still sends
+   `SUPABASE_ANON_KEY` as `apikey` on the post-payment kick of `lazywait-sync`.
+   After step 8 that kick should be treated as refused at the gateway. The order
+   is picked up by the next once-a-minute cron run, so nothing is lost. Fixing it
+   is one line of payment code, and that is your decision.
+
+**Rollback:** up to step 8, reactivate the legacy keys; no redeploy needed. After
+step 9's redeploys, reactivating them does not help, because those functions no
+longer read a legacy key. Restore the new-key secrets, or redeploy the
+pre-step-9 bundle (`SUPABASE_API_KEYS.md` §3).
 
 ## 43. Privacy policy — device location is used for more than the delivery pin
 

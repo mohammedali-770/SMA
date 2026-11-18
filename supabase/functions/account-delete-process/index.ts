@@ -38,8 +38,8 @@ type Admin = ReturnType<typeof adminClient>;
  * allowing pg_cron/pg_net to invoke the worker securely.
  */
 async function authorized(req: Request, admin: Admin): Promise<boolean> {
-  // Legacy `Bearer <service_role>` or an opaque secret key on `apikey`
-  // (_shared/apiKeys.ts), compared in constant time.
+  // A secret key on `apikey` (_shared/apiKeys.ts), compared in constant time.
+  // The legacy `Bearer <service_role>` form is no longer accepted.
   if (isServiceCall(req)) return true;
 
   const candidate = req.headers.get('x-process-secret');

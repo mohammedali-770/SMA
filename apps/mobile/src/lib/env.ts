@@ -3,26 +3,26 @@
  *
  * Expo inlines any `EXPO_PUBLIC_*` variable into the JS bundle at build time,
  * so these are readable on-device via `process.env`. Only NON-secret values
- * belong here: the Supabase URL and the public key (publishable, or the legacy
- * anon key). RLS is the security boundary — the public key is meant to be
- * shipped. The service_role / secret key and all provider secrets
- * (payment/SMS/push/Lazywait) must NEVER appear in the app.
+ * belong here: the Supabase URL and the publishable key. RLS is the security
+ * boundary — the publishable key is meant to be shipped. The secret key and all
+ * provider secrets (payment/SMS/push/Lazywait) must NEVER appear in the app.
  */
 export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 
 /**
- * The public Supabase key: the new publishable key (`sb_publishable_…`) once
- * EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY is set, else the legacy anon JWT, which
- * Supabase retires by the end of 2026 (docs/SUPABASE_API_KEYS.md). Both are
- * public by design; RLS is the boundary.
+ * The public Supabase key: the publishable key (`sb_publishable_…`) and nothing
+ * else. The legacy anon JWT it used to fall back to was deactivated
+ * (docs/SUPABASE_API_KEYS.md §3, steps 8 and 9), so a build without the
+ * publishable key reports itself unconfigured instead of shipping a key the
+ * gateway refuses.
  *
- * Each is read as a DIRECT `process.env.EXPO_PUBLIC_*` member expression — the
- * only shape Expo inlines into the bundle — and joined with `||`, not `??`, so
- * an empty publishable value falls through to the legacy key instead of
- * shipping an app with no key at all.
+ * Read as a DIRECT `process.env.EXPO_PUBLIC_*` member expression — the only
+ * shape Expo inlines into the bundle. A value that is not a publishable key
+ * (empty, a leftover legacy JWT, or a `sb_secret_…` key pasted by mistake)
+ * counts as missing.
  */
-export const SUPABASE_PUBLIC_KEY =
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const PUBLISHABLE_KEY = (process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '').trim();
+export const SUPABASE_PUBLIC_KEY = /^sb_publishable_/.test(PUBLISHABLE_KEY) ? PUBLISHABLE_KEY : '';
 
 /** True only when both public Supabase env vars are present. */
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLIC_KEY);

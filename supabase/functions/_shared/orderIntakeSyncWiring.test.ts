@@ -273,7 +273,7 @@ describe('targeted kick and deferred off-path work', () => {
   });
 
   it('never lets a missing service-role env fail the order', () => {
-    // serviceTarget() THROWS when SUPABASE_SERVICE_ROLE_KEY is absent — the same
+    // serviceTarget() THROWS when SUPABASE_SECRET_KEYS has no secret key — the same
     // contract adminClient() had, and rest.test.ts pins the message. It used to
     // sit inside the sync block's try/catch; hoisting it bare to start the
     // config read early would turn a misconfigured environment into a failed

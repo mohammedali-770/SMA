@@ -22,7 +22,6 @@ Every environment variable the code reads, split by whether its value is visible
 - `EXPO_PUBLIC_SENTRY_DEV`
 - `EXPO_PUBLIC_SENTRY_DSN`
 - `EXPO_PUBLIC_SENTRY_ENV`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
 - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 - `EXPO_PUBLIC_SUPABASE_URL`
 - `EXPO_PUBLIC_VERCEL_ENV`
@@ -34,7 +33,6 @@ Every environment variable the code reads, split by whether its value is visible
 - `VITE_SENTRY_DEV`
 - `VITE_SENTRY_DSN`
 - `VITE_SENTRY_ENV`
-- `VITE_SUPABASE_ANON_KEY`
 - `VITE_SUPABASE_PUBLISHABLE_KEY`
 - `VITE_SUPABASE_URL`
 - `VITE_VERCEL_ENV`
@@ -54,7 +52,6 @@ Read by Edge Functions from the Deno environment. These are secrets. They live i
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_PUBLISHABLE_KEYS`
 - `SUPABASE_SECRET_KEYS`
-- `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_URL`
 - `WHATSAPP_OTP_HMAC_SECRET`
 

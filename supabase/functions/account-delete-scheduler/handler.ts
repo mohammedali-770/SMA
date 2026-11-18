@@ -35,7 +35,7 @@ export async function handler(req: Request): Promise<Response> {
 
   const admin = createClient(url, serviceKey.value, {
     auth: { persistSession: false, autoRefreshToken: false },
-    ...(serviceKey.kind === 'opaque' ? { global: { fetch: withoutOpaqueBearer() } } : {}),
+    global: { fetch: withoutOpaqueBearer() },
   });
 
   const { data: authorized, error: authError } = await admin.rpc('verify_account_deletion_process_secret', {
@@ -47,7 +47,7 @@ export async function handler(req: Request): Promise<Response> {
     const upstream = await fetch(`${url}/functions/v1/account-delete-process`, {
       method: 'POST',
       headers: {
-        // Legacy: Authorization + apikey, as before. Opaque: apikey only.
+        // apikey only: the secret key is not a JWT (_shared/apiKeys.ts).
         ...serviceCallHeaders(serviceKey),
         'Content-Type': 'application/json',
       },

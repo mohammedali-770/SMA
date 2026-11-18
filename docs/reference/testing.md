@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**280 TypeScript test files declaring 4165 test blocks, plus 97 SQL suites.**
+**281 TypeScript test files declaring 4178 test blocks, plus 97 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -162,7 +162,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-100 files, 1358 declared test blocks.
+100 files, 1362 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -231,7 +231,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/i18n/strings.test.ts` | 11 | STRINGS |
 | `apps/mobile/src/lib/catalogSelect.test.ts` | 5 | catalog select lists |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
-| `apps/mobile/src/lib/env.test.ts` | 7 | SUPABASE_PUBLIC_KEY |
+| `apps/mobile/src/lib/env.test.ts` | 11 | SUPABASE_PUBLIC_KEY |
 | `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
@@ -269,7 +269,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-135 files, 1841 declared test blocks.
+135 files, 1842 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -402,7 +402,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
 | `src/lib/staleAssetRecovery.test.ts` | 15 | failedAssetUrl |
-| `src/lib/supabaseKey.test.ts` | 17 | publicSupabaseKey |
+| `src/lib/supabaseKey.test.ts` | 18 | publicSupabaseKey |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/vercelConfig.test.ts` | 13 | vercel.json is expressible by this model |
 | `src/lib/webBudget.test.ts` | 8 | startupFontNames |
@@ -411,13 +411,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-44 files, 957 declared test blocks.
+45 files, 965 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
-| `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
+| `supabase/functions/_shared/adminAuthWiring.test.ts` | 19 | staff-accounts privileged actions |
 | `supabase/functions/_shared/adminPush.test.ts` | 50 | scopeFor |
 | `supabase/functions/_shared/adminPushWiring.test.ts` | 29 | the admin channel is separate from the customer channel |
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 18 | operations-alert-dispatch is inert until deliberately enabled |
@@ -432,6 +432,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | lazywait-sync, told order_cancelled by the gate |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
+| `supabase/functions/_shared/legacyKeyGuard.test.ts` | 6 | the legacy Supabase API keys stay out of the tree |
 | `supabase/functions/_shared/moyasar.test.ts` | 118 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 24 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
@@ -446,7 +447,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
-| `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
+| `supabase/functions/_shared/rest.test.ts` | 42 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
 | `supabase/functions/_shared/smtpTarget.test.ts` | 24 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |

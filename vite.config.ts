@@ -50,7 +50,6 @@ function prerenderLegal(): Plugin {
         const url = process.env.VITE_SUPABASE_URL;
         const key = publicSupabaseKey({
           VITE_SUPABASE_PUBLISHABLE_KEY: process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY,
         });
         if (!url || !key) {
           note(`skipped: VITE_SUPABASE_URL / ${PUBLIC_KEY_ENV_NAMES} not set`);

@@ -28,7 +28,7 @@ vi.mock('./supabaseClient.ts', () => ({
  * Fails on push-dispatch v9: every cancelled case sends.
  */
 
-const SERVICE_KEY = 'service-role-fixture';
+const SERVICE_KEY = 'sb_secret_fixture0000';
 const POS_STATUSES = ['pos_failed', 'pos_retrying', 'pos_confirmation_required', 'pos_confirmed'] as const;
 const LIVE_STATUSES = ['received', 'preparing', 'ready', 'out_for_delivery', 'delivered'] as const;
 
@@ -40,7 +40,10 @@ function event(db: FakeDb, orderId: string, status: string): Row | undefined {
 }
 
 beforeEach(() => {
-  db = freshDb({ SUPABASE_URL: 'https://project.example', SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY });
+  db = freshDb({
+    SUPABASE_URL: 'https://project.example',
+    SUPABASE_SECRET_KEYS: JSON.stringify({ default: SERVICE_KEY }),
+  });
   db.rows('integration_settings').push({
     provider_type: 'push',
     enabled: true,
@@ -124,7 +127,8 @@ async function dispatch(orderId: string, status: string) {
   const res = await h(
     new Request('https://project.example/functions/v1/push-dispatch', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_KEY}` },
+      // The service call as lazywait-sync makes it: the secret key on `apikey` only.
+      headers: { 'Content-Type': 'application/json', apikey: SERVICE_KEY },
       body: JSON.stringify({ action: 'pos_sync', orderId, status }),
     }),
   );

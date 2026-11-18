@@ -3,6 +3,11 @@
 > Owner of: `supabase/functions/_shared/apiKeys.ts` and every call site that
 > holds a Supabase API key. Written 2026-11-09 as Workstream S1 of the
 > 2026-11-09 compliance plan. Owner steps are mirrored in `OWNER_ACTIONS.md` §42.
+>
+> **Amended 2026-11-18 by the step 9 cleanup (§5 below).** That change removes every
+> legacy fallback and may be merged **only after step 8 has been done and has
+> held, with no legacy-key traffic in the logs**. Where §2 says "before step 9",
+> it describes the code that shipped from 2026-11-09 until that merge.
 
 ## 1. Why, and by when
 
@@ -60,19 +65,36 @@ with that:**
 `apiKeys.test.ts`):
 
 - `secretKey()` / `publishableKey()` return the `default` entry of
-  `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` once the project has new
-  keys, and **fall back to the legacy key otherwise** — malformed or empty JSON
-  included. Until the owner creates the keys, every function behaves exactly as
-  before, headers byte-for-byte.
+  `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS`, and **nothing else**.
+  An entry must be an `sb_secret_…` / `sb_publishable_…` key respectively, so a
+  legacy JWT or the wrong kind of key in the map is ignored. With no usable key
+  they return `null`, and `adminClient()`, `userClient()`, `serviceTarget()` and
+  `callerTarget()` throw `MISSING_SECRET_KEY` / `MISSING_PUBLISHABLE_KEY`, which
+  name the new variables. **Before step 9** they fell back to
+  `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_ANON_KEY`.
 - `serviceCallHeaders(key)` — for one of our functions calling another as the
-  service: legacy → `apikey` + `Authorization: Bearer` (unchanged); opaque →
-  `apikey` only.
-- `isServiceCall(req)` — the receiver side. Accepts the legacy
-  `Authorization: Bearer <service_role>` **or** an opaque secret on `apikey`
-  matching **any** key in `SUPABASE_SECRET_KEYS` (so rotating a secret key never
-  strands a sender). Constant-time. A publishable key never matches.
+  service: `apikey` only. **Before step 9** a legacy key also went on
+  `Authorization: Bearer`.
+- `isServiceCall(req)` — the receiver side. Accepts only an `sb_secret_…` key on
+  `apikey` that matches **any** key in `SUPABASE_SECRET_KEYS`, so rotating a
+  secret key never strands a sender. Constant-time. Neither a publishable key
+  nor the legacy `Authorization: Bearer <service_role>` matches. **Before step
+  9** that legacy Bearer was accepted as well.
 - `withoutOpaqueBearer()` — a fetch wrapper for supabase-js that drops only
-  `Authorization: Bearer sb_…`. A forwarded user JWT is untouched.
+  `Authorization: Bearer sb_…`. A forwarded user JWT is untouched. Since step 9
+  every client is built with it.
+
+The clients read only the publishable key: `src/lib/supabaseKey.ts`
+(`VITE_SUPABASE_PUBLISHABLE_KEY`, used by the console, the legal pages and the
+prerender) and `apps/mobile/src/lib/env.ts`
+(`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`). A value that does not start with
+`sb_publishable_` counts as unset, so a leftover legacy JWT or a pasted secret
+key makes the app report itself unconfigured. A Vercel production build in that
+state fails, and Vercel keeps serving the previous deployment.
+
+`legacyKeyGuard.test.ts` fails if any file outside its allow-list contains a
+legacy key JWT for this project, or reads one of the four legacy variables. The
+allow-list is `_shared/paymentSync.ts` (below) and test files.
 
 **Every service-key call site, and what moved:**
 
@@ -104,6 +126,33 @@ with that:**
   them to the helper. **`_shared/paymentSync.ts:25` still reads
   `SUPABASE_ANON_KEY` directly**, and that was not changed by the Moyasar work.
   If online payment is on before step 8, check that file first.
+
+  **Still not changed by step 9, on purpose.** Payment code needs the owner's
+  approval to change while Moyasar is parked, so the cleanup leaves
+  `triggerLazywaitSyncOnce` as it is and the guard allows it by name. What that
+  means once the legacy keys are deactivated:
+  - the post-payment kick sends the deactivated anon key as `apikey` to
+    `lazywait-sync`. **Treat that best-effort kick as refused.** The function
+    itself would not refuse it: v15 never reads `apikey`, is `verify_jwt =
+    false`, and authorizes only on `x-sync-secret` (`lazywait-sync/index.ts`
+    lines 34-50). But the request reaches the gateway first. The hosted gateway
+    checks `apikey` against the project's keys, and Supabase does not document
+    whether it lets a deactivated legacy JWT through to a `verify_jwt = false`
+    function. That was not measured, because measuring it needs the legacy keys
+    deactivated;
+  - nothing is lost. The kick is wrapped in `try`, has an 11-second timeout and
+    never fails the payment, and the once-a-minute `lazywait-sync` cron, which
+    sends only `x-sync-secret`, picks the paid order up on its next run. The cost
+    is up to about a minute of POS latency for an online order;
+  - it matters only while online payment is on. The live payment functions are
+    all Moyasar bundles (read-only inventory, 2026-11-18): deployed 2026-11-13,
+    `payment-refund` 2026-11-17, each byte-identical to the default branch at
+    `5c78d17`. Their Supabase clients already use the new-key helper, so they
+    keep working at step 8. This kick is the only part of them that does not.
+
+  **Fixing it is an owner decision**: one line, `apikey:
+  publishableKey()?.value`, as `order-intake` does. The guard's last test then
+  fails until the allow-list entry is removed.
 - **The JWT signing-key migration** is a separate, independent change. The
   user access tokens Supabase Auth issues are still signed by the project's JWT
   secret; rotating that secret would invalidate every session at once. Out of
@@ -115,9 +164,10 @@ with that:**
 ## 3. Owner steps, in order (each is a separate §5 action)
 
 **Progress, 2026-11-18.**
+- **Step 9 is written and NOT merged** (`security/legacy-key-cleanup-20261118`, §5 below). Merge it only after step 8 has held.
 - **Step 2 is done.** A publishable key (`default`) and a secret key exist alongside the legacy ones (owner-confirmed; the publishable key read through the Supabase connector).
 - **§4's open question is settled:** sending the publishable key on both `apikey` and `Authorization: Bearer` returned 200 from `GET /auth/v1/settings` and from the `legal_documents` read.
-- **Step 6's `eas.json` prerequisite is this change:** all three profiles carry `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, pinned by `apps/mobile/src/lib/env.test.ts`, which also refuses any `sb_secret_` value. The legacy anon variable stays as the fallback until step 9.
+- **Step 6's `eas.json` prerequisite landed in #485:** all three profiles carry `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, pinned by `apps/mobile/src/lib/env.test.ts`, which also refuses any `sb_secret_` value. The legacy anon variable stayed as the fallback until step 9, which removes it from all three.
 - **Steps 3–5, the build itself, and 7–9 are still to do.**
 
 The order exists so that no step can break a running path: receivers learn the
@@ -134,11 +184,18 @@ depends on them.
 | 6 | **December EAS build pair** with the publishable key, distributed to every tester. Needs `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` added to the three `apps/mobile/eas.json` profiles first: a small PR, and the value is public | installed binaries carry the old key until replaced | the app signs in and orders on the new build |
 | 7 | Logs: confirm no remaining legacy-key traffic | a remaining caller would break at step 8 | — |
 | 8 | Verify `online_payment_enabled = false`, then **deactivate** the legacy keys (reversible) | the payment functions go dark here, by decision | smoke test: order, push, deletion request, alerts |
-| 9 | Cleanup PR removes the legacy fallbacks | only once step 8 has held | — |
+| 9 | Merge the cleanup PR that removes the legacy fallbacks (§5 below), then redeploy each function in §5's list, one at a time, each its own CLAUDE.md §5 action. Then remove `VITE_SUPABASE_ANON_KEY` from Vercel (Production and Preview) | only once step 8 has held and the logs show no legacy-key traffic | after each redeploy, the same smoke test as step 8; after the Vercel change, the console signs in and `/app` reaches the login screen |
 
-**Rollback at any step:** reactivate the legacy keys (the dashboard toggle is
-reversible). Because every helper prefers the new key but accepts the old one,
-re-deploying an older bundle is never needed.
+**Rollback at any step up to 8:** reactivate the legacy keys (the dashboard
+toggle is reversible). Because every helper before step 9 prefers the new key
+but accepts the old one, re-deploying an older bundle is never needed.
+
+**Rollback after step 9 is different.** A function redeployed from the cleanup
+no longer reads or accepts a legacy key. Reactivating the legacy keys therefore
+does not help it. A function that breaks because `SUPABASE_SECRET_KEYS` /
+`SUPABASE_PUBLISHABLE_KEYS` went missing must be fixed by restoring those
+secrets, or by redeploying the pre-step-9 bundle. Web builds that fail the same
+way are fixed by restoring the Vercel variable.
 
 ## 4. What is not yet known, stated rather than glossed
 
@@ -158,3 +215,93 @@ re-deploying an older bundle is never needed.
   correctness does not depend on the answer.
 - Supabase's exact deletion date ("Late 2026, TBC"). Steps 2-8 should therefore
   finish in December, not wait for an announcement.
+
+## 5. Step 9 — the cleanup (written 2026-11-18, not merged)
+
+Branch `security/legacy-key-cleanup-20261118`. It removes every legacy-key
+fallback in the tree except one: `_shared/paymentSync.ts` (§2).
+
+### Merge preconditions — all four, checked on the day
+
+1. **Step 8 is done and has held.** The legacy keys are deactivated, and
+   ordering, push, deletion requests and alerts have kept working since.
+2. **No legacy-key traffic in the logs** (step 7 repeated after step 8). Use the
+   dashboard's "last used" indicators for the legacy keys, and the Edge Function
+   logs for 401s.
+3. **The new keys are present where the code now requires them.** Edge
+   Functions → Secrets lists `SUPABASE_SECRET_KEYS` and
+   `SUPABASE_PUBLISHABLE_KEYS`. Vercel Production **and** Preview carry
+   `VITE_SUPABASE_PUBLISHABLE_KEY` (step 5). Without it, a production build now
+   fails instead of falling back. `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` should
+   be set too, although `/app` now falls back to the publishable key in
+   `export-web.js` rather than to the legacy JWT.
+4. **The installed apps already carry the publishable key** (step 6's December
+   build pair). The cleanup removes the legacy anon key from all three
+   `eas.json` profiles. Builds made after it have only the publishable key.
+
+**A merge ships the web build.** Per CLAUDE.md §13, every merge to the default
+branch reaches Vercel production. The function bundles do **not** change until
+each redeploy below.
+
+### What changes
+
+- **Functions:** `apiKeys.ts` reads only the new keys and fails closed (§2).
+  `serviceTarget()` sends `apikey` alone. Receivers accept only an `sb_secret_…`
+  key on `apikey`. The supabase-js clients always use `withoutOpaqueBearer`.
+- **Clients:** the console, the legal pages, the prerender and the Expo app read
+  only the publishable key. `eas.json` and `export-web.js` no longer contain the
+  legacy anon JWT, and `export-web.js` now falls back to the same publishable key
+  the EAS profiles ship. `.env.example`, `apps/mobile/.env.example` and
+  `src/vite-env.d.ts` no longer name the anon variable.
+- **Guard:** `legacyKeyGuard.test.ts` (§2). It was mutation-tested: re-adding
+  any one of six legacy reads or literals (`env('SUPABASE_SERVICE_ROLE_KEY')`
+  and `Deno.env.get('SUPABASE_ANON_KEY')` in `apiKeys.ts`,
+  `process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY` in `env.ts`,
+  `import.meta.env.VITE_SUPABASE_ANON_KEY` in `supabase.ts`, the anon JWT in
+  `eas.json`, and a service_role JWT in a document) fails it. Fixing
+  `paymentSync.ts` fails its exception test.
+
+### Redeploys — each one a separate CLAUDE.md §5 action
+
+Computed by diffing every function's local import closure against the default
+branch at `5c78d17`. A function is listed when any file in its bundle differs.
+
+**22 of 24 functions change.** Most change only because they bundle
+`_shared/apiKeys.ts` and `_shared/supabaseClient.ts`:
+
+- **Receivers.** Their own `index.ts` changes too: `push-dispatch`,
+  `admin-push-dispatch`, `operations-alert-dispatch`, `account-delete-process`.
+- **Senders and the checkout path:** `lazywait-sync`, `account-delete-request`,
+  `account-delete-scheduler` (`handler.ts`), and `order-intake`. `order-intake`
+  is four files, of which `index.ts`, `rest.ts` and `apiKeys.ts` change;
+  `ORDER_CONFIRMATION_FLOW.md`.
+- **Shared client only:** `auth-send-sms-whatsapp`, `email-test-config`,
+  `lazywait-catalog`, `lazywait-webhook`, `staff-accounts`, `whatsapp-send-otp`,
+  `whatsapp-test-config`, `whatsapp-verify-otp`, `whatsapp-webhook`.
+- **Payment, and NOT part of this cleanup's deploys:** `payment-initiate`,
+  `payment-refund`, `payment-test-config`, `payment-verify`, `payment-webhook`.
+  Their bundles change only through `supabaseClient.ts`. Leave them out for
+  three reasons:
+  - payment work is parked (CLAUDE.md §6), and approval for this cleanup does
+    not cover a payment deploy;
+  - the live bundles are Moyasar bundles that already prefer the new keys
+    (read-only inventory, 2026-11-18), so step 8 does not need them redeployed;
+  - they pick up the fallback removal with the next approved payment deploy.
+- **Unchanged:** `payment-admin-test-return`, `payment-return`.
+
+**Order.** Before step 9, every receiver already accepted the `apikey`-only
+form, and every sender redeployed at step 4 already sends it. So these
+redeploys can go in any order. Receivers first is still the conservative
+choice. Before each redeploy, confirm the function's step 3/4 deploy is live: a
+sender still on a pre-2026-11-09 bundle would send the legacy Bearer, which a
+step-9 receiver refuses.
+
+### After merge — owner steps
+
+- Remove **`VITE_SUPABASE_ANON_KEY`** from Vercel, Production and Preview. No
+  code reads it any more. This is a Vercel change, so it is its own CLAUDE.md §5 action.
+  Do the same for `EXPO_PUBLIC_SUPABASE_ANON_KEY` if it was ever set there.
+- Leave `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` in the Edge Function
+  environment alone. No step-9 code reads the second, but `paymentSync.ts` still
+  reads the first, and whether the platform lets them be removed at all is not
+  documented here.

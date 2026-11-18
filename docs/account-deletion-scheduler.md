@@ -52,7 +52,15 @@ The scheduler and the post-request kick reach `account-delete-process` with
 and the processor recognises them with the shared constant-time `isServiceCall`.
 While only legacy keys exist the wire format is unchanged; once a secret key
 exists it travels on `apikey` alone. The Vault-held `x-process-secret` path is
-untouched. Deploy order (processor before its callers) and rollback:
+untouched.
+
+**Step 9 cleanup (2026-11-18, merged only after step 8 held):** the legacy
+fallback is gone. The scheduler answers 503 `scheduler_unavailable` when
+`SUPABASE_SECRET_KEYS` holds no `sb_secret_…` key, even if
+`SUPABASE_SERVICE_ROLE_KEY` is still set; the processor no longer accepts the
+legacy `Bearer <service_role>`. `handler_test.ts` pins both. All three
+account-deletion functions need a redeploy for it (`docs/SUPABASE_API_KEYS.md`
+§3, step 9). Deploy order (processor before its callers) and rollback:
 `docs/SUPABASE_API_KEYS.md` §3.
 
 ## Tests (2026-11-12)
