@@ -218,10 +218,22 @@ native Android frames arrive obfuscated until the mapping is uploaded
 
 **R8 is a choice, not an SDK 58 default.** The SDK 58 template still defaults
 `enableMinifyInReleaseBuilds` to false, and the rule above binds only where DEX
-exceeds 10 MB. Whether Sentry must read this bundle's native frames has to be decided
-before it ships, because a mapping uploaded later cannot be matched to a build made
-without Sentry's Gradle plugin. Play Console de-obfuscates either way, from the
-mapping inside the bundle.
+exceeds 10 MB. Play Console de-obfuscates either way, from the mapping inside the
+bundle.
+
+**Decided 2026-11-18: Sentry gets the mapping too.** From the next EAS Android
+build, the Sentry Android Gradle Plugin uploads each production bundle's R8 mapping
+(`SENTRY_OBSERVABILITY.md`, "Android release builds are minified"). For this record,
+what changes in the bundle and what does not:
+
+- the bundle gains two assets from the plugin: `sentry-debug-meta.properties`,
+  which carries the build's ProGuard UUID (`io.sentry.ProguardUuids`), and a list
+  of the app's Java dependencies. Neither is a permission, a manifest declaration
+  or a user-facing string; the declared permissions are unchanged;
+- the mapping is a build artifact about the app's own code. Uploading it sends no
+  customer data, so the Data safety answers below are unchanged;
+- bundles shipped before that build stay obfuscated in Sentry, because a mapping
+  uploaded later cannot be matched to a build made without the plugin.
 
 
 ---

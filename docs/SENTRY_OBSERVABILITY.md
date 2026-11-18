@@ -104,8 +104,8 @@ next EAS Android build; every build before it stays obfuscated (see below).
   `sentry { ... }` block in `android/app/build.gradle`; without it, nothing
   Sentry-related is generated at all.
 - **A build already shipped stays obfuscated.** Sentry matches a mapping to an
-  event through a ProGuard UUID that SAGP builds into the app
-  (`io.sentry.proguard-uuid`). A build made without the plugin carries none, so no
+  event through a ProGuard UUID that SAGP builds into the app (the
+  `io.sentry.ProguardUuids` entry of the `sentry-debug-meta.properties` asset). A build made without the plugin carries none, so no
   later upload can de-obfuscate it.
 - **Preview builds bundle the UUID but do not upload.** `eas.json` sets
   `SENTRY_DISABLE_AUTO_UPLOAD=true` for development and preview, which the Gradle

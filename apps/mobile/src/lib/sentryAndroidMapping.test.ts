@@ -99,7 +99,10 @@ async function prebuildAndroidGradle(props: Record<string, unknown>) {
     withSentry: (config: ExpoConfig, props: Record<string, unknown>) => Record<string, unknown>;
   };
   // A fresh object each time: the plugin deletes keys from its props.
-  const config = withSentry({ name: 'sentry-mapping-test', slug: 'sentry-mapping-test' }, structuredClone(props));
+  const config = withSentry(
+    { name: 'sentry-mapping-test', slug: 'sentry-mapping-test' },
+    structuredClone(props),
+  );
   return {
     project: await runGradleMod(config, 'projectBuildGradle', PROJECT_BUILD_GRADLE),
     app: await runGradleMod(config, 'appBuildGradle', APP_BUILD_GRADLE),
