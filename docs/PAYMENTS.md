@@ -260,15 +260,19 @@ panel → **Run** creates a 1.00 SAR test invoice that is linked to no order and
 opens it in a new browser tab. **Check** reads the result back and shows the
 amount in riyals (`1.00 SAR`). It needs the row **enabled**, provider `moyasar`
 and mode `test`; with the row disabled, Run answers "Enable Moyasar first."
-Enabling the row in TEST mode lets no customer pay: the Online Payment switch
-stays off, and `payment-initiate` refuses customer checkout in TEST mode. It never touches an order,
+Enabling the row in TEST mode lets no customer pay unless the testing-phase
+switch below is on: without it, `payment-initiate` refuses customer checkout in
+TEST mode. The sandbox itself never touches an order,
 `payment_records`, the POS or the app.
 
-**The console's Online Payment switch opens only for a live, enabled Moyasar
-row** (Settings → Payment Methods). Switching it off is always allowed. This
+**The console's Online Payment switch opens for an enabled Moyasar row in live
+or TEST mode** (Settings → Payment Methods). TEST mode was added 2026-11-18 for
+the testing phase; before that it opened only for a live row. Switching it off
+is always allowed. This
 guards the console control, not the setting: `set_payment_settings` checks
 `is_admin()` alone, so a direct RPC call can still turn it on. What keeps a
-customer from paying in TEST mode is `payment-initiate`'s refusal.
+customer from paying in TEST mode is `payment-initiate`'s refusal, which only
+the testing-phase switch below lifts.
 
 **The web build (`/app`) never offers online payment.** The app hides the online
 option on `web`, because the hosted page needs the in-app WebView. This takes
@@ -298,10 +302,9 @@ With it on:
 
 What it does **not** change: live mode, the 1.00 SAR minimum, the checkout-URL
 check, refunds, the console's sandbox (its invoices have no attempt row, so they
-never reach confirmation) and the console's Online Payment switch, which still
-opens only for a live row. So in TEST mode the setting
-`app_settings.online_payment_enabled` has to be turned on some other way for the
-app to offer card payment (`OWNER_ACTIONS.md` §60, step 4).
+never reach confirmation). The console's Online Payment switch, which the app
+needs on before it offers card payment, can be turned on in TEST mode since the
+same change (`OWNER_ACTIONS.md` §60, step 4).
 
 **One check stays on even with the switch on.** A TEST attempt is handed out
 only while the gateway is still configured in TEST. An attempt opened in TEST
