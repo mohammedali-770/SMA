@@ -291,6 +291,19 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
+**AMENDED 2026-11-18 — `20261016120000_refund_retry_backoff` is written,
+validated and UNAPPLIED, so on merge the outstanding set is exactly ONE: that
+file** (branch `fix/refund-retry-backoff-20261117`). With it merged the count
+below becomes **160 repository files / 165 live history rows / 157 applied, 2
+superseded (rows 8-9), 1 unapplied**; read live 2026-11-18, latest version
+still `20261118045145` and no history row for this file. Refund back-off, a
+10-attempt cap and watchdog rule R18 (gap PG-01, the owner's numbers); database
+only, no deploy implied; money path self-asserted (`12b6816d…` / `22e2d429…`).
+ONE is the dangerous shape: "apply the outstanding migrations" would have
+exactly one referent and still is not an instruction. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §68 (ledger row 121); steps:
+`docs/OWNER_ACTIONS.md` §58.
+
 **Current position 2026-11-18, read live AFTER the cancelled-order follow-ups
 apply: 159 repository files on the default branch / 165 live history rows / 157
 applied, 2 superseded, 0 unapplied.** Latest live version `20261118045145`. On

@@ -231,10 +231,12 @@ begin
   -- run bookkeeping
   if (select status from public.order_integrity_runs where id=v_run) <> 'success' then
     raise exception 'MATRIX FAILED: run not success'; end if;
-  -- 17 since 20261013120000 added R14-R17 (refunds and payments); this matrix
-  -- seeds none of their events, and payment_refund_visibility_test.sql covers them.
-  if (select rules_evaluated from public.order_integrity_runs where id=v_run) <> 17 then
-    raise exception 'MATRIX FAILED: rules_evaluated <> 17'; end if;
+  -- 17 since 20261013120000 added R14-R17 (refunds and payments), 18 since
+  -- 20261016120000 added R18 (a refund still being retried); this matrix seeds
+  -- none of their events, and payment_refund_visibility_test.sql and
+  -- refund_retry_backoff_test.sql cover them.
+  if (select rules_evaluated from public.order_integrity_runs where id=v_run) <> 18 then
+    raise exception 'MATRIX FAILED: rules_evaluated <> 18'; end if;
 
   -- per-rule detection counts
   if (select count(*) from public.order_integrity_incidents where rule_code='PAID_ORDER_NOT_SYNCED') <> 3 then

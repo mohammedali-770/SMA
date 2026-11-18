@@ -132,6 +132,8 @@ export const RULE_CODES = [
   // 20261013120000: refunds and payments that need a person (gaps PG-01, PG-02).
   'REFUND_FAILED', 'DUPLICATE_PAYMENT_RECORDED', 'PAYMENT_VERIFICATION_MISMATCH',
   'PAYMENT_CONFIRMATION_FAILED',
+  // 20261016120000: a refund still being retried (gap PG-01).
+  'REFUND_STUCK',
 ];
 
 /** Short display form for a branch/order uuid. */

@@ -96,6 +96,24 @@ end $$;
 -- moment of the release. Inside this one test transaction now() never moves,
 -- so the release time is restamped from clock_timestamp() (replica mode skips
 -- set_updated_at, which would put now() back).
+--
+-- Since 20261016120000 a release also backs the refund off (next_attempt_at).
+-- These cases are about the ORDER of the queue and the per-run exclusion, not
+-- about the wait, so prv_due() treats the wait as over; the wait itself is
+-- pinned by refund_retry_backoff_test.sql. The column is written only where it
+-- exists, so each block still runs against an older chain, and in replica mode,
+-- so set_updated_at does not move the refund in the queue.
+create function pg_temp.prv_due(p_refund uuid) returns void language plpgsql as $$
+begin
+  if exists (select 1 from information_schema.columns
+              where table_schema = 'public' and table_name = 'order_refunds'
+                and column_name = 'next_attempt_at') then
+    set local session_replication_role = replica;
+    execute 'update public.order_refunds set next_attempt_at = null where id = $1' using p_refund;
+    set local session_replication_role = origin;
+  end if;
+end $$;
+
 create function pg_temp.prv_release(p_refund uuid, p_token text) returns void language plpgsql as $$
 begin
   if not public.finalize_order_refund(p_refund, p_token, 'pending', null, null, null) then
@@ -104,6 +122,7 @@ begin
   set local session_replication_role = replica;
   update public.order_refunds set updated_at = clock_timestamp() where id = p_refund;
   set local session_replication_role = origin;
+  perform pg_temp.prv_due(p_refund);
 end $$;
 
 -- Run the watchdog n times; return the last run's status.
@@ -232,6 +251,8 @@ begin
     v_hits := v_hits + 1;
     v_seen := v_seen || v_claim;
     perform public.finalize_order_refund(v_claim, 'prv-2-' || i, 'pending', null, 'moyasar_ip_not_allowed', 'probe');
+    -- Due again at once, so it is the exclusion list that keeps it out.
+    perform pg_temp.prv_due(v_claim);
   end loop;
   if v_hits <> 1 then
     raise exception 'CASE 2 FAILED: one stuck refund was claimed % times in one run, expected 1', v_hits;
@@ -250,6 +271,7 @@ begin
     raise exception 'CASE 2 FAILED: a NULL in the exclusion list hid the queue (got %)', v_claim;
   end if;
   perform public.finalize_order_refund(v_s, 'prv-2-null', 'pending', null, null, null);
+  perform pg_temp.prv_due(v_s);
   -- And an explicit NULL list is an empty one.
   select refund_id into v_claim from public.claim_order_refund('prv-2-nulllist', null);
   if v_claim is distinct from v_s then

@@ -62,11 +62,14 @@ are considered safe operational identifiers and are shown.
 
 ---
 
-## 3. Rules (17 supported)
+## 3. Rules (18 supported)
 
 Rules 14-17 are added by `20261013120000_payment_refund_visibility.sql`
 (`MIGRATIONS.md` §65). **Written 2026-11-14, applied 2026-11-17;** until
-then Production evaluated 13.
+then Production evaluated 13. Rule 18 is added by
+`20261016120000_refund_retry_backoff.sql` (`MIGRATIONS.md` §68), **written
+2026-11-17 and not live until that file is applied;** until then Production
+evaluates 17.
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
@@ -91,6 +94,7 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 15 | `DUPLICATE_PAYMENT_RECORDED` | critical | a `payment_records` row `failed` with `failure_code='duplicate_payment'`: a second payment for something already paid (`PAYMENTS.md` §10). Nothing refunds it automatically. |
 | 16 | `PAYMENT_VERIFICATION_MISMATCH` | critical | a `payment_records` row `failed` with `failure_code='verification_mismatch'`: Moyasar reports it settled, but it matched no attempt, so it confirmed nothing. |
 | 17 | `PAYMENT_CONFIRMATION_FAILED` | critical | a Moyasar payment logged in `integration_sync_logs` as `failed` with `error` `finalize_failed` (no order was created) or `confirm_failed` (the order was not marked paid), while no `payment_records` row for that payment id is `paid` or `refunded`, or is a duplicate or mismatch record. One incident per **payment**, fingerprinted by `md5('moyasar:'\|\|payment id)` like R5, so the payment id itself never enters the watchdog's tables. |
+| 18 | `REFUND_STUCK` | warning, then critical | an `order_refunds` row still `pending` with `attempt_count >= 1` (the worker tried it and released it), opened (`created_at`) **more than 1 hour** ago: **warning**; **more than 24 hours** ago: **critical**. A refund never tried, or one being processed, raises nothing. One incident per **order**; its severity follows the refund's age, so the same incident turns critical in place (§5). `safe_details` carries the last failure code, attempts, amount, age and seconds until the next try, and only a yes/no for the error text. Owner thresholds, gap PG-01, 2026-11-17. |
 
 > ### ✅ CLOSED by R12/R13 — R1 and R7 could not see a cash order, and every real order is cash
 >
@@ -212,21 +216,43 @@ Operations Health to failing and raises the critical
 counts its own list of rule codes, and R14-R17 are added to it, so it reads
 failing too while the payment row is enabled and configured. Outside the console they reach nobody until external alert email
 is turned on (gap PG-10). The same records are listed on Live Orders, in the
-admin-only card "Refunds and payments needing attention".
+admin-only card "Refunds and payments needing attention". R18 reaches a person
+the same way: a warning R18 makes the Order Integrity card read degraded, a
+critical one failing. The payment card counts critical incidents only, so R18
+moves it at the 24-hour tier and not before. The card already lists every
+refund R18 can report, under "Refunds still being retried".
 
-**Not implemented — `REFUND_STUCK`, a refund still being retried.** The reason
-recorded here until 2026-11-14, "there is no refunds table", stopped being true
-when `order_refunds` was added (`20260724120000`). A refund that gave up is now
-R14. A refund still `pending` raises nothing: the age after which it counts as
-stuck is the owner's number (gap PG-01, `OWNER_ACTIONS.md` §55). Until it is
-set, the console card lists every pending refund already tried once, with its
-attempts and last reason.
+**R18 `REFUND_STUCK`, a refund still being retried (written 2026-11-17, not
+live until `20261016120000` is applied).** A refund that gave up is R14; R18
+covers the one that has not given up yet. The thresholds are the owner's (gap
+PG-01, 2026-11-17): a warning once a refund tried at least once is still
+`pending` more than 1 hour after it was opened, a critical once more than 24
+hours. Age is measured from `order_refunds.created_at`, not from the last try,
+because the question is how long the customer has waited.
 
-It is deliberately **not numbered**. It was written as "R12" while only 11 rules
-existed; R12 is now `UNPAID_ORDER_NOT_SYNCED`, and a document using one ordinal
-for both an implemented rule and an unimplemented proposal is worse than one that
-numbers only what exists. The ordinals in the table above are positions in that
-table — the `rule_code` is the identifier that matters, and it is what
+The same file caps a refund at 10 attempts with a back-off (5 minutes doubling
+to 6 hours; `PAYMENTS.md` §6). The waits add up to about 22 h 35 min, about
+23 h 20 min on the 5-minute schedule, so a refund normally reaches `failed`
+(and R14) before R18's critical tier. **A critical R18 therefore mostly means
+the refund job is not running often enough**, not that Moyasar is slow. When the
+cap writes `failed`, R18 stops detecting the refund, its incident resolves after
+two clean scans, and R14 opens.
+
+**What R18 does not see:** a refund never tried (`attempt_count = 0`). A refund
+waits in that state when the `payment-refund-worker` cron job is off, which it is
+when read on 2026-11-17. The owner chose "at least one attempt"; a never-tried
+refund is listed nowhere but the database until the job runs once.
+
+**R18 is the one rule whose severity changes.** Every other rule has one
+severity per rule code. Before `20261016120000` the incident update (§5 step 2)
+never touched `severity`, so an incident opened at warning would have stayed a
+warning; it now copies the detection's severity, which is a no-op for R1-R17.
+
+It was written as an unnumbered proposal before 2026-11-17. It was once called
+"R12" while only 11 rules existed; R12 is `UNPAID_ORDER_NOT_SYNCED`, which is
+why the proposal stayed unnumbered until it was built.
+
+The ordinals in the table above are positions in that table — the `rule_code` is the identifier that matters, and it is what
 `order_integrity_config.rule_enabled` and the admin filter key on.
 
 **Out of scope for v1 — provider-side capture reconciliation:** R3 detects the
@@ -252,8 +278,8 @@ pending owner approval.
 All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 **no Production order IDs are hard-coded in the scanner logic.**
 
-- `rule_enabled` — per-rule on/off map (all 17 supported rules default `true`;
-  a rule code missing from the map counts as enabled, which is how R14-R17
+- `rule_enabled` — per-rule on/off map (all 18 supported rules default `true`;
+  a rule code missing from the map counts as enabled, which is how R14-R18
   start enabled without a config row).
   Setting a rule to `false` freezes it: its active incidents stop being updated
   **and stop being resolved** (they neither advance clean-counts nor close).
@@ -271,7 +297,10 @@ All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 
 1. **Detect** → each scan builds the current set of firing fingerprints.
 2. **Update** re-detected active incidents (occurrence + consecutive-detection
-   counts up, clean-count reset; an expired suppression reverts to `open`).
+   counts up, clean-count reset; an expired suppression reverts to `open`). Since
+   `20261016120000` the incident also takes the detection's severity, so R18
+   turns critical in place; for every other rule the severity is fixed by the
+   rule code and this changes nothing.
 3. **Open** a new incident for any detection without an active incident.
 4. **Clean / resolve** active incidents NOT detected this run (enabled rules
    only): a resolve happens **only after two consecutive clean scans** (a single
@@ -280,6 +309,8 @@ All tunables live in this table as auditable data (`updated_by` / `updated_at`);
    - `opened` — once per incident lifetime, for non-suppressed active incidents:
      `critical` after **≥ 2 consecutive detections**; `warning` after the
      incident has persisted **≥ 15 minutes**.
+   - `escalated` — since `20261016120000`, once per incident, when an incident
+     whose `opened` alert was written at warning has turned critical (R18 only).
    - `recovery` — when an incident that had previously produced an `opened`/
      `escalated` alert resolves this run.
 
