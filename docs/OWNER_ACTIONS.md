@@ -3806,6 +3806,8 @@ then, and receivers accept both. **The steps, in this order, each a separate
    the second is what the `/app` web export reads.
 6. Add the key to `apps/mobile/eas.json` (small PR), then the **December** EAS
    build pair, to every tester.
+   *2026-11-18: step 2 done, §4's check passed, and the `eas.json` PR is open;
+   see `SUPABASE_API_KEYS.md` §3 "Progress".*
 7. Confirm no legacy-key traffic remains.
 8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
    (reversible). **The five frozen payment functions stop working here — owner

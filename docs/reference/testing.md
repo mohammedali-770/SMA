@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**280 TypeScript test files declaring 4163 test blocks, plus 97 SQL suites.**
+**280 TypeScript test files declaring 4165 test blocks, plus 97 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -162,7 +162,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-100 files, 1356 declared test blocks.
+100 files, 1358 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -231,7 +231,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/i18n/strings.test.ts` | 11 | STRINGS |
 | `apps/mobile/src/lib/catalogSelect.test.ts` | 5 | catalog select lists |
 | `apps/mobile/src/lib/chunkedSecureStorage.test.ts` | 15 | splitByUtf8Bytes |
-| `apps/mobile/src/lib/env.test.ts` | 5 | SUPABASE_PUBLIC_KEY |
+| `apps/mobile/src/lib/env.test.ts` | 7 | SUPABASE_PUBLIC_KEY |
 | `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |

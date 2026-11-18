@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const LEGACY = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig';
 const PUBLISHABLE = 'sb_publishable_abc123def456';
 
-/** `undefined` removes the variable, which is today's state in eas.json. */
+/** `undefined` removes the variable, which is what a build without the publishable key looks like. */
 async function load(vars: Record<string, string | undefined>) {
   for (const [k, v] of Object.entries(vars)) vi.stubEnv(k, v);
   vi.resetModules();
@@ -68,5 +68,29 @@ describe('the key is read in the shape Expo inlines', () => {
     expect(src).toMatch(
       /process\.env\.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY\s*\|\|\s*process\.env\.EXPO_PUBLIC_SUPABASE_ANON_KEY/,
     );
+  });
+});
+
+describe('eas.json ships the publishable key in every build profile', () => {
+  const eas = JSON.parse(readFileSync(resolve(__dirname, '../../eas.json'), 'utf8')) as {
+    build: Record<string, { env?: Record<string, string> }>;
+  };
+
+  for (const profile of ['development', 'preview', 'production']) {
+    it(`${profile}: a publishable key, never a secret key`, () => {
+      const env = eas.build[profile]?.env ?? {};
+      const key = env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? '';
+      // A secret key here would ship inside every binary; refuse anything but
+      // the publishable format, and refuse any sb_secret_ value in any variable.
+      expect(key).toMatch(/^sb_publishable_[A-Za-z0-9_-]+$/);
+      for (const value of Object.values(env)) expect(value).not.toMatch(/sb_secret_/);
+    });
+  }
+
+  it('uses the same publishable key in all three profiles', () => {
+    const keys = ['development', 'preview', 'production'].map(
+      (p) => eas.build[p]?.env?.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    );
+    expect(new Set(keys).size).toBe(1);
   });
 });
