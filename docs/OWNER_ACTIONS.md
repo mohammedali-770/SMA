@@ -4000,6 +4000,29 @@ until each function is redeployed.** Behaviour and evidence:
 
 Each step is its own §5 action. Approval for one is not approval for the next.
 
+**Status 2026-11-18: steps 1, 3 and 4 DONE; step 2 still open.**
+
+- **Step 3:** the owner set `SMTP_ALLOWED_HOSTS` in the dashboard (Edge
+  Functions → Secrets), to `mail.spicymeal.com.sa`. An agent cannot read a
+  secret's value, so the evidence is step 1's test email, below.
+- **Steps 1 and 4,** on the owner's approval naming both ("deploy
+  email-test-config and operations-alert-dispatch"), each from the default
+  branch at `0dd6a20`:
+  - `email-test-config` went v5 → **v6**, `verify_jwt` true.
+  - `operations-alert-dispatch` went v4 → **v5**, `verify_jwt` false.
+  - Each bundle is 8 files and read back from Supabase byte-identical. The
+    dispatcher's read-back was taken independently of the test function's.
+  - Live **v4**, not v1, was what ran before, and its five-file bundle had no
+    `smtpTarget.ts`. So until this deploy, the dispatcher checked nothing and
+    did not read step 3's secret.
+- **The deploys sent nothing.** `external_dispatch_enabled` was read false
+  first, and neither function was invoked.
+- **Step 1's "done looks like" is met:** the owner pressed "Send test email" in
+  the console after both deploys, and on 2026-11-18 confirmed that it arrived.
+  The relay therefore passes the new guard with `SMTP_ALLOWED_HOSTS` set, which
+  is the only evidence available that the secret's value is right.
+- **Step 2 (`admin-push-dispatch`) is still open.**
+
 1. **Redeploy `email-test-config`.** The live relay passes the new guard.
    Measured read-only on 2026-11-11, by counts only: the one email-provider row
    is enabled, uses a mail port, and has a host that passes the lexical rules.
@@ -5280,7 +5303,7 @@ the app can attach a file, which needs a native build.
 and PG-26 marked live in the gaps list. The phone's summary line arrives with
 the §47.17 EAS build; nothing extra is needed for it.
 
-## 57. A cancelled order is not started at the POS, re-queued by Retry, or told it failed — one apply, one deploy
+## 57. A cancelled order is not started at the POS, re-queued by Retry, or told it failed — one apply, one deploy — DONE 2026-11-18
 
 **Opened 2026-11-17.** The three engineering follow-ups §54's change listed and
 left (`MIGRATIONS.md` §64). Branch `fix/cancelled-order-followups-20261117`.
@@ -5303,6 +5326,22 @@ or changed, and no Arabic needs a read.
 Detail: `docs/MIGRATIONS.md` §67.
 
 ### The steps, each its own approval (CLAUDE.md §5)
+
+**All four steps DONE.** Merged as `0dd6a20` (#478) on 2026-11-17. On
+2026-11-18, on the owner's approval naming both ("Apply 20261015120000 and
+deploy push-dispatch"): applied 04:51:45 UTC, live `20261118045145`, ledger
+row 120, in one call named by version. A first attempt on 2026-11-17 was
+interrupted by a container restart; a read-only check found history still at
+164 and both pre-images in place, so nothing had landed. Step 3's hashes held:
+`begin_lazywait_create_attempt` `365fcc1b…` / 1 854 and
+`requeue_lazywait_order` `5b83a99c…` / 2 062, one overload each, money-path
+pair unchanged; `anon` executes neither function, `authenticated` only
+`requeue_lazywait_order`; no `VERIFY-20261015120000-` fixture survives (detail
+in `MIGRATIONS.md` §67). After that, `push-dispatch` was deployed
+as version 10 (from 9), `verify_jwt` false, its 8 bundle files from the
+default branch at `0dd6a20` read back byte-identical; only
+`push-dispatch/index.ts` differs from v9. No smoke request was sent. Nothing is
+left for this section.
 
 1. **Merge the pull request.** Nothing reaches a customer: the console code is
    not changed, and the web build `/app` that ships on merge (CLAUDE.md §13)
