@@ -5,11 +5,11 @@
  *
  * Per customer, not per device, because a shared phone is the case the notice
  * exists for: the first customer's grant says nothing about whether the second
- * was ever told that offers come with order updates.
+ * was ever told that this device's row has offers on.
  *
  * Reads fail SOFT, as `firstRunStore.ts` does: if storage is unreadable the
  * text counts as seen. Getting that backwards would raise the notice on every
- * launch, which is worse than missing it once; the opt-out itself stays in
+ * launch, which is worse than missing it once; the offers switch itself stays in
  * Profile either way.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -130,6 +130,14 @@ notifications on"* became **more** accurate when marketing moved to opt-out on
 the old opt-in model that sentence was wrong. It was not corrected then, and it
 did not need to be — but nobody had checked either way.
 
+**And it ages badly again on 2026-11-18.** Marketing is opt-in from the next
+build (CLAUDE.md §7): turning notifications on no longer turns offers on, so
+*"offers if you have turned notifications on"* overstates what a new customer
+receives. It errs toward disclosing more marketing than is sent, which is the
+safer direction, but it is no longer accurate. The same sentence is in
+`docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`. Correcting the live policy is
+a §5 write for the owner (`OWNER_ACTIONS.md` §10, 2026-11-18 subsection).
+
 ## The Arabic
 
 Every correction above was made in **both** languages. The Arabic is

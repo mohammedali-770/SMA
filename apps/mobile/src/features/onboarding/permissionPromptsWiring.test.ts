@@ -13,8 +13,9 @@ import { describe, expect, it } from 'vitest';
  *    ask straight after sign-in, with no context at all.
  *  - The OS notification prompt is raised only behind an explicit tap: the
  *    consent screen's Allow button, or a Profile toggle. The OS dialog cannot
- *    say that offers come with order updates; the consent screen in front of it
- *    does (Apple 4.5.4, CLAUDE.md §7).
+ *    say what the grant is for (order updates; offers stay off unless turned on
+ *    in Profile); the consent screen in front of it does (Apple 4.5.4,
+ *    CLAUDE.md §7).
  */
 
 const SRC = resolve(__dirname, '../..');

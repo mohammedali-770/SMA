@@ -8,14 +8,15 @@
  *    whoever just signed in, exactly as before, and reports the row it settled
  *    on.
  *  - THE NOTICE: if that row has offers on and this customer has not seen the
- *    consent text on this device, the same screen in NOTICE mode, once. That is
- *    Android 12 and older, where the OS never asks, and a second account on a
- *    shared phone.
+ *    consent text on this device, the same screen in NOTICE mode, once. Since
+ *    offers became opt-IN (2026-11-18) a new registration has them off, so this
+ *    is now only a row that already carried offers — registered under the
+ *    earlier opt-out default, or switched on by its customer.
  *
  * Nothing here changes who receives what. Prompt mode registers only what the
  * old first run registered — a device granted on this run, with the default
  * preferences — and the notice writes nothing at all. The screen discloses the
- * opt-out model (CLAUDE.md §7); it does not alter it.
+ * opt-in model (CLAUDE.md §7); it does not alter it.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
