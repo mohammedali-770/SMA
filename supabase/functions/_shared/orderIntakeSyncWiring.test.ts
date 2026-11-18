@@ -48,7 +48,8 @@ describe('order-intake — immediate POS sync, and no premature promise', () => 
   });
 
   it('still kicks the worker, with the server-side secret', () => {
-    expect(CODE).toContain('/functions/v1/lazywait-sync');
+    // Pinned to the database region (2026-11-18, _shared/functionRegion.ts).
+    expect(CODE).toContain("await fetch(internalFunctionUrl(url, 'lazywait-sync'), {");
     expect(CODE).toContain("'x-sync-secret'");
     expect(CODE).toContain('sync_trigger_secret');
   });
@@ -74,7 +75,7 @@ describe('lazywait-sync — dispatches the POS lifecycle messages', () => {
     // Before this, record_lazywait_sync and the reaper enqueued these rows and
     // NOTHING ever sent them: no cron, no trigger, no caller.
     expect(CODE).toContain('dispatchPendingPosSync');
-    expect(CODE).toContain('/functions/v1/push-dispatch');
+    expect(CODE).toContain("await fetch(internalFunctionUrl(url, 'push-dispatch'), {");
     expect(CODE).toContain("action: 'pos_sync'");
     expect(CODE).toContain("'notification_log'");
     expect(CODE).toContain("'pending'");

@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { internalFunctionUrl } from '../_shared/functionRegion.ts';
 import {
   callerTarget,
   isRow,
@@ -362,7 +363,7 @@ Deno.serve(async (req: Request) => {
       // order up within a minute.
       const anon = publishableKey()?.value;
       if (cfg?.enabled && secret && url && anon) {
-        await fetch(`${url}/functions/v1/lazywait-sync`, {
+        await fetch(internalFunctionUrl(url, 'lazywait-sync'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: anon, 'x-sync-secret': secret },
           // TARGETED: sync THIS order, not "up to five, oldest first".
