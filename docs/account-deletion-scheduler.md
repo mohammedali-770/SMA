@@ -63,6 +63,15 @@ account-deletion functions need a redeploy for it (`docs/SUPABASE_API_KEYS.md`
 §3, step 9). Deploy order (processor before its callers) and rollback:
 `docs/SUPABASE_API_KEYS.md` §3.
 
+**Deployed 2026-11-18.** `account-delete-process` v5 → **v6**, then
+`account-delete-scheduler` v4 → **v5**, both from the default branch at
+`5c78d17`, every file byte-identical, `verify_jwt = false` as `config.toml` sets
+it. 0 deletion requests were open at the time. Before v6, the processor refused
+the new key: once the new keys existed, `account-delete-request` v5 (already on
+the new code) sent its post-request kick with the secret key, and live v5 refused
+it with 403. No customer was affected, because the scheduled run still used the
+legacy key. Detail: `docs/SUPABASE_API_KEYS.md` §3 "Progress".
+
 ## Tests (2026-11-12)
 
 The gateway's request handler lives in
