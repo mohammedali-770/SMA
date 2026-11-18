@@ -104,6 +104,30 @@ strings are deleted, and `branchNumberCard.test.ts` fails if the card renders
 without a number, or if either phrase reappears anywhere in the app's source.
 The `yes` rows below therefore mean "show the number **when it arrives**".
 
+**Nor is the customer told the order is being SENT (owner, 2026-11-18,
+repeated, on build 30).** `sending_to_branch` used to read «جارٍ الإرسال إلى
+الفرع…» / "Sending to the branch…", with a sentence about the order being sent
+now. It now reads **"Order received" / «تم استلام الطلب»** with **"We will let
+you know as soon as your order is confirmed." / «سنُعلمك فور تأكيد طلبك.»**,
+in an informational tone with a clock icon and no success check. The
+POS-outcome push is what then tells them. The `oc_sending` strings are deleted,
+and `branchNumberCard.test.ts` fails if that wording reappears anywhere in the
+app's source. Measured on build 30 (SM-2026-000102), this state now lasts
+about 6 s: the POS had the order 6 s after the receipt opened. The error states
+(`verifying_with_branch`, the not-sent and failed ones) still say what
+happened, because the customer must not resend while it is uncertain.
+
+**And the receipt page waits for the number (owner, 2026-11-18).** The
+owner's instruction: "I want only the page with lazywait order number". So
+while the order is `sending_to_branch`, the receipt stays on its loading
+skeleton, with no status or sentence at all. The page appears the moment the
+number exists; it polls every 2 s while waiting. "Order received" above is
+therefore only what a customer sees if the POS is slow. After **20 s**
+(`RECEIPT_WAIT_FOR_NUMBER_MS`, `features/orders/receiptGate.ts`) the page shows
+anyway, so a slow or failing POS can never leave the customer on a blank screen
+with no way forward. Every other state shows at once. `receiptGate.test.ts`
+pins the rule, the bound and the wiring (3/3 mutants killed).
+
 The three `yes` rows are the states on an ACTIVE POS channel: the number is
 either already issued (`confirmed_by_branch`) or still expected
 (`sending_to_branch`, `verifying_with_branch`), so the card's "it will appear

@@ -42,6 +42,8 @@ import { requestStoreReview } from '../onboarding/storeReview';
 import { isTerminalOrderStatus, nextReceiptPollMs } from './ordersRefresh';
 import { mapOrder } from '../../lib/mappers';
 import { ConfirmationHero } from './view/ConfirmationHero';
+import { orderConfirmationState } from './orderConfirmation';
+import { RECEIPT_WAIT_FOR_NUMBER_MS, showFullReceipt } from './receiptGate';
 import { ReceiptBody } from './view/ReceiptBody';
 import { ReceiptSkeleton } from './view/Skeletons';
 import type { Order } from '../../types/models';
@@ -196,9 +198,26 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     }
   }, [orderId, refreshSilently, resending, t]);
 
+  // Hold the page until the branch's order number exists (receiptGate.ts):
+  // the skeleton stays up while the order is being sent, bounded so a slow POS
+  // never strands the customer. `waitStart` is when this screen first saw the
+  // in-flight state; the timeout only forces one re-render at the bound.
+  const state = order ? orderConfirmationState(order) : null;
+  const [waitStart, setWaitStart] = useState<number | null>(null);
+  const [, setWaitTick] = useState(0);
+  useEffect(() => {
+    if (state === 'sending_to_branch' && waitStart == null) setWaitStart(Date.now());
+  }, [state, waitStart]);
+  useEffect(() => {
+    if (waitStart == null) return undefined;
+    const t = setTimeout(() => setWaitTick((n) => n + 1), RECEIPT_WAIT_FOR_NUMBER_MS);
+    return () => clearTimeout(t);
+  }, [waitStart]);
+  const holdForNumber = state != null && !showFullReceipt(state, waitStart == null ? 0 : Date.now() - waitStart);
+
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.appBg}>
-      {loading ? (
+      {loading || holdForNumber ? (
         // Shaped like the loaded receipt so the first paint lands without a
         // jump. Rendered in the same `loading` branch; silent refreshes never
         // re-enter it.

@@ -117,10 +117,10 @@ export function deriveCustomerOrderState(o: OrderConfirmationInput): CustomerOrd
 
 export type ConfirmationTone = 'info' | 'success' | 'warning' | 'danger';
 export type ConfirmationTitleKey =
-  | 'oc_payment_pending' | 'oc_payment_received' | 'oc_received' | 'oc_sending'
+  | 'oc_payment_pending' | 'oc_payment_received' | 'oc_received'
   | 'oc_confirmed' | 'oc_verifying' | 'oc_not_sent' | 'oc_failed' | 'oc_cancelled';
 export type ConfirmationBodyKey =
-  | 'oc_payment_pending_body' | 'oc_no_pos_channel_body' | 'oc_sending_body'
+  | 'oc_payment_pending_body' | 'oc_no_pos_channel_body' | 'oc_received_body'
   | 'oc_confirmed_body' | 'oc_verifying_body'
   | 'oc_not_sent_paid_body' | 'oc_not_sent_unpaid_body'
   | 'oc_failed_refund_pending_body' | 'oc_failed_refunded_body'
@@ -152,7 +152,11 @@ const PRESENTATION: Record<CustomerOrderState, ConfirmationPresentation> = {
   payment_pending:{titleKey:'oc_payment_pending',bodyKey:'oc_payment_pending_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
   accepted_no_pos_channel:{titleKey:'oc_payment_received',bodyKey:'oc_no_pos_channel_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
   accepted_no_pos_channel_unpaid:{titleKey:'oc_received',bodyKey:'oc_no_pos_channel_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
-  sending_to_branch:{titleKey:'oc_sending',bodyKey:'oc_sending_body',tone:'info',success:false,canResend:false,showBranchNumber:true},
+  // The customer is never told the order is being SENT to the branch (owner,
+  // 2026-11-18, repeated): while it is in flight they see "Order received"
+  // and that they will be told when it is confirmed, which the POS-outcome
+  // push then does. branchNumberCard.test.ts pins this.
+  sending_to_branch:{titleKey:'oc_received',bodyKey:'oc_received_body',tone:'info',success:false,canResend:false,showBranchNumber:true},
   confirmed_by_branch:{titleKey:'oc_confirmed',bodyKey:'oc_confirmed_body',tone:'success',success:true,canResend:false,showBranchNumber:true},
   verifying_with_branch:{titleKey:'oc_verifying',bodyKey:'oc_verifying_body',tone:'warning',success:false,canResend:false,showBranchNumber:true},
   branch_failed_retry_available:{titleKey:'oc_not_sent',bodyKey:'oc_not_sent_paid_body',tone:'warning',success:false,canResend:true,showBranchNumber:false},
