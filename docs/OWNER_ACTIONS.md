@@ -4805,7 +4805,9 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   Refunding duplicates automatically is a separate decision.
 - **A refund refused by Moyasar's Allowed IPs is retried forever.** It is
   released, not failed, and re-claimed every run until the configuration is
-  fixed. There is no attempt cap.
+  fixed. There is no attempt cap. *(Superseded 2026-11-18: since
+  `20261016120000` was applied (§58) it backs off from 5 minutes to 6 hours and
+  is written `failed` at the tenth attempt, raising R14.)*
 - **Should `set_payment_settings` itself refuse online payment** unless the row is
   enabled, Moyasar and live? Today only the console refuses. That would be a
   migration.
@@ -5403,7 +5405,7 @@ queued. Doing both closes all three.
 in `docs/ORDER_CONFIRMATION_FLOW.md` §11, `docs/LAZYWAIT.md` and
 `docs/PAYMENTS.md` §12.
 
-## 58. Refund retries back off, stop after 10, and a stuck refund raises an alert — one apply
+## 58. Refund retries back off, stop after 10, and a stuck refund raises an alert — one apply — DONE 2026-11-18
 
 **Opened 2026-11-17.** Your decisions on gap PG-01, D2 and PG-14
 ([the card-payment gaps](readiness/20261113-card-payments-gaps.md)), the ones
@@ -5432,6 +5434,22 @@ in `docs/ORDER_CONFIRMATION_FLOW.md` §11, `docs/LAZYWAIT.md` and
 decides the wait and the cap. **No deploy is implied.** Detail:
 [`MIGRATIONS.md`](MIGRATIONS.md) §68; the runbook for a refund the cap stopped:
 [`PAYMENTS.md`](PAYMENTS.md) §6.
+
+**All three steps DONE.** Merged as `902cd1a` (#481). On 2026-11-18, on the
+owner's approval naming it by version ("Apply 20261016120000"): applied
+05:55:54 UTC, live `20261118055554`, ledger row 121, in one call named by
+version. Step 2's read-only checks all matched before sending. Comment-only
+lines outside the dollar-quoted bodies were stripped for transport size, so the
+applied text is not the repository file, but all 8 bodies were proven
+byte-identical to the merged file first. Step 3's checks held: every post-image
+in `MIGRATIONS.md` §68 matched, one overload each; the column is present;
+`refund_retry_delay(7)` is `05:20:00` and `(8)` is `06:00:00`; `anon` and
+`authenticated` execute none of the three refund functions; the money-path pair
+is unchanged; `order_refunds` and `order_integrity_incidents` still 0, and no
+order number was burned by the file's rolled-back probe. Live history
+**165 → 166**, nothing outstanding. No deploy was needed. The
+`payment-refund-worker` cron job is still **inactive**, so no refund runs until
+§47.16. Nothing is left for this section.
 
 **It changes nothing today, measured read-only on 2026-11-17:** `order_refunds`
 holds **0** rows and the `payment-refund-worker` cron job is **inactive**. It

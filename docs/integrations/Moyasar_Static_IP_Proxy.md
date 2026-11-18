@@ -95,6 +95,11 @@ refund. It holds since 2026-11-17, when `20261013120000` was applied and
 still inactive, so no refund runs yet). Only an attempt cap or a back-off bounds it, and those numbers
 are yours (gap PG-01).
 
+**2026-11-18: bounded.** `20261016120000` was applied (`MIGRATIONS.md` §68):
+a refund now backs off from 5 minutes to 6 hours and is written `failed` at the
+tenth attempt, so one stuck refund makes 10 claims over about a day, each one
+or two Moyasar requests, instead of up to 288 a day.
+
 **Location.** Neither QuotaGuard (12 AWS regions, none in the Middle East) nor
 Fixie (its pages point to the US) offers a Gulf location. Some scraping-proxy
 sellers do sell Saudi and UAE addresses (Oxylabs lists both), but they are ruled
