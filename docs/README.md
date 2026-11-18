@@ -80,7 +80,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
 | WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
 | Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
-| Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) · [static-IP proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) · [how Saudi apps get fixed addresses](integrations/Saudi_Apps_Static_Egress_20261113.md) · [card-payment gaps](readiness/20261113-card-payments-gaps.md) |
+| Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) · [static-IP proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) · [how Saudi apps get fixed addresses](integrations/Saudi_Apps_Static_Egress_20261113.md) · [card-payment gaps](readiness/20261113-card-payments-gaps.md) · [Faster card payment: Apple Pay and saved cards — proposed design](FASTER_CARD_PAYMENT.md) |
 | Maps | [Maps](MAPS.md) |
 | Sentry | [Mobile](SENTRY_OBSERVABILITY.md) · [Web and admin](SENTRY_WEB_OBSERVABILITY.md) |
 | Account deletion | [Deletion scheduler](account-deletion-scheduler.md) |
