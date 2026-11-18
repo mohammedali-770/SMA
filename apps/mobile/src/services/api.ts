@@ -488,6 +488,14 @@ export const payments = {
   /** Verify a session's payment; on 'paid' the response carries the created orderId. */
   verifySession: (checkoutSessionId: string) =>
     invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId }),
+  /**
+   * Drop a checkout the customer replaced by changing their cart. The server
+   * does so only when nobody has started paying it (cancelling its invoice at
+   * Moyasar first) and otherwise answers 'pending', so the old checkout is
+   * resumed. A server without the action answers a plain verify, likewise.
+   */
+  abandonSession: (checkoutSessionId: string) =>
+    invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId, action: 'abandon' }),
 };
 
 // ---------------------------------------------------------------------------

@@ -577,6 +577,47 @@ export function closedInvoiceOutcome(invoice: Record<string, unknown>): ClosedIn
 }
 
 // ---------------------------------------------------------------------------
+// Abandoning a checkout the customer has replaced (a changed cart).
+// ---------------------------------------------------------------------------
+
+/**
+ * May an invoice be cancelled because the customer changed their order?
+ *
+ *  - 'closed': Moyasar has already closed it (expired or cancelled) with nothing
+ *    settled. Nothing to do.
+ *  - 'cancellable': still open, and no payment on it is anything but `failed`.
+ *    A declined card leaves a `failed` payment that can never settle, so it
+ *    does not block; an empty invoice is the ordinary case.
+ *  - 'in_progress': any other payment exists (`initiated` is a 3-D Secure
+ *    challenge under way; `paid`, `authorized`, `captured` hold money). The
+ *    customer may yet complete it, so the checkout must NOT be dropped: doing so
+ *    is exactly the double charge the app's pending-session recovery prevents.
+ *
+ * Anything unrecognised is 'in_progress'. Refusing to abandon only costs the
+ * customer the old behaviour (the old checkout reopens); abandoning wrongly
+ * could cost them a second charge.
+ */
+export type AbandonInvoiceVerdict = 'closed' | 'cancellable' | 'in_progress';
+
+export function abandonInvoiceVerdict(invoice: Record<string, unknown>): AbandonInvoiceVerdict {
+  if (closedInvoiceOutcome(invoice)) return 'closed';
+  const payments = Array.isArray(invoice?.payments) ? (invoice.payments as Record<string, unknown>[]) : [];
+  if (payments.some((p) => String(p?.status ?? '').toLowerCase() !== 'failed')) return 'in_progress';
+  return String(invoice?.status ?? '').toLowerCase() === 'initiated' ? 'cancellable' : 'in_progress';
+}
+
+/**
+ * Did `PUT /v1/invoices/{id}/cancel` leave the invoice closed with nothing
+ * settled or in flight? The answer it returns is the invoice itself, read again
+ * here rather than assumed, because a payment could have started between the
+ * read that judged it cancellable and the cancel.
+ */
+export function invoiceCancelConfirmed(invoice: Record<string, unknown>): boolean {
+  return abandonInvoiceVerdict(invoice) === 'closed'
+    && closedInvoiceOutcome(invoice)?.outcome === 'cancelled';
+}
+
+// ---------------------------------------------------------------------------
 // Webhook authentication — a shared secret in the BODY, not a signature.
 // ---------------------------------------------------------------------------
 
