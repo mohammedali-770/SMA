@@ -429,10 +429,17 @@ not the worker.
   already made (gap PG-03). The trigger now skips a cancelled order. A refund
   enrolled *before* the order was cancelled still runs, so look at the order's
   refund status before refunding it by hand.
-- **A duplicate payment** (§10). Nothing refunds it automatically.
+- **A duplicate payment** (§10). Nothing refunds it automatically. **Decided
+  2026-11-17 (refund draft D2): duplicates are refunded by hand** from Moyasar's
+  dashboard, from the R15 listing on the "Refunds and payments needing
+  attention" card. That is the design, not a gap.
 
 Either one is refunded by hand in Moyasar's dashboard today. That is a live
-money action and an owner approval (§5 of CLAUDE.md).
+money action and an owner approval (§5 of CLAUDE.md). **A refund made in the
+dashboard is not recorded on the order yet.** The owner decided on 2026-11-17
+that it should be, automatically, from Moyasar's `refunded` notification (gap
+PG-14). That is its own later change; until it lands, keep the written refund
+log.
 
 ### Where staff see a refund problem
 
@@ -459,8 +466,16 @@ Since then:
   refusal (an admin not at AAL2) or before the migration is applied, so a
   refused request is not sent every minute.
 
-Nothing records a refund made by hand (gap PG-14), so after one the incident
-and the card row stay until that is decided.
+**Written 2026-11-17, not live until `20261016120000` is applied**
+(`MIGRATIONS.md` §68): a refund tried at least once and still pending raises
+R18 `REFUND_STUCK`, a **warning** once it has been open more than 1 hour and a
+**critical** once more than 24 hours (age from when the refund was opened). The
+same incident turns critical in place. A refund stopped by the attempt cap
+(below) is `failed` and raises R14 like any other.
+
+Nothing records a refund made by hand yet (gap PG-14, decided automatic on
+2026-11-17 and not built), so after one the incident and the card row stay until
+that change lands.
 
 ### How the worker runs
 
@@ -496,9 +511,59 @@ day, and every newer refund waited. Since `20261013120000` was applied and
   `http_503`, `refund_not_final`, `key_unavailable` or `reconcile_unavailable`.
   The last two say nothing was sent.
 
-There is still **no attempt cap and no back-off**, and no age after which a
-pending refund counts as stuck. Those numbers are the owner's
-(`OWNER_ACTIONS.md` §55).
+### Back-off, attempt cap and the stuck alert
+
+**The owner's numbers, decided 2026-11-17 (gap PG-01). Written on the branch
+`fix/refund-retry-backoff-20261117` as `20261016120000_refund_retry_backoff`
+(`MIGRATIONS.md` §68); not live until that file is applied.** Until then a
+refund that cannot finish is tried on every run, every 5 minutes, for ever, and
+raises nothing until it is `failed`.
+
+- **Back-off.** Each release as `pending` sets `order_refunds.next_attempt_at`,
+  and `claim_order_refund` takes only refunds that are due. The wait after the
+  n-th unsuccessful attempt is 5 minutes × 2^(n−1), capped at 6 hours:
+
+  | After attempt | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | Next try waits | 5 min | 10 min | 20 min | 40 min | 80 min | 160 min | 320 min | 6 h | 6 h |
+
+  The seventh wait is 5 h 20 min, because 160 minutes doubled is still below
+  the 6-hour cap; the cap first binds at the eighth. In all, about 22 h 35 min
+  of waiting, about 23 h 20 min on the 5-minute schedule.
+- **Attempt cap.** The tenth unsuccessful attempt writes the refund `failed`,
+  keeping the release's own failure code (for example `provider_no_answer`,
+  `http_503`, `moyasar_ip_not_allowed`; `retry_limit_reached` if it gave none)
+  and the safe error "Automatic refund stopped after 10 attempts. Last reason:
+  …". The order reads `refund_state = 'failed'`, R14 `REFUND_FAILED` opens, and
+  the card moves it to "Automatic refunds that stopped". The customer's app
+  shows "Refund in progress" and "we will contact you", as for any failed
+  refund.
+- **Stuck alert.** R18 `REFUND_STUCK` (above, and
+  `ORDER_INTEGRITY_WATCHDOG.md` §3).
+- **Cost.** One stuck refund now makes 10 claims over about a day, each one or
+  two Moyasar requests through the metered proxy, instead of up to 288 a day.
+
+It is decided entirely in Postgres: `payment-refund` already calls
+`finalize_order_refund` for every release, and that is where the wait and the
+cap are written. **No `payment-refund` redeploy is needed for it.** The worker's
+own log line for the tenth release still says `pending`; the row says `failed`.
+
+**Runbook: a refund stopped by the cap.**
+
+1. Open "Refunds and payments needing attention" (Live Orders, admin at AAL2)
+   and read the refund's last reason under "Automatic refunds that stopped".
+2. **Look the payment up in Moyasar's dashboard before doing anything.** The
+   reasons that stop a refund by the cap (`provider_no_answer`, an `http_5xx`,
+   `refund_not_final`, `reconcile_unavailable`) are all answers that do not rule
+   out that Moyasar refunded it. If the dashboard shows it refunded, send
+   nothing.
+3. If it shows nothing refunded, refund it there by hand (§10), and record it
+   in the written refund log.
+4. If the reason is `moyasar_ip_not_allowed`, `key_unavailable` or
+   `http_429`, fix that first (§8.1, the payment row's keys, or Moyasar's rate
+   limit), because every other refund will be stopped the same way.
+5. The R14 incident stays open after a hand refund until PG-14 records it
+   (above).
 
 **Settled 2026-11-13: `refund_trigger_secret` is present on the payment row**
 (read by length only: 64). The paragraph below is the 2026-11-11 position.
@@ -528,10 +593,12 @@ removed.
 A 401 whose message names the IP allow-list is classified `pending` with
 `failure_code = 'moyasar_ip_not_allowed'`, and the claim is released, the same
 path as a 429 or a 5xx. The order stays `refund_state = 'pending'` and does not
-appear in `list_failed_order_refunds()`. **There is no attempt cap**: until the
-proxy and Allowed IPs are fixed, every cron run claims and releases it again,
-once a run since `20261013120000` and the `payment-refund` deploy of
-2026-11-17 (above; five times a run before). It is listed under "Refunds
+appear in `list_failed_order_refunds()`. **Until `20261016120000` is applied
+there is no attempt cap**: until the proxy and Allowed IPs are fixed, every
+cron run claims and releases it again, once a run since `20261013120000` and
+the `payment-refund` deploy of 2026-11-17 (above; five times a run before).
+**After `20261016120000`** it backs off and, at the tenth attempt, is written
+`failed` with `moyasar_ip_not_allowed` and raises R14 (above). While it is retried it is listed under "Refunds
 still being retried" with the reason "Moyasar refused our address (Allowed
 IPs)". Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a
 bad key) is a definitive failure.
@@ -835,8 +902,9 @@ The order-first race is decided under the order's row lock
 `order_already_paid_by_another_payment`, and the losing payment becomes the
 record.
 
-**Nothing refunds a duplicate automatically.** Making it automatic needs an owner
-decision (refund draft D2). **Live today, nothing alerts on it either:** no
+**Nothing refunds a duplicate automatically, by decision.** The owner decided on
+2026-11-17 (refund draft D2) that duplicates are refunded by hand from Moyasar's
+dashboard, from the R15 listing below. **Live today, nothing alerts on it either:** no
 watchdog rule or alert reads `duplicate_payment` (the watchdog's double-capture
 rule counts `paid` rows, and a duplicate is `failed`).
 
@@ -892,8 +960,10 @@ the `paid` row.
 
 **After a hand refund the incident and the card row stay** (gap PG-14): nothing
 records the refund, and acknowledging an incident marks it seen without
-removing it from the counts. Until PG-14 is decided, the written record is the
-only proof the money went back.
+removing it from the counts. The owner decided on 2026-11-17 that Moyasar's
+`refunded` notification should record it automatically; that is its own later
+change, not built. Until it lands, the written record is the only proof the
+money went back.
 
 ---
 
@@ -923,12 +993,12 @@ For Supabase: which edge-runtime version hosted functions run, and whether
 
 For the owner:
 
-- automatic refund of a duplicate payment (§10), and of a cancelled paid order
-  the branch accepted (§6);
-- how many times a refund is tried, the wait between tries, and when a pending
-  refund counts as stuck (PG-01; any cause, not only Allowed IPs);
-- who receives payment alerts outside the console (PG-10), and how a hand
-  refund is recorded (PG-14);
+- automatic refund of a cancelled paid order the branch accepted (§6).
+  (Decided 2026-11-17: a duplicate payment is refunded by hand, D2, §10;
+  how many times a refund is tried, the wait and the stuck age, PG-01, §6;
+  a hand refund is to be recorded automatically from Moyasar's `refunded`
+  notification, PG-14, not yet built);
+- who receives payment alerts outside the console (PG-10);
 - whether `set_payment_settings` should also refuse Online Payment unless the
   row is live (a migration);
 - whether the webhook verification code may stay readable by accountants;
@@ -950,11 +1020,18 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   still confirm it. If the customer has meanwhile paid a newer invoice on the
   same session, the second is recorded as a duplicate and must be refunded by
   hand.
-- **Duplicates are manual.** See §10.
-- **Refunds have no attempt cap and no back-off** (§6, PG-01). Since
-  `20261013120000` was applied and `payment-refund` redeployed (2026-11-17),
-  one stuck refund takes one claim a run, not all five. The refund job's cron
-  is still inactive, so no refund runs until it is turned on.
+- **Duplicates are manual, by decision** (D2, 2026-11-17). See §10.
+- **Refunds have no attempt cap and no back-off until `20261016120000` is
+  applied** (§6, PG-01). Since `20261013120000` was applied and
+  `payment-refund` redeployed (2026-11-17), one stuck refund takes one claim a
+  run, not all five, for ever. After `20261016120000` it backs off from 5
+  minutes to 6 hours and is `failed` at the tenth attempt. The refund job's
+  cron is still inactive, so no refund runs until it is turned on.
+- **A refund stopped by the cap may still have landed.** Its last reason is
+  what the worker last saw, and several reasons do not rule out a refund at
+  Moyasar. Check the dashboard before refunding by hand (§6 runbook).
+- **A refund never tried raises nothing.** R18 needs at least one attempt, so a
+  refund waiting while the refund job is off is seen only by a database query.
 - **Refund and payment problems reach the console's alert inbox** since
   `20261013120000` was applied on 2026-11-17 (PG-01, PG-02); outside the console they reach nobody until external alert email is on
   (PG-10).
