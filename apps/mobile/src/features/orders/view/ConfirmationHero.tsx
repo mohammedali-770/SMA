@@ -14,7 +14,6 @@ import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
 
 function manualFlowBody(state:CustomerOrderState,pick:(en:string,ar:string)=>string,fallback:string):string{
-  if(state==='sending_to_branch')return pick('Your order is being sent to the branch now. You can leave this screen and check the latest status in My Orders.','يتم إرسال طلبك إلى الفرع الآن. يمكنك مغادرة هذه الشاشة ومتابعة آخر حالة من صفحة طلباتي.');
   if(state==='verifying_with_branch')return pick('We could not verify whether the branch received this order. Please do not resend it while we verify, because it may already exist at the branch.','تعذر التحقق مما إذا كان الفرع قد استلم هذا الطلب. لا تُعد إرساله أثناء التحقق لأنه قد يكون موجوداً بالفعل لدى الفرع.');
   if(state==='branch_failed_retry_available')return pick('Your payment was successful, but this order was not sent to the branch. Tap Resend order below when you want to try again. Nothing will be resent automatically.','تم الدفع بنجاح، لكن هذا الطلب لم يُرسل إلى الفرع. اضغط «إعادة إرسال الطلب» أدناه عندما ترغب بالمحاولة مرة أخرى. لن تتم إعادة الإرسال تلقائياً.');
   if(state==='unpaid_branch_failed_retry_available')return pick('This order was not sent to the branch. Tap Resend order below when you want to try again. Nothing will be resent automatically.','لم يُرسل هذا الطلب إلى الفرع. اضغط «إعادة إرسال الطلب» أدناه عندما ترغب بالمحاولة مرة أخرى. لن تتم إعادة الإرسال تلقائياً.');

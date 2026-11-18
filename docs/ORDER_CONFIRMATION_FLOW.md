@@ -104,6 +104,19 @@ strings are deleted, and `branchNumberCard.test.ts` fails if the card renders
 without a number, or if either phrase reappears anywhere in the app's source.
 The `yes` rows below therefore mean "show the number **when it arrives**".
 
+**Nor is the customer told the order is being SENT (owner, 2026-11-18,
+repeated, on build 30).** `sending_to_branch` used to read «جارٍ الإرسال إلى
+الفرع…» / "Sending to the branch…", with a sentence about the order being sent
+now. It now reads **"Order received" / «تم استلام الطلب»** with **"We will let
+you know as soon as your order is confirmed." / «سنُعلمك فور تأكيد طلبك.»**,
+in an informational tone with a clock icon and no success check. The
+POS-outcome push is what then tells them. The `oc_sending` strings are deleted,
+and `branchNumberCard.test.ts` fails if that wording reappears anywhere in the
+app's source. Measured on build 30 (SM-2026-000102), this state now lasts
+about 6 s: the POS had the order 6 s after the receipt opened. The error states
+(`verifying_with_branch`, the not-sent and failed ones) still say what
+happened, because the customer must not resend while it is uncertain.
+
 The three `yes` rows are the states on an ACTIVE POS channel: the number is
 either already issued (`confirmed_by_branch`) or still expected
 (`sending_to_branch`, `verifying_with_branch`), so the card's "it will appear
