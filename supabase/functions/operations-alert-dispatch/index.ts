@@ -102,8 +102,9 @@ interface ClaimedRow {
  */
 const SMTP_ALLOWED_HOSTS = Deno.env.get('SMTP_ALLOWED_HOSTS') ?? null;
 
-// Legacy `Bearer <service_role>` OR an opaque secret key on `apikey`, during the
-// Supabase key cut-over — see _shared/apiKeys.ts. Constant-time.
+// A secret key on `apikey`, matched against every key in SUPABASE_SECRET_KEYS —
+// see _shared/apiKeys.ts. Constant-time. The legacy `Bearer <service_role>`
+// form is no longer accepted.
 const isServiceRoleCall = isServiceCall;
 
 /** Strip anything that could carry configuration detail into a stored string. */

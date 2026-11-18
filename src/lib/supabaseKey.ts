@@ -1,34 +1,34 @@
 /**
- * The public Supabase key the web console sends.
+ * The public Supabase key the web console sends: the publishable key
+ * (`sb_publishable_…`), and nothing else.
  *
- * Supabase retires the JWT-based `anon` key by the end of 2026 and replaces it
- * with an opaque publishable key (`sb_publishable_…`). Both are DESIGNED to be
- * public — they identify the project, and Row Level Security is the boundary —
- * so either may sit in a `VITE_*` variable (CLAUDE.md §9).
+ * Supabase retired the JWT-based `anon` key. Until step 9 of
+ * docs/SUPABASE_API_KEYS.md §3 this module fell back to `VITE_SUPABASE_ANON_KEY`
+ * when no publishable key was set; that fallback is gone, because the legacy
+ * keys have been deactivated and a build still carrying one would ship a key
+ * the gateway refuses. The publishable key is DESIGNED to be public — it
+ * identifies the project, and Row Level Security is the boundary — so it may sit
+ * in a `VITE_*` variable (CLAUDE.md §9).
  *
- * `VITE_SUPABASE_PUBLISHABLE_KEY` wins when it is set; otherwise the legacy
- * `VITE_SUPABASE_ANON_KEY` is used exactly as before. That lets the Vercel
- * environment gain the new variable without a code change, and lets the old
- * one be removed only once the new one is live. Runbook:
- * docs/SUPABASE_API_KEYS.md.
+ * A value that is not a publishable key — empty, a legacy JWT left behind in
+ * the variable, or a `sb_secret_…` key pasted by mistake — is treated as
+ * missing, so the console reports itself unconfigured (and a Vercel production
+ * build refuses to build) rather than shipping it.
  *
- * Callers pass the values in as DIRECT `import.meta.env.X` member expressions
+ * Callers pass the value in as a DIRECT `import.meta.env.X` member expression
  * (or `process.env.X` at build time), because Vite only replaces that exact
  * shape — reading the env object dynamically here would compile to undefined.
  */
 export interface PublicKeyEnv {
   VITE_SUPABASE_PUBLISHABLE_KEY?: string;
-  VITE_SUPABASE_ANON_KEY?: string;
 }
 
-/** Names quoted in "not configured" messages, so they always name both. */
-export const PUBLIC_KEY_ENV_NAMES = 'VITE_SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_ANON_KEY';
+/** The name quoted in "not configured" messages. */
+export const PUBLIC_KEY_ENV_NAMES = 'VITE_SUPABASE_PUBLISHABLE_KEY';
 
 export function publicSupabaseKey(env: PublicKeyEnv): string | undefined {
   const publishable = env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
-  if (publishable) return publishable;
-  const anon = env.VITE_SUPABASE_ANON_KEY?.trim();
-  return anon || undefined;
+  return publishable && /^sb_publishable_/.test(publishable) ? publishable : undefined;
 }
 
 /** What a console build needs to reach Supabase at all. */
@@ -38,8 +38,8 @@ export interface SupabaseBuildEnv extends PublicKeyEnv {
 
 /**
  * The variable names a console build is missing, empty when it has what it
- * needs. A key is satisfied by EITHER public key, exactly as at run time, so the
- * two missing keys are reported as one entry naming both.
+ * needs. The key is judged exactly as at run time, so a variable holding
+ * something other than a publishable key counts as missing.
  *
  * Read by `vite.config.ts`, which fails a Vercel PRODUCTION build on a
  * non-empty answer. Without that, a production build with no Supabase settings
@@ -74,7 +74,6 @@ export function supabaseBuildGuard(
   const missing = missingSupabaseBuildEnv({
     VITE_SUPABASE_URL: env.VITE_SUPABASE_URL,
     VITE_SUPABASE_PUBLISHABLE_KEY: env.VITE_SUPABASE_PUBLISHABLE_KEY,
-    VITE_SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY,
   });
   if (missing.length === 0 || (vercelEnv !== 'production' && vercelEnv !== 'preview')) return { action: 'ok' };
   const message =
@@ -87,11 +86,10 @@ export function supabaseBuildGuard(
  * Headers for a raw PostgREST `fetch` made with the public key.
  *
  * `apikey` ONLY. Supabase's migration guide: "Send publishable and secret keys
- * on the `apikey` header only". With the legacy anon key this was measured to
- * read exactly what `apikey` + `Authorization: Bearer` read (2026-11-09: the
- * same 9 active legal documents, HTTP 200), because the gateway supplies the
- * anon role when no session JWT is sent. supabase-js clients are unaffected —
- * they manage their own headers.
+ * on the `apikey` header only". The gateway supplies the anon role when no
+ * session JWT is sent (measured 2026-11-09 with the legacy key, and with the
+ * publishable key on 2026-11-18 — docs/SUPABASE_API_KEYS.md §3). supabase-js
+ * clients are unaffected — they manage their own headers.
  */
 export function publicRestHeaders(key: string): Record<string, string> {
   return { apikey: key };

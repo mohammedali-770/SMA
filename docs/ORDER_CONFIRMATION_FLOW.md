@@ -905,6 +905,16 @@ migration (`docs/SUPABASE_API_KEYS.md`) and is Web-standard-only, so the graph i
 still dependency-free. **A hand deploy of `order-intake` must send all four** —
 a missing file is a function that fails at boot.
 
+**Step 9 cleanup (2026-11-18, merged only after step 8 held).** `serviceTarget()`
+and `callerTarget()` read only `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS`
+and throw `MISSING_SECRET_KEY` / `MISSING_PUBLISHABLE_KEY` otherwise. The
+service target sends `apikey` alone. The checkout path is unchanged in effect:
+`serviceTarget()` still sits inside the sync block's `try`, so a missing secret
+key skips the config read and the instant POS kick, and never fails the order.
+The kick's `apikey` is the publishable key only; without one the kick is skipped
+and the once-a-minute cron picks the order up. Three of the four bundle files
+change (`index.ts`, `rest.ts`, `apiKeys.ts`), so the deploy is again all four.
+
 **A version caveat worth stating.** `npm:@supabase/supabase-js@2` is a *floating*
 specifier resolved at build time, so which 2.x the deployed function bundled is
 not something this repository records. The behaviours above were read from

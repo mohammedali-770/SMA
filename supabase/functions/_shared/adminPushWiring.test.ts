@@ -100,15 +100,17 @@ describe('the caller gate', () => {
   });
 
   it('accepts the service role only through the shared constant-time check', () => {
-    // The comparison itself (legacy Bearer or opaque secret on `apikey`) is
-    // executed in apiKeys.test.ts; here it is pinned that this receiver uses it
-    // rather than a hand-rolled `===`.
+    // The comparison itself (a secret key on `apikey`; the legacy Bearer is
+    // refused since step 9 of docs/SUPABASE_API_KEYS.md §3) is executed in
+    // apiKeys.test.ts; here it is pinned that this receiver uses it rather than
+    // a hand-rolled `===`, and does not read the legacy variable itself.
     // The import is read from the raw handler (code() strips imports, because an
     // import alone proves nothing); the binding and its use are read from code().
     expect(handler()).toContain("import { isServiceCall } from '../_shared/apiKeys.ts';");
     expect(code()).toContain('const isServiceRoleCall = isServiceCall;');
     expect(code()).toMatch(/\bisServiceRoleCall\(req\)/);
     expect(code()).not.toMatch(/auth === `Bearer \$\{key\}`/);
+    expect(code()).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
   });
 });
 

@@ -15,36 +15,38 @@ const LEGACY = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig';
 const PUBLISHABLE = 'sb_publishable_abc123def456';
 
 describe('publicSupabaseKey', () => {
-  it('uses the legacy anon key, unchanged, while no publishable key is configured', () => {
-    expect(publicSupabaseKey({ VITE_SUPABASE_ANON_KEY: LEGACY })).toBe(LEGACY);
+  // Step 9 of docs/SUPABASE_API_KEYS.md §3 removed the legacy anon fallback.
+  // These cases used to pin that fallback; they now pin its absence.
+  it('returns the publishable key', () => {
+    expect(publicSupabaseKey({ VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE })).toBe(PUBLISHABLE);
+    expect(publicSupabaseKey({ VITE_SUPABASE_PUBLISHABLE_KEY: `  ${PUBLISHABLE}  ` })).toBe(PUBLISHABLE);
   });
 
-  it('prefers the publishable key once it is set', () => {
-    expect(
-      publicSupabaseKey({ VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE, VITE_SUPABASE_ANON_KEY: LEGACY }),
-    ).toBe(PUBLISHABLE);
+  it('NEVER reads the legacy anon variable, even when it is all that is set', () => {
+    // The parameter type no longer has the field; an old caller passing it
+    // through a wider object must still get nothing.
+    const legacyOnly = { VITE_SUPABASE_ANON_KEY: LEGACY } as unknown as Parameters<typeof publicSupabaseKey>[0];
+    expect(publicSupabaseKey(legacyOnly)).toBeUndefined();
   });
 
-  it('treats an empty or whitespace publishable value as unset, not as a key', () => {
-    expect(publicSupabaseKey({ VITE_SUPABASE_PUBLISHABLE_KEY: '  ', VITE_SUPABASE_ANON_KEY: LEGACY })).toBe(
-      LEGACY,
-    );
+  it('treats an empty, whitespace or non-publishable value as unset', () => {
+    for (const value of ['', '  ', LEGACY, 'sb_secret_abc123', 'YOUR-anon-public-key']) {
+      expect(publicSupabaseKey({ VITE_SUPABASE_PUBLISHABLE_KEY: value }), value).toBeUndefined();
+    }
   });
 
-  it('returns undefined when neither is configured', () => {
+  it('returns undefined when nothing is configured', () => {
     expect(publicSupabaseKey({})).toBeUndefined();
-    expect(publicSupabaseKey({ VITE_SUPABASE_ANON_KEY: '' })).toBeUndefined();
   });
 
-  it('names both variables in configuration messages', () => {
-    expect(PUBLIC_KEY_ENV_NAMES).toContain('VITE_SUPABASE_PUBLISHABLE_KEY');
-    expect(PUBLIC_KEY_ENV_NAMES).toContain('VITE_SUPABASE_ANON_KEY');
+  it('names only the publishable variable in configuration messages', () => {
+    expect(PUBLIC_KEY_ENV_NAMES).toBe('VITE_SUPABASE_PUBLISHABLE_KEY');
   });
 });
 
 describe('publicRestHeaders', () => {
   it('sends the key on apikey only — never as a Bearer token', () => {
-    for (const key of [LEGACY, PUBLISHABLE]) {
+    for (const key of [PUBLISHABLE]) {
       const h = publicRestHeaders(key);
       expect(h).toEqual({ apikey: key });
       expect(Object.keys(h).map((k) => k.toLowerCase())).not.toContain('authorization');
@@ -63,10 +65,10 @@ describe('every console key reader goes through the helper', () => {
     it(`${file} resolves the key through publicSupabaseKey`, () => {
       const src = read(file);
       expect(src).toMatch(/publicSupabaseKey\(/);
-      // Both variables are read as direct member expressions, which is the only
-      // shape Vite replaces at build time.
+      // Read as a direct member expression, the only shape Vite replaces at
+      // build time — and the legacy anon variable is not read at all.
       expect(src).toMatch(/(?:import\.meta|process)\.env\.VITE_SUPABASE_PUBLISHABLE_KEY/);
-      expect(src).toMatch(/(?:import\.meta|process)\.env\.VITE_SUPABASE_ANON_KEY/);
+      expect(src).not.toMatch(/VITE_SUPABASE_ANON_KEY/);
     });
   }
 
@@ -82,25 +84,22 @@ describe('every console key reader goes through the helper', () => {
 describe('missingSupabaseBuildEnv', () => {
   const URL = 'https://example.supabase.co';
 
-  it('is empty when the URL and either public key are present', () => {
-    expect(missingSupabaseBuildEnv({ VITE_SUPABASE_URL: URL, VITE_SUPABASE_ANON_KEY: LEGACY })).toEqual([]);
+  it('is empty when the URL and the publishable key are present', () => {
     expect(
       missingSupabaseBuildEnv({ VITE_SUPABASE_URL: URL, VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE }),
     ).toEqual([]);
   });
 
-  it('names the URL, and the two keys as one entry, when they are absent or blank', () => {
+  it('names the URL and the key when they are absent, blank or not a publishable key', () => {
     expect(missingSupabaseBuildEnv({})).toEqual(['VITE_SUPABASE_URL', PUBLIC_KEY_ENV_NAMES]);
-    expect(missingSupabaseBuildEnv({ VITE_SUPABASE_URL: '  ', VITE_SUPABASE_ANON_KEY: LEGACY })).toEqual([
-      'VITE_SUPABASE_URL',
-    ]);
     expect(
-      missingSupabaseBuildEnv({
-        VITE_SUPABASE_URL: URL,
-        VITE_SUPABASE_PUBLISHABLE_KEY: '',
-        VITE_SUPABASE_ANON_KEY: ' ',
-      }),
-    ).toEqual([PUBLIC_KEY_ENV_NAMES]);
+      missingSupabaseBuildEnv({ VITE_SUPABASE_URL: '  ', VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE }),
+    ).toEqual(['VITE_SUPABASE_URL']);
+    for (const value of ['', ' ', LEGACY]) {
+      expect(missingSupabaseBuildEnv({ VITE_SUPABASE_URL: URL, VITE_SUPABASE_PUBLISHABLE_KEY: value })).toEqual([
+        PUBLIC_KEY_ENV_NAMES,
+      ]);
+    }
   });
 });
 
@@ -127,10 +126,13 @@ describe('supabaseBuildGuard', () => {
     expect(supabaseBuildGuard('development', {}).action).toBe('ok');
   });
 
-  it('passes a production build that has the URL and either key', () => {
+  it('FAILS a production build that still carries only the legacy anon key', () => {
     expect(supabaseBuildGuard('production', { VITE_SUPABASE_URL: URL, VITE_SUPABASE_ANON_KEY: LEGACY }).action).toBe(
-      'ok',
+      'fail',
     );
+  });
+
+  it('passes a production build that has the URL and the publishable key', () => {
     expect(
       supabaseBuildGuard('production', { VITE_SUPABASE_URL: URL, VITE_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE })
         .action,

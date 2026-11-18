@@ -9,7 +9,7 @@
  *
  * The read is anonymous by design. `legal_documents_select_public` grants `anon`
  * SELECT on `is_active` rows only, so this page can never surface a draft, and the
- * anon key it sends is a public, RLS-scoped credential (CLAUDE.md §9).
+ * publishable key it sends is a public, RLS-scoped credential (CLAUDE.md §9).
  *
  * EVERY DOCUMENT FIELD IS WRITTEN WITH textContent, NEVER innerHTML. The bodies are
  * edited by administrators in the console; rendering them as markup would turn the
@@ -31,9 +31,8 @@ import {
 import { publicRestHeaders, publicSupabaseKey } from '../lib/supabaseKey';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_ANON_KEY = publicSupabaseKey({
+const SUPABASE_PUBLIC_KEY = publicSupabaseKey({
   VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined,
-  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined,
 });
 
 const SELECT = 'document_type,title_en,title_ar,content_en,content_ar,version,effective_date';
@@ -114,7 +113,7 @@ function el(tag: string, className?: string, text?: string): HTMLElement {
 }
 
 async function load(): Promise<void> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_PUBLIC_KEY) {
     failed = true;
     render();
     return;
@@ -124,7 +123,7 @@ async function load(): Promise<void> {
   render();
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/legal_documents?select=${SELECT}&is_active=eq.true`, {
-      headers: publicRestHeaders(SUPABASE_ANON_KEY),
+      headers: publicRestHeaders(SUPABASE_PUBLIC_KEY),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     docs = orderDocs((await res.json()) as PublicLegalDoc[]);

@@ -960,3 +960,8 @@ no-action-buttons guarantee).
 `Authorization: Bearer <service_role>` or an opaque secret key on `apikey`,
 constant-time. The pg_cron driver is unaffected — it authenticates with its own
 trigger secret and sends no Supabase key. Steps: `docs/SUPABASE_API_KEYS.md`.
+
+**Step 9 cleanup (2026-11-18, merged only after step 8 held):** the legacy
+Bearer form is no longer accepted; only an `sb_secret_…` key on `apikey` is. The
+pg_cron path is still unaffected. The bundle changes, so the function needs its
+own redeploy (`docs/SUPABASE_API_KEYS.md` §3, step 9).

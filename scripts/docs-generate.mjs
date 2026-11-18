@@ -556,17 +556,15 @@ function generateEnvironment() {
   }
   for (const f of walk(join(ROOT, 'supabase', 'functions'), (x) => x.endsWith('.ts') && !x.endsWith('.test.ts'))) {
     // `Deno.env.get('X')` directly, and the pure-module readers that keep a file
-    // executable under Vitest: `env('X')` (rest.ts, apiKeys.ts), `keyMap('X')`
-    // and `pick('NEW', 'LEGACY')` (apiKeys.ts). Before the API-key migration
-    // only the first form was matched, and moving the service key behind the
-    // helper silently dropped SUPABASE_SERVICE_ROLE_KEY from this reference —
-    // a secret the functions still read, missing from the list of secrets.
+    // executable under Vitest: `env('X')` (rest.ts, apiKeys.ts), `keyMap('X', …)`
+    // and `pick('X', …)` (apiKeys.ts). Before the API-key migration only the
+    // first form was matched, and moving the service key behind the helper
+    // silently dropped SUPABASE_SERVICE_ROLE_KEY from this reference — a secret
+    // the functions still read, missing from the list of secrets. `pick` used to
+    // take two names (new, legacy); since the legacy fallback was removed it
+    // takes one name and a pattern, and only the name is a variable.
     const src = read(f);
-    for (const m of src.matchAll(/\b(?:Deno\.env\.get|env|keyMap)\(\s*['"]([A-Z0-9_]+)['"]/g)) serverVars.add(m[1]);
-    for (const m of src.matchAll(/\bpick\(\s*['"]([A-Z0-9_]+)['"]\s*,\s*['"]([A-Z0-9_]+)['"]/g)) {
-      serverVars.add(m[1]);
-      serverVars.add(m[2]);
-    }
+    for (const m of src.matchAll(/\b(?:Deno\.env\.get|env|keyMap|pick)\(\s*['"]([A-Z0-9_]+)['"]/g)) serverVars.add(m[1]);
   }
 
   return (

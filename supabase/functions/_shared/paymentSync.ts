@@ -7,6 +7,7 @@
  * confirmed payment; the background sync worker + reaper reconcile the tail.
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import { publishableKey } from './apiKeys.ts';
 import { getProviderConfig } from './secrets.ts';
 import { DEFAULT_BASE_URL, lazywaitFetch, round2, type LazywaitConfig } from './lazywait.ts';
 
@@ -16,17 +17,25 @@ import { DEFAULT_BASE_URL, lazywaitFetch, round2, type LazywaitConfig } from './
  * 'awaiting_payment' to 'pending' — is created in the POS promptly. The
  * sync_trigger_secret is read server-side and sent as x-sync-secret; it never
  * leaves Postgres/the function.
+ *
+ * `apikey` is the publishable key from `publishableKey()`, exactly as
+ * order-intake's kick sends it: lazywait-sync authorizes on x-sync-secret, and
+ * the key only identifies the project. Until 2026-11-18 this read
+ * `SUPABASE_ANON_KEY` directly, which the gateway refuses once the legacy keys
+ * are deactivated (docs/SUPABASE_API_KEYS.md §5). Without a publishable key the
+ * kick is skipped: it is best-effort, and the once-a-minute cron picks the paid
+ * order up.
  */
 export async function triggerLazywaitSyncOnce(admin: SupabaseClient): Promise<void> {
   try {
     const cfg = await getProviderConfig(admin, 'lazywait');
     const secret = String((cfg?.secretConfig as Record<string, unknown>)?.sync_trigger_secret ?? '');
     const url = Deno.env.get('SUPABASE_URL');
-    const anon = Deno.env.get('SUPABASE_ANON_KEY');
-    if (cfg?.enabled && secret && url && anon) {
+    const apikey = publishableKey()?.value;
+    if (cfg?.enabled && secret && url && apikey) {
       await fetch(`${url}/functions/v1/lazywait-sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: anon, 'x-sync-secret': secret },
+        headers: { 'Content-Type': 'application/json', apikey, 'x-sync-secret': secret },
         body: JSON.stringify({ limit: 5 }),
         signal: AbortSignal.timeout(11_000),
       });
