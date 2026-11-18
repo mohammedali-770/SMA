@@ -8,7 +8,8 @@ import {
   matchesAnyWebhookSecret, WEBHOOK_VERIFICATION_TYPE, webhookVerificationLogRow, confirmMessageKey,
   closedInvoiceOutcome, MOYASAR_MIN_INVOICE_MINOR_UNITS, isBelowMoyasarMinimum, invoiceExpiryForAttempt,
   INVOICE_EXPIRY_MARGIN_MS, MIN_INVOICE_LIFETIME_MS, decideSessionVerify, isGenuineConfirmation,
-  DUPLICATE_PAYMENT, DUPLICATE_PAYMENT_MESSAGE, NOT_A_DUPLICATE_FILTER,
+  DUPLICATE_PAYMENT, DUPLICATE_PAYMENT_MESSAGE, NOT_A_DUPLICATE_FILTER, abandonInvoiceVerdict,
+  invoiceCancelConfirmed,
 } from './moyasar.ts';
 import { STRINGS } from '../../../apps/mobile/src/i18n/strings.ts';
 import { decidePendingAction } from '../../../apps/mobile/src/features/checkout/pendingSession.ts';
@@ -983,5 +984,43 @@ describe('payment-verify answer helpers (second-round review, 2026-11-12)', () =
     expect(isSessionLive('pending_payment', '2026-11-12T10:00:00Z', now)).toBe(false);
     expect(isSessionLive('expired', '2026-11-12T10:30:00Z', now)).toBe(false);
     expect(isSessionLive('pending_payment', null, now)).toBe(true);
+  });
+});
+
+// A checkout the customer replaced by changing their cart is dropped only when
+// nobody has started paying it (payment-verify, action 'abandon').
+describe('abandonInvoiceVerdict / invoiceCancelConfirmed', () => {
+  const inv = (status: string, payments: { status: string }[] = []) => ({ id: 'inv', status, payments });
+
+  it('an open invoice with no payment, or only declined ones, is cancellable', () => {
+    expect(abandonInvoiceVerdict(inv('initiated'))).toBe('cancellable');
+    expect(abandonInvoiceVerdict(inv('initiated', [{ status: 'failed' }, { status: 'FAILED' }]))).toBe('cancellable');
+  });
+
+  it.each(['initiated', 'paid', 'authorized', 'captured', 'verified', 'refunded', 'voided', ''])(
+    'any payment that is not failed (%s) blocks it', (st) => {
+      expect(abandonInvoiceVerdict(inv('initiated', [{ status: 'failed' }, { status: st }]))).toBe('in_progress');
+    },
+  );
+
+  it('an invoice Moyasar already closed with nothing settled is closed', () => {
+    expect(abandonInvoiceVerdict(inv('expired'))).toBe('closed');
+    expect(abandonInvoiceVerdict(inv('canceled', [{ status: 'failed' }]))).toBe('closed');
+  });
+
+  it('a paid invoice, or an unknown invoice status, is never cancellable', () => {
+    expect(abandonInvoiceVerdict(inv('paid', [{ status: 'paid' }]))).toBe('in_progress');
+    expect(abandonInvoiceVerdict(inv('on_hold'))).toBe('in_progress');
+    expect(abandonInvoiceVerdict(inv('something_new'))).toBe('in_progress');
+    expect(abandonInvoiceVerdict({})).toBe('in_progress');
+  });
+
+  it('a cancel counts only when its answer shows the invoice cancelled with nothing in flight', () => {
+    expect(invoiceCancelConfirmed(inv('canceled'))).toBe(true);
+    expect(invoiceCancelConfirmed(inv('cancelled', [{ status: 'failed' }]))).toBe(true);
+    expect(invoiceCancelConfirmed(inv('initiated'))).toBe(false);
+    expect(invoiceCancelConfirmed(inv('expired'))).toBe(false);
+    expect(invoiceCancelConfirmed(inv('canceled', [{ status: 'paid' }]))).toBe(false);
+    expect(invoiceCancelConfirmed({})).toBe(false);
   });
 });

@@ -23,6 +23,12 @@ export interface PendingSession {
   sessionId: string;
   /** epoch ms when the pay flow started (for optional staleness display). */
   at: number;
+  /**
+   * The cart's idempotency key when this checkout was begun, i.e. which order it
+   * is for. Null for a record written by an older build, or from the payment
+   * return link, which never knows the cart. See `recoverPendingSession`.
+   */
+  cartKey?: string | null;
 }
 
 /** Parse a stored record; null if absent, malformed, or wrong-shaped. */
@@ -31,7 +37,11 @@ export function parsePendingSession(raw: string | null | undefined): PendingSess
   try {
     const o = JSON.parse(raw) as Record<string, unknown>;
     if (o && typeof o.sessionId === 'string' && o.sessionId.length > 0) {
-      return { sessionId: o.sessionId, at: typeof o.at === 'number' ? o.at : 0 };
+      return {
+        sessionId: o.sessionId,
+        at: typeof o.at === 'number' ? o.at : 0,
+        cartKey: typeof o.cartKey === 'string' && o.cartKey.length > 0 ? o.cartKey : null,
+      };
     }
   } catch {
     /* corrupt value → treat as absent */
@@ -40,8 +50,18 @@ export function parsePendingSession(raw: string | null | undefined): PendingSess
 }
 
 /** Serialize a pending session for storage. */
-export function serializePendingSession(sessionId: string, at: number): string {
-  return JSON.stringify({ sessionId, at });
+export function serializePendingSession(sessionId: string, at: number, cartKey: string | null = null): string {
+  return JSON.stringify(cartKey ? { sessionId, at, cartKey } : { sessionId, at });
+}
+
+/**
+ * Is the saved checkout for a DIFFERENT order than the cart now on screen?
+ * Only when both keys are known: a record without one (older build, payment
+ * return link) is treated as the same order, which is the behaviour before
+ * this check existed.
+ */
+export function cartChangedSince(pending: PendingSession, currentCartKey: string | null | undefined): boolean {
+  return Boolean(pending.cartKey && currentCartKey && pending.cartKey !== currentCartKey);
 }
 
 /** The result of verifySession, narrowed to what the decision needs. */
@@ -165,6 +185,13 @@ export async function recoverPendingSession(deps: {
   read: () => Promise<PendingSession | null>;
   verify: (sessionId: string) => Promise<VerifyOutcome>;
   clear: () => Promise<void>;
+  /**
+   * The cart now on screen, and the server call that drops a checkout the
+   * customer has replaced (payment-verify, action 'abandon'). Both optional:
+   * without them an unresolved checkout is always resumed.
+   */
+  currentCartKey?: string | null;
+  abandon?: (sessionId: string) => Promise<VerifyOutcome>;
 }): Promise<RecoverResult> {
   const pending = await deps.read();
   if (!pending) return { kind: 'none' };
@@ -184,6 +211,30 @@ export async function recoverPendingSession(deps: {
   if (action.kind === 'clear') {
     await deps.clear();
     return { kind: 'cleared' };
+  }
+
+  // Still open, but for a different order than the cart now on screen: the
+  // customer gave up on that payment and changed their cart. Ask the server to
+  // drop it. It does so only when nobody has started paying it, after
+  // cancelling its invoice at Moyasar; otherwise it answers pending and THAT
+  // checkout is resumed, exactly as before, because a payment under way must
+  // never be abandoned for a second charge.
+  if (deps.abandon && cartChangedSince(pending, deps.currentCartKey)) {
+    let res2: VerifyOutcome | null = null;
+    try {
+      res2 = await deps.abandon(pending.sessionId);
+    } catch {
+      res2 = null; // could not find out → resume, the safe answer
+    }
+    const after = decidePendingAction(res2);
+    if (after.kind === 'receipt') {
+      await deps.clear();
+      return { kind: 'receipt', orderId: after.orderId };
+    }
+    if (after.kind === 'clear') {
+      await deps.clear();
+      return { kind: 'cleared' };
+    }
   }
   return { kind: 'resume', sessionId: pending.sessionId };
 }

@@ -170,12 +170,16 @@ such a remainder.
 | Read an invoice + its payments | `GET /v1/invoices/{id}` |
 | Reconcile an ambiguous create | `GET /v1/invoices?metadata[reference_transaction]=…` |
 | Read a payment (authoritative confirmation) | `GET /v1/payments/{id}` |
+| Cancel an unpaid invoice the customer replaced (changed cart) | `PUT /v1/invoices/{id}/cancel` |
 | Refund | `POST /v1/payments/{id}/refund` |
 | Credential check (creates nothing) | `GET /v1/payments/{a-nonexistent-uuid}` |
 
 Every one of these goes through `moyasarFetch()` (§1.0). `PUT
-/v1/invoices/{id}/cancel` exists and is **not** used; whether to cancel an older
-invoice when a new attempt opens is an open question (`docs/PAYMENTS.md` §11).
+/v1/invoices/{id}/cancel` is used since 2026-11-18 for one case only: dropping
+a checkout the customer replaced with a different cart, when no payment on its
+invoice is anything but `failed` (`docs/PAYMENTS.md` §4). Whether to cancel an
+older invoice when a new attempt opens on the SAME checkout is still an open
+question (`docs/PAYMENTS.md` §11).
 
 ### 3.1 Create an invoice — `POST /v1/invoices`
 

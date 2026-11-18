@@ -291,6 +291,8 @@ export function CheckoutScreen() {
           read: loadPendingSession,
           verify: (id) => payments.verifySession(id),
           clear: clearPendingSession,
+          currentCartKey: cart.idempotencyKey,
+          abandon: (id) => payments.abandonSession(id),
         });
         if (!active) return;
         if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
@@ -793,6 +795,10 @@ export function CheckoutScreen() {
         read: loadPendingSession,
         verify: (id) => payments.verifySession(id),
         clear: clearPendingSession,
+        // A checkout begun for a different cart is dropped, if nobody has
+        // started paying it, instead of reopening the old amount.
+        currentCartKey: cart.idempotencyKey,
+        abandon: (id) => payments.abandonSession(id),
       });
       if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
       if (rec.kind === 'resume') { await runOnlinePayment(rec.sessionId); return; }
@@ -847,7 +853,7 @@ export function CheckoutScreen() {
         } else {
           // Keep the cart until payment actually succeeds — a failed/abandoned
           // payment must not wipe it, and there is no order to strand.
-          await runOnlinePayment(session.id);
+          await runOnlinePayment(session.id, cart.idempotencyKey);
         }
       } else {
         // Cash: unchanged. The order is created + synced to the POS now.
@@ -866,7 +872,9 @@ export function CheckoutScreen() {
   // Session-based: the order is created by the backend ONLY after the payment is
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
-  const runOnlinePayment = async (sessionId: string) => {
+  // `cartKey` is passed only when this call BEGAN the checkout; a resume keeps
+  // the key saved with it (savePendingSession), so it stays tied to its order.
+  const runOnlinePayment = async (sessionId: string, cartKey?: string) => {
     // Single-flight: a second concurrent run for the same (or any) session would
     // stack a duplicate payment WebView and fire a redundant verify. Bail if one
     // is already in progress; the ref is reset in the finally below.
@@ -878,7 +886,7 @@ export function CheckoutScreen() {
       // Awaited (not fire-and-forget) so the write is committed before we hand
       // off to the in-app WebView — the exact window this recovery is meant to
       // survive (see pendingSession.ts).
-      await savePendingSession(sessionId, Date.now());
+      await savePendingSession(sessionId, Date.now(), cartKey);
       setPayFlow({ state: 'opening', sessionId });
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
       if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }

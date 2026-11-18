@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  cartChangedSince,
   decidePendingAction,
   describeVerifyResult,
   parsePendingSession,
@@ -14,7 +15,16 @@ import {
 describe('parsePendingSession', () => {
   it('round-trips a saved session', () => {
     const raw = serializePendingSession('sess-1', 1234);
-    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234 });
+    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: null });
+  });
+  it('round-trips the cart key a checkout was begun for', () => {
+    const raw = serializePendingSession('sess-1', 1234, 'cart-a');
+    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: 'cart-a' });
+  });
+  it('reads a record from an older build, which has no cart key, as unknown', () => {
+    expect(parsePendingSession('{"sessionId":"s","at":5}')).toEqual({ sessionId: 's', at: 5, cartKey: null });
+    expect(parsePendingSession('{"sessionId":"s","cartKey":""}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
+    expect(parsePendingSession('{"sessionId":"s","cartKey":7}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
   });
   it('returns null for absent / empty', () => {
     expect(parsePendingSession(null)).toBeNull();
@@ -28,7 +38,7 @@ describe('parsePendingSession', () => {
     expect(parsePendingSession('{"sessionId":123}')).toBeNull();
   });
   it('defaults a missing timestamp to 0', () => {
-    expect(parsePendingSession('{"sessionId":"s"}')).toEqual({ sessionId: 's', at: 0 });
+    expect(parsePendingSession('{"sessionId":"s"}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
   });
 });
 
@@ -202,5 +212,99 @@ describe('refusalDropsSession', () => {
     [{}],
   ])('keeps it for %j', (init) => {
     expect(refusalDropsSession(init)).toBe(false);
+  });
+});
+
+describe('cartChangedSince', () => {
+  it('is true only when both keys are known and differ', () => {
+    expect(cartChangedSince({ sessionId: 's', at: 0, cartKey: 'a' }, 'b')).toBe(true);
+    expect(cartChangedSince({ sessionId: 's', at: 0, cartKey: 'a' }, 'a')).toBe(false);
+    expect(cartChangedSince({ sessionId: 's', at: 0, cartKey: null }, 'b')).toBe(false);
+    expect(cartChangedSince({ sessionId: 's', at: 0 }, 'b')).toBe(false);
+    expect(cartChangedSince({ sessionId: 's', at: 0, cartKey: 'a' }, null)).toBe(false);
+    expect(cartChangedSince({ sessionId: 's', at: 0, cartKey: 'a' }, undefined)).toBe(false);
+  });
+});
+
+// 2026-11-18: a customer whose card payment was refused changed their cart from
+// a 17.00 SAR meal to a 1.00 SAR water, and was shown the 17.00 page again,
+// because an unresolved checkout is always resumed before a new one begins.
+describe('recoverPendingSession — a checkout the customer replaced by changing the cart', () => {
+  const old: PendingSession = { sessionId: 'sess-old', at: 100, cartKey: 'cart-meal' };
+  const stillOpen = async () => ({ status: 'pending' }) as VerifyOutcome;
+
+  it('drops it and lets a new checkout begin when the server cancelled it', async () => {
+    const clear = vi.fn(async () => {});
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear, currentCartKey: 'cart-water', abandon,
+    });
+    expect(abandon).toHaveBeenCalledWith('sess-old');
+    expect(res).toEqual({ kind: 'cleared' });
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('resumes it when the server refuses because a payment is under way', async () => {
+    const clear = vi.fn(async () => {});
+    const abandon = vi.fn(async () => ({ status: 'pending' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear, currentCartKey: 'cart-water', abandon,
+    });
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it('resumes it when the abandon call fails (could not find out)', async () => {
+    const clear = vi.fn(async () => {});
+    const abandon = vi.fn(async () => { throw new Error('network'); });
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear, currentCartKey: 'cart-water', abandon,
+    });
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it('opens the receipt when the old checkout turned out to be paid', async () => {
+    const clear = vi.fn(async () => {});
+    const abandon = vi.fn(async () => ({ status: 'paid', orderId: 'order-7' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear, currentCartKey: 'cart-water', abandon,
+    });
+    expect(res).toEqual({ kind: 'receipt', orderId: 'order-7' });
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('never asks to abandon the checkout for the SAME cart', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear: async () => {}, currentCartKey: 'cart-meal', abandon,
+    });
+    expect(abandon).not.toHaveBeenCalled();
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+  });
+
+  it('never asks for a record without a cart key (older build, payment return link)', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => ({ sessionId: 'sess-old', at: 1, cartKey: null }),
+      verify: stillOpen, clear: async () => {}, currentCartKey: 'cart-water', abandon,
+    });
+    expect(abandon).not.toHaveBeenCalled();
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+  });
+
+  it('does not ask when verify already settled it (paid or terminal)', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const paid = await recoverPendingSession({
+      read: async () => old, verify: async () => ({ status: 'paid', orderId: 'o' }), clear: async () => {},
+      currentCartKey: 'cart-water', abandon,
+    });
+    const dead = await recoverPendingSession({
+      read: async () => old, verify: async () => ({ status: 'expired' }), clear: async () => {},
+      currentCartKey: 'cart-water', abandon,
+    });
+    expect(abandon).not.toHaveBeenCalled();
+    expect(paid).toEqual({ kind: 'receipt', orderId: 'o' });
+    expect(dead).toEqual({ kind: 'cleared' });
   });
 });

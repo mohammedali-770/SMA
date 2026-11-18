@@ -64,9 +64,13 @@ export interface RetrievedResource {
  * makes those failures likelier, so they are reported, not thrown.
  */
 async function moyasarGet(secretKey: string, path: string): Promise<RetrievedResource> {
+  return await moyasarRequest(secretKey, path, 'GET');
+}
+
+async function moyasarRequest(secretKey: string, path: string, method: 'GET' | 'PUT'): Promise<RetrievedResource> {
   try {
     const res = await moyasarFetch(`${MOYASAR_API_BASE}${path}`, {
-      method: 'GET',
+      method,
       headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
@@ -81,6 +85,17 @@ async function moyasarGet(secretKey: string, path: string): Promise<RetrievedRes
 /** GET the invoice (server-to-server) with the mode-appropriate secret key. */
 export function retrieveMoyasarInvoice(secretKey: string, invoiceId: string): Promise<RetrievedResource> {
   return moyasarGet(secretKey, `/invoices/${encodeURIComponent(invoiceId)}`);
+}
+
+/**
+ * Cancel an open invoice (`PUT /v1/invoices/{id}/cancel`,
+ * https://docs.moyasar.com/api/invoices/06-cancel-invoice). Used only when a
+ * customer has replaced the checkout with a different order and nobody has
+ * started paying this one (payment-verify, action 'abandon'). Never throws:
+ * `ok: false` is "could not find out", and the caller then keeps the checkout.
+ */
+export function cancelMoyasarInvoice(secretKey: string, invoiceId: string): Promise<RetrievedResource> {
+  return moyasarRequest(secretKey, `/invoices/${encodeURIComponent(invoiceId)}/cancel`, 'PUT');
 }
 
 /** GET the payment (server-to-server) with the mode-appropriate secret key. */

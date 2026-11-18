@@ -2,10 +2,13 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
-  DUPLICATE_PAYMENT, NOT_A_DUPLICATE_FILTER, SESSION_TERMINAL_STATUSES, decideSessionVerify,
-  isSessionLive, olderInvoiceVerdict, resolveMoyasarConfig, verifyAnswerStatus,
+  DUPLICATE_PAYMENT, NOT_A_DUPLICATE_FILTER, SESSION_TERMINAL_STATUSES, abandonInvoiceVerdict,
+  decideSessionVerify, invoiceCancelConfirmed, isSessionLive, olderInvoiceVerdict, resolveMoyasarConfig,
+  sanitizeMoyasarInvoice, verifyAnswerStatus,
 } from '../_shared/moyasar.ts';
-import { verifyMoyasarAttempt, type MoyasarAttempt } from '../_shared/moyasarVerify.ts';
+import {
+  cancelMoyasarInvoice, retrieveMoyasarInvoice, verifyMoyasarAttempt, type MoyasarAttempt,
+} from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
@@ -42,6 +45,11 @@ Deno.serve(async (req: Request) => {
 
   const supaUser = userClient(authHeader);
   const admin = adminClient();
+
+  // A customer who changed their order asks to drop the checkout they replaced
+  // (action 'abandon'). A server without this action answers the plain verify,
+  // which the app treats exactly as before: it reopens the old checkout.
+  if (sessionId && body.action === 'abandon') return await abandonSession(supaUser, admin, sessionId);
 
   // Session flow: the order is created by finalize_checkout_session on a clean
   // paid payment. Return its id so the app can open the receipt.
@@ -85,18 +93,27 @@ Deno.serve(async (req: Request) => {
 type VerifyBody = Record<string, unknown> & { status: string };
 
 async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, sessionId: string): Promise<Response> {
+  const answer = await sessionVerifyAnswer(supaUser, admin, sessionId);
+  return 'error' in answer ? json({ error: answer.error }, answer.httpStatus) : json(answer.body, 200);
+}
+
+type SessionAnswer = { body: VerifyBody } | { error: string; httpStatus: number };
+
+async function sessionVerifyAnswer(
+  supaUser: SupabaseClient, admin: SupabaseClient, sessionId: string,
+): Promise<SessionAnswer> {
   const { data: session, error: sErr } = await supaUser
     .from('checkout_sessions').select('id, status, order_id, expires_at').eq('id', sessionId).maybeSingle();
-  if (sErr) return json({ error: sErr.message }, 400);
-  if (!session) return json({ error: 'Checkout session not found' }, 404);
+  if (sErr) return { error: sErr.message, httpStatus: 400 };
+  if (!session) return { error: 'Checkout session not found', httpStatus: 404 };
   if (session.order_id) {
-    return json({ status: 'paid', orderId: session.order_id }, 200);
+    return { body: { status: 'paid', orderId: session.order_id } };
   }
 
   const latest = await latestMoyasarAttempt(admin, 'checkout_session_id', sessionId);
   // A failed read is not "no attempt": that would answer terminal and let the
   // app drop a session whose invoice may be paid.
-  if (!latest.ok) return json({ status: 'pending' }, 200);
+  if (!latest.ok) return { body: { status: 'pending' } };
 
   const nowMs = Date.now();
   const verdict = decideSessionVerify({
@@ -123,9 +140,103 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
       supaUser, admin, sessionId, latest.rec?.id ?? null,
       isSessionLive(session.status, session.expires_at, nowMs),
     );
-    if (older) return json(older, 200);
+    if (older) return { body: older };
   }
-  return json(primary, 200);
+  return { body: primary };
+}
+
+/**
+ * Drop a checkout the customer has REPLACED with a different order — only when
+ * nobody has started paying it, and only by cancelling its invoices at Moyasar
+ * first, so none of them can be paid afterwards.
+ *
+ * Why: the app reopens a saved, unresolved checkout before it will start any
+ * new order, which is what stops a second charge when the app closes mid
+ * payment. But a customer who gave up on a card payment, then changed their
+ * cart, was shown the OLD amount for the OLD items until that checkout expired
+ * (2026-11-18: a 17.00 SAR page for a 1.00 SAR cart).
+ *
+ * Order of work, each step failing safe to 'pending' (the app then reopens the
+ * old checkout, the behaviour before this action existed):
+ *   1. The ordinary verify answer. Paid opens the receipt; terminal lets the app
+ *      drop it. Only 'pending' goes on.
+ *   2. Every open attempt on the session is judged. An attempt still creating
+ *      its invoice, or an invoice with a payment under way, refuses the abandon.
+ *   3. Each cancellable invoice is cancelled, and the cancel's own answer must
+ *      show it closed with nothing in flight.
+ *   4. Only then are the attempts closed, and the answer is the ordinary
+ *      verify again: with every invoice cancelled it is 'cancelled', and a paid
+ *      order that appeared meanwhile (a webhook) still wins.
+ *
+ * The session row itself is not written, here or anywhere in this function:
+ * a session whose attempts are all closed already reads as terminal.
+ */
+async function abandonSession(supaUser: SupabaseClient, admin: SupabaseClient, sessionId: string): Promise<Response> {
+  const first = await sessionVerifyAnswer(supaUser, admin, sessionId);
+  if ('error' in first) return json({ error: first.error }, first.httpStatus);
+  if (first.body.status !== 'pending') return json(first.body, 200);
+
+  const keep = (reason: string) => {
+    console.log(JSON.stringify({ event: 'checkout_abandon_refused', reason }));
+    return json({ status: 'pending' }, 200);
+  };
+
+  const { data, error } = await admin.from('payment_records')
+    .select(moyasarSelect() + ', expires_at')
+    .eq('checkout_session_id', sessionId).eq('provider', 'moyasar').eq('status', 'initiated')
+    .or(NOT_A_DUPLICATE_FILTER);
+  if (error) return keep('attempts_unreadable');
+  const open = (Array.isArray(data) ? data : []) as unknown as (MoyasarAttempt & { expires_at: string | null })[];
+
+  const cfg = await getProviderConfig(admin, 'payment');
+  const nowMs = Date.now();
+  const toCancel: { rec: MoyasarAttempt; key: string }[] = [];
+  for (const rec of open) {
+    if (!rec.provider_checkout_ref) {
+      // payment-initiate may be creating this invoice right now. Once the
+      // attempt's own expiry has passed it can no longer be opened.
+      const exp = Date.parse(String(rec.expires_at ?? ''));
+      if (!(Number.isFinite(exp) && exp <= nowMs)) return keep('invoice_being_created');
+      continue;
+    }
+    if (!cfg) return keep('no_config');
+    const m = resolveMoyasarConfig(
+      cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig,
+      (rec.mode as 'test' | 'live') ?? undefined,
+    );
+    if (!m.secretKey) return keep('no_key');
+    const got = await retrieveMoyasarInvoice(m.secretKey, rec.provider_checkout_ref);
+    if (!got.ok) return keep('invoice_unreadable');
+    const verdict = abandonInvoiceVerdict(got.body);
+    if (verdict === 'in_progress') return keep('payment_in_progress');
+    if (verdict === 'cancellable') toCancel.push({ rec, key: m.secretKey });
+  }
+
+  for (const { rec, key } of toCancel) {
+    const res = await cancelMoyasarInvoice(key, String(rec.provider_checkout_ref));
+    if (!res.ok || !invoiceCancelConfirmed(res.body)) return keep('cancel_not_confirmed');
+    await admin.from('payment_records')
+      .update({
+        status: 'failed', failure_code: 'invoice_canceled', failed_at: new Date().toISOString(),
+        failure_message_safe: 'Invoice cancelled: the customer changed the order',
+        last_verified_at: new Date().toISOString(), raw: sanitizeMoyasarInvoice(res.body),
+      })
+      .eq('id', rec.id).eq('status', 'initiated');
+  }
+
+  // Attempts that never got an invoice and have expired can never open one.
+  for (const rec of open.filter((r) => !r.provider_checkout_ref)) {
+    await admin.from('payment_records')
+      .update({ status: 'failed', failure_code: 'expired', failure_message_safe: 'Payment session expired', failed_at: new Date().toISOString() })
+      .eq('id', rec.id).eq('status', 'initiated');
+  }
+
+  const after = await sessionVerifyAnswer(supaUser, admin, sessionId);
+  if ('error' in after) return json({ error: after.error }, after.httpStatus);
+  console.log(JSON.stringify({
+    event: 'checkout_abandoned', invoices_cancelled: toCancel.length, answer: after.body.status,
+  }));
+  return json(after.body, 200);
 }
 
 /** How many older invoices are asked; a session rarely holds more than two. */

@@ -358,6 +358,43 @@ A failed database read answers `pending`. This decision is made before the
 payment configuration is read, so a disabled gateway cannot keep a dead session
 alive.
 
+### A checkout the customer replaced by changing the cart
+
+Added 2026-11-18. Until then, a customer who gave up on a card payment and then
+changed their cart was shown the **old** amount for the **old** items until that
+checkout expired, because an open checkout is always resumed first. Measured
+that day in TEST mode: a 17.00 SAR meal checkout reopened for a 1.00 SAR cart.
+
+The app now saves, with the session id, the cart's idempotency key: which order
+the checkout is for. On entering checkout, and before every order, a session
+that `payment-verify` still answers `pending` **and** that was begun for a
+different cart is offered to `payment-verify` with `action: 'abandon'`. The
+server drops it only when nobody has started paying it:
+
+1. The ordinary verify answer comes first. `paid` opens the receipt; a terminal
+   answer is cleared as before. Only `pending` goes on.
+2. Every open Moyasar attempt on the session is judged before anything changes
+   (`abandonInvoiceVerdict`). An attempt still creating its invoice, an invoice
+   that cannot be read, or any payment on it that is not `failed` (a 3-D Secure
+   challenge under way, or money held) **refuses** the abandon. A declined card
+   leaves a `failed` payment and does not block.
+3. Each open invoice is cancelled at Moyasar (`PUT /v1/invoices/{id}/cancel`),
+   and the cancel's own answer must show it `canceled` with nothing in flight
+   (`invoiceCancelConfirmed`). Only then is its attempt closed, with
+   `failure_code` `invoice_canceled`.
+4. The answer is the ordinary verify again: `cancelled`, or `paid` if a webhook
+   finished a payment meanwhile. The session row itself is not written.
+
+Every refusal answers `pending`, and the app then resumes the old checkout,
+which is the behaviour before this existed. A payment in flight is still never
+paid twice. A record without a cart key (saved by an older build, or by the
+payment return link, which never knows the cart) is never offered for abandon.
+A server without the action answers a plain verify, so an app with this change
+works against an older `payment-verify` exactly as before.
+
+Refusals log `checkout_abandon_refused` with a reason; an abandon logs
+`checkout_abandoned` with the number of invoices cancelled.
+
 **Older invoices are asked before a terminal answer.** A session can hold
 several attempts. Before any answer that lets the app drop the session, and
 while the newest attempt has no invoice, `payment-verify` asks up to **five**
@@ -1063,7 +1100,9 @@ For the owner:
   row is live (a migration);
 - whether the webhook verification code may stay readable by accountants;
 - whether to cancel the previous invoice at Moyasar when a new attempt opens
-  (`PUT /v1/invoices/{id}/cancel`).
+  on the SAME checkout (`PUT /v1/invoices/{id}/cancel`). It is used since
+  2026-11-18 only to drop a checkout the customer replaced with a different
+  cart (§4).
 
 ---
 

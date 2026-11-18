@@ -13,9 +13,19 @@ import {
   type PendingSession,
 } from './pendingSession';
 
-export async function savePendingSession(sessionId: string, at: number): Promise<void> {
+/**
+ * `cartKey` names the order this checkout is for. Omitted when resuming (or
+ * from the payment return link), the key already saved for the SAME session is
+ * kept, so resuming never makes an old checkout look like the current cart's.
+ */
+export async function savePendingSession(sessionId: string, at: number, cartKey?: string | null): Promise<void> {
   try {
-    await AsyncStorage.setItem(PENDING_SESSION_KEY, serializePendingSession(sessionId, at));
+    let key = cartKey ?? null;
+    if (cartKey === undefined) {
+      const prev = parsePendingSession(await AsyncStorage.getItem(PENDING_SESSION_KEY));
+      key = prev && prev.sessionId === sessionId ? prev.cartKey : null;
+    }
+    await AsyncStorage.setItem(PENDING_SESSION_KEY, serializePendingSession(sessionId, at, key));
   } catch {
     /* ignore */
   }
