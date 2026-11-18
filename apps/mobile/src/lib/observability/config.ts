@@ -100,7 +100,8 @@ export function isSentryEnabled(input: {
 /**
  * Canonical release naming used by Sentry's native SDKs by default:
  *   <bundle id>@<version>+<build number>
- * e.g. com.spicymeal.app@1.0.0+42 (iOS) / sa.com.spicymeal.app@1.0.0+42 (Android).
+ * e.g. sa.com.spicymeal.app@1.0.0+42 (iOS and Android share the identifier
+ * since the iOS app moved to the company Apple account, 2026-11-18).
  * The SDK derives this automatically from the native binary, which is the
  * source of truth under EAS remote versioning; this helper exists so the
  * naming contract is pinned by tests and reusable for any future web release.

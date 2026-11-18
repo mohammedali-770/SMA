@@ -5632,3 +5632,22 @@ When an item is completed:
 This file is a current decision register, not an incident diary.
 
 ---
+
+## 59. iOS app moved to the company Apple account (2026-11-18)
+
+**Owner decision (2026-11-18): fresh start in the company account.** Apple cannot transfer an app that was never released, so the company account (First Taste Trading Company, Organization, Team ID `62V8923H9K`) has a new record and a new bundle ID.
+
+Done in the consoles on 2026-11-18:
+- App ID `sa.com.spicymeal.app` registered (explicit, Push Notifications only).
+- APNs key **Spicy Meal Push**, Key ID `QVQFTUZV26`, Sandbox & Production, team scoped. The `.p8` is downloadable once only and is held by the owner.
+- App Store Connect record **"Spicy Meal SA"** (temporary name; renamed to "Spicy Meal" once the personal record is removed), ASC App ID **6836319823**, SKU `spicymeal-ios-company`, primary language Arabic, company name First Taste Trading Company.
+- App Store Connect API access accepted for the company, and Team Key **EAS Submit**, Key ID `4XYS8L7325`, role App Manager. Issuer ID `f978795f-bfc4-45c6-89b4-1538ea8fc369`. The `.p8` is held by the owner.
+
+This PR: `ios.bundleIdentifier` → `sa.com.spicymeal.app`, `submit.production.ios.ascAppId` → `6836319823`. **Merging changes nothing live**; nothing reaches a phone until an iOS build, which is its own §5 approval.
+
+Still to do, in order:
+1. Owner uploads both `.p8` files in expo.dev → Credentials → iOS for `sa.com.spicymeal.app` (API key for EAS Submit; push key).
+2. If the Mapbox public token is restricted by bundle id, add `sa.com.spicymeal.app`.
+3. First company build ("build iOS", owner approval), TestFlight internal test, device check including a real order push.
+4. Only after 3 passes: retire the personal record (expire builds, Remove App), rename "Spicy Meal SA" → "Spicy Meal", optionally revoke the personal account's keys and remove its credentials in Expo.
+5. Redo the record-level App Store setup on the new record: age rating (due 12 Jan 2027), App Privacy, pricing and availability, listing, review notes and reviewer sign-in, trader status as the company.
