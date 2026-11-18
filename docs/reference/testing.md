@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**290 TypeScript test files declaring 4249 test blocks, plus 98 SQL suites.**
+**290 TypeScript test files declaring 4261 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -163,7 +163,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-105 files, 1396 declared test blocks.
+105 files, 1408 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -221,8 +221,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
 | `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 25 | reference and channel safety |
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
-| `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
-| `apps/mobile/src/features/orders/receiptGate.test.ts` | 4 | the receipt page waits for the branch order number (owner, 2026-11-18) |
+| `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 14 | isTerminalOrderStatus |
+| `apps/mobile/src/features/orders/receiptGate.test.ts` | 10 | the order page appears only with the branch order number (owner, 2026-11-18) |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
 | `apps/mobile/src/features/profile/addressForm.test.ts` | 34 | validateAddressForm — a complete address |
