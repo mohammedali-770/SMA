@@ -10005,9 +10005,11 @@ unchanged.
   bare text incidentally (its purpose was that §58 did not touch it). It now
   follows this file, with a comment saying why, rather than becoming an argument
   against the change.
-- **Mutation checks, each caught by both the file's own block and the suite:**
-  one index dropped (`comp_members_added_by_idx`), the policy reverted to the
-  bare form, and the policy with `is_staff()` alone left bare.
+- **Mutation checks.** Three mutants, all refused at apply by the file's own
+  block: one index dropped (`comp_members_added_by_idx`), the policy reverted to
+  the bare form, and the policy with `is_staff()` alone left bare. The paired
+  suite was run against the first two and failed on both; it was not run
+  against the third.
 
 ### Applying it (owner, §5, named by version)
 
