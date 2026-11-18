@@ -1335,7 +1335,9 @@ refunded twice.
      an Allowed-IPs 401
    - `pending` — anything else: an undocumented status, 429, 5xx, timeout,
      network error, and a 401
-     from Moyasar's Allowed IPs list (`moyasar_ip_not_allowed`, no attempt cap)
+     from Moyasar's Allowed IPs list (`moyasar_ip_not_allowed`). Since
+     `20261016120000` (applied 2026-11-18) a released refund backs off and is
+     written `failed` at the tenth attempt (`PAYMENTS.md` §6)
    A refund whose timestamp is set but whose amount does not reconcile is parked
    `failed` with `refund_ambiguous_needs_review`.
 4. `finalize_order_refund()` is token-fenced. A `pending` outcome **releases** the

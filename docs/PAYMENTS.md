@@ -466,7 +466,7 @@ Since then:
   refusal (an admin not at AAL2) or before the migration is applied, so a
   refused request is not sent every minute.
 
-**Written 2026-11-17, not live until `20261016120000` is applied**
+**Written 2026-11-17, live since `20261016120000` was applied on 2026-11-18**
 (`MIGRATIONS.md` §68): a refund tried at least once and still pending raises
 R18 `REFUND_STUCK`, a **warning** once it has been open more than 1 hour and a
 **critical** once more than 24 hours (age from when the refund was opened). The
@@ -515,9 +515,11 @@ day, and every newer refund waited. Since `20261013120000` was applied and
 
 **The owner's numbers, decided 2026-11-17 (gap PG-01). Written on the branch
 `fix/refund-retry-backoff-20261117` as `20261016120000_refund_retry_backoff`
-(`MIGRATIONS.md` §68); not live until that file is applied.** Until then a
-refund that cannot finish is tried on every run, every 5 minutes, for ever, and
-raises nothing until it is `failed`.
+(`MIGRATIONS.md` §68); live since that file was applied on 2026-11-18
+(05:55:54 UTC, ledger row 121).** Before it, a refund that could not finish was
+tried on every run, every 5 minutes, for ever, and raised nothing until it was
+`failed`. The refund job's cron is still inactive, so no refund runs until it is
+turned on (`OWNER_ACTIONS.md` §47.16).
 
 - **Back-off.** Each release as `pending` sets `order_refunds.next_attempt_at`,
   and `claim_order_refund` takes only refunds that are due. The wait after the
@@ -593,12 +595,12 @@ removed.
 A 401 whose message names the IP allow-list is classified `pending` with
 `failure_code = 'moyasar_ip_not_allowed'`, and the claim is released, the same
 path as a 429 or a 5xx. The order stays `refund_state = 'pending'` and does not
-appear in `list_failed_order_refunds()`. **Until `20261016120000` is applied
-there is no attempt cap**: until the proxy and Allowed IPs are fixed, every
-cron run claims and releases it again, once a run since `20261013120000` and
-the `payment-refund` deploy of 2026-11-17 (above; five times a run before).
-**After `20261016120000`** it backs off and, at the tenth attempt, is written
-`failed` with `moyasar_ip_not_allowed` and raises R14 (above). While it is retried it is listed under "Refunds
+appear in `list_failed_order_refunds()`. **Since `20261016120000` was applied
+(2026-11-18)** it backs off and, at the tenth attempt, is written `failed` with
+`moyasar_ip_not_allowed` and raises R14 (above). Before that apply there was no
+attempt cap: until the proxy and Allowed IPs were fixed, every cron run would
+have claimed and released it again, once a run since `20261013120000` and the
+`payment-refund` deploy of 2026-11-17 (five times a run before). While it is retried it is listed under "Refunds
 still being retried" with the reason "Moyasar refused our address (Allowed
 IPs)". Each line logs `moyasar_request_refused` with the remedy. A plain 401 (a
 bad key) is a definitive failure.
@@ -1021,12 +1023,12 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   same session, the second is recorded as a duplicate and must be refunded by
   hand.
 - **Duplicates are manual, by decision** (D2, 2026-11-17). See §10.
-- **Refunds have no attempt cap and no back-off until `20261016120000` is
-  applied** (§6, PG-01). Since `20261013120000` was applied and
-  `payment-refund` redeployed (2026-11-17), one stuck refund takes one claim a
-  run, not all five, for ever. After `20261016120000` it backs off from 5
-  minutes to 6 hours and is `failed` at the tenth attempt. The refund job's
-  cron is still inactive, so no refund runs until it is turned on.
+- **Refunds back off and stop after 10 attempts** since `20261016120000` was
+  applied on 2026-11-18 (§6, PG-01): from 5 minutes to 6 hours, then `failed`
+  at the tenth attempt with its last reason. Before that apply, one stuck
+  refund took one claim a run, for ever (since `20261013120000` and the
+  `payment-refund` redeploy of 2026-11-17). The refund job's cron is still
+  inactive, so no refund runs until it is turned on.
 - **A refund stopped by the cap may still have landed.** Its last reason is
   what the worker last saw, and several reasons do not rule out a refund at
   Moyasar. Check the dashboard before refunding by hand (§6 runbook).

@@ -291,7 +291,29 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
-**AMENDED 2026-11-18 — `20261016120000_refund_retry_backoff` is written,
+**Current position 2026-11-18, read live AFTER the refund back-off apply: 160
+repository files on the default branch / 166 live history rows / 158 applied,
+2 superseded, 0 unapplied — NOTHING IS OUTSTANDING.** Latest live version
+`20261118055554`. On the owner's approval naming it by version ("Apply
+20261016120000"), `20261016120000_refund_retry_backoff` (merged in #481 as
+`902cd1a`) was applied at 05:55:54 UTC in one call (ledger row 121). Comment-only
+lines outside the dollar-quoted bodies were stripped for transport size, as for
+row 119, so the applied text is not the repository file; all 8 bodies were
+proven byte-identical to the merged file before sending, and every stored body
+equals the post-image `docs/MIGRATIONS.md` §68 pre-computed. The file's
+rolled-back probe left nothing behind, and burned no order number
+(`order_number_seq` still equals the newest order, `SM-2026-000092`).
+Reconciled **by name** against the default branch at `902cd1a`: 158 applied,
+2 superseded (rows 8-9), 0 unapplied. Money-path pair unchanged (`12b6816d…` /
+`22e2d429…`). Refund back-off, the 10-attempt cap and R18 `REFUND_STUCK` are
+live in the database; no deploy is implied, and **automated refunds are still
+OFF** — the `payment-refund-worker` cron job is inactive, and turning it on is
+its own §5 action. With nothing outstanding the rule does not relax: the next
+file written is the next referent. **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §68; steps: `docs/OWNER_ACTIONS.md` §58.
+
+**Superseded the same day by the apply above, kept because the count is the
+point — AMENDED 2026-11-18: `20261016120000_refund_retry_backoff` is written,
 validated and UNAPPLIED, so on merge the outstanding set is exactly ONE: that
 file** (branch `fix/refund-retry-backoff-20261117`). With it merged the count
 below becomes **160 repository files / 165 live history rows / 157 applied, 2
@@ -304,8 +326,8 @@ exactly one referent and still is not an instruction. **Name the target by
 version.** Detail: `docs/MIGRATIONS.md` §68 (ledger row 121); steps:
 `docs/OWNER_ACTIONS.md` §58.
 
-**Current position 2026-11-18, read live AFTER the cancelled-order follow-ups
-apply: 159 repository files on the default branch / 165 live history rows / 157
+**Superseded, kept because the count is the point — the position 2026-11-18,
+read live AFTER the cancelled-order follow-ups apply: 159 repository files on the default branch / 165 live history rows / 157
 applied, 2 superseded, 0 unapplied.** Latest live version `20261118045145`. On
 the owner's approval naming both ("Apply 20261015120000 and deploy
 push-dispatch"), `20261015120000_cancelled_order_followups` was applied at
