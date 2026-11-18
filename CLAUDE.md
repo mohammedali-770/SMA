@@ -302,6 +302,17 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
+**AMENDED 2026-11-18 (later) — `20261017120000_advisor_fixes` is written,
+validated and UNAPPLIED, so on merge the outstanding set is exactly ONE: that
+file** (branch `db/advisor-fixes-20261118`). Moyasar is not in it: the Moyasar
+files were applied on 2026-11-13. Read live 2026-11-18 and reconciled by name:
+on merge **161 repository files / 166 live history rows / 158 applied, 2
+superseded (rows 8-9), 1 unapplied**, latest version still `20261118055554`.
+One RLS policy wrapped in scalar SELECTs and 21 covering indexes, from the
+owner's advisor run; no function, no data, no deploy; money path self-asserted
+(`12b6816d…` / `22e2d429…`). **Name the target by version.** Detail:
+`docs/MIGRATIONS.md` §69 (ledger row 122); steps: `docs/OWNER_ACTIONS.md` §59.
+
 **Current position 2026-11-18, read live AFTER the refund back-off apply: 160
 repository files on the default branch / 166 live history rows / 158 applied,
 2 superseded, 0 unapplied — NOTHING IS OUTSTANDING.** Latest live version

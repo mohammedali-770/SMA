@@ -58,6 +58,14 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-18 (advisor fixes) — `20261017120000_advisor_fixes` is
+> written, validated and NOT applied (§69, ledger row 122).** On merge it is the
+> ONLY unapplied file: 161 files = 158 applied + 2 superseded (rows 8-9) + 1
+> unapplied, against 166 live history rows (read live 2026-11-18, latest
+> `20261118055554`, reconciled by name). One policy wrapped and 21 covering
+> indexes; no function, no data, no deploy; money path asserted by the file.
+> **Name the target by version.**
+
 > **Updated 2026-11-18 (refund back-off apply) — `20261016120000_refund_retry_backoff`
 > is APPLIED, and NOTHING is outstanding.** On the owner's approval naming it
 > by version ("Apply 20261016120000"): applied at 05:55:54 UTC, live
@@ -1755,12 +1763,15 @@ production.
 | 119 | 20261013120000 | payment_refund_visibility | `cb2c8d704610` | 20261117114924 | payment_refund_visibility | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-17 11:49:24 UTC** on explicit owner approval ("Apply 20261013120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**, after row 118 was verified. §65, `OWNER_ACTIONS.md` §55. §9-B.7: the merged copy is sha256 `cb2c8d704610d5d4e925562568028ea965c014b320bac69f3f3e0202305bdeb3`, 2 832 lines / 149 646 bytes. **ONE TRANSPORT DEVIATION, the same caveat as row 102:** comment-only lines OUTSIDE function bodies were stripped for transport, so 131 170 bytes were sent and the applied TEXT is not the repository file. The stored statement is 131 107 bytes (md5 `cfbe6fd6d87338301ec4b67154cff764`): exactly the 63 bytes saved by the 20 `\u` escapes at or above U+0020 arriving decoded (row 115's kind; the five control-character escapes arrived as written). **Every stored function body matches the merged file's**, the snapshot in its decoded form. **Outcomes, md5(prosrc) / length:** `claim_order_refund(text, uuid[])` `999471eed604d690da4e61675b89a02e` / 2 151, `service_role` only; `order_integrity_watchdog` `fb4fc4e2bdcee6ec46ced01029269cb0` / 34 998; `operations_health_snapshot_internal` `3847b5f3e18713bb0b322cacf9ce46ab` / 50 621 (the stored form §65 predicts); `list_payments_needing_attention` `9f4ceb05a05dba19169454d7c5dfff91` / 222, `anon` NO, `authenticated` YES; `payments_needing_attention_internal` `6dd733ccc74ef5f7f8888aa817fe7a95` / 4 744, `service_role` only. All equal §65's post-image table. `integration_sync_logs_moyasar_unconfirmed_idx` present; `to_regprocedure('public.claim_order_refund(text)')` is null. 0 open incidents, 0 `order_refunds`, 82 orders. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **163 → 164**. **Version NOT aligned** (§9-D). **`payment-refund` was then deployed** on its own approval, after this row was verified: version 4 → **5** at 12:03:44 UTC, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `1aad3d00…` → `380ce300…`; its 8 bundle files, from the default branch at `8aac448`, read back from Supabase byte-identical. The `payment-refund-worker` cron job (`*/5 * * * *`) is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `8aac448`: 158 files = 156 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 120 | 20261015120000 | cancelled_order_followups | `133245864b0a` | 20261118045145 | cancelled_order_followups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 04:51:45 UTC** on explicit owner approval ("Apply 20261015120000 and deploy push-dispatch", naming the file by version), via MCP `apply_migration`, **one call, target named explicitly**. §67, `OWNER_ACTIONS.md` §57. §9-B.7: the merged copy (merged in #478 as `0dd6a20`; sha256 `133245864b0a80edeedc3e7d272cb2ccaf42ebcab838367ee2585d268000185b`, 521 lines / 29 041 bytes) was sent verbatim. It carries no `\u` escape, and there was no transport deviation. **THE FIRST ATTEMPT, ON 2026-11-17, LANDED NOTHING:** it was interrupted by a container restart. A read-only check afterwards found history still at 164 and both pre-images in place (`begin_lazywait_create_attempt` `c67adf40dece53accd70637f07fd5ae3` / 1 235, `requeue_lazywait_order` `45d8e8a0d08a1d4f75d4dba84c744452` / 1 869). The second call landed. **Outcomes, md5(prosrc) / length, equal to the hashes pre-computed from the merged file before sending:** `begin_lazywait_create_attempt` `365fcc1b8d82a95eac196076740bd957` / 1 854; `requeue_lazywait_order` `5b83a99cb110ec14bb99deb2c839e0fc` / 2 062; one overload each. **Grants, read afterwards:** `anon` executes neither; `authenticated` executes only `requeue_lazywait_order`; `service_role` executes `begin_lazywait_create_attempt`. **Rolled-back fixtures:** 0 branches (`name_en`) and 0 orders (`order_number`) starting `VERIFY-20261015120000-` survive. 0 orders were in a `syncing`, `pending` or `retrying` sync state at the time; 82 orders in all. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **164 → 165**. **Version NOT aligned** (§9-D). **`push-dispatch` was deployed** after this row was verified, the same day under the same approval: version 9 → **10**, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `ba959385…`. Its 8 bundle files, from the default branch at `0dd6a20`, read back from Supabase byte-identical, and only `push-dispatch/index.ts` differs from v9. A `pos_sync` event for a cancelled order is now closed `superseded` and sends none of the four POS-outcome pushes. No smoke request was sent. Reconciled by name against the default branch at `0dd6a20`: 159 files = 157 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
+| 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 
-Reconciliation check: the rows above detail **121 repository rows, 119 of which
-carry a live version** (recomputed 2026-11-18 when row 121 was marked applied;
-it read 121 / 118 when row 121 was added unapplied, 120 / 118 after row 120,
-119 / 117 after rows 118-119, and 116 / 114 before that) — rows 8 and 9 do not,
-and both are class **H** (superseded). **Counted from the table itself, so it is reproducible:** every data
+Reconciliation check: the rows above detail **122 repository rows, 119 of which
+carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
+it read 121 / 119 when row 121 was marked applied, 121 / 118 when row 121 was
+added unapplied, 120 / 118 after row 120, 119 / 117 after rows 118-119, and
+116 / 114 before that) — rows 8 and 9 do not, and both are class **H**
+(superseded); row 122 does not, because it is written and **not applied**
+(class **E**). **Counted from the table itself, so it is reproducible:** every data
 row between the header and this paragraph, split on whether column 2 and column
 5 hold a 14-digit version.
 
@@ -9870,3 +9881,152 @@ Content hashes the guard accepts on a re-apply: claim
    `failed` stays failed.
 
 Steps: `docs/OWNER_ACTIONS.md` §58.
+
+## 69. Advisor fixes: one RLS init-plan and 21 covering indexes — WRITTEN 2026-11-18, NOT APPLIED (ledger row 122)
+
+`20261017120000_advisor_fixes.sql`. **Written 2026-11-18 on branch
+`db/advisor-fixes-20261118`, validated on a local chain, awaiting owner
+approval.** The owner asked for Supabase's advisors to be run and anything new
+fixed. Section number 69 follows §68, `20261016120000`, applied 2026-11-18
+(ledger row 121).
+
+sha256 `f7880fc0b55ac3011e4741ded6cb065208566fefaf65289897333b59deaf3656`, 382 lines / 24 484 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape and no dollar-quoted function body, so there is nothing to transport
+differently.
+
+### What the advisors reported, read live 2026-11-18 (11:04 UTC)
+
+| Lint | Level | Count | Here |
+| --- | --- | --- | --- |
+| 0003 `auth_rls_initplan` | WARN | 1 | **fixed** (section 1 of the file) |
+| 0001 `unindexed_foreign_keys` | INFO | 21 | **fixed** (section 2) |
+| 0005 `unused_index` | INFO | 30 | not changed |
+| 0006 `multiple_permissive_policies` | WARN | 16 | not changed |
+| 0028 `anon_security_definer_function_executable` | WARN | 1 | not changed (deliberate) |
+| 0029 `authenticated_security_definer_function_executable` | WARN | 89 | not changed; all 89 read and classified below |
+| `auth_leaked_password_protection` | WARN | 1 | not a migration: needs a paid plan |
+| 0008 `rls_enabled_no_policy` | INFO | 17 | not changed (deliberately closed tables) |
+
+Expected after apply: 0003 **1 → 0** and 0001 **21 → 0**. Every other count is
+unchanged.
+
+### What it changes
+
+- **`checkout_sessions_select_own`** read `((customer_id = auth.uid()) OR
+  is_staff())`, live and on the local chain, so both calls ran once per row. It
+  now reads `((customer_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_staff()
+  AS is_staff))`. Each scalar SELECT is an InitPlan, run once per statement.
+  `is_staff()` is wrapped as well as `auth.uid()`, for the reason §58 gave: a
+  SECURITY DEFINER SQL function is never inlined, so a bare call costs a call
+  per row. Both are STABLE and depend only on the caller's JWT and profile, so
+  neither can differ between rows of one statement. `ALTER POLICY ... USING`,
+  so the name, `SELECT`, `TO authenticated`, `PERMISSIVE` and the absent
+  `WITH CHECK` all stay, and all five are asserted. §58 left this policy alone
+  because it belonged to the then-frozen payment path; CLAUDE.md §6 no longer
+  freezes repository work that keeps Moyasar the only provider, and this changes
+  no payment behaviour.
+- **21 covering btree indexes**, one per foreign key the advisor reported,
+  named `<table>_<column>_idx`. Eleven are on `*_by` columns referencing
+  `profiles(id)` or `auth.users(id)`; account deletion removes those rows, and
+  each delete checks every referencing table, which without an index is a scan.
+  Plain `create index if not exists`, not `concurrently`: a migration runs in a
+  transaction, and the tables are small. **Row counts, read live 2026-11-18:**
+  `branch_availability_events` 26, `checkout_sessions` 7, `integration_settings`
+  6, `branch_delivery_events` 4, `comp_members` 2, `staff_branch_assignments` 2,
+  `app_settings` 1, `branch_delivery_requests` 1, and 0 in `admin_push_outbox`,
+  `branch_reference_entries`, `branch_reference_reveals`, `loyalty_multipliers`,
+  `order_integrity_incidents` and `order_refunds`. None of the 21 names existed.
+
+### What it does not do
+
+- **It drops no index.** The 30 `unused_index` findings are not evidence: the
+  project is in a testing phase with little traffic, so an index nobody has used
+  yet says nothing about whether it will be needed.
+- **It merges none of the 16 `multiple_permissive_policies` findings.** They are
+  the deliberate public/staff splits — active rows for everyone, inactive rows
+  for staff. Merging them changes who can read what; §52 records why
+  `product_variants` was split.
+- **It touches no other policy**, asserted by hashing every other policy before
+  and after, and **changes no existing index**, asserted the same way.
+- It redefines no function, writes no row and changes no grant. **No deploy
+  implied.** **MONEY PATH UNTOUCHED**, asserted before and after:
+  `place_order` `12b6816d256c29b76edf947ae1a7ea77`, `compute_order_snapshot`
+  `22e2d42935459e7bf93abb2941b56325` (`md5(pg_get_functiondef(oid))`).
+- **A finding the advisor does not make, recorded and left alone.** On the
+  local chain nine foreign keys are covered only by a PARTIAL index (for
+  example `order_refunds_order_id_fkey` by `order_refunds_one_active_uq`,
+  `checkout_sessions_address_id_fkey` by `checkout_sessions_address_idx`). The
+  advisor counts a partial index as covering, and the file's schema-wide check
+  follows the advisor's rule. Whether any of the nine needs a full index for
+  deletes is a separate question for a change of its own.
+
+### The security advisor, read rather than assumed
+
+- **0029, 89 SECURITY DEFINER functions executable by `authenticated`.** §51
+  recorded 85; the four added since are `admin_loyalty_stats`,
+  `admin_lazywait_sync_monitor`, `customer_push_device_counts` and
+  `list_payments_needing_attention`, all gated. Every one of the 89 was read
+  live with `pg_get_functiondef`, read-only, 2026-11-18:
+
+  | Class | Count | Members |
+  | --- | --- | --- |
+  | Gated, `is_admin()` first statement | 40 | the `admin_*` writers and lists, `adjust_loyalty_points`, `import_lazywait_catalog`, the Lazywait mapping writers, the delivery-zone and delivery-area editors, `reorder_*`, `requeue_lazywait_order`, `resolve_account_deletion_request`, the payment, integration and alert-settings writers, `list_failed_order_refunds`, `list_integration_settings`, `list_payments_needing_attention`, `list_pos_confirmation_required`, `customer_push_device_counts`, the admin-push subscription RPCs, `order_integrity_acknowledge_incident` / `_suppress_incident` |
+  | Gated, `is_staff()` first statement | 17 | `admin_list_orders*`, `admin_order_stats`, `admin_loyalty_stats`, `admin_lazywait_sync_monitor`, `lazywait_mapping_status`, the `operations_*` readers, the `order_integrity_*` readers |
+  | Gated, `is_admin() or is_branch_operator(branch)` | 9 | the six snooze set/clear RPCs, `request_branch_delivery_pause`, `cancel_branch_delivery_request`, `branch_reference_reveal` (the last two read the row first, to learn its branch, and raise `P0002` for an unknown id) |
+  | Gated, `is_admin() or is_call_center()` | 5 | `set_/clear_branch_delivery_pause`, `set_/clear_delivery_area_disabled`, `resolve_branch_delivery_request` |
+  | Customer-scoped by `auth.uid()` | 10 | `begin_checkout_session`, `place_customer_order` (and the `place_order` it calls raises `28000` without a user), `preview_loyalty_points`, `compute_campaign_discount`, `export_my_data`, `register_push_device`, `deactivate_push_device`, `request_customer_pos_resend`, `caller_can_read_order`, `current_staff_branch_id` |
+  | Deliberately public predicates | 8 | `is_admin`, `is_staff`, `is_call_center`, `is_branch_operator`, `is_ops_operator`, `whatsapp_login_enabled`, `point_in_active_delivery_zone` (active zones are already public through `bdz_select_active_public`), `validate_coupon` (checkout's coupon check; since `20260920120000_promo_disclosure_hardening` (ledger row 95) an inactive code answers exactly like one that never existed) |
+  | **UNGATED** | **0** | — |
+
+- **0028, 1 anon-executable definer: `whatsapp_login_enabled()`.** Deliberate:
+  the login screen asks it before anybody is signed in (§51).
+- **`auth_leaked_password_protection`** needs a paid plan. The owner will
+  upgrade before production; it is a dashboard setting, not a migration.
+- **0008, 17 tables with RLS on and no policy.** Deliberately closed to every
+  client role; they are reached through the service role or through gated RPCs.
+
+### Validation
+
+- Local chain harness (`.github/sql-ci/run.sh`, Postgres 16 + PostGIS),
+  2026-11-18: **161 migrations applied; 98 suites run, 96 passed, 2
+  quarantined, 0 new failures**; the existing-data stage applied this file onto
+  existing rows with every check held and no existing row changed. The base
+  chain, run the same way first, gave 160 / 97 / 95 / 2 / 0. The six
+  idempotence report-only entries are the same six before and after. The file
+  re-applies as a no-op.
+- Paired suite `supabase/tests/advisor_fixes_test.sql`, 5 cases: the policy's
+  shape; no policy in `public` calling `auth.uid()` per row; all 21 named
+  covering indexes; **who can read a checkout session, by execution as the real
+  `authenticated` role** (owner sees their own, another customer none, an
+  administrator at aal2 all, at aal1 none — identical on the base chain); and
+  the money path. **On the base chain it fails at CASE 1.**
+- `rls_initplan_live_board_order_year_test.sql` CASE 1 pinned this policy's
+  bare text incidentally (its purpose was that §58 did not touch it). It now
+  follows this file, with a comment saying why, rather than becoming an argument
+  against the change.
+- **Mutation checks, each caught by both the file's own block and the suite:**
+  one index dropped (`comp_members_added_by_idx`), the policy reverted to the
+  bare form, and the policy with `is_staff()` alone left bare.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must hold, or stop:
+   ```sql
+   select qual from pg_policies
+    where schemaname = 'public' and tablename = 'checkout_sessions'
+      and policyname = 'checkout_sessions_select_own';
+   -- ((customer_id = auth.uid()) OR is_staff())
+   select md5(pg_get_functiondef('public.place_order'::regproc)),
+          md5(pg_get_functiondef('public.compute_order_snapshot'::regproc));
+   -- 12b6816d256c29b76edf947ae1a7ea77 | 22e2d42935459e7bf93abb2941b56325
+   ```
+2. Apply `20261017120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the policy reads the wrapped form above; the 21
+   indexes exist; the money-path pair is unchanged; the performance advisor
+   shows 0003 at 0 and 0001 at 0.
+4. Rollback, if ever wanted: `alter policy checkout_sessions_select_own on
+   public.checkout_sessions using ((customer_id = auth.uid()) or
+   public.is_staff());` and `drop index` of the 21 names. Neither loses data.
+
+Steps: `docs/OWNER_ACTIONS.md` §59.
