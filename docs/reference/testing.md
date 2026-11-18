@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**283 TypeScript test files declaring 4190 test blocks, plus 98 SQL suites.**
+**284 TypeScript test files declaring 4203 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -413,7 +413,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-46 files, 969 declared test blocks.
+47 files, 982 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -445,8 +445,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/paymentRefundQueue.test.ts` | 8 | one stuck refund no longer takes every claim of a run |
 | `supabase/functions/_shared/paymentSyncDisclosure.test.ts` | 7 | what the POS receives about a card payment |
 | `supabase/functions/_shared/paymentSyncKick.test.ts` | 4 | triggerLazywaitSyncOnce — the post-payment POS kick |
+| `supabase/functions/_shared/paymentTestCheckout.test.ts` | 12 | allowTestModeCheckout() |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
-| `supabase/functions/_shared/paymentWiring.test.ts` | 71 | payment functions talk to Moyasar only |
+| `supabase/functions/_shared/paymentWiring.test.ts` | 72 | payment functions talk to Moyasar only |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |

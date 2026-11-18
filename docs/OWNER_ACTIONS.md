@@ -2910,8 +2910,8 @@ Admin-facing, in the console (live on merge):
 10. «إعادة التحقق من الدفع عبر Moyasar»
 11. «الدفع الإلكتروني عبر Moyasar. لا يُرسل الطلب الإلكتروني إلى الكاشير حتى يتم
     التحقق من دفعه.»
-12. «فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع
-    التجريبي.»
+12. «فعّل Moyasar أولاً، في الوضع المباشر أو التجريبي.» (changed 2026-11-18,
+    §60: the console now allows online payment in TEST mode too)
 13. «الدفع / Moyasar» — the payment label in Operations Health and Operations
     Alerts. The alert emails the database renders carry it only after
     `20261003120000` is applied (§47.3).
@@ -4642,6 +4642,8 @@ by 47.13.
 
 ### 47.13 Switch to live and enter the LIVE keys and webhook
 
+0. **If the testing-phase secret `PAYMENT_ALLOW_TEST_CHECKOUT` is set (§60),
+   delete it first.**
 1. In the Moyasar card, switch the mode to **live**. The console asks for
    confirmation.
 2. Save the live secret key, the live publishable key and a live webhook token.
@@ -5661,6 +5663,66 @@ ungated**. Detail: [`MIGRATIONS.md`](MIGRATIONS.md) §69.
 
 **Not decided here, still yours:** leaked-password protection, after the plan
 upgrade (a dashboard setting).
+
+## 60. Pay test orders in the app with Moyasar test cards — the testing-phase switch
+
+**Opened 2026-11-18.** You asked to put the Moyasar TEST keys in the console,
+turn online payment on, and pay real test orders in the mobile app with
+Moyasar's test cards. Until now that was refused on purpose, twice:
+`payment-initiate` refused customer checkout in TEST mode, and the confirmation
+refused to mark a TEST payment paid.
+
+Both refusals now give way to one Edge Function secret,
+**`PAYMENT_ALLOW_TEST_CHECKOUT`**, and only when it is exactly `true`. Unset, or
+anything else, nothing changes. What it does and does not do:
+[`PAYMENTS.md`](PAYMENTS.md) §3, "The testing-phase switch".
+
+**It is for the testing phase only. Unset it before card payments go live.**
+
+**Which deployed bundles change.** Computed from each function's import closure
+(`deno info`): the change is in `payment-initiate/index.ts`,
+`_shared/moyasarVerify.ts` and the new `_shared/paymentTestCheckout.ts`, which
+reach exactly four functions:
+
+- `payment-initiate`
+- `payment-verify`
+- `payment-webhook`
+- `payment-test-config`
+
+`payment-return`, `payment-refund` and `payment-admin-test-return` are
+unchanged. Deploy the four together (or all seven with the workflow's `all`
+preset): a new `payment-initiate` beside an old `payment-verify` or
+`payment-webhook` would take a test payment that nothing confirms.
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** Nothing changes in Production on merge.
+2. **Set the secret** `PAYMENT_ALLOW_TEST_CHECKOUT` to `true` in Supabase →
+   Edge Functions → Secrets. The functions deployed today do not read it, so on
+   its own it changes nothing.
+3. **Redeploy the four functions above**, from the default branch, with their
+   `verify_jwt` from `supabase/config.toml` (`DEPLOY.md` §12).
+4. **In the console:** the TEST keys and the TEST webhook token are already
+   saved (§47.7, §47.8), and the payment row is enabled in TEST mode. Turn on
+   **Online Payment** (Settings → Payment Methods). The console allows that in
+   TEST mode since this change (`src/lib/onlinePaymentGate.ts`); with the secret
+   unset, a customer would see card payment unavailable at the payment step.
+5. **Pay with the test cards in §47.9:** mada `4201320111111010`, Visa
+   `4111111111111111` or `4111114005765430`, Mastercard `5421080101000000`, and
+   mada `4201320000311101` for a decline.
+6. **Before launch: unset the secret** (delete it in Supabase → Edge Functions →
+   Secrets), before the switch to live at §47.13. It is also a line in
+   [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) and in `PAYMENTS.md` §9 B.
+
+**Every test order is a real order.** It is created paid, goes to the branch
+POS as a real kitchen ticket, earns loyalty points on delivery, and counts in
+reports. Its payment record carries `mode = 'test'`. Tell the branch before you
+test, or use a branch whose POS you can ignore.
+
+**Done looks like:** a test card pays an order in the app, the receipt shows,
+the order reads paid, and the function logs show
+`"event":"payment_test_mode_allowed"`, once from `payment-initiate` and once
+from the confirmation.
 
 ## Owner-action closeout rule
 

@@ -311,6 +311,11 @@ describe('payment-initiate hands the app only a Moyasar checkout URL', () => {
 // order and send it to the kitchen. Customer checkout is refused twice: on the
 // configured mode before an attempt is opened, and on the attempt's STORED mode
 // after begin_*_attempt, because a reused attempt can predate a switch to live.
+//
+// Updated deliberately 2026-11-18 (owner request): both checks now give way to
+// the testing-phase switch PAYMENT_ALLOW_TEST_CHECKOUT, and to nothing else. The
+// refusal with the switch off, and its exact values, are driven through the real
+// handler in paymentTestCheckout.test.ts; this pins where the checks sit.
 describe('payment-initiate refuses customer checkout in TEST mode', () => {
   const src = code('payment-initiate');
   const flows = [
@@ -327,7 +332,7 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     ({ flow, fn, begin }) => {
       const body = fnBody(src, fn);
       const check = body.indexOf(
-        `if (m.mode !== 'live') return refuseTestModeCheckout('${flow}', 'configured');`,
+        `if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('${flow}', 'configured');`,
       );
       expect(check).toBeGreaterThan(body.indexOf('const m = resolveMoyasarConfig('));
       expect(check).toBeLessThan(body.indexOf(begin));
@@ -339,7 +344,10 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     ({ flow, fn, begin }) => {
       const body = fnBody(src, fn);
       const check = body.indexOf(
-        `if (attempt.mode !== 'live') return refuseTestModeCheckout('${flow}', 'attempt');`,
+        `if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('${flow}', 'attempt');`,
+      );
+      expect(block(body, "if (attempt.mode !== 'live') {")).toContain(
+        `if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('${flow}', 'attempt');`,
       );
       expect(check).toBeGreaterThan(body.indexOf(begin));
       expect(check).toBeLessThan(
@@ -354,6 +362,22 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     expect(refusal).toContain("return json({ status: 'disabled', reason: 'test_mode' }, 200);");
     expect(count(refusal, 'console.')).toBe(1);
     expect(refusal).toMatch(/console\.warn\(JSON\.stringify\(\{[^}]*reason: 'test_mode'/);
+  });
+
+  it('the exception is the switch alone, and only while the gateway is configured in TEST', () => {
+    expect(fnBody(src, 'function testAttemptAllowed(')).toContain(
+      "return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout();",
+    );
+    expect(count(src, 'allowTestModeCheckout()')).toBe(3);
+    expect(count(src, 'testAttemptAllowed(m.mode, attempt.mode)')).toBe(2);
+    expect(src).toContain(
+      "import { allowTestModeCheckout, logTestModeAllowed } from '../_shared/paymentTestCheckout.ts';",
+    );
+    const helper = stripComments(
+      readFileSync(new URL('./paymentTestCheckout.ts', import.meta.url), 'utf8'),
+    );
+    expect(helper).toContain("return Deno.env.get(PAYMENT_ALLOW_TEST_CHECKOUT_ENV) === 'true';");
+    expect(helper).toContain("export const PAYMENT_ALLOW_TEST_CHECKOUT_ENV = 'PAYMENT_ALLOW_TEST_CHECKOUT';");
   });
 
   it('leaves no path to an invoice around the two checks', () => {
@@ -404,7 +428,9 @@ describe('a TEST-mode attempt never confirms an order', () => {
     expect(block(verify, 'async function stampPaymentRef(')).toContain(
       '.update({ provider_ref: paymentId })',
     );
-    const refused = block(paid, "if (attempt.mode !== 'live') {");
+    // Updated deliberately 2026-11-18: the refusal now sits inside the
+    // testing-phase exception, and only the exact switch opens it.
+    const refused = block(block(paid, "if (attempt.mode !== 'live') {"), "if (!(attempt.mode === 'test' && allowTestModeCheckout())) {");
     expect(refused).toContain("return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };");
     expect(refused).toContain("status: 'failed', failure_code: 'test_mode_attempt',");
     expect(count(refused, 'console.')).toBe(1);

@@ -8,6 +8,7 @@ import {
 } from '../_shared/moyasar.ts';
 import { moyasarFetch } from '../_shared/moyasarHttp.ts';
 import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
+import { allowTestModeCheckout, logTestModeAllowed } from '../_shared/paymentTestCheckout.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
@@ -25,6 +26,9 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * Customer checkout is refused while the gateway is in TEST mode, so a test
  * card can never pay for a real order; see refuseTestModeCheckout(). Sandbox
  * testing is the console's admin test (payment-test-config `test_checkout`).
+ * The one exception is the testing-phase switch PAYMENT_ALLOW_TEST_CHECKOUT
+ * (exactly 'true'; _shared/paymentTestCheckout.ts), which must be unset before
+ * card payments go live; see testAttemptAllowed().
  *
  * A total under Moyasar's invoice minimum (1.00 SAR) is refused before any
  * attempt is opened; see refuseBelowMinimum().
@@ -347,6 +351,9 @@ function configForAttempt(
  * reused attempt keeps the mode it was opened in and can predate a switch from
  * test to live.
  *
+ * Both checks give way only to the testing-phase switch
+ * PAYMENT_ALLOW_TEST_CHECKOUT; see testAttemptAllowed().
+ *
  * Answers {status:'disabled'}, which the app shows as "Online payment is
  * unavailable right now." (CheckoutScreen.tsx: status 'disabled' →
  * t('payUnavailable')).
@@ -354,6 +361,22 @@ function configForAttempt(
 function refuseTestModeCheckout(flow: 'order' | 'session', check: 'configured' | 'attempt'): Response {
   console.warn(JSON.stringify({ event: 'payment_initiate_refused', reason: 'test_mode', flow, check }));
   return json({ status: 'disabled', reason: 'test_mode' }, 200);
+}
+
+/**
+ * The testing-phase exception to refuseTestModeCheckout (owner request,
+ * 2026-11-18). With PAYMENT_ALLOW_TEST_CHECKOUT exactly 'true', a customer may
+ * pay a real order with Moyasar TEST keys and test cards. Unset, or anything
+ * else, this is false and both checks refuse exactly as they always have.
+ *
+ * Narrower than "the switch is on": a TEST attempt proceeds only while the
+ * gateway is still CONFIGURED in TEST. A reused TEST attempt can outlive a
+ * switch to live (begin_*_attempt keeps the stored mode), and handing it out
+ * then would let a test card pay a real order on a live gateway, even with the
+ * switch left on by mistake.
+ */
+function testAttemptAllowed(configuredMode: string, attemptMode: unknown): boolean {
+  return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout();
 }
 
 /**
@@ -415,7 +438,7 @@ async function initiateMoyasar(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
-  if (m.mode !== 'live') return refuseTestModeCheckout('order', 'configured');
+  if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('order', 'configured');
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_payment_attempt', {
     p_order_id: order.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -429,7 +452,10 @@ async function initiateMoyasar(
     console.error('begin_payment_attempt returned no attempt_id');
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
-  if (attempt.mode !== 'live') return refuseTestModeCheckout('order', 'attempt');
+  if (attempt.mode !== 'live') {
+    if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('order', 'attempt');
+    logTestModeAllowed({ fn: 'payment-initiate', flow: 'order', attempt: String(attempt.attempt_id).slice(0, 36) });
+  }
 
   // The attempt's stored mode is authoritative from here on — a reused attempt
   // may predate a mode switch. See configForAttempt().
@@ -492,7 +518,7 @@ async function initiateMoyasarForSession(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
-  if (m.mode !== 'live') return refuseTestModeCheckout('session', 'configured');
+  if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('session', 'configured');
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_session_attempt', {
     p_session_id: session.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -506,7 +532,10 @@ async function initiateMoyasarForSession(
     console.error('begin_session_attempt returned no attempt_id');
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
-  if (attempt.mode !== 'live') return refuseTestModeCheckout('session', 'attempt');
+  if (attempt.mode !== 'live') {
+    if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('session', 'attempt');
+    logTestModeAllowed({ fn: 'payment-initiate', flow: 'session', attempt: String(attempt.attempt_id).slice(0, 36) });
+  }
 
   const mAttempt = configForAttempt(cfg, attempt);
   if (!mAttempt) {

@@ -83,15 +83,16 @@ export const SettingsPanel: React.FC = () => {
               payForm.defaultMethod !== paymentSettings.defaultMethod ||
               payForm.outageMode !== paymentSettings.outageMode;
             // Online payment may be switched ON only for an enabled Moyasar gateway
-            // in live mode: payment-initiate refuses customer checkout in test mode.
+            // in live or test mode. In test mode, payment-initiate allows customer
+            // checkout only while PAYMENT_ALLOW_TEST_CHECKOUT is set (testing phase).
             // Switching it OFF is always allowed. The row is the one the
             // Integrations panel edits (admin-only, so an accountant never has it).
             const onlineCanTurnOn = canEnableOnlinePayment(
               integrationSettings.find(r => r.provider_type === 'payment'),
             );
             const onlineNeedsLive = isRTL
-              ? 'فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع التجريبي.'
-              : 'Switch Moyasar to live mode and enable it first — customer checkout is refused in test mode.';
+              ? 'فعّل Moyasar أولاً، في الوضع المباشر أو التجريبي.'
+              : 'Enable Moyasar first, in live or test mode.';
             const handleSavePayments = () => {
               // Checked again here: the switch may have been drafted while the
               // gateway still qualified.

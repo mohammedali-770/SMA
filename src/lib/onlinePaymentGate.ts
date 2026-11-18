@@ -2,11 +2,12 @@
  * May an administrator switch customer online payment ON?
  *
  * Only while the payment integration is enabled, names Moyasar and is in LIVE
- * mode. payment-initiate refuses every customer checkout while Moyasar is in
- * TEST mode, so a test card can never pay for a real order. Switching online
- * payment on before then would offer customers a method that is refused at the
- * payment step. Sandbox testing happens through the console's admin test
- * checkout instead, which needs no customer-facing switch.
+ * or TEST mode. Changed 2026-11-18 for the testing phase: TEST mode is allowed
+ * too, because customer checkout in TEST mode is now decided on the server by
+ * the PAYMENT_ALLOW_TEST_CHECKOUT Edge Function secret (docs/PAYMENTS.md §3).
+ * With that secret unset, payment-initiate still refuses a TEST-mode checkout,
+ * so a test card still cannot pay for an order; the customer sees the method
+ * unavailable at the payment step.
  *
  * Switching online payment OFF is always allowed and is not decided here.
  *
@@ -27,5 +28,6 @@ export interface PaymentIntegrationRow {
 export function canEnableOnlinePayment(row: PaymentIntegrationRow | null | undefined): boolean {
   if (!row || row.enabled !== true) return false;
   if ((row.provider_name ?? '').toLowerCase() !== 'moyasar') return false;
-  return String(row.public_config?.mode ?? '').toLowerCase() === 'live';
+  const mode = String(row.public_config?.mode ?? '').toLowerCase();
+  return mode === 'live' || mode === 'test';
 }

@@ -77,6 +77,7 @@ Approval for one action is not blanket approval for later actions.
 **What keeps it safe while it is off.** Each is code in this repository, with tests:
 - customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
 - an attempt opened in TEST mode never confirms an order or a checkout session;
+- **the one exception to both (added 2026-11-18, owner request, testing phase only):** the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT`, exactly `true`, lets a customer pay a real order with Moyasar TEST keys and test cards, and confirms it. Unset, nothing changes. Setting it is a §5 action, and it **must be unset before card payments go live** (`docs/PAYMENTS.md` §3, `docs/OWNER_ACTIONS.md` §60);
 - the console's Online Payment switch opens only for an enabled, live Moyasar row. **It guards the console, not the setting:** `set_payment_settings` checks `is_admin()` alone;
 - the web build (`/app`) never offers online payment;
 - payment history is data: the `tap` rows stay and are shown read-only.
