@@ -136,7 +136,7 @@ describe('every Moyasar request goes through moyasarFetch', () => {
 
   it('sends each call site through the helper', () => {
     const calls = (path: string) => count(stripComments(sources.get(path) ?? ''), 'moyasarFetch(');
-    expect(calls('_shared/moyasarVerify.ts')).toBe(1); // every invoice and payment GET, and the list
+    expect(calls('_shared/moyasarVerify.ts')).toBe(1); // every invoice and payment GET, the list, the invoice cancel
     expect(calls('payment-initiate/index.ts')).toBe(1); // invoice create
     expect(calls('payment-refund/index.ts')).toBe(2); // reconcile GET, refund POST
     expect(calls('payment-test-config/index.ts')).toBe(2); // test_connection, test_checkout
@@ -152,7 +152,7 @@ describe('every Moyasar request goes through moyasarFetch', () => {
 
   it('reports a failed GET as a value instead of throwing it at the caller', () => {
     const verify = stripComments(sources.get('_shared/moyasarVerify.ts') ?? '');
-    const get = block(verify, 'async function moyasarGet(');
+    const get = block(verify, 'async function moyasarRequest(');
     expect(get).toMatch(/\} catch \(e\) \{[\s\S]*return \{ ok: false, status: 0, body: \{\} \};/);
     expect(
       section(verify, 'export async function verifyMoyasarAttempt(', 'export interface InvoiceLookupResult'),
@@ -513,7 +513,7 @@ describe('payment-verify', () => {
       orderFlow.indexOf('return await verifyMoyasarOrder(supaUser, admin, cfg, orderId);'),
     ).toBeGreaterThan(guard);
 
-    const sessionFlow = fnBody(src, 'async function verifySession(');
+    const sessionFlow = fnBody(src, 'async function sessionVerifyAnswer(');
     expect(sessionFlow).toContain(
       "primary = cfg\n      ? await verifyMoyasarSession(supaUser, admin, cfg, sessionId, latest.rec)\n      : { status: 'pending' };",
     );
@@ -533,8 +533,9 @@ describe('payment-verify', () => {
   it('verifies the newest MOYASAR attempt, with the key for its stored mode', () => {
     expect(src).not.toMatch(/attemptProvider|unverifiableProvider|provider_not_configured/);
     expect(src).toContain(".eq(column, value).eq('provider', 'moyasar')");
-    // Three: the order flow, the session's newest attempt, its older invoices.
-    expect(count(src, "(rec.mode as 'test' | 'live') ?? undefined,")).toBe(3);
+    // Four: the order flow, the session's newest attempt, its older invoices,
+    // and each open invoice a changed-cart abandon judges.
+    expect(count(src, "(rec.mode as 'test' | 'live') ?? undefined,")).toBe(4);
   });
 });
 
@@ -920,8 +921,9 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
   });
 
   it('every lookup of "the newest attempt" skips a recorded duplicate', () => {
-    // Two: the newest attempt, and the older invoices asked before a terminal answer.
-    expect(count(code('payment-verify'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(2);
+    // Three: the newest attempt, the older invoices asked before a terminal
+    // answer, and the open attempts a changed-cart abandon judges.
+    expect(count(code('payment-verify'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(3);
     expect(code('payment-verify')).toContain('latestMoyasarAttempt(admin, ');
     expect(count(code('payment-test-config'), '.or(NOT_A_DUPLICATE_FILTER)')).toBe(1);
     expect(code('payment-webhook')).toContain(
@@ -944,7 +946,7 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
 
 describe('payment-verify decides a dead session before it needs a key', () => {
   const src = code('payment-verify');
-  const session = fnBody(src, 'async function verifySession(');
+  const session = fnBody(src, 'async function sessionVerifyAnswer(');
 
   it('reads the session expiry and the attempt before the payment configuration', () => {
     expect(session).toContain(".select('id, status, order_id, expires_at')");
@@ -957,7 +959,7 @@ describe('payment-verify decides a dead session before it needs a key', () => {
   });
 
   it('a failed read is pending, and nothing here writes the session', () => {
-    expect(session).toContain("if (!latest.ok) return json({ status: 'pending' }, 200);");
+    expect(session).toContain("if (!latest.ok) return { body: { status: 'pending' } };");
     expect(src).not.toMatch(/from\('checkout_sessions'\)[^;]*\.update\(/);
   });
 });
@@ -985,5 +987,76 @@ describe('the app drops a saved session only when nothing can be paid on it', ()
     expect(rest).toContain('void settleRefusedSession();');
     expect(rest).not.toContain('clearPendingSession');
     expect(block(screen, 'const settleRefusedSession = async () => {')).toContain('recoverPendingSession({');
+  });
+});
+
+// 2026-11-18: a customer who changed their cart after a refused card payment
+// was shown the old checkout's amount. payment-verify's 'abandon' action drops
+// such a checkout, and only when nobody has started paying it.
+describe("payment-verify 'abandon': drop a replaced checkout only when nothing can be paid on it", () => {
+  const src = code('payment-verify');
+  const handler = fnBody(src, 'Deno.serve(');
+  const abandon = fnBody(src, 'async function abandonSession(');
+
+  it('is reached only by an explicit action, before the plain session verify', () => {
+    const gate = handler.indexOf("if (sessionId && body.action === 'abandon') return await abandonSession(");
+    expect(gate).toBeGreaterThan(-1);
+    expect(handler.indexOf('if (sessionId) return await verifySession(')).toBeGreaterThan(gate);
+  });
+
+  it('starts from the ordinary verify answer and goes on only while it is pending', () => {
+    const first = abandon.indexOf('const first = await sessionVerifyAnswer(supaUser, admin, sessionId);');
+    expect(first).toBeGreaterThan(-1);
+    expect(abandon.indexOf("if (first.body.status !== 'pending') return json(first.body, 200);")).toBeGreaterThan(first);
+  });
+
+  it('refuses while an invoice is being created, unreadable, or has a payment under way', () => {
+    for (const reason of ['attempts_unreadable', 'invoice_being_created', 'no_config', 'no_key',
+      'invoice_unreadable', 'payment_in_progress', 'cancel_not_confirmed']) {
+      expect(abandon).toContain(`return keep('${reason}');`);
+    }
+    expect(abandon).toContain("return json({ status: 'pending' }, 200);");
+    expect(abandon).toContain("if (verdict === 'in_progress') return keep('payment_in_progress');");
+  });
+
+  it('judges EVERY invoice before cancelling any, and closes an attempt only after its cancel is confirmed', () => {
+    const judgeLoop = abandon.indexOf('for (const rec of open) {');
+    const cancelLoop = abandon.indexOf('for (const { rec, key } of toCancel) {');
+    expect(judgeLoop).toBeGreaterThan(-1);
+    expect(cancelLoop).toBeGreaterThan(judgeLoop);
+    const cancel = abandon.slice(cancelLoop);
+    const confirmed = cancel.indexOf("if (!res.ok || !invoiceCancelConfirmed(res.body)) return keep('cancel_not_confirmed');");
+    expect(confirmed).toBeGreaterThan(-1);
+    expect(cancel.indexOf("status: 'failed', failure_code: 'invoice_canceled'")).toBeGreaterThan(confirmed);
+  });
+
+  it('answers with the ordinary verify again, and never writes the session row', () => {
+    expect(abandon).toContain('const after = await sessionVerifyAnswer(supaUser, admin, sessionId);');
+    expect(src).not.toMatch(/from\('checkout_sessions'\)[^;]*\.update\(/);
+  });
+});
+
+describe('the app asks to abandon only a checkout begun for a DIFFERENT cart', () => {
+  const screen = readFileSync(
+    new URL('../../../apps/mobile/src/features/checkout/CheckoutScreen.tsx', import.meta.url),
+    'utf8',
+  );
+  const api = readFileSync(new URL('../../../apps/mobile/src/services/api.ts', import.meta.url), 'utf8');
+
+  it('sends the abandon action to payment-verify', () => {
+    expect(api).toContain("invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId, action: 'abandon' })");
+  });
+
+  it('passes the current cart on entry and before every order, and not after a refusal', () => {
+    expect(count(screen, 'currentCartKey: cart.idempotencyKey,')).toBe(2);
+    expect(count(screen, 'abandon: (id) => payments.abandonSession(id),')).toBe(2);
+    expect(block(screen, 'const settleRefusedSession = async () => {')).not.toContain('abandon');
+  });
+
+  it('records the cart key only when a checkout is begun, so a resume keeps its own', () => {
+    expect(screen).toContain('await runOnlinePayment(session.id, cart.idempotencyKey);');
+    expect(screen).toContain('await savePendingSession(sessionId, Date.now(), cartKey);');
+    expect(count(screen, 'runOnlinePayment(session.id')).toBe(1);
+    expect(screen).toContain("else if (rec.kind === 'resume') { void runOnlinePayment(rec.sessionId); }");
   });
 });
