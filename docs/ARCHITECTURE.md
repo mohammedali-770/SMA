@@ -499,7 +499,7 @@ Delivery paths:
 
 - **order_status** — fired by admin status changes in the console. `order-intake` also sent `received` until 2026-08-27; a new order's first message is now the POS outcome (`pos_sync`, below). Idempotent per `(order_id, status)` via the unique index plus the `send_status` lifecycle, and anti-spoofed by re-reading the order's real status server-side. Targets only that order's customer, and only devices with `order_updates_enabled` (**defaults TRUE**).
 - **pos_sync** — POS confirmation lifecycle, consumed from deduplicated events under a fenced claim.
-- **broadcast** — admin-initiated, immediate, non-recallable. Targets only devices with `promos_enabled = true`. Marketing has been opt-out since 2026-08-20, so that is every device that allowed notifications and has not switched offers off. The column default is FALSE but never decides a live device, because every registration passes both preferences.
+- **broadcast** — admin-initiated, immediate, non-recallable. Targets only devices with `promos_enabled = true`. Marketing is opt-in as of the owner decision of 2026-11-18 (`DEFAULT_DEVICE_PREFS.promosEnabled = false`), so from the next build a new device joins only when its customer switches offers on; devices registered under the 2026-08-20 opt-out default keep whatever they hold. The column default is FALSE but never decides a live device, because every registration passes both preferences.
 - **test** — admin-initiated, targets only the calling admin's own registered devices.
 
 Payloads carry only `{ type, orderId }`; tap navigation resolves through `resolveNotificationRoute`'s allow-list, so a payload can never open an arbitrary route or an external URL.

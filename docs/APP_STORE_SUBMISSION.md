@@ -62,21 +62,24 @@ read: TestFlight does not make a build installable until processing succeeds.
 So processing cannot retroactively invalidate it, and no *console* step in §8
 requires a binary.
 
-**The known exception is guideline 4.5.4.** Apple expects consent *"via consent
-language displayed in your app's UI"* before marketing push, plus an in-app
-opt-out. **Since 2026-11-10 the language is there**: the first run shows a
-consent screen before the OS prompt, stating order updates **and** occasional
-offers and where to turn offers off, and the OS prompt is raised only from its
-Allow button. The Profile toggle remains the opt-out. Marketing is still
-opt-OUT — offers come on with the grant — which is the deliberate decision the
-owner accepted on 2026-08-20 and re-confirmed on 2026-11-09 (CLAUDE.md §7), and
-the residual risk. If App Review rejects on it, the fix is one line —
-`promosEnabled: false` in `DEFAULT_DEVICE_PREFS` — but a one-line fix still ships
-as a **new build with a higher number**, because build numbers are unique per
-version train (§3a). That is a review risk, not a processing risk, and it is the
-only one currently identified. **The consent screen first ships in the next
-build**: every build already uploaded predates it, so a reviewer of one of those
-sees no in-app text.
+**The known exception is guideline 4.5.4.** Apple expects explicit consent
+before marketing push — *"via consent language displayed in your app's UI"* —
+plus an in-app opt-out. **As of the owner decision on 2026-11-18 marketing is
+opt-IN in source** (CLAUDE.md §7): `promosEnabled: false` in
+`DEFAULT_DEVICE_PREFS`, so the OS grant turns on order updates only and offers
+start only when the customer switches **Offers & promotions** on in Profile ›
+Notifications. That switch is the explicit consent and the same switch is the
+opt-out. The first-run consent screen (since 2026-11-10) now asks for order
+updates and says offers stay off unless turned on there.
+
+That closes the residual 4.5.4 risk **only for a binary built after the
+change**. Every build already uploaded predates it and registers with offers on
+(the 2026-08-20 opt-out decision, accepted then and re-confirmed 2026-11-09), and
+the builds uploaded before 2026-11-10 also show no in-app consent text at all.
+Submit the build that carries the opt-in change, not an earlier one: a fix after
+a rejection still ships as a **new build with a higher number**, because build
+numbers are unique per version train (§3a). That is a review risk, not a
+processing risk.
 
 ---
 
@@ -454,8 +457,9 @@ declaring more than may be collected is the safe direction. Play's "User IDs" ro
 `profiles.id`, and does not depend on this.
 
 **Device ID carries no marketing purpose on Apple's form the way it does on
-Play's.** Play asks for a purpose list and the push token's opt-out promos make
-"Advertising or marketing" mandatory there (CLAUDE.md §7). Apple's App Privacy
+Play's.** Play asks for a purpose list and the push token's promos make
+"Advertising or marketing" mandatory there (CLAUDE.md §7) — opt-out until the
+2026-11-18 decision, opt-in after it, and the token serves offers either way. Apple's App Privacy
 asks for *purposes* too — declare **App Functionality** and **Product
 Personalization**; it is not "Third-Party Advertising", because nothing is sold
 or shared with an ad network.
@@ -794,17 +798,15 @@ physical-device validation gate, which has run on neither platform.
 ## 9. Open questions
 
 - **Does Apple's App Privacy accept "Product Personalization" for the push
-  token** given promos are opt-out (CLAUDE.md §7)? The Play form forced
+  token** given it also carries promos (opt-in since 2026-11-18, CLAUDE.md §7)? The Play form forced
   "Advertising or marketing"; Apple's taxonomy differs and the honest answer may
   be "Third-Party Advertising: No, Developer's Advertising or Marketing: Yes".
   Decide before entering the form, and keep it consistent with C5.
-- **Will Apple query B2 / guideline 4.5.4** — marketing push is opt-OUT here
-  (owner decision 2026-08-20, risk accepted, re-confirmed 2026-11-09). Since
-  2026-11-10 an in-app consent screen states it before the OS prompt, which is
-  the "consent language displayed in your app's UI" the guideline names; the
-  remaining question is whether Apple accepts offers coming on with the grant.
-  If App Review rejects, the revert is one line: `promosEnabled: false` in
-  `DEFAULT_DEVICE_PREFS`.
+- **Will Apple query B2 / guideline 4.5.4** — largely answered by the owner's
+  2026-11-18 decision: marketing push is now opt-IN in source (`promosEnabled:
+  false`; offers start only from the Profile toggle). The question survives only
+  for a binary built before that change, which registers with offers on under
+  the superseded 2026-08-20 opt-out decision. Submit a build that carries it.
 - **`supportsTablet: false`** — iPad screenshots are therefore not required, but
   confirm the App Store listing is iPhone-only before uploading assets.
 

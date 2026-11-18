@@ -6,8 +6,9 @@
  *
  *  1. NOTIFICATIONS — once, on the first run after sign-in, the in-app consent
  *     screen is offered, and the OS notification prompt follows only if the
- *     customer taps Allow there (`firstRunNotificationStep`). The OS dialog
- *     cannot say that offers come with order updates; the screen does.
+ *     customer taps Allow there (`firstRunNotificationStep`). The screen says
+ *     what the grant is for — order updates — and that offers stay off unless
+ *     turned on in Profile, which the OS dialog cannot say.
  *     Location is NOT asked here: it is asked where it is used, on the pickup
  *     tab and at "Use my location" on the delivery map.
  *
@@ -49,8 +50,8 @@ export function shouldRequestFirstRunPermissions(state: FirstRunState, signedIn:
  *
  * `offer_consent`: show the in-app consent screen. The OS prompt is raised only
  * from its Allow button, so the one ask iOS allows is never spent on someone
- * who has not read what they are allowing — order updates AND occasional
- * offers, which are on by default (CLAUDE.md §7).
+ * who has not read what they are allowing — order updates, with offers off
+ * unless turned on in Profile (opt-IN since 2026-11-18, CLAUDE.md §7).
  *
  * `nothing`, whenever there is nothing honest to ask:
  *  - not signed in, already spent on this device, or the push kill switch off;

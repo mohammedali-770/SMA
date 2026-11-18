@@ -72,36 +72,39 @@ export interface DevicePrefs {
 /**
  * Defaults applied when a device registers without an explicit choice.
  *
- * BOTH CHANNELS ON (owner decision 2026-08-20). Granting the OS notification
- * permission turns on every channel, and the customer never has to switch
- * anything on inside the app. Switching a channel back off is theirs to do —
- * iOS/Android Settings, or the Profile toggles, which stay in place for exactly
- * that purpose.
+ * ORDER UPDATES ON, OFFERS OFF (owner decision 2026-11-18). Granting the OS
+ * notification permission turns on order-status updates only. Offers are
+ * opt-IN: a customer receives them only after switching "Offers & promotions"
+ * on in Profile › Notifications, which is a separate, prior consent to
+ * marketing (the PDPL reading in docs/OWNER_ACTIONS.md §44 item 6).
  *
- * WHAT THE CUSTOMER IS TOLD (since 2026-11-10). The OS dialog cannot say that
- * offers come with order updates, so the in-app consent screen in front of it
- * does: order updates AND occasional offers, and where to turn offers off
- * (NotificationConsentModal). Where the OS never asks — Android 12 and older —
- * the same text is shown once as a notice (`shouldShowConsentNotice`). These
- * defaults are unchanged by either: the screen discloses them, it does not
- * alter who receives what.
+ * This SUPERSEDES the 2026-08-20 opt-out decision, under which both channels
+ * defaulted on. That decision is recorded in CLAUDE.md §7, marked superseded.
+ * The change is prospective only: it decides what a NEW registration gets.
+ * `shouldRegisterOnFirstRun` and `shouldRegisterOnSignIn` never rewrite an
+ * existing row, so a device that already has offers on keeps them until its
+ * customer turns them off. Whether to reset those rows is a separate owner
+ * decision and is not taken here.
  *
- * This REPLACES the previous strictly-opt-in marketing default
- * (`promosEnabled: false`). The database column keeps its own `default false`
- * (20260714090000_push_notifications.sql:25) and that is deliberate, not an
- * oversight: every registration path passes both preferences explicitly through
- * `register_push_device`, so the column default never decides a real device's
- * targeting and no migration is needed to change this behaviour.
+ * WHAT THE CUSTOMER IS TOLD. The in-app consent screen in front of the OS
+ * prompt (NotificationConsentModal) says notifications are for order updates
+ * and that offers stay off unless turned on in Profile. The one-time notice
+ * (`shouldShowConsentNotice`) still keys on a row that HAS offers on, so it now
+ * fires only where that is actually true — never for a new default device.
  *
- * Store-review note: Apple guideline 4.5.4 expects consent language in the
- * app's own UI before marketing push, plus an in-app opt-out. The consent
- * screen carries the language; the Profile "Offers & promotions" toggle is the
- * opt-out. Marketing stays opt-OUT. Recorded in CLAUDE.md section 7 and
- * docs/OWNER_ACTIONS.md section 10.
+ * The database column keeps its own `default false`
+ * (20260714090000_push_notifications.sql:25), which now agrees with this value.
+ * It still never decides a real device's targeting: every registration path
+ * passes both preferences explicitly through `register_push_device`.
+ *
+ * Store-review note: Apple guideline 4.5.4 expects explicit consent before
+ * marketing push, plus an in-app opt-out. Opt-in through the Profile toggle is
+ * that consent, and the same toggle is the opt-out. Recorded in CLAUDE.md
+ * section 7 and docs/OWNER_ACTIONS.md sections 10 and 44.
  */
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
   orderUpdatesEnabled: true,
-  promosEnabled: true,
+  promosEnabled: false,
 };
 
 /**
@@ -173,17 +176,20 @@ export function shouldRegisterOnSignIn(input: {
  * Whether to show the one-time consent NOTICE: so that offers never reach a
  * customer who was not told about them.
  *
- * Marketing is opt-out here, so a registered device receives offers unless the
- * customer turns them off. Where the OS asks first (iOS, Android 13+), the
- * consent screen precedes that prompt and says so. Where it never asks, nobody
- * would: Android 12 and older grant notifications at install, and a second
- * account on a shared phone inherits a grant someone else gave — in both, the
- * sign-in claim registers the device with offers on.
+ * Where the OS asks first (iOS, Android 13+), the consent screen precedes that
+ * prompt. Where it never asks, nobody would: Android 12 and older grant
+ * notifications at install, and a second account on a shared phone inherits a
+ * grant someone else gave — in both, the sign-in claim registers the device
+ * without any screen.
  *
- * So the notice is owed whenever THIS customer's row for THIS device has offers
- * on and they have not seen the consent text on this device. It writes nothing
- * and changes no one's targeting; it only discloses what the opt-out model
- * already does, and points at the switch.
+ * The notice is owed whenever THIS customer's row for THIS device has offers on
+ * and they have not seen the consent text on this device. Since offers became
+ * opt-IN (2026-11-18) a new registration has offers OFF, so a default device
+ * never triggers it: it now fires only for a row that really carries offers —
+ * one registered under the earlier opt-out default, or one whose customer
+ * switched offers on. Its text ("…and send occasional offers") is true for
+ * exactly those rows. It writes nothing and changes no one's targeting; it
+ * only discloses what the row already says, and points at the switch.
  */
 export function shouldShowConsentNotice(input: {
   seen: boolean;
