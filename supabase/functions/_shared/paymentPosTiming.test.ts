@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LIVE_PUBLIC, SECRETS, type FakeMoyasar, type FakePaymentDb } from './__fixtures__/paymentFakes.ts';
-import { call, currentDb, freshRuntime, webhook } from './__fixtures__/paymentRuntime.ts';
+import { call, currentDb, freshRuntime, setEnv, webhook } from './__fixtures__/paymentRuntime.ts';
 
 vi.mock('./supabaseClient.ts', () => ({
   adminClient: () => currentDb().client(),
@@ -101,5 +101,57 @@ describe('when the POS receives a card payment', () => {
         Card_Type: 'card',
       });
     }
+  });
+});
+
+// 2026-11-18, order SM-2026-000099: the order existed at 13:23:20.5 but the app
+// saw the receipt only at 13:23:35.6, because the confirmation waited for the
+// POS before answering. The POS handoff now runs after the response.
+describe('the confirmation answers before the POS handoff', () => {
+  const rt = globalThis as { EdgeRuntime?: { waitUntil(p: Promise<unknown>): void } };
+  let deferred: Promise<unknown>[];
+  let releasePos: () => void;
+
+  beforeEach(() => {
+    deferred = [];
+    rt.EdgeRuntime = { waitUntil: (p) => { deferred.push(p); } };
+    // The POS kick is configured, so the handoff starts with a request to
+    // lazywait-sync, which the gate below holds open, as a slow POS would.
+    setEnv('SUPABASE_PUBLISHABLE_KEYS', JSON.stringify({ default: 'sb_publishable_fixture' }));
+    const lw = db.rows('integration_settings').find((r) => r.provider_type === 'lazywait');
+    (lw!.secret_config as Record<string, unknown>).sync_trigger_secret = 'sync_fixture';
+    // Hold every POS request open until the test releases it.
+    const gate = new Promise<void>((r) => { releasePos = r; });
+    const inner = (globalThis as { fetch: typeof fetch }).fetch;
+    (globalThis as Record<string, unknown>).fetch = async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      if (url.hostname !== 'api.moyasar.com') await gate;
+      return inner(input, init);
+    };
+  });
+  afterEach(() => { delete rt.EdgeRuntime; });
+
+  it('returns paid while the POS request is still open, then sends it in the background', async () => {
+    const session = db.session({ total: 64 });
+    const init = await call('payment-initiate', { checkoutSessionId: session.id, language: 'en' });
+    const payment = moyasar.pay(String(init.body.invoiceId), 'pay_pos_bg', 'paid');
+    const order0 = () => db.rows('orders')[0];
+
+    // The order is created and the answer is 'paid' with the POS still blocked.
+    const res = await webhook(payment);
+    expect(res.body.status).toBe('paid');
+    expect(order0()).toBeTruthy();
+    expect(deferred).toHaveLength(1);
+    expect(posPosts).toHaveLength(0); // the kick itself is still held
+    expect(updates()).toHaveLength(0);
+
+    // The POS holds the order by the time the background work reads it.
+    order0().lazywait_ref = 'LW-ORDER-BG';
+    order0().branch_id = 'br000000-0000-4000-8000-000000000001';
+    releasePos();
+    await Promise.all(deferred);
+    expect(posPosts.some((p) => p.path === '/functions/v1/lazywait-sync')).toBe(true);
+    expect(updates()).toHaveLength(1);
+    expect(updates()[0].body).toMatchObject({ order_ref: 'LW-ORDER-BG', Approval_No: 'pay_pos_bg' });
   });
 });
