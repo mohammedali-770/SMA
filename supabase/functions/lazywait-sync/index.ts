@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { internalFunctionUrl } from '../_shared/functionRegion.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
@@ -757,7 +758,7 @@ async function dispatchPendingPosSync(
     for (const row of rows) {
       if (!row.order_id || !row.status) continue;
       try {
-        const res = await fetch(`${url}/functions/v1/push-dispatch`, {
+        const res = await fetch(internalFunctionUrl(url, 'push-dispatch'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...serviceCallHeaders(serviceKey) },
           body: JSON.stringify({ action: 'pos_sync', orderId: row.order_id, status: row.status }),
