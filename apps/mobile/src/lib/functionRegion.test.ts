@@ -25,7 +25,9 @@ describe('regionalFunction', () => {
       customFetch: (async (input: RequestInfo | URL, init?: RequestInit) => {
         const h = new Headers(init?.headers);
         const headers: Record<string, string> = {};
-        h.forEach((v, k) => { headers[k] = v; });
+        h.forEach((v, k) => {
+          headers[k] = v;
+        });
         seen.push({ url: String(input), headers });
         return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } });
       }) as typeof fetch,

@@ -13,7 +13,9 @@ describe('internalFunctionUrl', () => {
 
   it('names the same region as the app', () => {
     const app = readFileSync(
-      new URL('../../../apps/mobile/src/lib/functionRegion.ts', import.meta.url), 'utf8');
+      new URL('../../../apps/mobile/src/lib/functionRegion.ts', import.meta.url),
+      'utf8',
+    );
     expect(app).toContain(`export const FUNCTION_REGION = '${FUNCTION_REGION}';`);
   });
 
