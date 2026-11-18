@@ -592,6 +592,10 @@ and calls `claim_comp_membership`. A customer who can sign in is already verifie
 | `whatsapp-send-otp` | yes (v2) | ~~the admin console's test-send (`src/lib/api.ts`)~~ **none in this repository** (corrected 2026-11-11: that test send calls `whatsapp-test-config`, which sends through `sendOtpViaWhatsApp` itself) |
 | `whatsapp-verify-otp` | yes (v2) | **none** |
 
+*Versions superseded 2026-11-18: both functions were redeployed for the API-key
+switch-over, `whatsapp-send-otp` v5 → v6 and `whatsapp-verify-otp` v5 → v6. The
+callers column is unchanged. See the redeploy list below.*
+
 `whatsapp-verify-otp` is now a deployed function with no caller anywhere. It was
 deliberately **not** deleted: removing a deployed Edge Function is an owner action
 under CLAUDE.md §5, and it backs `mark_phone_verified()` — the third of the three
@@ -902,6 +906,23 @@ carries, as far as this repository records:
   picks the request up instead: a delay, not a lost request.
 - `whatsapp-test-config` (last recorded v3, 2026-08-23) and `whatsapp-send-otp`
   (v2): every shared file changed since their last deploys, #419 included.
+
+**2026-11-18: the three remaining WhatsApp functions were redeployed** for the
+API-key switch-over (`docs/SUPABASE_API_KEYS.md` §3 "Progress"), on the owner's
+word ("deploy the 9 key-switch functions"). Each was built from the default
+branch at `5c78d17`, every file read back byte-identical, and `verify_jwt` is as
+`supabase/config.toml` sets it:
+
+| function | before | after | `verify_jwt` |
+| --- | --- | --- | --- |
+| `whatsapp-send-otp` | v5 | **v6** | `true` |
+| `whatsapp-verify-otp` | v5 | **v6** | `true` |
+| `whatsapp-webhook` | v6 | **v7** | `false` |
+
+`whatsapp-send-otp` v6 carries #437's 3-second deadline on the Meta send
+(`WHATSAPP_SEND_TIMEOUT_MS` in `_shared/whatsappSend.ts`). The other two change
+key handling only. With this deploy, every function in the table above that
+reaches the Meta send carries the deadline.
 
 **What a check after the deploy can and cannot show.** As on 2026-09-02, a `GET`
 returning the hook-shaped 405 and an unsigned `POST` returning 401 prove that the

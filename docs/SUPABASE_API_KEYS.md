@@ -104,6 +104,16 @@ with that:**
   them to the helper. **`_shared/paymentSync.ts:25` still reads
   `SUPABASE_ANON_KEY` directly**, and that was not changed by the Moyasar work.
   If online payment is on before step 8, check that file first.
+
+  **Corrected 2026-11-18.** "The live bundles are still the July Tap-era ones"
+  is no longer true. The read-only inventory in §3 found that all 7 live payment
+  functions are Moyasar bundles. They were deployed 2026-11-13, except
+  `payment-refund`, deployed 2026-11-17. All 7 carry the new-key helper, and
+  each is byte-identical to the default branch. The 2026-11-09 reason for the
+  payment functions going dark at step 8 was bundles that predate the helper.
+  That reason no longer holds, except for the one direct read in
+  `_shared/paymentSync.ts:25` (§3, "For steps 7 and 8"). This correction is
+  about which code is deployed. It makes no payment decision.
 - **The JWT signing-key migration** is a separate, independent change. The
   user access tokens Supabase Auth issues are still signed by the project's JWT
   secret; rotating that secret would invalidate every session at once. Out of
@@ -118,7 +128,53 @@ with that:**
 - **Step 2 is done.** A publishable key (`default`) and a secret key exist alongside the legacy ones (owner-confirmed; the publishable key read through the Supabase connector).
 - **§4's open question is settled:** sending the publishable key on both `apikey` and `Authorization: Bearer` returned 200 from `GET /auth/v1/settings` and from the `legal_documents` read.
 - **Step 6's `eas.json` prerequisite is this change:** all three profiles carry `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, pinned by `apps/mobile/src/lib/env.test.ts`, which also refuses any `sb_secret_` value. The legacy anon variable stays as the fallback until step 9.
-- **Steps 3–5, the build itself, and 7–9 are still to do.**
+- **Steps 3, 4 and 5 are done (2026-11-18), each on the owner's word:** "deploy the 9 key-switch functions" for steps 3–4, and "go ahead with 1 and 2" for the two Vercel variables in step 5. Detail below.
+- **Step 6 started 2026-11-18** on the owner's word ("do 6, 7, 8 and 9"). GitHub Actions run 44258720558 (EAS Build, `production`, `all`, from `5c78d17`) succeeded at 07:26 UTC and handed both builds to EAS: iOS auto-submits to TestFlight, Android is build-only. Its SENTRY_AUTH_TOKEN preflight passed.
+- **Step 7 baseline, read-only from the gateway logs (`request.sb.jwt.apikey.payload.role = 'anon'`), 2026-11-18:** legacy-key traffic still came from the installed TestFlight app `SpicyMeal/28` (last 05:37 UTC), a Windows browser with the console open (last 06:12), an iPhone browser on `/app` (last 05:39), and a `node` client, most plausibly Vercel's build-time prerender (last 06:28). Nothing after the step-5 redeploy (07:13). Step 7 is closed only when, after testers install the step-6 build and open tabs are reloaded, no legacy traffic remains.
+- **Steps 8 and 9 wait on step 7.** Deactivating the legacy keys before then would stop every installed copy of build 28. Step 9's cleanup is prepared on its own branch and must not merge until step 8 has held.
+
+**Steps 3–4: which functions needed a deploy.** A read-only inventory of all 25 live Edge Functions was taken first:
+
+- **16 already ran the new-key code.** That is every function deployed 2026-11-13 or later, which includes three of step 3's four receivers (`push-dispatch`, `admin-push-dispatch`, `operations-alert-dispatch`), `account-delete-request`, and all 7 payment functions. The payment bundles are byte-identical to the default branch.
+- **9 did not.** Those 9 were deployed from the default branch at `5c78d17`. No file under `supabase/functions/` changed between `0dd6a20` and `5c78d17`. The order was the receiver first, then the senders, then the rest. Each deploy was one call.
+
+| Function | Version | `verify_jwt` | `ezbr_sha256` |
+| --- | --- | --- | --- |
+| `account-delete-process` (receiver) | 5 → 6 | `false` | `1b94e218…` |
+| `lazywait-sync` | 14 → 15 | `false` | `ea544471…` |
+| `account-delete-scheduler` | 4 → 5 | `false` | `9340a9b5…` |
+| `order-intake` | 15 → 16 | `true` | `27d62d50…` |
+| `lazywait-catalog` | 6 → 7 | `true` | `ea9cd517…` |
+| `lazywait-webhook` | 5 → 6 | `false` | `a8b9e493…` |
+| `whatsapp-send-otp` | 5 → 6 | `true` | `0f16763a…` |
+| `whatsapp-verify-otp` | 5 → 6 | `true` | `c0892b69…` |
+| `whatsapp-webhook` | 6 → 7 | `false` | `3a5af1dc…` |
+
+After the deploys, each function was read back by script, and every file was compared with `cmp` against the bundle. All were byte-identical. Each `verify_jwt` matches `supabase/config.toml`. At deploy time, 0 orders were in a sync state and 0 deletion requests were open.
+
+**What the 9 deploys changed:**
+
+- **`account-delete-process` now accepts the new secret key.** Before this deploy there was a refusal. Once the keys existed (step 2), `account-delete-request` v5, which was already on the new code, sent its post-request notification with the new key, and live `account-delete-process` v5 refused it with 403. No customer was affected, because the scheduled run still used the legacy key. This is the one place where the receivers-first order was not met, because step 2 came before step 3.
+- **`lazywait-sync` and `lazywait-catalog` now carry #371's POS base-URL allowlist:** https only, and the host must be `lazywait.com` or a subdomain of it (`LAZYWAIT.md`, "The POS base URL is allowlisted"). Before this deploy, neither live bundle carried it. The stored base URL was read live before the deploy: `https` on `apiv2-dev.lazywait.com`, which the allowlist admits, so nothing changed for today's configuration.
+- **`lazywait-sync`'s two no-row gate refusals now log the order id**, as JSON lines (#439; `LAZYWAIT.md`, "Gate refusals that write no row").
+- **`whatsapp-send-otp` gains #437's 3-second timeout on the Meta send.**
+- **The other functions change key handling only.**
+
+The table's live checks for steps 3–4 (a test order's POS kick and push, and the scheduler's next run) are not recorded here. What was verified is the read-back above.
+
+**Step 5: Vercel project `sma`.**
+
+- Two variables were added as sensitive, for Production and Preview, with the same publishable value: `VITE_SUPABASE_PUBLISHABLE_KEY` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- Production was then redeployed from `5c78d17` (deployment `dpl_BrEAYDgcEWWRwUfmggAabHnTMTKq`).
+
+Verified afterwards:
+
+- The live `/app` entry bundle contains the publishable key, and does not contain the legacy `anon` JWT.
+- The live console bundle contains the publishable key, which `supabaseKey.ts` prefers. It also contains the legacy key, inlined as the fallback. That is expected until step 9 removes `VITE_SUPABASE_ANON_KEY`.
+- A headless guest visit to `/app` had 0 page errors, and all 13 catalogue REST reads returned 200.
+- The console sign-in page and `/privacy` loaded with 0 errors, and `/privacy`'s REST read returned 200. A staff sign-in was not part of this check.
+
+**For steps 7 and 8: one direct legacy-key read is left.** The inventory found one non-test site that still reads the legacy key directly. `_shared/paymentSync.ts:25` reads `SUPABASE_ANON_KEY` and sends it as `apikey` on the post-payment kick to `lazywait-sync`. It is bundled into the four payment functions that import `_shared/moyasarVerify.ts`: `payment-initiate`, `payment-verify`, `payment-webhook` and `payment-test-config`. Online payment is off, so the call is idle today. The kick is best-effort and wrapped in `try`/`catch`. If it is refused, the scheduled `lazywait-sync` run still picks the order up. This record is documentation only and does not change the code. The fix is ordinary repository work under CLAUDE.md §6, which lifted the payment freeze for repository work on 2026-11-11; it is made in the step 9 cleanup pull request (#487), and reaches Production only with a later, separately approved deploy of those four payment functions. Read it before step 8 if online payment is on by then.
 
 The order exists so that no step can break a running path: receivers learn the
 new format before any sender uses it, and the legacy keys stay until nothing
