@@ -3,10 +3,10 @@
  * Settings → Payment Methods: the Online Payment switch and its caption.
  *
  * Online payment may be switched ON only while the payment integration is
- * enabled, names Moyasar and is in live mode. payment-initiate refuses every
- * customer checkout in TEST mode, so switching it on earlier offers customers a
- * method that is then refused at the payment step. Switching it OFF is always
- * allowed. The caption names Moyasar and must stay true while online payment is
+ * enabled, names Moyasar and is in live or test mode (test mode allowed since
+ * 2026-11-18, testing phase: whether a TEST-mode checkout goes through is
+ * decided on the server by PAYMENT_ALLOW_TEST_CHECKOUT). Switching it OFF is
+ * always allowed. The caption names Moyasar and must stay true while online payment is
  * off.
  *
  * The app context and the loyalty-campaign read are mocked: no Supabase.
@@ -29,8 +29,8 @@ vi.mock('../../lib/loyaltyCampaignsApi', () => ({
 
 import { SettingsPanel } from './SettingsPanel';
 
-const NOTE = 'Switch Moyasar to live mode and enable it first — customer checkout is refused in test mode.';
-const NOTE_AR = 'فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع التجريبي.';
+const NOTE = 'Enable Moyasar first, in live or test mode.';
+const NOTE_AR = 'فعّل Moyasar أولاً، في الوضع المباشر أو التجريبي.';
 
 function paymentRow(over: Partial<DbIntegrationSetting> = {}): DbIntegrationSetting {
   return {
@@ -121,8 +121,11 @@ describe('the Online Payment caption', () => {
 });
 
 describe('switching Online Payment ON', () => {
-  it('is allowed for an enabled Moyasar gateway in live mode, with no note', async () => {
-    mockContext({ row: paymentRow() });
+  it.each([
+    ['live', paymentRow()],
+    ['test', paymentRow({ public_config: { mode: 'test' } })],
+  ])('is allowed for an enabled Moyasar gateway in %s mode, with no note', async (_label, row) => {
+    mockContext({ row });
     openPayments();
     expect(onlineSelect().disabled).toBe(false);
     expect(screen.queryByText(NOTE)).toBeNull();
@@ -134,7 +137,7 @@ describe('switching Online Payment ON', () => {
   });
 
   it.each([
-    ['in test mode', paymentRow({ public_config: { mode: 'test' } })],
+    ['naming no mode', paymentRow({ public_config: {} })],
     ['disabled', paymentRow({ enabled: false })],
     ['for another provider', paymentRow({ provider_name: 'tap' })],
     ['with no payment row', null],
@@ -146,18 +149,18 @@ describe('switching Online Payment ON', () => {
   });
 
   it('says so in Arabic too', () => {
-    mockContext({ row: paymentRow({ public_config: { mode: 'test' } }), lang: 'ar' });
+    mockContext({ row: paymentRow({ enabled: false }), lang: 'ar' });
     openPayments();
     expect(screen.getByText(NOTE_AR)).toBeTruthy();
   });
 
-  /** A draft made while the gateway was live must not save after it stopped being live. */
+  /** A draft made while the gateway qualified must not save after it stopped qualifying. */
   it('is refused at save time if the gateway stops qualifying after the switch was drafted', async () => {
     mockContext({ row: paymentRow() });
     const { rerender } = openPayments();
     fireEvent.change(onlineSelect(), { target: { value: 'true' } });
 
-    mockContext({ row: paymentRow({ public_config: { mode: 'test' } }) });
+    mockContext({ row: paymentRow({ enabled: false }) });
     rerender(<SettingsPanel />);
     fireEvent.click(screen.getByRole('button', { name: /Save/ }));
 
@@ -167,11 +170,11 @@ describe('switching Online Payment ON', () => {
 });
 
 describe('switching Online Payment OFF', () => {
-  it('is always allowed, even while the gateway is in test mode', async () => {
-    mockContext({ row: paymentRow({ public_config: { mode: 'test' } }), onlineEnabled: true });
+  it('is always allowed, even while the gateway is disabled', async () => {
+    mockContext({ row: paymentRow({ enabled: false }), onlineEnabled: true });
     openPayments();
     expect(onlineSelect().disabled).toBe(false);
-    // Already on in test mode: customers are being refused, which the note explains.
+    // Already on with the gateway disabled: customers are being refused, which the note explains.
     expect(screen.getByText(NOTE)).toBeTruthy();
 
     fireEvent.change(onlineSelect(), { target: { value: 'false' } });

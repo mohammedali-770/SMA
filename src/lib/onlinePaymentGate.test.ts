@@ -10,12 +10,13 @@ describe('canEnableOnlinePayment', () => {
   });
 
   /**
-   * payment-initiate refuses every customer checkout while Moyasar is in TEST
-   * mode, so online payment switched on in test mode is offered to customers
-   * and then refused at the payment step.
+   * Since 2026-11-18 TEST mode may also be switched on: whether a TEST-mode
+   * checkout is allowed is decided on the server by PAYMENT_ALLOW_TEST_CHECKOUT.
+   * A row that names no mode, or an unknown one, is still refused.
    */
-  it('refuses while the gateway is in test mode, or names no mode', () => {
-    expect(canEnableOnlinePayment({ ...liveMoyasar, public_config: { mode: 'test' } })).toBe(false);
+  it('allows test mode, and refuses a row that names no mode or an unknown one', () => {
+    expect(canEnableOnlinePayment({ ...liveMoyasar, public_config: { mode: 'test' } })).toBe(true);
+    expect(canEnableOnlinePayment({ ...liveMoyasar, public_config: { mode: 'TEST' } })).toBe(true);
     expect(canEnableOnlinePayment({ ...liveMoyasar, public_config: {} })).toBe(false);
     expect(canEnableOnlinePayment({ ...liveMoyasar, public_config: { mode: 'production' } })).toBe(false);
   });

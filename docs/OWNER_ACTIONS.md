@@ -2910,8 +2910,8 @@ Admin-facing, in the console (live on merge):
 10. «إعادة التحقق من الدفع عبر Moyasar»
 11. «الدفع الإلكتروني عبر Moyasar. لا يُرسل الطلب الإلكتروني إلى الكاشير حتى يتم
     التحقق من دفعه.»
-12. «فعّل Moyasar وحوّله إلى الوضع المباشر أولاً — يُرفض دفع العملاء في الوضع
-    التجريبي.»
+12. «فعّل Moyasar أولاً، في الوضع المباشر أو التجريبي.» (changed 2026-11-18,
+    §60: the console now allows online payment in TEST mode too)
 13. «الدفع / Moyasar» — the payment label in Operations Health and Operations
     Alerts. The alert emails the database renders carry it only after
     `20261003120000` is applied (§47.3).
@@ -5703,15 +5703,10 @@ preset): a new `payment-initiate` beside an old `payment-verify` or
 3. **Redeploy the four functions above**, from the default branch, with their
    `verify_jwt` from `supabase/config.toml` (`DEPLOY.md` §12).
 4. **In the console:** the TEST keys and the TEST webhook token are already
-   saved (§47.7, §47.8), and the payment row is enabled in TEST mode. Then turn
-   on **Online Payment** (Settings → Payment Methods). **The console will not
-   do that in TEST mode:** the switch opens only for a live row
-   (`src/lib/onlinePaymentGate.ts`), and this change leaves the console alone.
-   Two ways round it, your choice: switch the Moyasar card to live, turn Online
-   Payment on, and switch the card straight back to test (while it is live, a
-   checkout uses the LIVE key, so do it only while no LIVE key is saved, which
-   makes checkout fail rather than take real money); or set
-   `app_settings.online_payment_enabled` directly, which is a live write.
+   saved (§47.7, §47.8), and the payment row is enabled in TEST mode. Turn on
+   **Online Payment** (Settings → Payment Methods). The console allows that in
+   TEST mode since this change (`src/lib/onlinePaymentGate.ts`); with the secret
+   unset, a customer would see card payment unavailable at the payment step.
 5. **Pay with the test cards in §47.9:** mada `4201320111111010`, Visa
    `4111111111111111` or `4111114005765430`, Mastercard `5421080101000000`, and
    mada `4201320000311101` for a decline.
