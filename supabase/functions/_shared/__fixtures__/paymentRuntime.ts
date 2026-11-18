@@ -22,8 +22,13 @@ const g = globalThis as Record<string, unknown>;
 const handlers = new Map<Name, Handler>();
 let captured: Handler | null = null;
 
+/** Edge Function secrets the test has set, beyond SUPABASE_URL; cleared by freshRuntime. */
+const env = new Map<string, string>();
+
 g.Deno = {
-  env: { get: (key: string) => (key === 'SUPABASE_URL' ? 'https://project.example' : undefined) },
+  env: {
+    get: (key: string) => (key === 'SUPABASE_URL' ? 'https://project.example' : env.get(key)),
+  },
   serve: (h: Handler) => {
     captured = h;
     return { finished: Promise.resolve(), shutdown() {} };
@@ -38,7 +43,14 @@ export function freshRuntime(): { db: FakePaymentDb; moyasar: FakeMoyasar } {
   db = new FakePaymentDb();
   moyasar = new FakeMoyasar();
   g.fetch = moyasar.fetch;
+  env.clear();
   return { db, moyasar };
+}
+
+/** Set (or, with undefined, unset) one Edge Function secret until the next freshRuntime. */
+export function setEnv(key: string, value: string | undefined): void {
+  if (value === undefined) env.delete(key);
+  else env.set(key, value);
 }
 
 export function currentDb(): FakePaymentDb {

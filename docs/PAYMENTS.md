@@ -275,6 +275,47 @@ option on `web`, because the hosted page needs the in-app WebView. This takes
 effect when the branch is merged, because the web build deploys with every
 merge ([CLAUDE.md §13](../CLAUDE.md)).
 
+### The testing-phase switch: `PAYMENT_ALLOW_TEST_CHECKOUT`
+
+**For the testing phase only. It MUST be unset (or deleted) before card
+payments go live.** Added 2026-11-18 at the owner's request, so test orders can
+be paid in the mobile app with Moyasar's test cards (`OWNER_ACTIONS.md` §60).
+
+It is an Edge Function secret. **Only the exact string `true` turns it on.**
+`TRUE`, `1`, an empty value or no secret at all leave both refusals above
+exactly as they are, which is the production default. It is read on every
+request by `allowTestModeCheckout()` in `_shared/paymentTestCheckout.ts`.
+
+With it on:
+
+- `payment-initiate` lets a customer pay an order or a checkout session while
+  the gateway is in TEST mode. The invoice is opened with the TEST key, so only
+  Moyasar's test cards pay it;
+- the confirmation (`validateAndConfirmMoyasarPayment`, reached by
+  `payment-webhook`, `payment-verify` and the console's re-verify) confirms a
+  TEST attempt exactly as it confirms a live one;
+- each one writes a log line, `{"event":"payment_test_mode_allowed", …}`.
+
+What it does **not** change: live mode, the 1.00 SAR minimum, the checkout-URL
+check, refunds, the console's sandbox (its invoices have no attempt row, so they
+never reach confirmation) and the console's Online Payment switch, which still
+opens only for a live row. So in TEST mode the setting
+`app_settings.online_payment_enabled` has to be turned on some other way for the
+app to offer card payment (`OWNER_ACTIONS.md` §60, step 4).
+
+**One check stays on even with the switch on.** A TEST attempt is handed out
+only while the gateway is still configured in TEST. An attempt opened in TEST
+and reused after the gateway is switched to live is refused, so a test card
+cannot pay a real order on a live gateway. A TEST attempt that already has an
+invoice can still be confirmed until the switch is unset, which is why the
+secret is unset **before** the switch to live (§9 B).
+
+**A test order is a real order.** It is created paid, goes to the branch POS
+like any card order (a real kitchen ticket), earns loyalty points on delivery,
+and appears in reports and `payment_records` with `mode = 'test'` (the console
+labels such a record "Test payment"). Cancelling a paid one refunds it through
+Moyasar with the TEST key, which moves no real money.
+
 ---
 
 ## 4. What the customer sees
@@ -862,6 +903,8 @@ succeeds only for 200.00 to 300.00 SAR, and the admin test invoice is fixed at
 
 ### B. Live (a small real payment and its automatic refund)
 
+- [ ] **`PAYMENT_ALLOW_TEST_CHECKOUT` is unset** in the Edge Function secrets
+      (§3), before the switch to live and before Online Payment goes on.
 - [ ] Before step 14 of §7: Moyasar's written answer on which payment methods
       and card schemes its hosted page offers on our account
       (`OWNER_ACTIONS.md` §47.19; gap PG-11, a gate); each of the 12 gaps that

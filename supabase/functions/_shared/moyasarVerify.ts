@@ -43,6 +43,7 @@ import {
   type MoyasarOutcome,
 } from './moyasar.ts';
 import { moyasarFetch } from './moyasarHttp.ts';
+import { allowTestModeCheckout, logTestModeAllowed } from './paymentTestCheckout.ts';
 
 export { selectInvoicePayment } from './moyasar.ts';
 import { triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from './paymentSync.ts';
@@ -317,15 +318,23 @@ export async function validateAndConfirmMoyasarPayment(
     // customer; this is the second line, here because every confirmation (the
     // webhook, payment-verify and the admin re-verify) comes through it. The
     // admin sandbox invoice has no attempt row, so it never reaches this.
+    //
+    // The one exception is the testing-phase switch PAYMENT_ALLOW_TEST_CHECKOUT
+    // (exactly 'true'; paymentTestCheckout.ts, owner request 2026-11-18): with
+    // it on, a TEST attempt confirms exactly as a live one does. Unset, this
+    // refuses as it always has. It must be unset before card payments go live.
     if (attempt.mode !== 'live') {
-      console.warn(JSON.stringify({
-        event: 'moyasar_confirm_refused', reason: 'test_mode_attempt', attempt: String(attempt.id).slice(0, 36),
-      }));
-      await touch({
-        status: 'failed', failure_code: 'test_mode_attempt',
-        failure_message_safe: 'A test payment cannot pay for an order.',
-      });
-      return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };
+      if (!(attempt.mode === 'test' && allowTestModeCheckout())) {
+        console.warn(JSON.stringify({
+          event: 'moyasar_confirm_refused', reason: 'test_mode_attempt', attempt: String(attempt.id).slice(0, 36),
+        }));
+        await touch({
+          status: 'failed', failure_code: 'test_mode_attempt',
+          failure_message_safe: 'A test payment cannot pay for an order.',
+        });
+        return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };
+      }
+      logTestModeAllowed({ fn: 'confirm', attempt: String(attempt.id).slice(0, 36) });
     }
 
     const paidMajor = fromMinorUnits(Number(payment.amount ?? 0), currency);
