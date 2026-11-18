@@ -2,8 +2,8 @@
 
 **Status: LIVE AND DELIVERING as of 2026-09-20.** Both migrations are applied
 (`20260927120000` → `20260920050434`, `20260928120000` → `20260920061858`), the
-VAPID public key is in `app_settings`, `admin-push-dispatch` is deployed as
-version 1, the pg_cron driver ticks every minute, and the owner's re-installed
+VAPID public key is in `app_settings`, `admin-push-dispatch` is deployed
+(version 1 on 2026-09-20; **version 3 since 2026-11-18**, §5 item 7), the pg_cron driver ticks every minute, and the owner's re-installed
 console is subscribed. A branch closing an item, a size or delivery queues a
 notification and it arrives.
 
@@ -11,10 +11,11 @@ notification and it arrives.
 all 7 `sent`** — real closure notices delivered to a real phone, not merely the
 confirmation tap.
 
-**The endpoint rule tightened on 2026-11-11, in the repository only.** The sender
-now admits only the four browser push services and refuses an explicit port
-(§3c, "A public hostname was not enough"). The deployed version 1 still applies
-the old rule until `admin-push-dispatch` is redeployed (§5, item 7).
+**The endpoint rule tightened on 2026-11-11, and it is LIVE since 2026-11-18.**
+The sender admits only the four browser push services and refuses an explicit
+port (§3c, "A public hostname was not enough"). `admin-push-dispatch` version 3,
+deployed 2026-11-18 from `0dd6a20` and read back byte-identical, carries it
+(§5, item 7). The version it replaced, v2, still accepted any public host.
 
 **THE BELL TAP ANSWERED THE ONE QUESTION NO PROBE COULD REACH.**
 `assertVapidKeyPair` runs only inside the deployed function, AFTER the caller
@@ -415,6 +416,11 @@ service is the one that records the outcome.
 
 ### The deployed bundle is NOT byte-identical to this repository
 
+> **Superseded 2026-11-18 for the running version.** Version 3 was deployed
+> from `0dd6a20` as an 8-file bundle and read back from Supabase byte-identical
+> (§5, item 7), so what runs now matches the repository at that commit. The
+> note below describes version 1 and is kept as written.
+
 **`admin-push-dispatch` version 1 was deployed 2026-09-20 from commit
 `38c50f7`, and its comments were stripped in transport.** Every executable
 statement is present and identical; the doc comments in `index.ts`,
@@ -529,7 +535,20 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
 6. ~~**Delete the Home Screen icon and re-add it**, last.~~ **DONE 2026-09-20 —
    the bell was tapped and notifications arrive.** See §1 — iOS fixes an
    installed web app's capabilities at install time, which is why this was last.
-7. **Redeploy `admin-push-dispatch`**, so the running sender carries the
+7. ~~**Redeploy `admin-push-dispatch`**~~ **DONE 2026-11-18**, on the owner's
+   approval ("deploy admin-push-dispatch"): v2 → **v3**, ACTIVE, `verify_jwt`
+   false (ezbr `666eaca5…`), from the default branch at `0dd6a20`, an 8-file
+   bundle (`index.ts` and `_shared/` `adminAuth`, `adminPush`, `apiKeys`,
+   `cors`, `publicHost`, `supabaseClient`, `webPush`) read back byte-identical.
+   Pre-check, read-only: 1 subscription, on the list, no explicit port; 0 queued
+   outbox rows. Live v2 was older than the repository: it accepted any public
+   host, had no explicit-port refusal, compared the service role as a plain
+   string and had no `apiKeys.ts`. No record in this repository says when v2
+   was deployed; only v1 (2026-09-20) was recorded. After the deploy the owner turned the bell
+   off and on in the installed console and the confirmation notification
+   arrived, which proves v3 delivers to the existing subscription. Customer push
+   (`push-dispatch`, `CLAUDE.md` §7) is untouched. The step as written:
+   **Redeploy `admin-push-dispatch`**, so the running sender carries the
    2026-11-11 endpoint rule (§3c, "A public hostname was not enough"). Until
    then version 1 POSTs to any public host on any port. The live subscription
    passes the new rule, so nothing changes for the owner's phone. If

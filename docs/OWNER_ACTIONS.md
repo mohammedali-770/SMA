@@ -4000,7 +4000,7 @@ until each function is redeployed.** Behaviour and evidence:
 
 Each step is its own §5 action. Approval for one is not approval for the next.
 
-**Status 2026-11-18: steps 1, 3 and 4 DONE; step 2 still open.**
+**Status 2026-11-18: all four steps DONE.** Step 2 was done last, below.
 
 - **Step 3:** the owner set `SMTP_ALLOWED_HOSTS` in the dashboard (Edge
   Functions → Secrets), to `mail.spicymeal.com.sa`. An agent cannot read a
@@ -4021,7 +4021,26 @@ Each step is its own §5 action. Approval for one is not approval for the next.
   the console after both deploys, and on 2026-11-18 confirmed that it arrived.
   The relay therefore passes the new guard with `SMTP_ALLOWED_HOSTS` set, which
   is the only evidence available that the secret's value is right.
-- **Step 2 (`admin-push-dispatch`) is still open.**
+- **Step 2,** on the owner's approval ("deploy admin-push-dispatch"), from the
+  default branch at `0dd6a20`:
+  - `admin-push-dispatch` went v2 → **v3**, ACTIVE, `verify_jwt` false (ezbr
+    `666eaca5…`).
+  - The bundle is 8 files (`index.ts` and `_shared/` `adminAuth`, `adminPush`,
+    `apiKeys`, `cors`, `publicHost`, `supabaseClient`, `webPush`), and it read
+    back from Supabase byte-identical.
+  - **Pre-check, read-only:** 1 subscription, on the list of the four browser
+    push services, with no explicit port; 0 queued outbox rows. So the new rule
+    could not drop the live subscription, and the deploy had nothing to send.
+  - Live **v2** was older than the repository: it accepted any public host and
+    had no explicit-port refusal, it checked the service role with a plain
+    string compare, and its bundle had no `apiKeys.ts`. v3 carries the
+    2026-11-11 endpoint rule and the `isServiceCall` check
+    (`docs/SUPABASE_API_KEYS.md`).
+  - **Step 2's "done looks like" is met:** after the deploy the owner turned the
+    bell off and on in the installed console, and the confirmation notification
+    arrived. That proves v3 delivers to the existing subscription.
+  - **Customer push is untouched:** `push-dispatch` (`CLAUDE.md` §7) was not
+    deployed or changed by this step.
 
 1. **Redeploy `email-test-config`.** The live relay passes the new guard.
    Measured read-only on 2026-11-11, by counts only: the one email-provider row
