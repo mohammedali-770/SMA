@@ -487,7 +487,7 @@ if anything changes.
 | Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
 | Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
 | Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
-| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is not optional to declare:** since the 2026-08-20 opt-OUT decision, `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so a device that grants notification permission is registered into the promotional audience without any further action (§7). Declaring only "App functionality" would understate it. Since 2026-11-10 the app says so on screen before the Android 13+ prompt, and once as a notice on Android 12 and older, where the OS never asks (note under this table) |
+| Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is still declared:** the same token carries offers to any device whose customer has them on. Since the owner's 2026-11-18 opt-in decision `DEFAULT_DEVICE_PREFS` sets `promosEnabled: false`, so a NEW registration joins the promotional audience only when the customer switches offers on in Profile (§7) — that reaches customers in the next build. Under the superseded 2026-08-20 opt-out decision (`promosEnabled: true`) every granting device was enrolled, and devices registered then keep their setting. Declaring only "App functionality" would understate it either way |
 | **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **True only while online payment is off — owner decision pending, see §6b** |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
 
@@ -504,14 +504,19 @@ which door the food is taken to.** The declared permissions and the rows above
 are unchanged.
 
 The **notification** prompt (`POST_NOTIFICATIONS`, Android 13+) is now preceded
-by an in-app consent screen stating order updates **and** occasional offers, and
-where to turn offers off. It is raised only from that screen's Allow button.
+by an in-app consent screen. It is raised only from that screen's Allow button.
 **Android 12 and older never show a notification prompt** — the permission is
-granted at install, and expo-notifications reports it as granted — so before this
-change those devices were enrolled in offers at sign-in with no prompt and no
-text. They now see the same text once, as a notice that writes nothing. No
-Android device had registered when this was measured, so no customer was
-affected; the gap would have opened with the first Android release.
+granted at install, and expo-notifications reports it as granted — so before
+2026-11-10 those devices were enrolled in offers at sign-in with no prompt and no
+text. No Android device had registered when this was measured, so no customer
+was affected; the gap would have opened with the first Android release.
+
+**Changed again 2026-11-18 — offers are opt-in** (CLAUDE.md §7). The screen now
+asks for order updates and says offers stay off unless turned on in Profile.
+An Android 12-and-older device is registered at sign-in with order updates on
+and offers **off**, so it receives no marketing without the customer's own
+switch, and the one-time notice (which fires only for a row with offers on) no
+longer fires for it. Both take effect from the next build.
 
 **Sentry is configured not to send PII — but "no PII" is too strong, and the
 precise version matters for the form.** `sendDefaultPii: false` with a

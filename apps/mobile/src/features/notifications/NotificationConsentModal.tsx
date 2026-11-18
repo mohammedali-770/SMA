@@ -5,12 +5,16 @@
  *  - PROMPT — before the OS notification prompt, which is raised only if the
  *    customer taps Allow. Apple 4.5.4 asks for consent language in the app's
  *    own UI before marketing push, and the OS dialog cannot carry it.
+ *    Offers are not part of this grant: it registers order updates only.
  *  - NOTICE — once, where the OS never asks (Android 12 and older, or a second
  *    account on a phone someone else allowed), so offers never reach a customer
  *    who was not told about them. It writes nothing.
  *
- * Both say the same two things: order updates AND occasional offers, and that
- * offers can be turned off in Profile › Notifications.
+ * Since offers became opt-IN (2026-11-18) the two say different things, each
+ * true where it is shown. PROMPT asks for order updates only and says offers
+ * stay off unless turned on in Profile › Notifications. NOTICE is reached only
+ * by a device whose row really has offers on (`shouldShowConsentNotice`), so it
+ * says they are on and where to turn them off.
  *
  * It appears only on a tab and never over the order-type pop-up
  * (`consentScreenVisible`): both are native modals, and this one must never
@@ -68,7 +72,7 @@ export function NotificationConsentModal({
       <View style={styles.backdrop}>
         <View style={styles.card} accessibilityViewIsModal>
           <Text variant="title" align="center" accessibilityRole="header">
-            {t('notifConsentTitle')}
+            {t(prompt ? 'notifConsentTitle' : 'notifConsentNoticeTitle')}
           </Text>
           <Text variant="body" tone="secondary">
             {t(prompt ? 'notifConsentBody' : 'notifConsentNoticeBody')}

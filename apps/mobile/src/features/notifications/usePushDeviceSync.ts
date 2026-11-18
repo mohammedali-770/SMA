@@ -32,9 +32,10 @@
  *
  * IT REPORTS WHAT IT SETTLED ON. The hook returns this customer's row for this
  * device once the claim is definitive, which is what the one-time consent
- * notice reads (`shouldShowConsentNotice`, via useNotificationOnboarding): a
- * claim on a device the OS never asked about registers it with offers on, and
- * the customer is told so. The claim itself is unchanged by that.
+ * notice reads (`shouldShowConsentNotice`, via useNotificationOnboarding): if
+ * the row it settles on has offers on, the customer is told so once. A NEW
+ * registration has offers off (opt-IN since 2026-11-18), so that is now only a
+ * row that already carried them. The claim itself is unchanged by that.
  *
  * An attempt that finishes after its sign-in has ended (sign-out, or a language
  * change re-running the effect) records nothing: marking it complete then would
@@ -85,9 +86,9 @@ async function attemptClaim(lang: 'en' | 'ar'): Promise<ClaimOutcome> {
   }
 
   try {
-    // Default preferences: both channels on (DEFAULT_DEVICE_PREFS). Where the
-    // OS never asked, the customer is told once by the consent notice. A null
-    // return means no token, so nothing landed.
+    // Default preferences: order updates on, offers off (DEFAULT_DEVICE_PREFS,
+    // opt-IN since 2026-11-18), so a device the OS never asked about receives
+    // no marketing. A null return means no token, so nothing landed.
     const row = await registerThisDevice(lang);
     return { done: row !== null, device: row };
   } catch {

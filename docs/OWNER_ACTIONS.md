@@ -306,7 +306,7 @@ Completed:
 
 - **sending a promotional broadcast** — immediate and **cannot be recalled**; check the live opt-in count in the confirm line before clicking;
 - **turning the master flag off** — the way to stop all sending, including order updates;
-- **changing who a broadcast reaches.** As of 2026-08-20 `promos_enabled` defaults **TRUE** at registration (see the 2026-08-20 subsection below), so the broadcast audience is now every device that granted OS notification permission and has not switched offers off. Widening targeting beyond that — segments, topics, reaching devices that opted out — is still a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and still needs a separate owner decision, not a code change made in passing.
+- **changing who a broadcast reaches.** As of the 2026-11-18 opt-in decision `promos_enabled` defaults **FALSE** at registration in the client (see the 2026-11-18 subsection below), so once that build ships the broadcast audience is the devices that kept offers on from the opt-out period plus customers who switch offers on themselves. Until then every installed binary still registers with offers on, as it has since 2026-08-20. Widening targeting beyond that — segments, topics, reaching devices that opted out — is still a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and still needs a separate owner decision, not a code change made in passing.
 
 ### Expo send timeout — written 2026-11-11, live only after a `push-dispatch` deploy
 
@@ -347,9 +347,53 @@ timeout and what it turns into.
   handling (§42). If `lazywait-sync` is deployed in the same session, deploy
   `push-dispatch` first: §42 puts receivers before senders.
 
-### Marketing consent — now opt-OUT (owner decision, 2026-08-20)
+### Marketing consent — now opt-IN (owner decision, 2026-11-18)
 
-**Status:** SOURCE CONFIRMED — this is the current rule.
+**Status:** SOURCE CONFIRMED in the pull request that made it; **reaches
+customers only in the next EAS build.** This is the current rule.
+
+The owner decided on 2026-11-18 to switch marketing push from opt-out to opt-in,
+"if nothing breaks", on the PDPL reading in §44 item 6 (prior, separate consent
+for marketing). `DEFAULT_DEVICE_PREFS` now sets `promosEnabled: false`, with
+`orderUpdatesEnabled` still `true`: granting the OS permission turns on order
+updates only, and offers start only when the customer switches **Offers &
+promotions** on in Profile › Notifications. That is the one-line change the
+2026-08-20 subsection below named as its revert, and §44's option between (a)
+and (b): opt-in through the existing toggle, with no new consent-screen choice
+and no consent ledger.
+
+- **Copy changed with it.** The consent screen's prompt says notifications are
+  for order updates and that offers stay off unless turned on in Profile; the
+  Profile subtitle reads "Occasional deals. Off unless you turn them on." The
+  Arabic for both is engineering-drafted and joins the native read in §35.
+- **The one-time notice was kept, unchanged in its rule.** It fires only for a
+  row with offers on, so it no longer fires for a new device; for a row that
+  still carries offers its text is true.
+- **Nothing server-side changed.** `push-dispatch` and its targeting, the column
+  default (already `false`), migrations and every existing row are untouched.
+- **Existing devices with offers on keep them** (2 at the time of the decision,
+  as reported in conversation). Neither registration rule rewrites a row.
+  **Resetting them is a separate decision for you** — a live write under
+  CLAUDE.md §5 — and was not done.
+- **The live privacy policy now overstates offers.** It says offers are sent
+  *"if you have turned notifications on"*; from the opt-in build, turning
+  notifications on no longer turns offers on. It errs toward disclosing more
+  than is sent, so it is not urgent, but a wording such as "if you have turned
+  offers on" is now the accurate one, in both languages. Editing a live legal
+  document is a CLAUDE.md §5 write and was not done; the card-payments draft
+  (`docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`) carries the same
+  sentence. See `docs/LEGAL_DOCUMENTS_AUDIT.md`.
+- **Not yet done, and still §44's question for counsel:** a consent record
+  (option (c), `docs/decisions/0002-consent-ledger.md`). The toggle is now the
+  prior, separate consent; nothing yet documents it with time and means.
+
+### Marketing consent — opt-OUT (owner decision, 2026-08-20) — SUPERSEDED
+
+> **Superseded on 2026-11-18** by the subsection above. Kept because it is the
+> model every installed binary runs until the next build, and because the
+> consent screen it led to (2026-11-10) is still in use, with new copy.
+
+**Status:** SUPERSEDED 2026-11-18 (was SOURCE CONFIRMED).
 
 The owner decided on 2026-08-20 that the OS notification permission dialog is the
 single consent moment: granting it turns on **both** channels, and the customer
@@ -411,7 +455,8 @@ account. Account **deletion** still deactivates.
 
 ### Marketing consent — reaffirmed strictly opt-in (2026-08-19) — SUPERSEDED
 
-> **Superseded on 2026-08-20** by the subsection above. The consent rule stated
+> **Superseded on 2026-08-20** by the 2026-08-20 subsection above (itself
+> superseded on 2026-11-18, which returned to opt-in). The consent rule stated
 > here is no longer current. It is kept because the incident it records — a
 > branch asserting its own authorisation — is still worth reading, and because
 > the conditions it set for bundling marketing are the ones the 2026-08-20
@@ -862,8 +907,9 @@ Three consequences the owner should hold:
   `broadcast` and `pos_sync`, and `supabase/config.toml:43-44` sets
   `verify_jwt = false`, so that role check was the **only** gate on the path.
   Unlike the four above it is **already live** (§7), and `broadcast` sends
-  immediately to every device with `is_active` and `promos_enabled` — since the
-  2026-08-20 opt-out decision, close to the whole active base — with no recall.
+  immediately to every device with `is_active` and `promos_enabled` — under the
+  2026-08-20 opt-out decision, close to the whole active base; after the
+  2026-11-18 opt-in build ships, only devices whose offers are on — with no recall.
   So an admin on an AAL1 session could send an unrecallable push to every
   customer. It now calls the same `is_admin()` predicate through the caller's
   own client. Two of the four actions still accept a service-role call without a
@@ -2784,6 +2830,23 @@ regression — it is one more string on an existing list.
   ("only if you opt in") while offers were on by default, and now says they are
   on by default and can be switched off.
 
+**Widened 2026-11-18 — marketing became opt-in (§10), so three of the strings
+above were rewritten. Read the NEW text, not the 2026-11-10 one:**
+
+- `notifConsentTitle` — «تحديثات الطلبات» ("Order updates"). It no longer
+  mentions offers, because the grant no longer turns them on;
+- `notifConsentBody` — «سنُعلمك عندما يكون طلبك قيد التحضير أو جاهزاً أو في
+  الطريق إليك. أما العروض فتبقى متوقفة ما لم تفعّلها من الملف الشخصي ثم
+  الإشعارات.» ("…Offers are off unless you turn them on in Profile ›
+  Notifications.");
+- `notifPromosSub` — «عروض من حين لآخر. متوقفة ما لم تفعّلها بنفسك.»
+  ("Occasional deals. Off unless you turn them on.").
+
+The notice keeps its 2026-11-10 body, and its title moved to a new key,
+`notifConsentNoticeTitle`, carrying the old title text unchanged. This is consent
+copy: the point to check is that «متوقفة ما لم تفعّلها» reads as "off unless you
+switch them on", not as "paused" or "suspended".
+
 **Widened 2026-11-12 — four console messages and one manual section, same pass.**
 These are staff-facing, not customer-facing, so they rank below the consent copy
 above. All are engineering-drafted.
@@ -3999,7 +4062,14 @@ the rules.
        separate consent shall be obtained for each Processing purpose"*;
      - IR Arts 28–29 require evidence of consent, and an opt-out as easy as
        opting in.
-   - **What the app does:** offers are opt-out — on when notifications are
+   - **DECIDED 2026-11-18 — opt-in.** The owner switched marketing push to
+     opt-in ("if nothing breaks"): `promosEnabled: false`, offers start only
+     from the Profile toggle, and the consent-screen copy says so (§10). It
+     reaches customers in the next EAS build. Existing rows with offers on were
+     **not** reset — a separate decision. Option (c)'s consent record is still
+     open, and so is counsel's read of whether the toggle alone meets IR Art 11's
+     "documented with time and means". The analysis below is kept as written.
+   - **What the app did when this was written:** offers are opt-out — on when notifications are
      granted (CLAUDE.md §7). #425 now *tells* the customer before the OS prompt,
      but one tap still grants two purposes, order updates and offers, and nothing
      records it.
@@ -4018,8 +4088,8 @@ the rules.
      Moving to opt-in is the one-line revert CLAUDE.md §7 already records
      (`promosEnabled: false`). Doing it properly is (c).
    - **Any change to who receives offers is a §7 owner decision** (2026-08-20,
-     re-confirmed 2026-11-09). This item asks you to revisit it with counsel, not
-     assume the answer.
+     re-confirmed 2026-11-09, changed to opt-in 2026-11-18). This item asked you
+     to revisit it with counsel, not assume the answer.
 7. **The record of processing.** PDPL Art 31 and IR Art 33 require it to be
    written, kept current, available to SDAIA on request, and kept for five years
    after the processing ends. `docs/RECORD_OF_PROCESSING.md` is the engineering

@@ -50,7 +50,7 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 - Account-deletion request/processing workflow.
 - Scheduled operations-health and alerting functions.
 - Online card payment is **Moyasar**, the provider the owner chose on 2026-11-11; the Tap and Geidea code is removed. Online payment and automated refunds were both off on 2026-11-11, and each step that turns them on is a separate owner approval ([`CLAUDE.md`](CLAUDE.md) §6, [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §47). *Changed 2026-11-12: this line said the payment code was provisional and frozen.*
-- Push notifications are **live**: order updates reach customers who allowed notifications automatically, and marketing is opt-out, so a broadcast reaches every one of them who has not switched offers off ([`CLAUDE.md`](CLAUDE.md) §7).
+- Push notifications are **live**: order updates reach customers who allowed notifications automatically, and marketing is opt-in from the next build (owner decision 2026-11-18): a new device gets offers only after its customer switches them on, and devices registered under the earlier opt-out default keep what they hold ([`CLAUDE.md`](CLAUDE.md) §7).
 
 ## Tech stack
 
@@ -206,7 +206,7 @@ Do not treat this repository like a sandbox:
 - Do not push directly to the production branch; use a fresh branch and PR.
 - Do not use `supabase db push` or `supabase migration repair` against production.
 - Keep Moyasar the only payment provider. Do not apply a payment migration, deploy a payment function, enter a key, change the Moyasar dashboard, switch the payment row or online payment, or make a live payment or refund without explicit approval for that step.
-- Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag on or off without explicit approval. Marketing push has been opt-out since 2026-08-20, so a broadcast reaches nearly the whole active base.
+- Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag on or off without explicit approval. Marketing push was opt-out from 2026-08-20 and is opt-in from the next build (owner decision 2026-11-18); read the broadcast confirm line's device count before sending.
 - Do not commit secrets, service-role keys or provider credentials.
 
 See [`CLAUDE.md`](CLAUDE.md) for the binding rules.

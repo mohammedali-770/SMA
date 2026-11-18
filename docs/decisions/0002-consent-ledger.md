@@ -25,9 +25,11 @@ easy as giving it (IR Art 12). None of that can be shown today.
 **What the customer is shown has just become worth recording.** Since #425 the
 app shows consent text before the OS notification prompt, and once as a notice
 where the OS never asks (Android 12 and older, a second account on a shared
-phone). Marketing is opt-OUT by owner decision (CLAUDE.md §7). That makes the
-evidence question sharper, not weaker: an opt-out model's defence is that the
-customer was told, and nothing proves they were. The only trace of the consent
+phone). Marketing was opt-OUT by owner decision when this was written; **since
+2026-11-18 it is opt-in** (CLAUDE.md §7), so the consent act is now the Profile
+toggle. That makes the evidence question sharper, not weaker: an opt-out model's
+defence is that the customer was told, an opt-in model's is that they chose, and
+nothing proves either. The only trace of the consent
 screen is a flag in the phone's own storage, which the server never sees.
 
 **Constraints that are not obvious from the code:**

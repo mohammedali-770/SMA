@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
+import { STRINGS } from '../../i18n/strings';
 import {
   consentScreenVisible, DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan,
   NOTIFICATION_FALLBACK_ROUTE, notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute,
@@ -63,8 +64,17 @@ describe('exactly-once tap handling (cold start + listener see the SAME response
 });
 
 describe('device preference defaults + lifecycle', () => {
-  it('both channels default ON — the OS permission grant is the consent moment', () => {
-    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: true });
+  it('order updates default ON, offers default OFF — marketing is opt-in (owner decision 2026-11-18)', () => {
+    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: false });
+  });
+  it('granting OS permission never enrols a device in offers', () => {
+    // The PDPL reading in docs/OWNER_ACTIONS.md §44 item 6: marketing needs a
+    // prior, separate consent, which is the Profile toggle — not the OS grant.
+    // Pinned on its own so a revert to opt-out cannot hide inside a wider edit.
+    expect(DEFAULT_DEVICE_PREFS.promosEnabled).toBe(false);
+    // ...and a device registered with only the defaults still stays active,
+    // so order updates keep arriving.
+    expect(deviceShouldStayActive(DEFAULT_DEVICE_PREFS)).toBe(true);
   });
   it('device stays active while any channel is on; deactivates when both off', () => {
     expect(deviceShouldStayActive({ orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
@@ -141,9 +151,10 @@ describe('shouldShowConsentNotice — offers never reach a customer who was not 
   const offersOn = { is_active: true, promos_enabled: true };
 
   it('shows once where this device is registered for me with offers on and I have not seen the text', () => {
-    // Android 12 and older (the OS never asks), or a second account on a shared
-    // phone: the sign-in claim registers the device with offers on, and nobody
-    // would otherwise have said so.
+    // Since offers became opt-in a NEW registration has them off, so this is a
+    // row that already carried offers: registered under the earlier opt-out
+    // default (Android 12 and older, or a shared phone, where the OS never
+    // asked and nobody would otherwise have said so), or switched on by me.
     expect(shouldShowConsentNotice({ seen: false, device: offersOn })).toBe(true);
   });
 
@@ -158,6 +169,12 @@ describe('shouldShowConsentNotice — offers never reach a customer who was not 
 
   it('not when offers are already off — there is nothing to disclose', () => {
     expect(shouldShowConsentNotice({ seen: false, device: { is_active: true, promos_enabled: false } })).toBe(false);
+  });
+
+  it('never for a device registered with the defaults — opt-in leaves nothing to disclose', () => {
+    // A new Android 12-and-older claim registers exactly DEFAULT_DEVICE_PREFS.
+    const device = { is_active: true, promos_enabled: DEFAULT_DEVICE_PREFS.promosEnabled };
+    expect(shouldShowConsentNotice({ seen: false, device })).toBe(false);
   });
 
   it('not when the device is switched off', () => {
@@ -239,5 +256,27 @@ describe('push client gate ↔ native config coupling (CLAUDE.md §7)', () => {
     // enabling the server flag is its own owner-approval-gated step
     // (CLAUDE.md §5).
     expect(typeof PUSH_CLIENT_ENABLED).toBe('boolean');
+  });
+});
+
+describe('consent copy matches the opt-in model', () => {
+  // The prompt precedes the OS grant, which registers order updates only, so it
+  // must not tell the customer offers are coming. The notice is shown only for
+  // a row that HAS offers on (shouldShowConsentNotice), so it says they are on.
+  it.each(['en', 'ar'] as const)('%s: the prompt and the Profile subtitle do not say offers are on', (lang) => {
+    const s = STRINGS[lang];
+    if (lang === 'en') {
+      expect(s.notifConsentTitle).toBe('Order updates');
+      expect(s.notifConsentBody).toContain('Offers are off unless you turn them on');
+      expect(s.notifConsentBody).not.toMatch(/also send|turn offers off/i);
+      expect(s.notifPromosSub).toBe('Occasional deals. Off unless you turn them on.');
+      expect(s.notifConsentNoticeBody).toContain('send occasional offers');
+    } else {
+      expect(s.notifConsentTitle).toBe('تحديثات الطلبات');
+      expect(s.notifConsentBody).toContain('متوقفة ما لم تفعّلها');
+      expect(s.notifConsentBody).not.toContain('وسنرسل لك أيضاً');
+      expect(s.notifPromosSub).not.toContain('مفعّلة تلقائياً');
+      expect(s.notifPromosSub).toContain('متوقفة ما لم تفعّلها');
+    }
   });
 });

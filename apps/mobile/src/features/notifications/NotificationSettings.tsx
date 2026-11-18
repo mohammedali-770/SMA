@@ -1,8 +1,10 @@
 /**
  * Profile → Notifications card. Two per-device toggles:
- *   Order updates · Offers & promotions — BOTH on at registration
- *   (DEFAULT_DEVICE_PREFS: offers are opt-out, CLAUDE.md §7). This card is
- *   where a customer turns either one off; the consent screen points here.
+ *   Order updates · Offers & promotions. A new registration has order updates
+ *   on and offers OFF (DEFAULT_DEVICE_PREFS: offers are opt-IN since
+ *   2026-11-18, CLAUDE.md §7). This card is the only place a customer turns
+ *   offers on, and where either one is turned off; the consent screen points
+ *   here.
  *
  * Here, the OS permission is requested only when the customer first turns a
  * toggle ON (clear context — see notificationPolicy.toggleRequiresPermission). With

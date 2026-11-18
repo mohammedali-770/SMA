@@ -7,10 +7,11 @@
  * in front of either — both on top of the order-type pop-up. Both asked before
  * telling the customer why:
  *
- *  - Notifications. Marketing is opt-out (DEFAULT_DEVICE_PREFS, CLAUDE.md §7),
- *    so granting the OS prompt also turns offers on — which the OS dialog has
- *    no way to say. Apple 4.5.4 wants that said in the app's own UI first. The
- *    consent screen says it, and the OS prompt follows only from its Allow
+ *  - Notifications. Marketing was opt-out then (DEFAULT_DEVICE_PREFS, CLAUDE.md
+ *    §7), so granting the OS prompt also turned offers on — which the OS dialog
+ *    has no way to say. Apple 4.5.4 wants that said in the app's own UI first.
+ *    Since 2026-11-18 offers are opt-IN and the grant registers order updates
+ *    only; the screen says so, and the OS prompt follows only from its Allow
  *    button (`allow`). "Not now" asks nothing; the Profile toggles stay the way
  *    in later.
  *  - Location is no longer asked here at all. It is asked where it is used:
@@ -124,9 +125,10 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): Fi
       if (!shouldRegisterOnFirstRun(await hasNotificationPermission())) return;
 
       if (await ensureNotificationPermission()) {
-        // Both channels on. The customer has just read that offers come with
-        // order updates and where to turn them off (DEFAULT_DEVICE_PREFS, owner
-        // decision 2026-08-20; CLAUDE.md section 7).
+        // Order updates on, offers off. The customer has just read that the
+        // grant is for order updates and that offers stay off unless turned on
+        // in Profile (DEFAULT_DEVICE_PREFS, owner decision 2026-11-18;
+        // CLAUDE.md section 7).
         await registerThisDevice(lang);
       }
     } catch {
