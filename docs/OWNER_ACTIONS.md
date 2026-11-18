@@ -3832,8 +3832,13 @@ then, and receivers accept both. **The steps, in this order, each a separate
    build pair, to every tester.
    *2026-11-18: step 2 done, §4's check passed, and the `eas.json` change is
    merged (#485); see `SUPABASE_API_KEYS.md` §3 "Progress". The build pair was
-   started 2026-11-18 (run 44258720558); installing it is the testers' step.*
+   started 2026-11-18 (run 44258720558); the owner installed iOS build 29 the
+   same day.*
 7. Confirm no legacy-key traffic remains.
+   *2026-11-18: done. No legacy-key request reached the gateway after 07:46:48
+   UTC; the last one was a console window opened before step 5's redeploy.
+   Build 29, the console, `/app`, the prerender and every Edge Function used
+   the new keys (`SUPABASE_API_KEYS.md` §3).*
 8. Verify `online_payment_enabled = false`, then deactivate the legacy keys
    (reversible). **The five frozen payment functions stop working here — owner
    decision 2026-11-09**, acceptable only while online payment is off.
@@ -3852,9 +3857,15 @@ then, and receivers accept both. **The steps, in this order, each a separate
    four are redeployed, which is its own approval. It is idle while online
    payment is off. This is a record of what is deployed, not a
    payment decision.
-9. A cleanup PR removes the fallbacks. *2026-11-18: written on
-   `security/legacy-key-cleanup-20261118`, not merged
-   (`SUPABASE_API_KEYS.md` §5).* **Merge only when all of these hold:**
+   *2026-11-18: done by the owner in the Supabase dashboard, after
+   `online_payment_enabled = false` was read live. It has held: every gateway
+   request afterwards succeeded with no 401s, and a cash pickup test order
+   (08:36 UTC) reached the POS on its first attempt and sent its
+   `pos_confirmed` push (`SUPABASE_API_KEYS.md` §3).*
+9. A cleanup PR removes the fallbacks. *2026-11-18: merged as #487
+   (`0b7d453`) on the owner's word, after step 8 had held; the redeploys and
+   the Vercel removal below remain (`SUPABASE_API_KEYS.md` §5).* **It was merged
+   only once all of these held:**
    - step 8 is done and has held;
    - the logs show no legacy-key traffic;
    - `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` are in the Edge
