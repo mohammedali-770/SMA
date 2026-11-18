@@ -114,6 +114,12 @@ with that:**
 
 ## 3. Owner steps, in order (each is a separate §5 action)
 
+**Progress, 2026-11-18.**
+- **Step 2 is done.** A publishable key (`default`) and a secret key exist alongside the legacy ones (owner-confirmed; the publishable key read through the Supabase connector).
+- **§4's open question is settled:** sending the publishable key on both `apikey` and `Authorization: Bearer` returned 200 from `GET /auth/v1/settings` and from the `legal_documents` read.
+- **Step 6's `eas.json` prerequisite is this change:** all three profiles carry `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, pinned by `apps/mobile/src/lib/env.test.ts`, which also refuses any `sb_secret_` value. The legacy anon variable stays as the fallback until step 9.
+- **Steps 3–5, the build itself, and 7–9 are still to do.**
+
 The order exists so that no step can break a running path: receivers learn the
 new format before any sender uses it, and the legacy keys stay until nothing
 depends on them.
