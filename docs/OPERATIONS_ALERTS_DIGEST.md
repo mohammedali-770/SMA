@@ -698,6 +698,12 @@ gate with the service key.
 and redeploy the dispatcher. "What the SMTP guard cannot see", below, says why
 each one is needed.
 
+**Both were done on 2026-11-18.** The owner set `SMTP_ALLOWED_HOSTS` to
+`mail.spicymeal.com.sa`. `operations-alert-dispatch` was redeployed as v5, with
+`email-test-config` as v6, both read back byte-identical
+(`OWNER_ACTIONS.md` §46). The flag is still false, so the flag is again the
+only step left before mail goes out.
+
 **Expected volume at the default `critical` floor**, measured 2026-09-13 over
 the preceding 7 days: **4** `critical` opens, versus 56 `warning` opens and 60
 `info` recoveries. So single-digit emails per week as configured; lowering the

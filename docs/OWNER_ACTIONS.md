@@ -4000,6 +4000,27 @@ until each function is redeployed.** Behaviour and evidence:
 
 Each step is its own §5 action. Approval for one is not approval for the next.
 
+**Status 2026-11-18: steps 1, 3 and 4 DONE; step 2 still open.**
+
+- **Step 3:** the owner set `SMTP_ALLOWED_HOSTS` in the dashboard (Edge
+  Functions → Secrets), to `mail.spicymeal.com.sa`. An agent cannot read a
+  secret's value, so the evidence is step 1's test email, below.
+- **Steps 1 and 4,** on the owner's approval naming both ("deploy
+  email-test-config and operations-alert-dispatch"), each from the default
+  branch at `0dd6a20`:
+  - `email-test-config` went v5 → **v6**, `verify_jwt` true.
+  - `operations-alert-dispatch` went v4 → **v5**, `verify_jwt` false.
+  - Each bundle is 8 files and read back from Supabase byte-identical. The
+    dispatcher's read-back was taken independently of the test function's.
+  - Live **v4**, not v1, was what ran before, and its five-file bundle had no
+    `smtpTarget.ts`. So until this deploy, the dispatcher checked nothing and
+    did not read step 3's secret.
+- **The deploys sent nothing.** `external_dispatch_enabled` was read false
+  first, and neither function was invoked.
+- **Step 1's "done looks like" is the owner's test email**, which had not been
+  sent when this was recorded.
+- **Step 2 (`admin-push-dispatch`) is still open.**
+
 1. **Redeploy `email-test-config`.** The live relay passes the new guard.
    Measured read-only on 2026-11-11, by counts only: the one email-provider row
    is enabled, uses a mail port, and has a host that passes the lexical rules.
