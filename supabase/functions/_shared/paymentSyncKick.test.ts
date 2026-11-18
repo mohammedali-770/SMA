@@ -60,7 +60,8 @@ describe('triggerLazywaitSyncOnce — the post-payment POS kick', () => {
     const calls = recordFetch();
     await triggerLazywaitSyncOnce(adminWith(LAZYWAIT_ON));
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(`${URL_}/functions/v1/lazywait-sync`);
+    // Pinned to the database region (2026-11-18, _shared/functionRegion.ts).
+    expect(calls[0].url).toBe(`${URL_}/functions/v1/lazywait-sync?forceFunctionRegion=eu-central-1`);
     expect(calls[0].headers.get('apikey')).toBe(PUBLISHABLE);
     expect(calls[0].headers.get('x-sync-secret')).toBe(SYNC_SECRET);
     expect(calls[0].headers.get('Authorization')).toBeNull();

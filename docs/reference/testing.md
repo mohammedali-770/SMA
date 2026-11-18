@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**287 TypeScript test files declaring 4236 test blocks, plus 98 SQL suites.**
+**289 TypeScript test files declaring 4243 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -163,7 +163,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-103 files, 1386 declared test blocks.
+104 files, 1390 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -237,6 +237,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/env.test.ts` | 11 | SUPABASE_PUBLIC_KEY |
 | `apps/mobile/src/lib/errors/orderRefusalWiring.test.ts` | 3 | order refusal wiring |
 | `apps/mobile/src/lib/errors/userMessage.test.ts` | 11 | describeFailure |
+| `apps/mobile/src/lib/functionRegion.test.ts` | 4 | regionalFunction |
 | `apps/mobile/src/lib/maps.test.ts` | 10 | hasUsableCoordinates |
 | `apps/mobile/src/lib/navigationLatch.test.ts` | 12 | createNavigationLatch |
 | `apps/mobile/src/lib/observability/classify.test.ts` | 6 | expected (breadcrumb-only) failures |
@@ -415,7 +416,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-48 files, 999 declared test blocks.
+49 files, 1002 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -430,6 +431,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/deployFunctionsWiring.test.ts` | 9 | deploy-functions.yml |
 | `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 7 | email-test-config validates the SMTP endpoint before connecting |
+| `supabase/functions/_shared/functionRegion.test.ts` | 3 | internalFunctionUrl |
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |

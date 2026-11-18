@@ -21,6 +21,7 @@ import {
 import { mapLoyaltyRedemption } from '../lib/mappers';
 import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
+import { regionalFunction } from '../lib/functionRegion';
 import {
   isEmptyPatch, requireCustomerId, toAddressInsert, toAddressPatch, type AddressInput,
 } from './addressPayload';
@@ -342,7 +343,7 @@ export const orders = {
    * number. place_order stays the authoritative order creation inside it.
    */
   async placeAndSync(input: PlaceOrderInput): Promise<DbCustomerOrderWithItems> {
-    const { data, error } = await supabase.functions.invoke('order-intake', {
+    const { data, error } = await supabase.functions.invoke(regionalFunction('order-intake'), {
       body: {
         branchId: input.branchId,
         orderType: input.orderType,
@@ -472,7 +473,7 @@ export interface PaymentInitiateResult {
 // (Issue #94). The app navigates by orderId and renders the branch's number only.
 export interface PaymentVerifyResult { status: string; messageKey?: string; orderId?: string | null; }
 async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke(fn, { body });
+  const { data, error } = await supabase.functions.invoke(regionalFunction(fn), { body });
   if (error) {
     let msg = error.message;
     const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
@@ -770,7 +771,7 @@ export const accountDeletion = {
   /** Send an OTP to the account's REGISTERED phone (server-derived). Also reports
    *  whether the password reauth fallback is possible (account has an email). */
   sendOtp: async (language: 'ar' | 'en'): Promise<{ status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone'; reauthAvailable?: boolean }> => {
-    const { data, error } = await supabase.functions.invoke('account-delete-request', {
+    const { data, error } = await supabase.functions.invoke(regionalFunction('account-delete-request'), {
       body: { action: 'send_otp', language },
     });
     if (error) throw new Error(error.message);
@@ -778,7 +779,7 @@ export const accountDeletion = {
   },
   /** Re-verify identity (OTP code or account password) and enqueue the request. */
   submit: async (method: 'otp' | 'reauth', factors: { code?: string; password?: string }): Promise<DeletionSubmitResult> => {
-    const { data, error } = await supabase.functions.invoke('account-delete-request', {
+    const { data, error } = await supabase.functions.invoke(regionalFunction('account-delete-request'), {
       body: { action: 'submit', method, code: factors.code, password: factors.password },
     });
     if (error) throw new Error(error.message);

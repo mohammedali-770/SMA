@@ -263,6 +263,48 @@ attach follow.
 This reaches Production only when `payment-verify` and `payment-webhook` are
 redeployed (a separate owner action).
 
+**Function calls run next to the database (2026-11-18).** The project's
+database is in Frankfurt (`eu-central-1`). Supabase runs an Edge Function in the
+region nearest its **caller** unless told otherwise. For customers in Saudi
+Arabia, and for Moyasar's webhook, that was Mumbai (`ap-south-1`), so every
+database round trip inside a function crossed Mumbai-Frankfurt.
+
+Average execution, measured over the 24 h to 2026-11-18 14:40 UTC:
+
+| Function | Frankfurt | Mumbai |
+| --- | --- | --- |
+| `lazywait-sync` | 0.65 s (1 439 runs, pg_cron) | 5.7 s (6 runs) |
+| `push-dispatch` | 1.1 s | 3.2 s |
+| `order-intake` | none | 7.9 s |
+| `payment-verify` | none | 3.4 s |
+| `payment-initiate` | none | 2.3 s |
+
+Every app call landed in Mumbai.
+
+Calls are now pinned to Frankfurt with Supabase's `forceFunctionRegion` query
+parameter (https://supabase.com/docs/guides/functions/regional-invocation):
+
+- **The app** (`apps/mobile/src/lib/functionRegion.ts`): every
+  `supabase.functions.invoke` name goes through `regionalFunction()`, and a
+  test fails on any call that does not. Only the query parameter is used.
+  supabase-js's own `region` option also sends an `x-region` header, which our
+  CORS allow-list does not include, so the web build's preflight would refuse
+  it. This ships with the next app build, and with the next web deploy for
+  `/app`.
+- **Function-to-function calls** (`_shared/functionRegion.ts`): the POS kick
+  from `order-intake` and from a confirmed payment, and the `push-dispatch`
+  drain from `lazywait-sync`. This takes effect when those functions are
+  redeployed.
+- **Moyasar's webhook** arrives from Moyasar and cannot carry the parameter
+  unless its URL does. Adding `?forceFunctionRegion=eu-central-1` to the webhook
+  URL in the Moyasar dashboard pins it too. This is an owner action. Since
+  2026-11-18 the customer no longer waits on the webhook (`payment-verify`
+  answers first), so it is optional.
+
+A pinned region is not re-routed during a regional outage. That costs nothing
+here: the database is in that region, so an outage there stops the functions
+wherever they run.
+
 ---
 
 ## 3. TEST mode and LIVE mode

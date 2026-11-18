@@ -122,14 +122,17 @@ describe('order-intake carries no npm dependency', () => {
     );
   });
 
-  it('is exactly the four files the deploy must send', () => {
+  it('is exactly the five files the deploy must send', () => {
     // Sending an incomplete bundle produces a function that fails at boot, and
     // the deploy list is written by hand. If this changes, the deploy changes.
     // `_shared/apiKeys.ts` joined on 2026-11-09 for the Supabase API-key
     // migration; it is Web-standard-only, so the graph stays dependency-free.
+    // `_shared/functionRegion.ts` joined on 2026-11-18 (the POS kick is pinned
+    // to the database region); it imports nothing.
     expect([...graph.keys()].sort()).toEqual([
       '_shared/apiKeys.ts',
       '_shared/cors.ts',
+      '_shared/functionRegion.ts',
       '_shared/rest.ts',
       'order-intake/index.ts',
     ]);
