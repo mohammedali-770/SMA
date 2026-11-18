@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**282 TypeScript test files declaring 4185 test blocks, plus 98 SQL suites.**
+**283 TypeScript test files declaring 4190 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -163,7 +163,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-100 files, 1365 declared test blocks.
+101 files, 1370 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -249,6 +249,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/payment.test.ts` | 7 | online payment is offered only in the native app |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/readTimeoutFetch.test.ts` | 17 | isTimedRead — the boundary |
+| `apps/mobile/src/lib/sentryAndroidMapping.test.ts` | 5 | Sentry Android R8 mapping upload |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/variantAvailabilityMatrix.test.ts` | 10 | buildVariantAvailabilityMatrix |
 | `apps/mobile/src/lib/webExportConfig.test.ts` | 1 | web export bundling |
