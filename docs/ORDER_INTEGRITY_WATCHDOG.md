@@ -68,8 +68,8 @@ Rules 14-17 are added by `20261013120000_payment_refund_visibility.sql`
 (`MIGRATIONS.md` §65). **Written 2026-11-14, applied 2026-11-17;** until
 then Production evaluated 13. Rule 18 is added by
 `20261016120000_refund_retry_backoff.sql` (`MIGRATIONS.md` §68), **written
-2026-11-17 and not live until that file is applied;** until then Production
-evaluates 17.
+2026-11-17, applied 2026-11-18** (05:55:54 UTC, ledger row 121); until then
+Production evaluated 17.
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
@@ -222,8 +222,8 @@ critical one failing. The payment card counts critical incidents only, so R18
 moves it at the 24-hour tier and not before. The card already lists every
 refund R18 can report, under "Refunds still being retried".
 
-**R18 `REFUND_STUCK`, a refund still being retried (written 2026-11-17, not
-live until `20261016120000` is applied).** A refund that gave up is R14; R18
+**R18 `REFUND_STUCK`, a refund still being retried (written 2026-11-17, live
+since `20261016120000` was applied on 2026-11-18).** A refund that gave up is R14; R18
 covers the one that has not given up yet. The thresholds are the owner's (gap
 PG-01, 2026-11-17): a warning once a refund tried at least once is still
 `pending` more than 1 hour after it was opened, a critical once more than 24
