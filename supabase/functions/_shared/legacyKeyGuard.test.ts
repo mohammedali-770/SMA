@@ -27,20 +27,15 @@ import { describe, expect, it } from 'vitest';
  *      template. Prose that merely names a variable is not a read, so the
  *      runbooks can still explain what was removed.
  *
- * THE ALLOW-LIST is exactly two things, and nothing else may be added without
- * the owner deciding it:
- *   - `supabase/functions/_shared/paymentSync.ts`, which still reads
- *     `SUPABASE_ANON_KEY` for its post-payment kick of `lazywait-sync`. Payment
- *     code needs the owner's approval to change (CLAUDE.md §6), so it was left
- *     alone and flagged; the last test below fails once it is fixed, so the
- *     exception cannot outlive its reason.
- *   - test files, which need legacy-shaped values to prove they are refused.
+ * THE ALLOW-LIST is test files only, which need legacy-shaped values to prove
+ * they are refused. There is no production exception: `_shared/paymentSync.ts`,
+ * the last file that read `SUPABASE_ANON_KEY`, was moved to `publishableKey()`
+ * in the same change, and the guard covers it like every other file. Adding an
+ * exception is a decision to record, not a convenience.
  */
 
 const ROOT = resolve(__dirname, '../../..');
 
-/** Repo-relative paths, forward slashes. */
-const ALLOWED_FILES = new Set(['supabase/functions/_shared/paymentSync.ts']);
 const TEST_FILE = /(?:\.test\.(?:ts|tsx|js|mjs|cjs|sh)|_test\.ts|\.spec\.ts)$/;
 
 /** Never descended into: dependencies, build output, VCS and tool caches. */
@@ -113,7 +108,7 @@ function walk(dir: string, out: string[] = []): string[] {
 const FILES = walk(ROOT).filter((f) => TEXT_FILE.test(f));
 
 function allowed(file: string): boolean {
-  return ALLOWED_FILES.has(file) || TEST_FILE.test(file);
+  return TEST_FILE.test(file);
 }
 
 /** `file:line: text` for every line in `file` that matches any pattern. */
@@ -147,6 +142,7 @@ describe('the legacy Supabase API keys stay out of the tree', () => {
       'apps/mobile/scripts/export-web.js',
       '.env.example',
       'apps/mobile/.env.example',
+      'supabase/functions/_shared/paymentSync.ts',
     ]) {
       expect(FILES, f).toContain(f);
     }
@@ -178,7 +174,7 @@ describe('the legacy Supabase API keys stay out of the tree', () => {
 
   it('prose that only NAMES a variable is not a read', () => {
     for (const s of [
-      '`_shared/paymentSync.ts:25` still reads `SUPABASE_ANON_KEY` directly.',
+      '`_shared/paymentSync.ts:25` used to read `SUPABASE_ANON_KEY` directly.',
       'After merge, remove the VITE_SUPABASE_ANON_KEY variable from Vercel.',
       'const usesAdmin = /\\bSUPABASE_SERVICE_ROLE_KEY\\b/.test(own)',
     ]) {
@@ -186,12 +182,8 @@ describe('the legacy Supabase API keys stay out of the tree', () => {
     }
   });
 
-  it('the frozen exception is still there — remove it from the allow-list once paymentSync.ts is fixed', () => {
-    // When the owner approves changing paymentSync.ts (CLAUDE.md §6), its kick
-    // should use publishableKey() like order-intake's. This fails then, so the
-    // allow-list entry is removed rather than left to excuse a future regression.
-    const found = hits('supabase/functions/_shared/paymentSync.ts', READS);
-    expect(found).toHaveLength(1);
-    expect(found[0]).toContain("Deno.env.get('SUPABASE_ANON_KEY')");
+  it('has no production exception — paymentSync.ts is checked like every other file', () => {
+    expect(allowed('supabase/functions/_shared/paymentSync.ts')).toBe(false);
+    expect(hits('supabase/functions/_shared/paymentSync.ts', READS)).toEqual([]);
   });
 });

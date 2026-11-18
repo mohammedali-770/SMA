@@ -3831,19 +3831,22 @@ then, and receivers accept both. **The steps, in this order, each a separate
    following is a separate action:
    - **Redeploy the 17 non-payment functions** whose bundles change, as listed in
      `SUPABASE_API_KEYS.md` §5, one at a time.
-   - **Leave the five payment functions alone.** Their bundles change only
-     through the shared client, and payment work is parked (CLAUDE.md §6). The
-     live bundles are Moyasar bundles that already prefer the new keys
-     (read-only inventory, 2026-11-18), so step 8 does not need them redeployed.
-     They pick up the fallback removal with the next approved payment deploy.
+   - **The five payment functions are not part of these redeploys.** Their
+     bundles change too, four of them through the `paymentSync.ts` fix below.
+     Redeploying them is a separate live payment action, which needs its own
+     approval. The live bundles are Moyasar bundles that already prefer the new
+     keys (read-only inventory, 2026-11-18), so step 8 does not need them
+     redeployed.
    - **Remove `VITE_SUPABASE_ANON_KEY` from Vercel**, Production and Preview. No
      code reads it any more.
 
-   **Left for the owner, and flagged:** `_shared/paymentSync.ts:25` still sends
-   `SUPABASE_ANON_KEY` as `apikey` on the post-payment kick of `lazywait-sync`.
-   After step 8 that kick should be treated as refused at the gateway. The order
-   is picked up by the next once-a-minute cron run, so nothing is lost. Fixing it
-   is one line of payment code, and that is your decision.
+   **`_shared/paymentSync.ts` is fixed in this PR.** Its post-payment kick of
+   `lazywait-sync` used to send `SUPABASE_ANON_KEY` as `apikey`. It now sends
+   the publishable key, as `order-intake` does. The live payment bundles keep
+   the old kick until they are redeployed, and after step 8 that kick should be
+   treated as refused at the gateway. The cost is at most about a minute of POS
+   latency, and only while online payment is on: the next once-a-minute cron run
+   picks the order up.
 
 **Rollback:** up to step 8, reactivate the legacy keys; no redeploy needed. After
 step 9's redeploys, reactivating them does not help, because those functions no

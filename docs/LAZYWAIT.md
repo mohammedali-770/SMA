@@ -1307,12 +1307,13 @@ The POS bearer token, the webhook HMAC and the `x-sync-secret` are untouched.
 
 **Step 9 cleanup (2026-11-18, merged only after step 8 held).** Both calls now
 use only the new keys: the instant kick sends the publishable key, or is skipped
-without one, and the push drain sends the secret key on `apikey` alone. One
-legacy read remains in the POS path, on purpose. `_shared/paymentSync.ts` still
-sends `SUPABASE_ANON_KEY` on the post-payment kick, because payment code needs
-the owner's approval to change. `lazywait-sync` itself ignores `apikey`, but
-after step 8 that kick should be treated as refused at the gateway. The
-once-a-minute cron then picks the paid order up on its next run
+without one, and the push drain sends the secret key on `apikey` alone. The
+post-payment kick in `_shared/paymentSync.ts` moves from `SUPABASE_ANON_KEY` to
+the publishable key in the same change. It reaches Production only with a
+separately approved redeploy of the payment functions. Until then the live
+bundles keep the old kick. `lazywait-sync` itself ignores `apikey`, but after
+step 8 that kick should be treated as refused at the gateway, and the
+once-a-minute cron picks the paid order up on its next run
 (`SUPABASE_API_KEYS.md` §2).
 
 ## Gate refusals that write no row now log the order id (2026-11-11)

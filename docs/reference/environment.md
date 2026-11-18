@@ -49,7 +49,6 @@ Read by Edge Functions from the Deno environment. These are secrets. They live i
 - `EXPO_ACCESS_TOKEN`
 - `SEND_SMS_HOOK_SECRET`
 - `SMTP_ALLOWED_HOSTS`
-- `SUPABASE_ANON_KEY`
 - `SUPABASE_PUBLISHABLE_KEYS`
 - `SUPABASE_SECRET_KEYS`
 - `SUPABASE_URL`

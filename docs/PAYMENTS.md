@@ -225,6 +225,18 @@ documented by Moyasar; a page that ignores it is unharmed.
 | App: interrupted-payment recovery | `apps/mobile/src/features/checkout/pendingSession.ts` |
 | Console: payment card, panel, receipt | `src/components/admin/IntegrationCard.tsx`, `MoyasarPaymentPanel.tsx`, `view/orders/PaymentDetails.tsx` |
 | Console: Online Payment switch guard | `src/lib/onlinePaymentGate.ts` |
+| Post-payment POS handoff (kick + online-payment attach) | `supabase/functions/_shared/paymentSync.ts` |
+
+**The post-payment kick uses the publishable key (2026-11-18, #487).**
+`triggerLazywaitSyncOnce` used to send `SUPABASE_ANON_KEY` as `apikey` on its
+kick of `lazywait-sync`. After the legacy keys are deactivated, the gateway
+refuses that. It now sends `publishableKey()`, as `order-intake` does, and skips
+the kick when there is no publishable key. `paymentSyncKick.test.ts` executes
+it. The fix reaches Production only when the four payment functions that bundle
+the file (`payment-initiate`, `-verify`, `-webhook`, `-test-config`) are
+redeployed, which is a separate live owner action
+(`SUPABASE_API_KEYS.md` §5). Until then the live bundles keep the old kick. With
+online payment on, the cron picks the paid order up within about a minute.
 
 ---
 

@@ -28,10 +28,9 @@
  * `MISSING_PUBLISHABLE_KEY` below). A legacy JWT is never accepted from either
  * variable and never matched by the receiver.
  *
- * The one exception in the tree is `_shared/paymentSync.ts`, which reads
- * `SUPABASE_ANON_KEY` directly and was left alone because payment code needs the
- * owner's approval to change (CLAUDE.md §6). `legacyKeyGuard.test.ts` allows it
- * by name and refuses any other legacy read.
+ * Nothing in the tree reads a legacy key any more, `_shared/paymentSync.ts`'s
+ * post-payment kick included. `legacyKeyGuard.test.ts` fails on any legacy read
+ * or legacy key JWT outside test files.
  *
  * Pure: Web-standard APIs only, environment read through `globalThis.Deno` so
  * Vitest can execute it (see apiKeys.test.ts).

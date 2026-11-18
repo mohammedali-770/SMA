@@ -94,7 +94,7 @@ state fails, and Vercel keeps serving the previous deployment.
 
 `legacyKeyGuard.test.ts` fails if any file outside its allow-list contains a
 legacy key JWT for this project, or reads one of the four legacy variables. The
-allow-list is `_shared/paymentSync.ts` (below) and test files.
+allow-list is test files only: there is no production exception.
 
 **Every service-key call site, and what moved:**
 
@@ -127,32 +127,31 @@ allow-list is `_shared/paymentSync.ts` (below) and test files.
   `SUPABASE_ANON_KEY` directly**, and that was not changed by the Moyasar work.
   If online payment is on before step 8, check that file first.
 
-  **Still not changed by step 9, on purpose.** Payment code needs the owner's
-  approval to change while Moyasar is parked, so the cleanup leaves
-  `triggerLazywaitSyncOnce` as it is and the guard allows it by name. What that
-  means once the legacy keys are deactivated:
-  - the post-payment kick sends the deactivated anon key as `apikey` to
-    `lazywait-sync`. **Treat that best-effort kick as refused.** The function
-    itself would not refuse it: v15 never reads `apikey`, is `verify_jwt =
-    false`, and authorizes only on `x-sync-secret` (`lazywait-sync/index.ts`
-    lines 34-50). But the request reaches the gateway first. The hosted gateway
-    checks `apikey` against the project's keys, and Supabase does not document
-    whether it lets a deactivated legacy JWT through to a `verify_jwt = false`
-    function. That was not measured, because measuring it needs the legacy keys
-    deactivated;
+  **Fixed by step 9 (#487).** `triggerLazywaitSyncOnce` now sends
+  `publishableKey()` as `apikey`, exactly as `order-intake` does, and skips the
+  kick when there is no publishable key. `paymentSyncKick.test.ts` executes it.
+  The guard has no exception for the file any more. Four payment bundles include
+  it (`payment-initiate`, `-verify`, `-webhook`, `-test-config`), so the fix
+  reaches Production only when those are redeployed. **That is a separate live
+  owner action, not covered by this cleanup.** Until then:
+  - the live bundles keep the old kick, which sends the deactivated anon key as
+    `apikey` to `lazywait-sync`. **Treat that kick as refused after step 8.**
+    The function itself would not refuse it: v15 never reads `apikey`, is
+    `verify_jwt = false`, and authorizes only on `x-sync-secret`
+    (`lazywait-sync/index.ts` lines 34-50). But the request reaches the gateway
+    first. The hosted gateway checks `apikey` against the project's keys, and
+    Supabase does not document whether it lets a deactivated legacy JWT through
+    to a `verify_jwt = false` function. That was not measured, because measuring
+    it needs the legacy keys deactivated;
   - nothing is lost. The kick is wrapped in `try`, has an 11-second timeout and
-    never fails the payment, and the once-a-minute `lazywait-sync` cron, which
-    sends only `x-sync-secret`, picks the paid order up on its next run. The cost
-    is up to about a minute of POS latency for an online order;
+    never fails the payment. The once-a-minute `lazywait-sync` cron, which sends
+    only `x-sync-secret`, picks the paid order up on its next run. The cost is at
+    most about a minute of POS latency for an online order;
   - it matters only while online payment is on. The live payment functions are
     all Moyasar bundles (read-only inventory, 2026-11-18): deployed 2026-11-13,
     `payment-refund` 2026-11-17, each byte-identical to the default branch at
     `5c78d17`. Their Supabase clients already use the new-key helper, so they
-    keep working at step 8. This kick is the only part of them that does not.
-
-  **Fixing it is an owner decision**: one line, `apikey:
-  publishableKey()?.value`, as `order-intake` does. The guard's last test then
-  fails until the allow-list entry is removed.
+    keep working at step 8. The kick is the only part of them that does not.
 - **The JWT signing-key migration** is a separate, independent change. The
   user access tokens Supabase Auth issues are still signed by the project's JWT
   secret; rotating that secret would invalidate every session at once. Out of
@@ -218,8 +217,9 @@ way are fixed by restoring the Vercel variable.
 
 ## 5. Step 9 — the cleanup (written 2026-11-18, not merged)
 
-Branch `security/legacy-key-cleanup-20261118`. It removes every legacy-key
-fallback in the tree except one: `_shared/paymentSync.ts` (§2).
+Branch `security/legacy-key-cleanup-20261118` (#487). It removes every
+legacy-key fallback in the tree, including the direct `SUPABASE_ANON_KEY` read in
+`_shared/paymentSync.ts` (§2).
 
 ### Merge preconditions — all four, checked on the day
 
@@ -258,8 +258,9 @@ each redeploy below.
   and `Deno.env.get('SUPABASE_ANON_KEY')` in `apiKeys.ts`,
   `process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY` in `env.ts`,
   `import.meta.env.VITE_SUPABASE_ANON_KEY` in `supabase.ts`, the anon JWT in
-  `eas.json`, and a service_role JWT in a document) fails it. Fixing
-  `paymentSync.ts` fails its exception test.
+  `eas.json`, and a service_role JWT in a document) fails it. So does putting
+  the `SUPABASE_ANON_KEY` read back in `paymentSync.ts`, which also fails
+  `paymentSyncKick.test.ts`.
 
 ### Redeploys — each one a separate CLAUDE.md §5 action
 
@@ -278,15 +279,17 @@ branch at `5c78d17`. A function is listed when any file in its bundle differs.
 - **Shared client only:** `auth-send-sms-whatsapp`, `email-test-config`,
   `lazywait-catalog`, `lazywait-webhook`, `staff-accounts`, `whatsapp-send-otp`,
   `whatsapp-test-config`, `whatsapp-verify-otp`, `whatsapp-webhook`.
-- **Payment, and NOT part of this cleanup's deploys:** `payment-initiate`,
-  `payment-refund`, `payment-test-config`, `payment-verify`, `payment-webhook`.
-  Their bundles change only through `supabaseClient.ts`. Leave them out for
-  three reasons:
-  - payment work is parked (CLAUDE.md §6), and approval for this cleanup does
-    not cover a payment deploy;
-  - the live bundles are Moyasar bundles that already prefer the new keys
-    (read-only inventory, 2026-11-18), so step 8 does not need them redeployed;
-  - they pick up the fallback removal with the next approved payment deploy.
+- **Payment: not part of this cleanup's redeploys; each needs its own
+  approval.** `payment-initiate`, `payment-test-config`, `payment-verify` and
+  `payment-webhook` change through `apiKeys.ts`, `supabaseClient.ts` and the
+  `paymentSync.ts` fix. `payment-refund` changes through the first two only.
+  - Redeploying a payment function is a live payment action. CLAUDE.md §6 keeps
+    that as its own §5 approval, and approval for this cleanup does not cover it.
+  - The live bundles are Moyasar bundles that already prefer the new keys
+    (read-only inventory, 2026-11-18), so step 8 does not need them redeployed.
+  - Until they are redeployed, they keep the old `paymentSync` kick, refused
+    after step 8 (§2). That costs at most about a minute of POS latency, and only
+    while online payment is on.
 - **Unchanged:** `payment-admin-test-return`, `payment-return`.
 
 **Order.** Before step 9, every receiver already accepted the `apikey`-only
@@ -302,6 +305,6 @@ step-9 receiver refuses.
   code reads it any more. This is a Vercel change, so it is its own CLAUDE.md §5 action.
   Do the same for `EXPO_PUBLIC_SUPABASE_ANON_KEY` if it was ever set there.
 - Leave `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` in the Edge Function
-  environment alone. No step-9 code reads the second, but `paymentSync.ts` still
-  reads the first, and whether the platform lets them be removed at all is not
-  documented here.
+  environment alone. No step-9 code reads either, but the live payment bundles
+  read the first until they are redeployed. Whether the platform lets them be
+  removed at all is not documented here.
