@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**278 TypeScript test files declaring 4131 test blocks, plus 96 SQL suites.**
+**280 TypeScript test files declaring 4162 test blocks, plus 96 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -268,7 +268,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-133 files, 1809 declared test blocks.
+135 files, 1840 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -350,6 +350,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/legal/prerender.test.ts` | 17 | escapeHtml — the whole reason this module can use string concatenation |
 | `src/lib/adminPushApi.test.ts` | 7 | sendAdminPushConfirmation |
 | `src/lib/api.test.ts` | 6 | admin.deleteBranch |
+| `src/lib/auditGate.test.ts` | 26 | audit gate — the real 2026-11-18 web shape |
 | `src/lib/banners.test.ts` | 17 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
 | `src/lib/branchImport.test.ts` | 47 | splitRows |
@@ -389,6 +390,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 17 | checkout payment availability |
 | `src/lib/paymentGatewayApi.test.ts` | 5 | paymentGateway.testCheckoutResult |
+| `src/lib/picomatchReachability.test.ts` | 5 | GHSA-fc5q-39xc-vjpf: the bundle scan can see picomatch |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
 | `src/lib/productImages.test.ts` | 19 | product image type gate |
 | `src/lib/pwa/adminPushState.test.ts` | 9 | resolveAdminPushState |

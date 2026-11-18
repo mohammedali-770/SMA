@@ -9,19 +9,21 @@
 
 ## 1. What the gate enforces
 
-Both dependency trees are audited on every PR. The web/admin tree still runs:
+Both dependency trees are audited on every PR, by `scripts/audit-web-high.mjs`
+and `scripts/audit-mobile-high.mjs`. Each executes `npm audit --audit-level=high
+--json` on its own tree (`--prefix apps/mobile` for the app) and fails closed.
+Since 2026-11-18 both hand the report to the same verdict logic,
+`scripts/audit-gate.mjs`, with their own exception tables. That logic is the
+mobile gate's, moved without changing a verdict. The web gate had no exception
+mechanism at all until then: it failed on any high. `src/lib/auditGate.test.ts`
+proves that each boundary can still fail.
 
-```bash
-npm audit --audit-level=high
-```
-
-The mobile tree runs `scripts/audit-mobile-high.mjs`, which itself executes
-`npm --prefix apps/mobile audit --audit-level=high --json` and fails closed.
-It permits only exact, time-bounded HIGH exceptions recorded in §3, and only
-while each one's evidence still holds. **There are none today**; §4.15 records the
-last. Any critical advisory, any other direct high advisory, any high record
-outside the approved dependency closure, malformed audit output, or an expired
-exception still fails CI.
+Each gate permits only exact, time-bounded HIGH exceptions recorded in §3, and
+only while each one's evidence still holds. **There is one today, the same in
+both trees: `picomatch` GHSA-fc5q-39xc-vjpf (§3.3), until 2027-01-31.** Any
+critical advisory, any other direct high advisory, any high record outside the
+approved dependency closure, a new path to an excepted package, malformed audit
+output, a missing proof, or an expired exception still fails CI.
 
 **It annotates every direct high/critical advisory before reaching any verdict.**
 Until 2026-10-08 it checked the expiry date first and exited, so once the date
@@ -40,8 +42,18 @@ Expo packages that have no non-breaking fix (§3.1). Gating at moderate would
 fail every PR on something this repository cannot fix, and a gate that is always
 red is a gate everybody learns to ignore.
 
-As of **2026-11-10**, both trees are clean at high/critical, and **the mobile
-gate holds no exception at all**. The last one, `decode-uri-component`, left with
+As of **2026-11-18**, both trees carry exactly one HIGH advisory, `picomatch`
+GHSA-fc5q-39xc-vjpf. It has no patched release, and it reached both trees when
+GitHub reviewed it on 2026-11-17. It is excepted in both gates, bounded and
+expiring (§3.3). Before the exception, **both gates were red on every pull
+request**, and so was the gated deploy job, which needs the audit job. It
+propagates to 5 high records in the web tree and 34 in the mobile tree. The
+moderate advisories in §3.1 and §3.2 are unchanged. One record moved:
+`@sentry/react-native` now counts as high, because it also reaches picomatch
+through Metro.
+
+*Superseded 2026-11-18:* as of **2026-11-10**, both trees were clean at
+high/critical, and **the mobile gate held no exception at all**. The last one, `decode-uri-component`, left with
 the Expo SDK 58 upgrade, which removed `query-string` from `expo-router`
 (§4.15). What remains are moderates, which the gate does not block: Expo's in
 the mobile tree (§3.1) and the Sentry Vite plugin's in the web tree (§3.2).
@@ -125,10 +137,209 @@ approved admin-web test event resolves to a readable stack (release validation
 in `docs/SENTRY_WEB_OBSERVABILITY.md`), and remove this entry once the audit is
 clean.
 
+### 3.3 `picomatch` — ReDoS through single-branch repeated extglobs (GHSA-fc5q-39xc-vjpf) — HIGH (both trees, build/test-time only)
+
+**This exception weakens a required gate, so accepting it is the owner's
+decision.** The owner makes it by merging the change that added it. It is the
+first HIGH exception the web tree has ever carried.
+
+| Field | Value |
+| --- | --- |
+| **Package** | `picomatch`. Web tree: 4.0.5. Mobile tree: 4.0.7 (hoisted), plus two 2.3.2 copies, under `micromatch` and `jest-util` |
+| **Advisory** | `GHSA-fc5q-39xc-vjpf` (CVE-2026-112366), CWE-1333, CVSS 7.5 |
+| **Severity** | High |
+| **Affected** | `<=4.0.7`, which is every published version. OSV records `introduced: 0`, `last_affected: 4.0.7` |
+| **Patched release as of review** | **None.** `4.0.7` (published 2026-08-24) is the latest version and `latest` dist-tag, and it is itself affected |
+| **What `npm audit fix` offers** | Downgrades only. Web: `vite` 6.2.7 and `vitest` 3.1.4. Mobile: `expo` 54.0.33 and `react-native` 0.83.10. None is acceptable |
+| **Reachability in SMA** | Build and test tooling only. **Web:** `picomatch` ← `vite`, `vitest`, `fdir`, `tinyglobby`. **Mobile:** `picomatch` ← `@expo/cli`, `@expo/metro-config`, `fdir`, `tinyglobby`, `micromatch` (← `metro-file-map`) and `jest-util` (← `jest-worker` ← `metro`). `tinyglobby` ← `@expo/config-plugins`, `@expo/metro-config`, `@react-native/codegen`, and `react-native`'s codegen script |
+| **In a shipped bundle?** | **No.** Measured 2026-11-18 on `npm run build` output: 16 JavaScript files, the admin console and the Expo web export (`/app` entry, 4.4 MB). Not one picomatch signature matches, and neither `picomatch` nor `extglob` occurs anywhere |
+| **Reviewed** | 2026-11-18 |
+| **Exception expires** | **2027-01-31**, the same date in both gates |
+| **Clear when** | `picomatch` publishes a release outside the affected range on every line installed here, and both lockfiles take it. That means 4.x for Vite, Vitest, Metro and the Expo CLI, and 2.x for `micromatch` and `jest-util`, which require `^2.3.1` |
+
+**What it is.** A crafted extglob *pattern* such as `+(*)` or `+(*a)` slips past
+`analyzeRepeatedExtglob` in `lib/parse.js`. The compiled regular expression
+then backtracks exponentially on short crafted input and blocks the event loop.
+The attacker has to supply the **pattern**, not only the string it is matched
+against.
+
+**Why nothing better was available, checked rather than assumed:**
+
+- **No patched release.** Checked with `npm view picomatch versions` and the
+  registry's bulk advisory endpoint, which is what `npm audit` reads. The
+  endpoint returns `vulnerable_versions: "<=4.0.7"` for 2.3.1, 2.3.2, 3.0.1,
+  3.0.2, 4.0.5 and 4.0.7. OSV says GitHub reviewed the advisory on 2026-11-17 at
+  15:56 UTC, which is why both gates turned red the next day. The GitHub
+  advisory page and API are outside this session's scope (403). The advisory
+  references an upstream fix, micromatch/picomatch#194, but whether it is merged
+  could not be read from here.
+- **No trustworthy fork.** `npm search picomatch` finds only republished copies
+  by individual accounts, such as `@ryotsu/picomatch` 4.0.7-a,
+  `@depup/picomatch` and `@tw1934/picomatch-custom`. Overriding Vite, Vitest
+  and Metro onto an unvetted fork would put unreviewed code into every build and
+  CI job. That is the risk §7 warns about, so it was rejected.
+- **No resolution avoids it.** Every Vite line depends on picomatch directly:
+  6.4.5 requires `^4.0.2`, and the latest, 8.3.8, requires `^4.0.7`. Vitest 4,
+  `tinyglobby` and Metro's file map do too. Moving the web tree from 4.0.5 to
+  4.0.7 changes nothing, because 4.0.7 is affected, so **neither lockfile is
+  touched by this change.**
+
+**Why it is accepted.** Every pattern these tools compile is written by this
+repository or by an installed dependency. None comes from a user. Where
+picomatch runs:
+
+- **Vite:** its `server.fs.deny` defaults, `import.meta.glob` calls in source,
+  plugin include and exclude filters, and the file watcher. The dev server listens
+  on `0.0.0.0` (`npm run dev`), and a request path is matched against
+  `fs.deny`. So a remote client controls the *string* but not the *pattern*, and
+  the default patterns contain no extglob.
+- **Vitest:** test and coverage include globs from the config.
+- **Metro and the Expo CLI:** watch folders and block lists from the
+  repository's Metro config.
+- **`@expo/metro-config`'s side-effects serializer:** it compiles the
+  `sideEffects` globs in installed packages' `package.json` files. Those come
+  from dependency publishers, who can already run code at install, so this adds
+  no new trust.
+- **React Native codegen and Expo config plugins:** native-project path
+  discovery during prebuild.
+
+The worst case is a slow or stalled build, test run or dev server on a developer
+machine or CI runner. No customer can reach it.
+
+#### How it is enforced
+
+`scripts/audit-web-high.mjs` and `scripts/audit-mobile-high.mjs` accept only
+`GHSA-fc5q-39xc-vjpf` on `picomatch`, through the four boundaries in
+`scripts/audit-gate.mjs`:
+
+1. **Exact identity.** Any other advisory fails, on picomatch or anywhere else.
+   So does this advisory reported on any other package.
+2. **Reachability bounds.** Each bound is that package's real parents in its
+   lockfile, measured 2026-11-18. npm's `effects` list is never larger.
+
+   | Tree | Bounded package | Only approved parents |
+   | --- | --- | --- |
+   | web | `picomatch` | `fdir`, `tinyglobby`, `vite`, `vitest` |
+   | web | `fdir` | `tinyglobby`, `vite` |
+   | web | `tinyglobby` | `vite`, `vitest` |
+   | mobile | `picomatch` | `@expo/cli`, `@expo/metro-config`, `fdir`, `jest-util`, `micromatch`, `tinyglobby` |
+   | mobile | `micromatch` | `metro-file-map` |
+   | mobile | `jest-util` | `jest-worker` |
+   | mobile | `tinyglobby` | `@expo/config-plugins`, `@expo/metro-config`, `@react-native/codegen`, `react-native` |
+
+   The generic globbing libraries are bounded as well as picomatch, because a
+   bound that stops at a general-purpose library proves nothing (#416). Every
+   package on these paths is barred from being declared by its tree or imported
+   by its source (`src` without test files; `apps/mobile/src`). The exceptions
+   are the declared roots: `vite` and `vitest` in the web tree, which are the
+   tools, and `react-native` in the mobile tree, which is the app's runtime.
+   `fdir` is **not** bounded in the mobile tree, because npm reports no
+   `effects` for it there and a bound on an empty list fails by design. Its one
+   lockfile parent is `tinyglobby`, which is bounded, and `fdir` stays barred
+   from being declared or imported.
+3. **Closure.** Every high record must be in picomatch's `effects` closure.
+4. **Preconditions.** Each gate refuses the exception unless
+   `src/lib/picomatchReachability.test.ts` exists and names the advisory,
+   `scripts/bundle-forbidden-libs.mjs` still lists `picomatch`, and
+   `npm run build` still runs that scan on `dist`.
+
+**The graph checks cannot prove "build-time only", and the bundle scan can.**
+`react-native` ships in the app and legitimately depends on `tinyglobby`, for a
+codegen script the app never loads. That is the limit described under "What the
+gate cannot see" below. So the real proof is the one that section describes:
+**`picomatch` is now in `scripts/bundle-forbidden-libs.mjs`.** `npm run build`
+is the build in CI, in Vercel's Git deploys and in the gated deploy, and it fails
+if picomatch's code is in any JavaScript it emitted.
+
+The scan recognises picomatch by three literals: two from `lib/parse.js` and one
+from `lib/picomatch.js`. The package has no `exports` map, so `lib/parse` can be
+bundled alone, and it is recognised by its own literals. Each literal is
+identical in 2.3.2, 4.0.5 and 4.0.7. Across all 20,160 installed JavaScript
+files in both trees, each occurs only in:
+
+- picomatch's own four installed copies;
+- four tools that **vendor** picomatch: `rollup` (four bundles), `prettier`,
+  `playwright`'s `expect` matcher and `resolve-workspace-root`.
+
+`npm audit` cannot see those vendored copies at all. The scan would catch one
+that shipped.
+
+`src/lib/picomatchReachability.test.ts` keeps that scan able to fail. It finds
+**every** installed copy in both trees by walking `node_modules`, so nested
+copies are included. It bundles each one minified through `index.js`,
+`posix.js`, `lib/picomatch.js` and `lib/parse.js`, and requires each signature
+to match individually. It also checks that no console or app source imports
+`picomatch`, `fdir`, `tinyglobby` or `micromatch`, after a known positive. In CI
+a missing tree fails the test instead of skipping it.
+
+**Mutation-tested 2026-11-18, every mutant's precondition confirmed before its
+verdict was counted.** The gates were run against real lockfiles, each mutated
+with `npm install --package-lock-only` and then restored:
+
+| mutant | web | mobile |
+| --- | --- | --- |
+| an unrelated new high (`lodash` 4.17.20, two advisories) | killed | killed |
+| picomatch gains a parent (`@rollup/pluginutils` 5.3.0) | killed | killed |
+| `tinyglobby` and picomatch gain a parent (`vite` added to the app) | — | killed |
+| `picomatch` declared directly | killed | killed |
+| a carrier declared directly (`tinyglobby` / `micromatch`) | killed | killed |
+| source imports picomatch without declaring it (`picomatch` / `picomatch/lib/parse`) | killed | killed |
+| the proof file deleted | killed | killed |
+| the proof no longer names the advisory | killed | — |
+| the bundle scan forgets picomatch | killed | killed |
+| `npm run build` stops running the scan | killed | killed |
+| the expiry in the past | killed | killed |
+| the exception recorded against the wrong package | killed | — |
+| unmutated | **passes** | **passes** |
+
+`src/lib/auditGate.test.ts` runs 26 cases against the real web shape, and
+most of them are mutants that must fail. They include a second advisory on
+picomatch itself, the advisory raised to critical, a critical elsewhere, and a
+stale entry while another high remains.
+
+The bundle proof was tested through the full `npm run build`:
+
+| mutant | result |
+| --- | --- |
+| the console entry imports `picomatch` | **build fails**: the scan names `dist/assets/main-….js` |
+| the app's root layout requires only `picomatch/lib/parse` | **build fails**: the scan names the `/app` entry bundle, on a `parse.js` literal |
+| one signature reworded so it no longer matches | proof suite fails (3 tests) |
+| both `parse.js` signatures removed | proof suite fails, including "`picomatch/lib/parse` bundled alone" |
+| app source imports `tinyglobby`; console source re-exports `micromatch` | proof suite fails |
+| unmutated | build and suites **pass** |
+
+**What it does not cover, stated rather than implied.** The scan has the same
+limits as before. Native iOS and Android JavaScript is built by EAS, and the web
+export is only a proxy for it. The 2.x copies stay affected even after a 4.x fix
+unless picomatch also patches 2.x, and the advisory's range then decides
+whether this entry narrows or stays.
+
+**Why 2027-01-31.** Ten weeks. The exception rests on reachability, and a fix
+looks close: an upstream fix is referenced, and every parent takes a new 4.x
+through its caret range with no override. The date is short so that the next
+review comes within one release cycle. It also deliberately avoids
+2026-12-31, the retired exception's date, in the holiday weeks when nobody would
+see a weekly failure. Extending it is a judgement that this evidence still holds
+(§5), not a way to make CI green.
+
+**To clear:**
+
+1. When a patched picomatch is published, check it as §7 says.
+2. Refresh both lockfiles inside the existing ranges. Add an `overrides` entry
+   only for a line whose parents' ranges cannot reach the fix.
+3. Re-run both gates. The stale-entry check then **fails** until `ALLOWED`,
+   `PROOFS` and the bounds are emptied in both scripts.
+4. Keep the `picomatch` entry in `scripts/bundle-forbidden-libs.mjs` when the
+   exception goes, as `braces` and `node-forge` were kept. A build-tool globbing
+   library has no business in a customer bundle.
+5. Move this section to §4.
+
 ### What the gate cannot see — stated rather than implied
 
-> **Read with the date in mind.** This section was written for the build-tool
-> exceptions retired on 2026-11-09 (§4.10, §4.11). Its argument — the dependency
+> **Read with the date in mind.** Since 2026-11-18 this section describes a
+> standing exception again: `picomatch` (§3.3) is a build-tool exception of the
+> same kind, and the scan below is its proof. It was first written for the
+> build-tool exceptions retired on 2026-11-09 (§4.10, §4.11). Its argument — the dependency
 > graph cannot tell build-time from runtime use, so only the built bundle can
 > answer "does this ship?" — still holds, and the bundle scan it describes is
 > **kept**: `braces`, `micromatch` and `node-forge` are build-tool libraries that

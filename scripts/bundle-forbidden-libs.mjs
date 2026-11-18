@@ -4,6 +4,10 @@
  *
  *   node scripts/bundle-forbidden-libs.mjs [dir]      (default: dist)
  *
+ * STATUS 2026-11-18: `picomatch` (GHSA-fc5q-39xc-vjpf) is excepted in both audit
+ * gates on the argument that it never ships, and this scan is that argument's
+ * proof — see its entry in FORBIDDEN_LIBS and docs/DEPENDENCY_ADVISORIES.md §3.3.
+ *
  * STATUS 2026-11-09: the audit exceptions this was written to bound are RETIRED
  * (node-forge 1.4.3 fixed its advisories; the braces advisory is no longer
  * reported) — and the scan is KEPT. These are Expo/Metro CLI and build libraries
@@ -108,6 +112,25 @@ export const FORBIDDEN_LIBS = Object.freeze({
     // unrelated library says any of them, so a match is always braces' code —
     // including a vendored copy, which carries the same flaw and which npm audit
     // cannot see at all.
+  ]),
+  // Added 2026-11-18 for GHSA-fc5q-39xc-vjpf, which has no patched release and is
+  // excepted in BOTH audit gates on the argument that picomatch is build/test-time
+  // only. This entry is what makes that argument checked rather than asserted:
+  // a build that ships picomatch fails. docs/DEPENDENCY_ADVISORIES.md §3.3.
+  //
+  // picomatch has no `exports` map, so `picomatch/lib/parse` — where the advisory's
+  // extglob analysis lives — can be imported alone. Two signatures come from
+  // parse.js's own source and one from lib/picomatch.js; all three are identical
+  // in every installed line (4.0.5 web, 4.0.7 and 2.3.2 mobile).
+  //
+  // Measured across all 20 160 installed JS files in both trees: each occurs only
+  // in picomatch's own module (four installed copies) and in four build/test tools
+  // that VENDOR picomatch — rollup (four bundles), prettier, playwright's `expect`
+  // matcher and resolve-workspace-root. No unrelated library says any of them.
+  picomatch: Object.freeze([
+    ', exceeds maximum allowed length: ', // lib/parse.js (static text of a template literal)
+    ' to match literal characters', // lib/parse.js, the bracket/paren syntax-error text
+    'Expected pattern to be a non-empty string', // lib/picomatch.js
   ]),
 });
 

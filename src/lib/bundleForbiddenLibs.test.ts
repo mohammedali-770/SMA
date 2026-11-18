@@ -98,7 +98,7 @@ describe('forbidden-library signatures — positive control', () => {
 /*
  * The package-entry controls above cannot see a piecemeal import: an entry point
  * loads every implementation module, so a signature living in any one of them
- * passes. But `braces` and `node-forge` have no `exports` map, so a dependency
+ * passes. But `braces`, `node-forge` and `picomatch` have no `exports` map, so a dependency
  * may import a single vulnerable module directly — and review on #417 found that
  * `braces/lib/compile` on its own produced no match at all. So each vulnerable
  * module is bundled ALONE, by its subpath, and must still be recognised.
@@ -108,6 +108,9 @@ const VULNERABLE_MODULES: ReadonlyArray<readonly [lib: keyof typeof FORBIDDEN_LI
   ['braces', 'braces/lib/compile'], // the advisory's named sink; one literal of its own, a debug line
   ['braces', 'braces/lib/expand'],
   ['braces', 'braces/lib/parse'],
+  // GHSA-fc5q-39xc-vjpf's extglob analysis. Every installed copy, in both trees, is covered by
+  // src/lib/picomatchReachability.test.ts; this is the hoisted mobile copy.
+  ['picomatch', 'picomatch/lib/parse'],
 ];
 
 describe('forbidden-library signatures — each vulnerable module imported alone', () => {
