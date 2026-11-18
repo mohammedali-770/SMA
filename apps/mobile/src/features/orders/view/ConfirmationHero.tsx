@@ -28,7 +28,7 @@ export function ConfirmationHero({order,onResend,resending,resendError}:{order:O
   // would print something the cashier cannot match against their system.
   // Whatever the POS returns is what appears here, unaltered.
   const branchNumber=orderDisplayNumber(order);
-  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={[p.showBranchNumber?`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}`:null,t(p.titleKey),body].filter(Boolean).join('. ')}>
+  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={[p.showBranchNumber&&branchNumber?`${t('oc_branch_order_number')} ${branchNumber}`:null,t(p.titleKey),body].filter(Boolean).join('. ')}>
     {/* The cashier is handed a phone: they need to see WHOSE order this is —
         which is why this is `hero` (64px) and not `compact` (30px, sized for a
         dense header). At 30px, alone above a 72px number, it read as a stray
@@ -42,14 +42,17 @@ export function ConfirmationHero({order,onResend,resending,resendError}:{order:O
         card used to render unconditionally — the flag had no consumer at all —
         so an order on a channel with NO POS step still read "not issued yet"
         above "it will appear here as soon as the branch issues it". For a
-        delivery order that promise can never come true. */}
-    {p.showBranchNumber ? (
+        delivery order that promise can never come true.
+
+        AND ONLY ONCE THERE IS A NUMBER (owner, 2026-11-18, repeated): a
+        customer is never shown the card's "not issued yet" placeholder
+        («لم يصدر بعد» / «سيظهر هنا فور إصداره من الفرع»). Until the branch
+        issues the number, the state pill and its sentence below say what is
+        happening; the card appears when there is something to show. */}
+    {p.showBranchNumber && branchNumber ? (
       <View style={styles.numberCard}>
         <Text variant="label" tone="tertiary" align="center" style={styles.numberLabel}>{t('oc_branch_order_number')}</Text>
-        {branchNumber
-          ? <Text align="center" style={styles.number} accessibilityElementsHidden>{branchNumber}</Text>
-          : <><Text variant="title" tone="tertiary" align="center">{t('oc_number_pending')}</Text>
-              <Text variant="caption" tone="tertiary" align="center">{t('oc_number_pending_hint')}</Text></>}
+        <Text align="center" style={styles.number} accessibilityElementsHidden>{branchNumber}</Text>
       </View>
     ) : null}
 
