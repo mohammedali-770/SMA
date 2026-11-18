@@ -4017,8 +4017,10 @@ Each step is its own §5 action. Approval for one is not approval for the next.
     did not read step 3's secret.
 - **The deploys sent nothing.** `external_dispatch_enabled` was read false
   first, and neither function was invoked.
-- **Step 1's "done looks like" is the owner's test email**, which had not been
-  sent when this was recorded.
+- **Step 1's "done looks like" is met:** the owner pressed "Send test email" in
+  the console after both deploys, and on 2026-11-18 confirmed that it arrived.
+  The relay therefore passes the new guard with `SMTP_ALLOWED_HOSTS` set, which
+  is the only evidence available that the secret's value is right.
 - **Step 2 (`admin-push-dispatch`) is still open.**
 
 1. **Redeploy `email-test-config`.** The live relay passes the new guard.
