@@ -2514,8 +2514,8 @@ will not submit until a method is chosen.
   Lazywait panel can put a cancelled order back in the queue the same way: the
   worker no longer sends it, but the panel does not refuse it either. Both are
   customer-messaging and console changes for their own pull request.
-  **Fixed on branch `fix/cancelled-order-followups-20261117`, not live until
-  `20261015120000` is applied (the Retry) and `push-dispatch` is deployed (the
+  **Fixed in #478 and LIVE since 2026-11-18: `20261015120000` applied (the
+  Retry; ledger row 120) and `push-dispatch` deployed as version 10 (the
   push)** (`MIGRATIONS.md` §67, `OWNER_ACTIONS.md` §57). `push-dispatch`
   sends none of the four POS-outcome pushes for a cancelled order and closes
   the event as `superseded`; `requeue_lazywait_order` refuses a cancelled
@@ -2531,9 +2531,9 @@ will not submit until a method is chosen.
   `ready_to_send`. The window is the time between the claim and the POST,
   usually seconds and up to tens of seconds in a batch run. A status check in
   that gate belongs with the admin-Retry follow-up above, once its live
-  definition has been read. **Fixed on branch
-  `fix/cancelled-order-followups-20261117`, not live until `20261015120000` is
-  applied** (`MIGRATIONS.md` §67). The gate answers `order_cancelled` and parks
+  definition has been read. **Fixed in #478 and
+  LIVE since `20261015120000` was applied on 2026-11-18** (ledger row 120,
+  `MIGRATIONS.md` §67). The gate answers `order_cancelled` and parks
   the order as `blocked` / `order_cancelled`, queuing no message;
   `lazywait-sync` is unchanged and sends nothing on that answer. An existing
   build shows such an order from its status, which is `cancelled`.

@@ -847,10 +847,10 @@ by a printed ticket rather than by the vendor.
   (`20261012120000`, gap PG-03; applied 2026-11-14, ledger row 117). Both
   claims skip it and `request_customer_pos_resend` refuses it with reason
   `order_cancelled`. Three things were left as they were, and are recorded in
-  `ORDER_CONFIRMATION_FLOW.md` §11. **All three are fixed on branch
-  `fix/cancelled-order-followups-20261117`** (`MIGRATIONS.md` §67,
-  `OWNER_ACTIONS.md` §57), **not live until `20261015120000` is applied and
-  `push-dispatch` is deployed**:
+  `ORDER_CONFIRMATION_FLOW.md` §11. **All three are fixed, and LIVE since
+  2026-11-18** (#478; `MIGRATIONS.md` §67, `OWNER_ACTIONS.md` §57):
+  `20261015120000` applied at 04:51:45 UTC (ledger row 120) and
+  `push-dispatch` deployed as version 10:
   - an admin **Retry** on a cancelled order still moves it to `pending` (the
     worker then leaves it there). *Fix:* `requeue_lazywait_order` refuses it
     with P0001 `order_cancelled: …`, which the panel shows as it is;
@@ -1313,7 +1313,7 @@ the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
 send nothing, and leave it 'syncing' for the stale reaper.
 
 **`order_cancelled` takes the same branch, and is not left 'syncing'**
-(`20261015120000`, written 2026-11-17, not applied). The gate answers it for a
+(`20261015120000`, written 2026-11-17, applied 2026-11-18, ledger row 120). The gate answers it for a
 cancelled order at the point an attempt would start, after the ref, state and
 marker checks and before the deadline checks, and parks the order itself, in
 the same locked statement, as `blocked` / `order_cancelled` with one `skipped`

@@ -140,8 +140,8 @@ Push is an **active production customer channel**. Both gates are open:
 - order-status transitions push to real customers automatically — `order_updates_enabled` defaults **TRUE** at device registration, so an opted-in customer receives preparing/ready/out_for_delivery/delivered without any further action. **Changed 2026-08-27: `received` is no longer pushed when an order is placed.** `order-intake` used to fire it unconditionally with copy claiming the kitchen had the order — untrue for delivery, which had not been sent anywhere yet. The POS outcome now owns the customer's first message (`pos_confirmed` on success, `pos_retrying`/`pos_confirmation_required`/`pos_failed` otherwise), and `lazywait-sync` dispatches it. `received` remains reachable from the admin status path, which is a real transition made by a human;
 - **`ready` is order-type aware as of `push-dispatch` v6, deployed 2026-09-03.** Every delivery order passes through `ready` on the way to `out_for_delivery`, and until v6 it was sent the PICKUP body in both languages — *"Your order is ready for pickup."* / «طلبك جاهز للاستلام.» — then contradicted minutes later by "On the way". `ready` now branches on `orders.order_type`, read from the order row the function already fetches; pickup copy is byte-identical to what it always was. It is the only status whose meaning differs by fulfilment, and `_shared/pushReadyCopyWiring.test.ts` pins the branch, the widened select and both bodies. **The delivery Arabic is engineering-drafted and has not had a native read** (`docs/OWNER_ACTIONS.md` §26);
 - admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true` — which since 2026-08-20 means **every device that granted OS notification permission and has not switched offers off**, not the small hand-raised subset it used to be. The confirm line's count is now close to the whole active base; read it before clicking;
-- **a broadcast's `notification_log` row records who sent it and what it said** (`sent_by`, and `content` with the four strings) once `20261007120000` is applied and `push-dispatch` redeployed; written 2026-11-12, neither done yet. Only the log row changed: targeting, copy, the gate and the response did not (`_shared/auditTrailWiring.test.ts`);
-- **a cancelled order gets no POS-outcome push** (`pos_confirmed`, `pos_retrying`, `pos_confirmation_required`, `pos_failed`) once `push-dispatch` is redeployed from branch `fix/cancelled-order-followups-20261117` (written 2026-11-17, not deployed; live is v9). The `pos_sync` claim's match reads the sync state, never `orders.status`, so a cancelled order still waiting in the POS queue was told "We could not send your order to the restaurant" when its deadline ran out. The handler now reads `status` on the order row it already fetches and closes such an event as `superseded`, token-fenced and terminal so the drain never retries it. Targeting, copy, the claim and every other order are unchanged (`_shared/pushPosSyncCancelled.test.ts`; `docs/OWNER_ACTIONS.md` §57);
+- **a broadcast's `notification_log` row records who sent it and what it said** (`sent_by`, and `content` with the four strings) since `20261007120000` was applied and `push-dispatch` v9 deployed on 2026-11-13 (`docs/MIGRATIONS.md` ledger row 112). Only the log row changed: targeting, copy, the gate and the response did not (`_shared/auditTrailWiring.test.ts`);
+- **a cancelled order gets no POS-outcome push** (`pos_confirmed`, `pos_retrying`, `pos_confirmation_required`, `pos_failed`) since `push-dispatch` **v10, deployed 2026-11-18** (from the default branch at `0dd6a20`, #478; its 8 bundle files read back byte-identical). The `pos_sync` claim's match reads the sync state, never `orders.status`, so a cancelled order still waiting in the POS queue was told "We could not send your order to the restaurant" when its deadline ran out. The handler now reads `status` on the order row it already fetches and closes such an event as `superseded`, token-fenced and terminal so the drain never retries it. Targeting, copy, the claim and every other order are unchanged (`_shared/pushPosSyncCancelled.test.ts`; `docs/OWNER_ACTIONS.md` §57);
 - signing out no longer silences a device. Sign-out used to deactivate the `push_devices` row while the first-run permission flag is device-scoped and never re-raised, so push stayed dead after signing back in. The row is now left alone and the token is re-claimed at the next sign-in (`usePushDeviceSync`). Account **deletion** still deactivates;
 - a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code;
 - **`push-dispatch` sends Expo's access token once `EXPO_ACCESS_TOKEN` is set** (added 2026-11-12, checklist S03#1; not yet deployed or set). Until the secret exists the request is byte-for-byte unchanged. Expo's Enhanced Security must be enabled only AFTER a deploy that sends the token and a confirmed real order push, or every customer push stops (`docs/OWNER_ACTIONS.md` §52);
@@ -291,7 +291,26 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
-**Current position 2026-11-17, read live AFTER the refund-visibility apply: 158
+**Current position 2026-11-18, read live AFTER the cancelled-order follow-ups
+apply: 159 repository files on the default branch / 165 live history rows / 157
+applied, 2 superseded, 0 unapplied.** Latest live version `20261118045145`. On
+the owner's approval naming both ("Apply 20261015120000 and deploy
+push-dispatch"), `20261015120000_cancelled_order_followups` was applied at
+04:51:45 UTC in one call named by version (ledger row 120). A first attempt on
+2026-11-17 was interrupted by a container restart, and a read-only check found
+history still at 164 and both pre-images in place before it was sent again: **a
+call that did not return is unknown until a read settles it.** Both stored
+bodies equal the hashes pre-computed from the merged file. `push-dispatch` was
+deployed the same day as version 10, all 8 bundle files read back
+byte-identical. Together they mean a cancelled order is no longer started at the
+POS, re-queued by Retry, or sent a POS-outcome push. Reconciled **by name** against the default branch at
+`0dd6a20`: 157 applied, 2 superseded (rows 8-9), 0 unapplied. Money-path pair
+unchanged (`12b6816d…` / `22e2d429…`). With nothing outstanding the rule does
+not relax: the next file written is the next referent. **Name the target by
+version.** Detail: `docs/MIGRATIONS.md` §67; steps: `docs/OWNER_ACTIONS.md` §57.
+
+**Superseded, kept because the count is the point — the position 2026-11-17,
+read live AFTER the refund-visibility apply: 158
 repository files on the default branch / 164 live history rows / NOTHING
 unapplied.** Latest live version `20261117114924`. On the owner's approval
 naming each by version, one call each, each verified before the next:
@@ -331,6 +350,10 @@ invoiced, and `place_customer_order` places no online order (gaps PG-03 and
 PG-27). No signature, table or row; no deploy; money path self-asserted
 (`12b6816d…` / `22e2d429…`). Applying it before `docs/OWNER_ACTIONS.md` §47.13
 step 1 closes that section's warning (§54). **Name the target by version.** Detail: `docs/MIGRATIONS.md` §64.
+
+**Superseded 2026-11-18 — the file in the amendment below is APPLIED (ledger
+row 120) and `push-dispatch` is deployed as version 10.** The amendment is kept
+as written.
 
 **AMENDED 2026-11-17 — `20261015120000_cancelled_order_followups` is written,
 validated and awaiting approval** (branch `fix/cancelled-order-followups-20261117`).

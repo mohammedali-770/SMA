@@ -5280,7 +5280,7 @@ the app can attach a file, which needs a native build.
 and PG-26 marked live in the gaps list. The phone's summary line arrives with
 the §47.17 EAS build; nothing extra is needed for it.
 
-## 57. A cancelled order is not started at the POS, re-queued by Retry, or told it failed — one apply, one deploy
+## 57. A cancelled order is not started at the POS, re-queued by Retry, or told it failed — one apply, one deploy — DONE 2026-11-18
 
 **Opened 2026-11-17.** The three engineering follow-ups §54's change listed and
 left (`MIGRATIONS.md` §64). Branch `fix/cancelled-order-followups-20261117`.
@@ -5303,6 +5303,20 @@ or changed, and no Arabic needs a read.
 Detail: `docs/MIGRATIONS.md` §67.
 
 ### The steps, each its own approval (CLAUDE.md §5)
+
+**All four steps DONE.** Merged as `0dd6a20` (#478) on 2026-11-17. On
+2026-11-18, on the owner's approval naming both ("Apply 20261015120000 and
+deploy push-dispatch"): applied 04:51:45 UTC, live `20261118045145`, ledger
+row 120, in one call named by version. A first attempt on 2026-11-17 was
+interrupted by a container restart; a read-only check found history still at
+164 and both pre-images in place, so nothing had landed. Step 3's hashes held:
+`begin_lazywait_create_attempt` `365fcc1b…` / 1 854 and
+`requeue_lazywait_order` `5b83a99c…` / 2 062, one overload each, money-path
+pair unchanged (detail in `MIGRATIONS.md` §67). `push-dispatch` was deployed
+as version 10 (from 9), `verify_jwt` false, its 8 bundle files from the
+default branch at `0dd6a20` read back byte-identical; only
+`push-dispatch/index.ts` differs from v9. No smoke request was sent. Nothing is
+left for this section.
 
 1. **Merge the pull request.** Nothing reaches a customer: the console code is
    not changed, and the web build `/app` that ships on merge (CLAUDE.md §13)

@@ -1012,16 +1012,16 @@ applied 2026-11-14):
 - **A cancelled order left in the POS queue gets a "could not send" push** when
   its deadline passes, and an admin Retry can put one back in the queue
   (`ORDER_CONFIRMATION_FLOW.md` §11). Neither sends anything to the kitchen.
-  **Fixed on branch `fix/cancelled-order-followups-20261117`; not live until
-  `push-dispatch` is deployed (the push) and `20261015120000` is applied (the
-  Retry)** (`MIGRATIONS.md` §67, `OWNER_ACTIONS.md` §57).
+  **Fixed in #478 and LIVE since 2026-11-18: `push-dispatch` deployed as
+  version 10 (the push) and `20261015120000` applied (the Retry; ledger row
+  120)** (`MIGRATIONS.md` §67, `OWNER_ACTIONS.md` §57).
 - **An order cancelled in the few seconds after the worker claims it is still
   sent to the kitchen.** The worker's last check before it sends reads the sync
   state, not the order's status (`LAZYWAIT.md`, *Retry / backoff /
   dead-letter*). Measured on a local chain on 2026-11-14; not fixed here. A
   paid order sent this way is still refunded by hand if the customer is owed
-  one. **Fixed on branch `fix/cancelled-order-followups-20261117`; not live
-  until `20261015120000` is applied.** The check then parks the order instead
+  one. **Fixed in #478 and LIVE since `20261015120000` was
+  applied on 2026-11-18** (ledger row 120). The check then parks the order instead
   of sending it. It touches no payment or refund: a paid order parked this way
   is still a hand refund, as for any cancelled paid order (above).
 
