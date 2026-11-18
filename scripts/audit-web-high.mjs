@@ -1,80 +1,84 @@
 #!/usr/bin/env node
 /**
- * Fail-closed web/admin npm audit gate.
+ * Fail-closed web/admin npm audit gate with a tiny, time-bounded exception list.
  *
- * Unlike the mobile audit gate, the web tree has no standing HIGH/CRITICAL
- * exceptions. This wrapper keeps that policy while emitting each direct
- * high/critical advisory as a GitHub Actions annotation so CI failures are
- * diagnosable without downloading raw job logs.
+ * Until 2026-11-18 the web tree had NO exception mechanism: any high or
+ * critical failed, and this file said "no web exceptions are allowed". That held
+ * until an advisory arrived with no patched release on a package every Vite
+ * version depends on — picomatch, GHSA-fc5q-39xc-vjpf, affected `<=4.0.7` while
+ * 4.0.7 is the latest published. The only remedy `npm audit` offers is
+ * downgrading Vite to 6.2.7. So the web tree now takes the mobile gate's
+ * exception machinery, shared in scripts/audit-gate.mjs, with exactly one entry
+ * (docs/DEPENDENCY_ADVISORIES.md §3.3).
+ *
+ * picomatch is reached only through Vite (the console's build tool and dev
+ * server), Vitest (the test runner) and the two globbing libraries between them.
+ * Every pattern any of them compiles is written in this repository's config or
+ * source. The proof that none of it ships is the bundle scan inside
+ * `npm run build`, kept alive by src/lib/picomatchReachability.test.ts.
  */
-import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
-function fail(message) {
-  console.error(`::error::${message}`);
+import { bundleScanCovers, readFileOrNull, runAuditGate, sourceFiles } from './audit-gate.mjs';
+
+// Shared with the mobile gate: one review clears or extends both. Extending it is
+// a judgement that the evidence still holds, NOT a way to make CI green
+// (docs/DEPENDENCY_ADVISORIES.md §5).
+const EXCEPTION_EXPIRES = '2027-01-31';
+
+// GHSA id -> { package, reason }, reviewed in docs/DEPENDENCY_ADVISORIES.md §3.
+const ALLOWED = new Map([
+  [
+    'GHSA-fc5q-39xc-vjpf',
+    {
+      package: 'picomatch',
+      reason:
+        'ReDoS on attacker-supplied extglob patterns; no patched release (<=4.0.7, latest 4.0.7). Build/test-time only: Vite and Vitest; patterns come from the repository',
+    },
+  ],
+]);
+
+// The test that proves the exception's precondition against the installed tree,
+// run by the unit-test job. The gate checks that it exists and names the advisory.
+const PROOFS = new Map([['GHSA-fc5q-39xc-vjpf', 'src/lib/picomatchReachability.test.ts']]);
+
+// The ONLY immediate parents each package may have: its real parents in
+// package-lock.json, measured 2026-11-18 (npm's `effects` list is never larger).
+// `fdir` and `tinyglobby` are general-purpose globbing libraries, so they are
+// bounded too: a runtime package that started using either would otherwise join
+// the approved closure unseen (#416).
+const REACHABILITY_BOUNDS = new Map([
+  ['picomatch', new Set(['fdir', 'tinyglobby', 'vite', 'vitest'])],
+  ['fdir', new Set(['tinyglobby', 'vite'])],
+  ['tinyglobby', new Set(['vite', 'vitest'])],
+]);
+
+// The tools themselves: direct devDependencies by design, and imported by the
+// build config and by test files. Exempt from the directness and import checks;
+// picomatch, fdir and tinyglobby are not.
+const TOOL_ROOTS = new Set(['vite', 'vitest']);
+
+let rootPackage;
+try {
+  rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
+} catch {
+  console.error('::error::could not parse package.json while validating advisory reachability');
   process.exit(1);
 }
 
-const run = spawnSync(
-  process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['audit', '--audit-level=high', '--json'],
-  { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 },
-);
-
-if (run.error) fail(`npm audit could not run: ${run.error.message}`);
-
-let report;
-try {
-  report = JSON.parse(run.stdout || '{}');
-} catch {
-  fail('npm audit did not return valid JSON');
-}
-
-if (!report || typeof report !== 'object' || !report.vulnerabilities || !report.metadata) {
-  const stderr = String(run.stderr || '').trim();
-  fail(`npm audit JSON is missing expected vulnerabilities/metadata fields${stderr ? `: ${stderr}` : ''}`);
-}
-
-const counts = report.metadata?.vulnerabilities ?? {};
-const critical = Number(counts.critical ?? 0);
-const high = Number(counts.high ?? 0);
-
-if (critical === 0 && high === 0) {
-  console.log('web dependency audit: no high/critical vulnerabilities');
-  process.exit(0);
-}
-
-function ghsaFromUrl(url) {
-  const match = String(url ?? '').match(/GHSA-[0-9a-z-]+/i);
-  return match?.[0] ?? null;
-}
-
-const direct = [];
-for (const [name, vulnerability] of Object.entries(report.vulnerabilities)) {
-  for (const cause of Array.isArray(vulnerability?.via) ? vulnerability.via : []) {
-    if (typeof cause !== 'object' || cause === null) continue;
-    const severity = String(cause.severity ?? '').toLowerCase();
-    if (!['high', 'critical'].includes(severity)) continue;
-    direct.push({
-      name,
-      severity,
-      ghsa: ghsaFromUrl(cause.url),
-      source: cause.source,
-      title: String(cause.title ?? 'security advisory'),
-      range: String(cause.range ?? vulnerability.range ?? ''),
-      url: String(cause.url ?? ''),
-    });
-  }
-}
-
-if (direct.length === 0) {
-  fail(`web dependency audit contains ${critical} critical and ${high} high vulnerability record(s), but no direct advisory objects could be identified`);
-}
-
-for (const advisory of direct) {
-  const id = advisory.ghsa ?? advisory.source ?? 'unknown-advisory';
-  const range = advisory.range ? ` affected ${advisory.range};` : '';
-  const url = advisory.url ? ` ${advisory.url}` : '';
-  console.error(`::error title=npm audit ${advisory.severity}: ${advisory.name} (${id})::${advisory.title};${range}${url}`);
-}
-
-fail(`web dependency audit contains ${critical} critical and ${high} high vulnerability record(s); no web exceptions are allowed`);
+runAuditGate(['audit', '--audit-level=high', '--json'], {
+  tree: 'web',
+  expires: EXCEPTION_EXPIRES,
+  allowed: ALLOWED,
+  proofs: PROOFS,
+  bounds: REACHABILITY_BOUNDS,
+  roots: TOOL_ROOTS,
+  packageJson: rootPackage,
+  // The console's source. Test files are left out: Vitest runs them and they are
+  // never bundled, and the build config (vite.config.ts) is outside src.
+  sourceLabel: 'src',
+  loadSources: () =>
+    sourceFiles('src', /\.test\.[cm]?[jt]sx?$/).map((file) => ({ file, text: readFileSync(file, 'utf8') })),
+  readFile: readFileOrNull,
+  preconditions: [bundleScanCovers('picomatch', rootPackage)],
+});

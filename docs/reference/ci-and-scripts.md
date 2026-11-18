@@ -59,8 +59,9 @@ The *job name* is what GitHub reports as a status check context. When configurin
 
 ## Repository scripts
 
+- `scripts/audit-gate.mjs` — Shared verdict logic for the two dependency audit gates, with exact, time-bounded HIGH exceptions
 - `scripts/audit-mobile-high.mjs` — Fail-closed mobile npm audit gate with a tiny, time-bounded exception list
-- `scripts/audit-web-high.mjs` — Fail-closed web/admin npm audit gate
+- `scripts/audit-web-high.mjs` — Fail-closed web/admin npm audit gate with a tiny, time-bounded exception list
 - `scripts/branch-audit.sh`
 - `scripts/build-logo-mark.mjs` — Generates the transparent-background brand mark from the official logo master
 - `scripts/build-play-feature-graphic.mjs` — Generates the Google Play feature graphic from the brand mark
