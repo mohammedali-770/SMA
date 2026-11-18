@@ -65,6 +65,8 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/cors.ts`
 - `_shared/deployFunctionsWiring.test.ts`
 - `_shared/emailTestConfigWiring.test.ts`
+- `_shared/functionRegion.test.ts`
+- `_shared/functionRegion.ts`
 - `_shared/lazywait.test.ts`
 - `_shared/lazywait.ts`
 - `_shared/lazywaitApi.test.ts`
