@@ -66,6 +66,64 @@ export function nextReceiptPollMs(
   return RECEIPT_POLL_MS;
 }
 
+/**
+ * How often the poll looks for the order while the receipt's FIRST load has not
+ * finished. No network: it only re-reads the screen's own reference.
+ */
+export const RECEIPT_AWAIT_LOAD_MS = 400;
+
+/**
+ * Run the receipt's refresh loop until `stop()` is called.
+ *
+ * WHY THIS IS A FUNCTION AND NOT AN EFFECT BODY. Until 2026-11-18 the loop
+ * lived in ReceiptScreen's focus effect and began with "if there is no order
+ * yet, return". The focus effect runs at mount, the order arrives from the
+ * network a moment later, and nothing ran the effect again, so on a receipt
+ * opened fresh after checkout THE POLL NEVER STARTED. The branch number
+ * reached the database in 5.5 s (SM-2026-000103) and the screen never asked
+ * for it. Every "number never appears" report traced to this.
+ *
+ * So the loop no longer needs the order to exist when it starts: while there
+ * is none it looks again every RECEIPT_AWAIT_LOAD_MS (bounded by the same
+ * window as the fast poll), and from then on follows nextReceiptPollMs.
+ * Framework-free, with the clock injectable, so the test drives it with fake
+ * timers and proves the late-arriving order is polled.
+ */
+export function startReceiptPolling(deps: {
+  getOrder: () => { status: OrderStatus; lazywaitOrderNumber?: string | null } | null;
+  refresh: () => void;
+  now?: () => number;
+}): () => void {
+  const now = deps.now ?? Date.now;
+  const startedAt = now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let stopped = false;
+
+  const schedule = () => {
+    if (stopped) return;
+    const current = deps.getOrder();
+    const elapsed = now() - startedAt;
+    const delay = current
+      ? nextReceiptPollMs(current, elapsed)
+      : elapsed < RECEIPT_PENDING_POLL_WINDOW_MS
+        ? RECEIPT_AWAIT_LOAD_MS
+        : RECEIPT_POLL_MS;
+    if (delay == null) return; // terminal — stop entirely
+    timer = setTimeout(() => {
+      if (stopped) return;
+      const order = deps.getOrder();
+      if (order && !isTerminalOrderStatus(order.status)) deps.refresh();
+      schedule();
+    }, delay);
+  };
+  schedule();
+
+  return () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
 /** Terminal orders never change status again — no reason to keep polling. */
 export function isTerminalOrderStatus(status: OrderStatus): boolean {
   return status === 'delivered' || status === 'cancelled';

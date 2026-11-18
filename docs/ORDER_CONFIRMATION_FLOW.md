@@ -116,17 +116,52 @@ app's source. Measured on build 30 (SM-2026-000102), this state now lasts
 about 6 s: the POS had the order 6 s after the receipt opened. The error states
 (`verifying_with_branch`, the not-sent and failed ones) still say what
 happened, because the customer must not resend while it is uncertain.
+On the receipt itself this state is now covered by the waiting window below;
+"Order received" remains what the My Orders list shows for it.
 
-**And the receipt page waits for the number (owner, 2026-11-18).** The
-owner's instruction: "I want only the page with lazywait order number". So
-while the order is `sending_to_branch`, the receipt stays on its loading
-skeleton, with no status or sentence at all. The page appears the moment the
-number exists; it polls every 2 s while waiting. "Order received" above is
-therefore only what a customer sees if the POS is slow. After **20 s**
-(`RECEIPT_WAIT_FOR_NUMBER_MS`, `features/orders/receiptGate.ts`) the page shows
-anyway, so a slow or failing POS can never leave the customer on a blank screen
-with no way forward. Every other state shows at once. `receiptGate.test.ts`
-pins the rule, the bound and the wiring (3/3 mutants killed).
+**And the customer waits in a WAITING WINDOW until the number exists (owner,
+2026-11-18, on build 31).** The owner's instruction: "It should show a window
+asking the customer to not close the app, and an interactive counter or loader,
+and as soon as we receive the order number from Lazywait show the order page".
+So while the order is `sending_to_branch`, the receipt route shows
+`OrderWaitingView` (`features/orders/view/OrderWaitingView.tsx`) instead of the
+page:
+
+- the logo, and for a paid card order a green **"Payment received" / «تم
+  استلام الدفع»** pill;
+- a turning ring with a live **seconds counter**;
+- **"Confirming your order…" / «جارٍ تأكيد طلبك…»** and **"Please keep the app
+  open. Your order number will appear here in a few seconds." / «فضلاً لا تُغلق
+  التطبيق. سيظهر رقم طلبك هنا خلال ثوانٍ.»**
+
+The order page replaces the window the moment the state leaves
+`sending_to_branch`, which on an active POS channel means the number has
+arrived (measured: about 6 s after the order is created). The page is **never**
+shown without the number while the order is in flight. This supersedes the
+#499 behaviour, a loading skeleton that fell back to the page after 20 s: that
+fallback is what the owner saw on build 31 and rejected.
+
+**If the branch is slow** (`WAITING_SLOW_AFTER_MS`, 30 s,
+`features/orders/receiptGate.ts`), the window stays but changes: the ring and
+counter go, the copy becomes **"This is taking longer than usual" / «يستغرق
+الأمر أطول من المعتاد»** with "Your order is safe…", it stops asking the
+customer to keep the app open, and a **My Orders** button appears. A customer is
+therefore never held on a counter with no way forward. Error states
+(`verifying_with_branch`, not-sent, failed) are not in flight, so they show the
+page at once, as before.
+
+**Why build 31 never showed the number: the receipt did not re-check.** The
+focus effect that polls the order returned early when the order was not loaded
+yet, and its dependencies never restarted it. After a card payment the receipt
+opens before the order is in memory, so the poll never ran: SM-2026-000103 had
+its POS number 5.5 s after it was created and the screen sat on "Order
+received" until the customer left. The poll now lives in `startReceiptPolling`
+(`features/orders/ordersRefresh.ts`): it waits for the order to load
+(`RECEIPT_AWAIT_LOAD_MS`, 400 ms, no network), then re-reads every 2 s while
+the number is awaited and relaxes to 25 s after 90 s. It never refreshes a
+terminal order and stops when the screen loses focus. `ordersRefresh.test.ts`
+and `receiptGate.test.ts` pin the polling, the gate, the wiring and the copy
+in both languages.
 
 The three `yes` rows are the states on an ACTIVE POS channel: the number is
 either already issued (`confirmed_by_branch`) or still expected
