@@ -5312,7 +5312,9 @@ interrupted by a container restart; a read-only check found history still at
 164 and both pre-images in place, so nothing had landed. Step 3's hashes held:
 `begin_lazywait_create_attempt` `365fcc1b…` / 1 854 and
 `requeue_lazywait_order` `5b83a99c…` / 2 062, one overload each, money-path
-pair unchanged (detail in `MIGRATIONS.md` §67). `push-dispatch` was deployed
+pair unchanged; `anon` executes neither function, `authenticated` only
+`requeue_lazywait_order`; no `VERIFY-20261015120000-` fixture survives (detail
+in `MIGRATIONS.md` §67). After that, `push-dispatch` was deployed
 as version 10 (from 9), `verify_jwt` false, its 8 bundle files from the
 default branch at `0dd6a20` read back byte-identical; only
 `push-dispatch/index.ts` differs from v9. No smoke request was sent. Nothing is
