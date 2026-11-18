@@ -42,7 +42,7 @@ native builds. It is that same missing path, and it is expected.
 
 Restore navigation instrumentation only after upgrading to a Sentry version verified compatible with the installed Expo/RN stack, by removing the name from that list.
 
-## Android release builds are minified — added 2026-11-10
+## Android release builds are minified — added 2026-11-10, decided 2026-11-18
 
 From the Expo SDK 58 upgrade, Android release builds run R8, set explicitly in
 `apps/mobile/app.json` (`expo-build-properties`,
@@ -50,28 +50,94 @@ From the Expo SDK 58 upgrade, Android release builds run R8, set explicitly in
 **native Android stack frames in Sentry are obfuscated** unless R8's mapping file
 is uploaded.
 
+**Decided 2026-11-18 by the owner: mapping upload is ON.** It takes effect at the
+next EAS Android build; every build before it stays obfuscated (see below).
+
 - **JavaScript stack traces are unaffected.** They come from the Hermes bundle
   and its Debug IDs, not from R8.
-- **Uploading the mapping needs Sentry's Android Gradle Plugin.** The Expo plugin
-  applies it only with `experimental_android.enableAndroidGradlePlugin`, and Sentry
-  still calls that option experimental. It is **not** turned on.
-- **So, for now, a native Android crash reads as obfuscated names.** Turning the
-  upload on is a follow-up decision, best tried on a preview build first. Without
-  `SENTRY_AUTH_TOKEN` it would change nothing anyway, because `app.config.js`
-  removes the whole Sentry plugin.
-- **Turning it on later does not help a build already shipped.** Sentry matches a
-  mapping to an event through a ProGuard UUID that the Gradle plugin builds into the
-  app (`io.sentry.proguard-uuid`). A build made without the plugin carries none, so
-  no later upload can de-obfuscate it. Decide before the first R8 build ships.
-- **A preview build cannot prove the upload as configured.** `eas.json` sets
-  `SENTRY_DISABLE_AUTO_UPLOAD=true` for preview, so a test of the plugin needs that
-  unset and the token present.
+- **How it is on.** The Sentry plugin entry in `app.json` carries an
+  `experimental_android` block with `enableAndroidGradlePlugin: true`, which makes
+  the installed plugin (`@sentry/react-native` 8.28.0,
+  `plugin/build/withSentry.js:62-70`) apply the Sentry Android Gradle Plugin
+  (SAGP) 6.22.0 (`plugin/build/withSentryAndroidGradlePlugin.js`). Sentry still
+  calls the option experimental. Every sub-option is set explicitly, not left to
+  a default:
+
+  | Option | Value | Why |
+  | --- | --- | --- |
+  | `includeProguardMapping` | `true` | builds the ProGuard UUID into the app and bundles the mapping |
+  | `autoUploadProguardMapping` | `true` | written as `shouldSentryAutoUpload()`, so `SENTRY_DISABLE_AUTO_UPLOAD=true` still stops it |
+  | `uploadNativeSymbols`, `autoUploadNativeSymbols` | `false` | NDK symbols were never uploaded; out of scope for this decision |
+  | `includeNativeSources`, `includeSourceContext` | `false` | no source code leaves the build |
+  | `dexguardEnabled` | `false` | R8, not DexGuard |
+
+- **What SAGP does NOT do here, and why that holds.** The plugin hard-codes
+  `autoInstallation { enabled = false }` and `tracingInstrumentation { enabled =
+  false }` into the Gradle block it writes (`withSentryAndroidGradlePlugin.js:61-66`);
+  neither is an option. Both matter. SAGP 6.22.0's auto-install defaults ON and
+  would pin `sentry-android` 8.56.0, below the 8.57.0 the RN SDK expects
+  (`sentry.gradle.kts:21`), and tracing instrumentation rewrites OkHttp, Room and
+  file I/O bytecode. `sentryAndroidMapping.test.ts` runs the installed plugin and
+  fails if either line changes in a future SDK.
+- **What SAGP still does that the Expo plugin cannot switch off.** Read from the
+  SAGP 6.22.0 jar on 2026-11-18, stated rather than buried:
+  - `runtimeOptimizations` defaults ON. It rewrites two classes of the Sentry
+    Android SDK at build time (`io.sentry.util.LoadClass` and
+    `io.sentry.android.core.ManifestMetadataReader`) so they read values computed
+    at build time from the resolved dependencies and the merged manifest. It is
+    meant to change startup cost, not behaviour. It is not instrumentation of app
+    code.
+  - `telemetry` defaults ON: SAGP reports its own build-time errors and timings to
+    Sentry's SaaS. That is build-machine data, not customer data.
+  - `includeDependenciesReport` defaults ON: a list of the app's Java
+    dependencies goes into the app bundle as an asset.
+
+  Turning any of these off would need hand-written Gradle in a local config plugin,
+  which this repository cannot run here (no Android SDK) and which the upstream
+  plugin does not offer. Raise it as its own change if any of them matters.
+- **No token, no SAGP.** `app.config.js` removes the whole Sentry plugin when
+  `SENTRY_AUTH_TOKEN` is absent, so a tokenless build applies neither the JS
+  source-map upload nor SAGP and cannot fail on either. Verified 2026-11-18 by
+  `expo prebuild --platform android` with and without a dummy token: with it, the
+  only change against the previous `app.json` is the SAGP classpath in
+  `android/build.gradle`, `apply plugin: "io.sentry.android.gradle"` and the
+  `sentry { ... }` block in `android/app/build.gradle`; without it, nothing
+  Sentry-related is generated at all.
+- **A build already shipped stays obfuscated.** Sentry matches a mapping to an
+  event through a ProGuard UUID that SAGP builds into the app (the
+  `io.sentry.ProguardUuids` entry of the `sentry-debug-meta.properties` asset). A build made without the plugin carries none, so no
+  later upload can de-obfuscate it.
+- **Preview builds bundle the UUID but do not upload.** `eas.json` sets
+  `SENTRY_DISABLE_AUTO_UPLOAD=true` for development and preview, which the Gradle
+  block honours. A preview test of the upload itself needs that unset and the
+  token present in the preview environment.
 - **Play Console still de-obfuscates production crashes.** AGP puts the mapping
   inside each app bundle, so Android vitals and a manual retrace keep working.
-  Preview APKs keep no mapping once the EAS worker is gone.
 - **R8 is this repository's choice, not an SDK 58 default.** The SDK 58 template still
   defaults `enableMinifyInReleaseBuilds` to false; only the `app.json` setting turns
   it on.
+
+### Verify it on the first Android production build after 2026-11-18
+
+None of this has run in Gradle yet: no Android SDK is available where it was
+written, so the prebuild output is the strongest evidence so far.
+
+1. **The build log shows the upload.** Look for the
+   `uploadSentryProguardMappings<Variant>` task (for this app
+   `uploadSentryProguardMappingsRelease`) running, not skipped, and sentry-cli
+   reporting the mapping uploaded. A `WARNING: @sentry/react-native depends on
+   sentry-android 8.57.0, but version … was resolved` line means a second SDK
+   copy got in, and is a failure.
+2. **Sentry holds the mapping.** In the `react-native` project, Settings → Debug
+   Files (ProGuard) lists a mapping uploaded at the build's time.
+3. **A native frame reads as real names.** An approved test event from a native
+   Android path on that build shows `io.sentry.…` / `sa.com.spicymeal.app.…`
+   class and method names, not one-letter names. Sending a test event from a
+   production build is an owner-approved action.
+
+If the build fails in a Sentry task, the fastest revert is
+`"enableAndroidGradlePlugin": false` in `app.json`; that leaves JS source maps
+and crash reporting exactly as they were.
 
 ## Environment behavior
 

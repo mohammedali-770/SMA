@@ -7,7 +7,10 @@
  * config plugin when `SENTRY_AUTH_TOKEN` is absent from the build environment.
  *
  * WHY. That plugin wires the native source-map / debug-symbol upload into the
- * iOS and Android release builds. With no token the upload step fails and takes
+ * iOS and Android release builds, and since 2026-11-18 it also applies the
+ * Sentry Android Gradle Plugin that uploads the R8 mapping
+ * (`experimental_android` in app.json, docs/SENTRY_OBSERVABILITY.md). Removing
+ * the plugin removes both. With no token the upload step fails and takes
  * the whole production build down with it:
  *
  *   Task :app:createBundleReleaseJsAndAssets_SentryUpload_... FAILED
