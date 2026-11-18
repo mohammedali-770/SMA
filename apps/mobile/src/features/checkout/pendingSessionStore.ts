@@ -23,7 +23,7 @@ export async function savePendingSession(sessionId: string, at: number, cartKey?
     let key = cartKey ?? null;
     if (cartKey === undefined) {
       const prev = parsePendingSession(await AsyncStorage.getItem(PENDING_SESSION_KEY));
-      key = prev && prev.sessionId === sessionId ? prev.cartKey : null;
+      key = prev && prev.sessionId === sessionId ? (prev.cartKey ?? null) : null;
     }
     await AsyncStorage.setItem(PENDING_SESSION_KEY, serializePendingSession(sessionId, at, key));
   } catch {

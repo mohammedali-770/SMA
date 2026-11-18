@@ -5,8 +5,12 @@ const mem = new Map<string, string>();
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: async (k: string) => mem.get(k) ?? null,
-    setItem: async (k: string, v: string) => { mem.set(k, v); },
-    removeItem: async (k: string) => { mem.delete(k); },
+    setItem: async (k: string, v: string) => {
+      mem.set(k, v);
+    },
+    removeItem: async (k: string) => {
+      mem.delete(k);
+    },
   },
 }));
 
