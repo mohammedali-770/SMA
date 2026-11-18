@@ -5621,6 +5621,47 @@ PG-01 marked live in the gaps list.
 **Not decided here, still yours:** who receives refund alerts outside the
 console (PG-10), and turning the refund job on (§47.16).
 
+## 59. Advisor fixes: one RLS policy and 21 covering indexes — one apply
+
+**Opened 2026-11-18.** You asked for Supabase's advisors to be run and anything
+new fixed. Two findings are fixed in `20261017120000_advisor_fixes`:
+
+- **0003 `auth_rls_initplan` (1):** `checkout_sessions_select_own` asked
+  `auth.uid()` and `is_staff()` once per row. It now asks once per query. Who
+  can read a checkout session does not change, and the paired suite checks that
+  by reading as a customer, another customer and an administrator.
+- **0001 `unindexed_foreign_keys` (21):** one small index per foreign key. Most
+  matter when an account is deleted, which checks every table that points at
+  it.
+
+Left alone on purpose, and why: the **30 "unused" indexes** (nothing is
+evidence of unused during testing, with little traffic), the **16 duplicate
+permissive policies** (the deliberate public/staff splits), the **17 tables with
+no policy** (deliberately closed), `whatsapp_login_enabled()` being callable
+before sign-in (the login screen needs it), and **leaked-password protection**,
+which needs the paid plan you will move to before production. All **89**
+staff and customer functions the security advisor lists were read: **none is
+ungated**. Detail: [`MIGRATIONS.md`](MIGRATIONS.md) §69.
+
+**It is a database change only. No deploy is implied.**
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** Nothing changes in Production on merge.
+2. **Apply `20261017120000` by name**, after re-hashing the merged copy against
+   [`MIGRATIONS.md`](MIGRATIONS.md) §69 and after the read-only checks listed
+   there. Never "the outstanding migrations": once merged it is the only
+   unapplied file (read live 2026-11-18), and an instruction that names no
+   version is still not an instruction to apply it.
+3. **Check afterwards**, read-only, as §69 lists: the policy's new text, the 21
+   indexes, the money-path pair, and the performance advisor at 0 for both
+   findings.
+
+**Done looks like:** §69 marked APPLIED with ledger row 122 filled in.
+
+**Not decided here, still yours:** leaked-password protection, after the plan
+upgrade (a dashboard setting).
+
 ## Owner-action closeout rule
 
 When an item is completed:

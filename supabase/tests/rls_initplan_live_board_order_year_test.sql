@@ -10,6 +10,7 @@
 --
 --   CASE 1  P01#2  the three policies read (owner = (select auth.uid()))
 --                  or (select public.is_staff()); checkout_sessions untouched
+--                  here (20261017120000 wraps it later)
 --   CASE 2  P01#2  same rows for every caller: against an oracle, and against
 --                  the old policies in the same transaction
 --   CASE 3  P01#2  the plan calls is_staff() once, as an InitPlan
@@ -169,13 +170,17 @@ begin
     end if;
   end loop;
 
+  -- 20261006120000 left checkout_sessions_select_own alone, and this case used
+  -- to pin its bare text. 20261017120000_advisor_fixes later wrapped it the
+  -- same way, on purpose, so the pin now follows that file; its own suite
+  -- (advisor_fixes_test.sql) asserts the policy in full.
   select qual into v from pg_policies
    where schemaname = 'public' and tablename = 'checkout_sessions' and policyname = 'checkout_sessions_select_own';
-  if v is distinct from '((customer_id = auth.uid()) OR is_staff())' then
+  if v is distinct from '((customer_id = ( SELECT auth.uid() AS uid)) OR ( SELECT is_staff() AS is_staff))' then
     raise exception 'CASE 1 FAILED: checkout_sessions_select_own reads %', coalesce(v, 'NULL');
   end if;
 
-  raise notice 'CASE 1 ok: three own-or-staff policies wrap is_staff(); checkout_sessions unchanged';
+  raise notice 'CASE 1 ok: three own-or-staff policies wrap is_staff(); checkout_sessions wrapped by 20261017120000';
 end $$;
 
 
