@@ -4,9 +4,10 @@ import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The public Supabase key the app ships: publishable once configured, legacy
- * anon until then (docs/SUPABASE_API_KEYS.md). env.ts reads `process.env` at
- * module load, so each case sets the environment and re-imports the module.
+ * The public Supabase key the app ships: the publishable key, and nothing else.
+ * Step 9 of docs/SUPABASE_API_KEYS.md §3 removed the legacy anon fallback; the
+ * cases that pinned it now pin its absence. env.ts reads `process.env` at module
+ * load, so each case sets the environment and re-imports the module.
  */
 
 const LEGACY = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig';
@@ -24,50 +25,56 @@ afterEach(() => {
 });
 
 describe('SUPABASE_PUBLIC_KEY', () => {
-  it('is the legacy anon key, unchanged, while no publishable key is set', async () => {
-    const env = await load({
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: LEGACY,
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined,
-    });
-    expect(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY).toBeUndefined();
-    expect(env.SUPABASE_PUBLIC_KEY).toBe(LEGACY);
-  });
-
-  it('is empty, and the app reports itself unconfigured, when neither key is set', async () => {
+  it('is the publishable key', async () => {
     const env = await load({
       EXPO_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: undefined,
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE,
+    });
+    expect(env.SUPABASE_PUBLIC_KEY).toBe(PUBLISHABLE);
+    expect(env.isSupabaseConfigured).toBe(true);
+  });
+
+  it('NEVER falls back to the legacy anon key: the app reports itself unconfigured', async () => {
+    const env = await load({
+      EXPO_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: LEGACY,
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined,
     });
     expect(env.SUPABASE_PUBLIC_KEY).toBe('');
     expect(env.isSupabaseConfigured).toBe(false);
   });
 
-  it('is the publishable key once it is set', async () => {
-    const env = await load({
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: LEGACY,
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: PUBLISHABLE,
-    });
-    expect(env.SUPABASE_PUBLIC_KEY).toBe(PUBLISHABLE);
-  });
-
-  it('falls back on an EMPTY publishable value rather than shipping no key', async () => {
+  it('is empty, and the app reports itself unconfigured, when no key is set', async () => {
     const env = await load({
       EXPO_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: LEGACY,
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: '',
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined,
     });
-    expect(env.SUPABASE_PUBLIC_KEY).toBe(LEGACY);
-    expect(env.isSupabaseConfigured).toBe(true);
+    expect(env.SUPABASE_PUBLIC_KEY).toBe('');
+    expect(env.isSupabaseConfigured).toBe(false);
+  });
+
+  it('treats an empty or non-publishable value as missing rather than shipping it', async () => {
+    for (const value of ['', '  ', LEGACY, 'sb_secret_abc123']) {
+      const env = await load({
+        EXPO_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        EXPO_PUBLIC_SUPABASE_ANON_KEY: LEGACY,
+        EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: value,
+      });
+      expect(env.SUPABASE_PUBLIC_KEY, value).toBe('');
+      expect(env.isSupabaseConfigured, value).toBe(false);
+    }
   });
 });
 
 describe('the key is read in the shape Expo inlines', () => {
-  it('uses direct process.env.EXPO_PUBLIC_* member expressions for both variables', () => {
-    const src = readFileSync(resolve(__dirname, 'env.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(src).toMatch(
-      /process\.env\.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY\s*\|\|\s*process\.env\.EXPO_PUBLIC_SUPABASE_ANON_KEY/,
-    );
+  const src = () => readFileSync(resolve(__dirname, 'env.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('uses a direct process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY member expression', () => {
+    expect(src()).toMatch(/process\.env\.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY\b/);
+  });
+
+  it('does not read the legacy anon variable at all', () => {
+    expect(src()).not.toMatch(/EXPO_PUBLIC_SUPABASE_ANON_KEY/);
   });
 });
 
@@ -87,10 +94,40 @@ describe('eas.json ships the publishable key in every build profile', () => {
     });
   }
 
+  for (const profile of ['development', 'preview', 'production']) {
+    it(`${profile}: no legacy anon key, and no JWT of any kind`, () => {
+      const env = eas.build[profile]?.env ?? {};
+      expect(Object.keys(env)).not.toContain('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+      for (const value of Object.values(env)) expect(value).not.toMatch(/^eyJ/);
+    });
+  }
+
   it('uses the same publishable key in all three profiles', () => {
     const keys = ['development', 'preview', 'production'].map(
       (p) => eas.build[p]?.env?.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     );
     expect(new Set(keys).size).toBe(1);
+  });
+});
+
+describe('the /app web export falls back to the same publishable key', () => {
+  // apps/mobile/scripts/export-web.js used to fall back to the legacy anon JWT
+  // when Vercel set nothing. It now falls back to the publishable key the EAS
+  // profiles ship, so /app can never build with a deactivated key.
+  const script = readFileSync(resolve(__dirname, '../../scripts/export-web.js'), 'utf8');
+  const eas = JSON.parse(readFileSync(resolve(__dirname, '../../eas.json'), 'utf8')) as {
+    build: Record<string, { env?: Record<string, string> }>;
+  };
+
+  it('defaults EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY to the eas.json value', () => {
+    const m = script.match(
+      /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY:\s*process\.env\.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY\s*\|\|\s*'([^']+)'/,
+    );
+    expect(m?.[1]).toBe(eas.build.production?.env?.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  });
+
+  it('no longer sets or reads the legacy anon variable', () => {
+    expect(script).not.toMatch(/EXPO_PUBLIC_SUPABASE_ANON_KEY/);
+    expect(script).not.toMatch(/eyJhbGci/);
   });
 });

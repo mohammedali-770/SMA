@@ -174,7 +174,12 @@ lives only in `integration_settings`; the admin UI reads the non-secret projecti
   (RLS + no grant); `list/upsert_integration_settings` return only `has_secret`; no
   RPC or query returns `secret_config`. The leaked Lazywait test token is **absent
   from the working tree and full git history**. The `eas.json` JWT is the public
-  **anon** key (`role:anon`), public by design.
+  **anon** key (`role:anon`), public by design. *Superseded by the step 9
+  cleanup of `docs/SUPABASE_API_KEYS.md` §3 (2026-11-18, merged only after the
+  legacy keys were deactivated): `eas.json` and the `/app` export carry only the
+  publishable key (`sb_publishable_…`), equally public by design, and
+  `legacyKeyGuard.test.ts` fails if a legacy key JWT for this project appears
+  anywhere in the tree.*
 - **Order integrity:** `place_order` binds `customer_id = auth.uid()`, recomputes
   subtotal/VAT/coupon/delivery/loyalty from the DB, prices from `products.price`,
   validates branch/product availability, forces `payment_status='pending'`,

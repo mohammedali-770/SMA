@@ -582,7 +582,13 @@ safety-critical.
 through `isServiceCall` in `supabase/functions/_shared/apiKeys.ts`, not a
 hand-rolled comparison: the legacy `Authorization: Bearer <service_role>` or an
 opaque `sb_secret_…` key on `apikey`, compared in constant time. Both are
-accepted during the cut-over so deploys need not be atomic. Nothing about the
+accepted during the cut-over so deploys need not be atomic.
+
+**Changed by the step 9 cleanup (2026-11-18, merged only after step 8 held):**
+only the `sb_secret_…` key on `apikey` is accepted. The legacy Bearer is refused,
+and a function with no `SUPABASE_SECRET_KEYS` refuses to build its service
+client. The bundle changes, so `admin-push-dispatch` needs its own redeploy
+(`docs/SUPABASE_API_KEYS.md` §3, step 9). Nothing about the
 admin-only audience, the subscription store or the customer-channel separation
 changes. Steps: `docs/SUPABASE_API_KEYS.md`; pinned by
 `adminPushWiring.test.ts` ("accepts the service role only through the shared

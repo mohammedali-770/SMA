@@ -115,18 +115,25 @@ Typical public variables include:
 
 ```text
 VITE_SUPABASE_URL
-VITE_SUPABASE_ANON_KEY
+VITE_SUPABASE_PUBLISHABLE_KEY
 EXPO_PUBLIC_SUPABASE_URL
-EXPO_PUBLIC_SUPABASE_ANON_KEY
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 ```
+
+The legacy `VITE_SUPABASE_ANON_KEY` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` are no
+longer read: step 9 of `docs/SUPABASE_API_KEYS.md` removed the fallback, and
+removing `VITE_SUPABASE_ANON_KEY` from Vercel after that merge is an owner step
+(§5 there).
 
 Map-provider variables depend on the currently selected provider/configuration; use the checked-in `.env.example` files and `docs/MAPS.md` rather than copying a stale key list from this document.
 
 ### A production console build without its Supabase settings fails (since 2026-11-12)
 
 `vite build` refuses to build when Vercel sets `VERCEL_ENV=production` and the
-console has no `VITE_SUPABASE_URL`, or neither `VITE_SUPABASE_PUBLISHABLE_KEY`
-nor `VITE_SUPABASE_ANON_KEY` (either key is enough, as at run time). The error
+console has no `VITE_SUPABASE_URL`, or no `VITE_SUPABASE_PUBLISHABLE_KEY` that
+starts with `sb_publishable_`. Since step 9 of `docs/SUPABASE_API_KEYS.md` the
+legacy `VITE_SUPABASE_ANON_KEY` no longer satisfies it, exactly as at run time.
+Until then, either key was enough. The error
 names what is missing. `supabaseBuildGuard` in `src/lib/supabaseKey.ts` decides,
 and `vite.config.ts` calls it for every build.
 

@@ -5,9 +5,10 @@
 // Every other check on an Edge Function reads its source or runs an extracted
 // helper; this calls the real request handler. The gateway is small and sits on
 // an authorization boundary — a cron job's Vault secret on one side, the
-// service-role key on the other — so each branch is pinned: method, missing
-// configuration, missing secret, refused secret, RPC error, the forward in both
-// key formats, and an unreachable processor.
+// service key on the other — so each branch is pinned: method, missing
+// configuration (a legacy-only environment included), missing secret, refused
+// secret, RPC error, the forward with the secret key, and an unreachable
+// processor.
 //
 // NO NETWORK. `fetch` is replaced for each test, so the Supabase RPC and the
 // call to account-delete-process are answered here and recorded. The suite is
@@ -22,7 +23,7 @@ const URL_ = 'https://project.example';
 const RPC_PATH = '/rest/v1/rpc/verify_account_deletion_process_secret';
 const PROCESS_PATH = '/functions/v1/account-delete-process';
 const LEGACY_KEY = 'legacy-service-role-jwt';
-const OPAQUE_KEY = 'sb_secret_testonly';
+const SECRET_KEY = 'sb_secret_testonly';
 const ENV_NAMES = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEYS'];
 
 interface Call {
@@ -91,10 +92,10 @@ const post = (headers: Record<string, string> = {}) =>
 const jsonResponse = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-const LEGACY_ENV = { SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: LEGACY_KEY };
+const ENV = { SUPABASE_URL: URL_, SUPABASE_SECRET_KEYS: JSON.stringify({ default: SECRET_KEY }) };
 
 Deno.test('OPTIONS answers the CORS preflight and calls nothing', async () => {
-  await withRuntime(LEGACY_ENV, {}, async (calls) => {
+  await withRuntime(ENV, {}, async (calls) => {
     const res = await handler(new Request('https://edge.example/x', { method: 'OPTIONS' }));
     assertEquals(res.status, 200, 'status');
     assertEquals(await res.text(), 'ok', 'body');
@@ -107,7 +108,7 @@ Deno.test('OPTIONS answers the CORS preflight and calls nothing', async () => {
 });
 
 Deno.test('any method but POST is 405 and calls nothing', async () => {
-  await withRuntime(LEGACY_ENV, {}, async (calls) => {
+  await withRuntime(ENV, {}, async (calls) => {
     for (const method of ['GET', 'PUT', 'DELETE']) {
       const res = await handler(
         new Request('https://edge.example/x', { method, headers: { 'x-process-secret': 's' } }),
@@ -119,16 +120,21 @@ Deno.test('any method but POST is 405 and calls nothing', async () => {
   });
 });
 
-Deno.test('missing SUPABASE_URL or service key is 503 before anything is read or sent', async () => {
+Deno.test('missing SUPABASE_URL or secret key is 503 before anything is read or sent', async () => {
+  // The legacy service_role key is no longer a fallback (docs/SUPABASE_API_KEYS.md
+  // §3 step 9): an environment that holds only it is unconfigured, as is a
+  // secret map whose only entry is a legacy JWT.
   const partial: Record<string, string>[] = [
-    { SUPABASE_SERVICE_ROLE_KEY: LEGACY_KEY },
+    { SUPABASE_SECRET_KEYS: JSON.stringify({ default: SECRET_KEY }) },
     { SUPABASE_URL: URL_ },
+    { SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: LEGACY_KEY },
+    { SUPABASE_URL: URL_, SUPABASE_SECRET_KEYS: JSON.stringify({ default: LEGACY_KEY }) },
     {},
   ];
   for (const env of partial) {
     await withRuntime(env, {}, async (calls) => {
       const res = await handler(post({ 'x-process-secret': 's' }));
-      assertEquals(res.status, 503, `status with ${Object.keys(env).join('+') || 'nothing'} set`);
+      assertEquals(res.status, 503, `status with ${JSON.stringify(env)}`);
       assertEquals(await res.json(), { error: 'scheduler_unavailable' }, 'body');
       assertEquals(calls.length, 0, 'requests made');
     });
@@ -136,7 +142,7 @@ Deno.test('missing SUPABASE_URL or service key is 503 before anything is read or
 });
 
 Deno.test('no x-process-secret is 403 without asking the database', async () => {
-  await withRuntime(LEGACY_ENV, {}, async (calls) => {
+  await withRuntime(ENV, {}, async (calls) => {
     const res = await handler(post());
     assertEquals(res.status, 403, 'status');
     assertEquals(await res.json(), { error: 'Forbidden' }, 'body');
@@ -145,7 +151,7 @@ Deno.test('no x-process-secret is 403 without asking the database', async () => 
 });
 
 Deno.test('a secret the RPC refuses is 403, and the processor is never called', async () => {
-  await withRuntime(LEGACY_ENV, { [RPC_PATH]: () => jsonResponse(false) }, async (calls) => {
+  await withRuntime(ENV, { [RPC_PATH]: () => jsonResponse(false) }, async (calls) => {
     const res = await handler(post({ 'x-process-secret': 'wrong-secret' }));
     assertEquals(res.status, 403, 'status');
     assertEquals(await res.json(), { error: 'Forbidden' }, 'body');
@@ -161,7 +167,7 @@ Deno.test('a secret the RPC refuses is 403, and the processor is never called', 
 Deno.test('an RPC error is 403, not a forward', async () => {
   const rpcError = () =>
     jsonResponse({ code: '42501', message: 'permission denied', details: null, hint: null }, 401);
-  await withRuntime(LEGACY_ENV, { [RPC_PATH]: rpcError }, async (calls) => {
+  await withRuntime(ENV, { [RPC_PATH]: rpcError }, async (calls) => {
     const res = await handler(post({ 'x-process-secret': 's' }));
     assertEquals(res.status, 403, 'status');
     assertEquals(calls.length, 1, 'requests made');
@@ -169,7 +175,7 @@ Deno.test('an RPC error is 403, not a forward', async () => {
 });
 
 Deno.test('an RPC answer that is truthy but not `true` is still 403', async () => {
-  await withRuntime(LEGACY_ENV, { [RPC_PATH]: () => jsonResponse('true') }, async (calls) => {
+  await withRuntime(ENV, { [RPC_PATH]: () => jsonResponse('true') }, async (calls) => {
     const res = await handler(post({ 'x-process-secret': 's' }));
     assertEquals(res.status, 403, 'status');
     assertEquals(calls.length, 1, 'requests made');
@@ -177,10 +183,10 @@ Deno.test('an RPC answer that is truthy but not `true` is still 403', async () =
 });
 
 Deno.test(
-  'an accepted secret forwards to the processor with the legacy key, and relays its answer',
+  'an accepted secret forwards to the processor with the secret key, and relays its answer',
   async () => {
     await withRuntime(
-      LEGACY_ENV,
+      ENV,
       {
         [RPC_PATH]: () => jsonResponse(true),
         [PROCESS_PATH]: () =>
@@ -198,15 +204,12 @@ Deno.test(
 
         assertEquals(calls.length, 2, 'requests made');
         const [rpc, forward] = calls;
-        assertEquals(rpc.headers.get('Authorization'), `Bearer ${LEGACY_KEY}`, 'RPC bearer (legacy)');
+        assertEquals(rpc.headers.get('apikey'), SECRET_KEY, 'RPC apikey');
+        assertEquals(rpc.headers.get('Authorization'), null, 'RPC bearer');
         assertEquals(forward.url, `${URL_}${PROCESS_PATH}`, 'processor URL');
         assertEquals(forward.method, 'POST', 'processor method');
-        assertEquals(forward.headers.get('apikey'), LEGACY_KEY, 'processor apikey');
-        assertEquals(
-          forward.headers.get('Authorization'),
-          `Bearer ${LEGACY_KEY}`,
-          'processor bearer (legacy)',
-        );
+        assertEquals(forward.headers.get('apikey'), SECRET_KEY, 'processor apikey');
+        assertEquals(forward.headers.get('Authorization'), null, 'processor bearer');
         assertEquals(forward.headers.get('x-process-secret'), null, 'the Vault secret is not passed on');
         assertEquals(JSON.parse(forward.body), { source: 'account-delete-scheduler' }, 'processor body');
       },
@@ -214,9 +217,9 @@ Deno.test(
   },
 );
 
-Deno.test('with an opaque secret key, neither request carries it as a bearer', async () => {
+Deno.test('neither request carries the secret key as a bearer', async () => {
   await withRuntime(
-    { SUPABASE_URL: URL_, SUPABASE_SECRET_KEYS: JSON.stringify({ default: OPAQUE_KEY }) },
+    ENV,
     {
       [RPC_PATH]: () => jsonResponse(true),
       // Bytes, not a string: a string body would get text/plain by default.
@@ -232,9 +235,9 @@ Deno.test('with an opaque secret key, neither request carries it as a bearer', a
       );
       assertEquals(calls.length, 2, 'requests made');
       for (const call of calls) {
-        assertEquals(call.headers.get('apikey'), OPAQUE_KEY, `${new URL(call.url).pathname} apikey`);
+        assertEquals(call.headers.get('apikey'), SECRET_KEY, `${new URL(call.url).pathname} apikey`);
         assert(
-          !(call.headers.get('Authorization') ?? '').includes(OPAQUE_KEY),
+          !(call.headers.get('Authorization') ?? '').includes(SECRET_KEY),
           `${new URL(call.url).pathname} sent the opaque key as a bearer`,
         );
       }
@@ -244,7 +247,7 @@ Deno.test('with an opaque secret key, neither request carries it as a bearer', a
 
 Deno.test('an unreachable processor is 502', async () => {
   await withRuntime(
-    LEGACY_ENV,
+    ENV,
     {
       [RPC_PATH]: () => jsonResponse(true),
       [PROCESS_PATH]: () => {

@@ -1,6 +1,6 @@
 /**
  * Web export wrapper: injects the PUBLIC client env (same shippable values as
- * the eas.json build env — the anon key is public by design; RLS is the
+ * the eas.json build env — the publishable key is public by design; RLS is the
  * security boundary) and runs the Expo static export. A committed script is
  * used instead of a .env file because the repo gitignores .env* everywhere,
  * and the Vercel build must be reproducible from a clean checkout.
@@ -16,11 +16,13 @@ const env = {
   ...process.env,
   EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL
     ?? 'https://wxfmmnihidsdyemasstf.supabase.co',
-  // The legacy anon key, as the fallback. Once Vercel sets
-  // EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY it arrives through the `process.env`
-  // spread above and wins in src/lib/env.ts — docs/SUPABASE_API_KEYS.md.
-  EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
-    ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4Zm1tbmloaWRzZHllbWFzc3RmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NzM3MzIsImV4cCI6MjA5OTA0OTczMn0.F4xEfsAXqvGfXvcaEqzdrbWi5RoTJBVYo4OophZYeKo',
+  // The publishable key, as the fallback — the same public value all three
+  // apps/mobile/eas.json profiles ship. Vercel's EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  // wins when it is set and non-empty. The legacy anon JWT that used to sit here
+  // was deactivated (docs/SUPABASE_API_KEYS.md §3, steps 8 and 9); src/lib/env.ts
+  // no longer reads it at all.
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+    || 'sb_publishable_jtEVpU0zDtUg4wIm3AsvQg_ApFxMYXy',
   // Sentry (web) build metadata — PUBLIC values only. Vercel provides
   // VERCEL_ENV ('production' | 'preview') and the deploy commit sha at build
   // time; mapping them into EXPO_PUBLIC_* lets Metro inline them so the /app

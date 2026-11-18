@@ -92,7 +92,7 @@ describe.each(FUNCTIONS)('%s admin gate wiring', (fn) => {
   });
 
   it('gates AFTER resolving the user, so an expired session reads as 401', () => {
-    // supabase-js falls back to sending the anon key when a session refresh
+    // supabase-js falls back to sending the publishable key when a session refresh
     // fails. Gating before getUser() would report that as "two-factor required"
     // instead of "unauthorized" and send the admin to the wrong remedy.
     const getUser = src.indexOf('auth.getUser()');
@@ -178,6 +178,17 @@ describe('push-dispatch admin gate wiring', () => {
     // without a JWT — order-intake and lazywait-webhook depend on it.
     expect(src).toMatch(/const fromService = isServiceRoleCall\(req\);/);
     expect((src.match(/if \(!fromService\) \{/g) ?? []).length).toBe(2);
+  });
+
+  it('recognises the service ONLY through the shared secret-key check, never the legacy key', () => {
+    // Step 9 of docs/SUPABASE_API_KEYS.md §3. The service path used to accept
+    // `Authorization: Bearer <service_role>` as well; isServiceCall no longer
+    // does (executed in apiKeys.test.ts), and this receiver must not reintroduce
+    // it by reading the legacy variable or comparing a Bearer itself.
+    const c = code('push-dispatch');
+    expect(c).toContain('const isServiceRoleCall = isServiceCall;');
+    expect(c).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(c).not.toMatch(/Bearer \$\{/);
   });
 
   it('returns the decision\'s own status and message, not a flat 403', () => {

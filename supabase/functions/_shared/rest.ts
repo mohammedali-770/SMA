@@ -87,7 +87,7 @@
  * filter, so they cannot drift apart unnoticed.
  */
 
-import { publishableKey, secretKey } from './apiKeys.ts';
+import { MISSING_PUBLISHABLE_KEY, MISSING_SECRET_KEY, publishableKey, secretKey } from './apiKeys.ts';
 
 // ===========================================================================
 // Environment — the ONLY place this module touches a runtime global
@@ -131,8 +131,8 @@ export interface RestTarget {
   apikey: string;
   /**
    * Full `Authorization` header value, including the `Bearer ` prefix — or
-   * null when the identity is an opaque `sb_secret_…` key, which must travel on
-   * `apikey` alone (apiKeys.ts).
+   * null for the service identity, whose opaque `sb_secret_…` key must travel
+   * on `apikey` alone (apiKeys.ts).
    */
   authorization: string | null;
   /** True ONLY for the service-role identity. RLS is bypassed. */
@@ -150,14 +150,14 @@ function requireEnv(url: string | undefined, key: string | undefined, message: s
  *
  * Mirrors `userClient()` in `supabaseClient.ts`, including its error message, so
  * a misconfigured environment fails identically either way. supabase-js sends
- * the anon key as `apikey` and lets a caller-supplied `Authorization` win over
+ * the publishable key as `apikey` and lets a caller-supplied `Authorization` win over
  * the key-derived Bearer (`fetchWithAuth` only fills a header that is ABSENT);
  * passing the header through untouched is the same wire result.
  */
 export function callerTarget(authHeader: string): RestTarget {
   const [baseUrl, apikey] = requireEnv(
     env('SUPABASE_URL'), publishableKey()?.value,
-    'Missing SUPABASE_URL / SUPABASE_ANON_KEY',
+    MISSING_PUBLISHABLE_KEY,
   );
   return { baseUrl, apikey, authorization: authHeader, service: false };
 }
@@ -171,13 +171,13 @@ export function callerTarget(authHeader: string): RestTarget {
  * misconfigured environment have to keep the call inside their own try.
  */
 export function serviceTarget(): RestTarget {
-  const secret = secretKey();
   const [baseUrl, key] = requireEnv(
-    env('SUPABASE_URL'), secret?.value,
-    'Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY',
+    env('SUPABASE_URL'), secretKey()?.value,
+    MISSING_SECRET_KEY,
   );
-  // Legacy: unchanged wire format. Opaque: `apikey` only (apiKeys.ts point 1).
-  return { baseUrl, apikey: key, authorization: secret?.kind === 'opaque' ? null : `Bearer ${key}`, service: true };
+  // `apikey` only — an opaque key on `Authorization` is parsed as a JWT and
+  // rejected (apiKeys.ts point 1).
+  return { baseUrl, apikey: key, authorization: null, service: true };
 }
 
 // ===========================================================================

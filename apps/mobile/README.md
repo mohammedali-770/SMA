@@ -27,9 +27,9 @@ Only two **public** variables (Expo inlines `EXPO_PUBLIC_*` into the bundle):
 | Var | Meaning |
 |-----|---------|
 | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL (same project the web app uses) |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon (public) key — safe to ship; RLS is the boundary |
+| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key (`sb_publishable_…`), public, safe to ship; RLS is the boundary. The legacy anon key is no longer read (`docs/SUPABASE_API_KEYS.md` §5) |
 
-The service_role key and every provider secret (payment / SMS / push / Lazywait)
+The secret key and every provider secret (payment / SMS / push / Lazywait)
 are **never** in the app — they live server-side in `integration_settings` /
 Edge Function secrets.
 

@@ -3845,14 +3845,48 @@ then, and receivers accept both. **The steps, in this order, each a separate
    **Corrected 2026-11-18:** the July Tap-era bundles are no longer live. All 7
    payment functions are Moyasar bundles deployed 2026-11-13 (`payment-refund`
    2026-11-17), carry the new-key helper, and are byte-identical to the default
-   branch. The one direct legacy-key read left in any non-test code is
-   `_shared/paymentSync.ts:25`, the post-payment kick to `lazywait-sync`, bundled
-   into `payment-initiate`, `-verify`, `-webhook` and `-test-config`. It is idle
-   while online payment is off. This is a record of what is deployed, not a
+   branch. The one direct legacy-key read that was left in non-test code,
+   `_shared/paymentSync.ts:25` (the post-payment kick to `lazywait-sync`, bundled
+   into `payment-initiate`, `-verify`, `-webhook` and `-test-config`), is fixed
+   in the step 9 cleanup (#487). The live bundles keep the old read until those
+   four are redeployed, which is its own approval. It is idle while online
+   payment is off. This is a record of what is deployed, not a
    payment decision.
-9. A cleanup PR removes the fallbacks.
+9. A cleanup PR removes the fallbacks. *2026-11-18: written on
+   `security/legacy-key-cleanup-20261118`, not merged
+   (`SUPABASE_API_KEYS.md` §5).* **Merge only when all of these hold:**
+   - step 8 is done and has held;
+   - the logs show no legacy-key traffic;
+   - `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` are in the Edge
+     Function secrets;
+   - Vercel Production and Preview carry `VITE_SUPABASE_PUBLISHABLE_KEY`, since
+     a production build without it now fails rather than falling back.
 
-**Rollback:** reactivate the legacy keys; no redeploy needed.
+   The merge itself ships the web build (CLAUDE.md §13). After it, each of the
+   following is a separate action:
+   - **Redeploy the 17 non-payment functions** whose bundles change, as listed in
+     `SUPABASE_API_KEYS.md` §5, one at a time.
+   - **The five payment functions are not part of these redeploys.** Their
+     bundles change too, four of them through the `paymentSync.ts` fix below.
+     Redeploying them is a separate live payment action, which needs its own
+     approval. The live bundles are Moyasar bundles that already prefer the new
+     keys (read-only inventory, 2026-11-18), so step 8 does not need them
+     redeployed.
+   - **Remove `VITE_SUPABASE_ANON_KEY` from Vercel**, Production and Preview. No
+     code reads it any more.
+
+   **`_shared/paymentSync.ts` is fixed in this PR.** Its post-payment kick of
+   `lazywait-sync` used to send `SUPABASE_ANON_KEY` as `apikey`. It now sends
+   the publishable key, as `order-intake` does. The live payment bundles keep
+   the old kick until they are redeployed, and after step 8 that kick should be
+   treated as refused at the gateway. The cost is at most about a minute of POS
+   latency, and only while online payment is on: the next once-a-minute cron run
+   picks the order up.
+
+**Rollback:** up to step 8, reactivate the legacy keys; no redeploy needed. After
+step 9's redeploys, reactivating them does not help, because those functions no
+longer read a legacy key. Restore the new-key secrets, or redeploy the
+pre-step-9 bundle (`SUPABASE_API_KEYS.md` §3).
 
 ## 43. Privacy policy — device location is used for more than the delivery pin
 

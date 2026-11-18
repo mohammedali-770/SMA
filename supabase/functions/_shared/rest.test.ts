@@ -11,6 +11,7 @@ import {
   serviceTarget,
   type RestTarget,
 } from './rest.ts';
+import { MISSING_PUBLISHABLE_KEY, MISSING_SECRET_KEY } from './apiKeys.ts';
 
 /**
  * EXECUTABLE tests, not source-shape tripwires — the distinction is the reason
@@ -31,10 +32,13 @@ import {
  * 2.100.1 is the one that did.
  */
 
+const PUBLISHABLE = 'sb_publishable_test0000';
+const SECRET = 'sb_secret_test0000';
+
 const ENV: Record<string, string> = {
   SUPABASE_URL: 'https://proj.supabase.co',
-  SUPABASE_ANON_KEY: 'anon-key',
-  SUPABASE_SERVICE_ROLE_KEY: 'service-key',
+  SUPABASE_PUBLISHABLE_KEYS: JSON.stringify({ default: PUBLISHABLE }),
+  SUPABASE_SECRET_KEYS: JSON.stringify({ default: SECRET }),
 };
 
 function stubEnv(overrides: Record<string, string | undefined> = {}) {
@@ -47,7 +51,7 @@ function stubEnv(overrides: Record<string, string | undefined> = {}) {
 /** A caller target built without touching the environment. */
 const CALLER: RestTarget = {
   baseUrl: 'https://proj.supabase.co',
-  apikey: 'anon-key',
+  apikey: PUBLISHABLE,
   authorization: 'Bearer user-jwt',
   service: false,
 };
@@ -140,7 +144,7 @@ describe('restSelectMaybeSingle', () => {
   it('sends the caller identity, not a key-derived one', async () => {
     const calls = mockFetch([jsonResponse([])]);
     await restSelectMaybeSingle(CALLER, 'orders', 'id', { id: 'eq.o1' });
-    expect(headerOf(calls[0], 'apikey')).toBe('anon-key');
+    expect(headerOf(calls[0], 'apikey')).toBe(PUBLISHABLE);
     expect(headerOf(calls[0], 'Authorization')).toBe('Bearer user-jwt');
     expect(headerOf(calls[0], 'Accept-Profile')).toBe('public');
     // No Accept override: maybeSingle is a client-side rule, and asking for
@@ -402,26 +406,27 @@ describe('retry — replicated from postgrest-js rather than dropped', () => {
 describe('identities', () => {
   beforeEach(() => stubEnv());
 
-  it('callerTarget forwards the request header verbatim and uses the anon key', () => {
+  it('callerTarget forwards the request header verbatim and uses the publishable key', () => {
     const t = callerTarget('Bearer the-users-jwt');
     expect(t).toEqual({
       baseUrl: 'https://proj.supabase.co',
-      apikey: 'anon-key',
+      apikey: PUBLISHABLE,
       authorization: 'Bearer the-users-jwt',
       service: false,
     });
   });
 
-  it('serviceTarget uses the service key for BOTH headers and flags itself', () => {
+  it('serviceTarget sends the secret key on `apikey` ONLY and flags itself', () => {
     const t = serviceTarget();
-    expect(t.apikey).toBe('service-key');
-    expect(t.authorization).toBe('Bearer service-key');
+    expect(t.apikey).toBe(SECRET);
+    // An opaque key on Authorization is parsed as a JWT and rejected.
+    expect(t.authorization).toBeNull();
     expect(t.service).toBe(true);
   });
 
   it('never lets the service key become a caller identity', () => {
-    expect(callerTarget('Bearer u').apikey).not.toBe('service-key');
-    expect(callerTarget('Bearer u').authorization).not.toContain('service-key');
+    expect(callerTarget('Bearer u').apikey).not.toBe(SECRET);
+    expect(callerTarget('Bearer u').authorization).not.toContain(SECRET);
   });
 
   it('trims a trailing slash so the path never doubles up', () => {
@@ -429,22 +434,35 @@ describe('identities', () => {
     expect(callerTarget('Bearer u').baseUrl).toBe('https://proj.supabase.co');
   });
 
-  it('throws the SAME messages the supabase-js factories threw', () => {
+  it('throws the SAME messages the supabase-js factories throw', () => {
     // Parity matters: `serviceTarget()` throwing is what order-intake's try/catch
     // is written around, and `callerTarget()` throwing is what a misconfigured
     // environment has always produced.
-    stubEnv({ SUPABASE_ANON_KEY: undefined });
-    expect(() => callerTarget('Bearer u')).toThrow('Missing SUPABASE_URL / SUPABASE_ANON_KEY');
-    stubEnv({ SUPABASE_SERVICE_ROLE_KEY: undefined });
-    expect(() => serviceTarget()).toThrow('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+    stubEnv({ SUPABASE_PUBLISHABLE_KEYS: undefined });
+    expect(() => callerTarget('Bearer u')).toThrow(MISSING_PUBLISHABLE_KEY);
+    stubEnv({ SUPABASE_SECRET_KEYS: undefined });
+    expect(() => serviceTarget()).toThrow(MISSING_SECRET_KEY);
+  });
+
+  it('fails closed on the legacy keys: they are never read, so they cannot stand in', () => {
+    // Step 9 of docs/SUPABASE_API_KEYS.md §3: the fallback is gone. An
+    // environment that still carries only the legacy variables is unconfigured.
+    stubEnv({
+      SUPABASE_PUBLISHABLE_KEYS: undefined,
+      SUPABASE_SECRET_KEYS: undefined,
+      SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiJ9.legacy-anon.sig',
+      SUPABASE_SERVICE_ROLE_KEY: 'eyJhbGciOiJIUzI1NiJ9.legacy-service.sig',
+    });
+    expect(() => callerTarget('Bearer u')).toThrow(MISSING_PUBLISHABLE_KEY);
+    expect(() => serviceTarget()).toThrow(MISSING_SECRET_KEY);
   });
 });
 
 describe('restProviderConfig', () => {
   const SERVICE: RestTarget = {
     baseUrl: 'https://proj.supabase.co',
-    apikey: 'service-key',
-    authorization: 'Bearer service-key',
+    apikey: SECRET,
+    authorization: null,
     service: true,
   };
 
@@ -461,7 +479,7 @@ describe('restProviderConfig', () => {
     expect(url.pathname).toBe('/rest/v1/integration_settings');
     expect(url.searchParams.get('select')).toBe('enabled,provider_name,public_config,secret_config');
     expect(url.searchParams.get('provider_type')).toBe('eq.lazywait');
-    expect(headerOf(calls[0], 'apikey')).toBe('service-key');
+    expect(headerOf(calls[0], 'apikey')).toBe(SECRET);
     expect(cfg).toEqual({
       enabled: true,
       providerName: 'lazywait',

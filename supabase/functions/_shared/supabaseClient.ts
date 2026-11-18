@@ -1,6 +1,12 @@
 import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
-import { publishableKey, secretKey, withoutOpaqueBearer } from './apiKeys.ts';
+import {
+  MISSING_PUBLISHABLE_KEY,
+  MISSING_SECRET_KEY,
+  publishableKey,
+  secretKey,
+  withoutOpaqueBearer,
+} from './apiKeys.ts';
 
 /**
  * SERVER-SIDE ONLY service-role client. Bypasses RLS — used by webhooks / sync
@@ -21,14 +27,14 @@ import { publishableKey, secretKey, withoutOpaqueBearer } from './apiKeys.ts';
  */
 export function adminClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL');
-  // The `default` secret key once the project has one, else the legacy
-  // service_role key — see apiKeys.ts for why both, and why an opaque key must
-  // not ride on `Authorization`.
+  // The `default` secret key from SUPABASE_SECRET_KEYS. There is no legacy
+  // fallback: without one this throws, and the function refuses to run. See
+  // apiKeys.ts for why an opaque key must not ride on `Authorization`.
   const key = secretKey();
-  if (!url || !key) throw new Error('Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !key) throw new Error(MISSING_SECRET_KEY);
   return createClient(url, key.value, {
     auth: { persistSession: false, autoRefreshToken: false },
-    ...(key.kind === 'opaque' ? { global: { fetch: withoutOpaqueBearer() } } : {}),
+    global: { fetch: withoutOpaqueBearer() },
   });
 }
 
@@ -40,14 +46,14 @@ export function adminClient(): SupabaseClient {
 export function userClient(authHeader: string | null): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL');
   const key = publishableKey();
-  if (!url || !key) throw new Error('Missing SUPABASE_URL / SUPABASE_ANON_KEY');
+  if (!url || !key) throw new Error(MISSING_PUBLISHABLE_KEY);
   return createClient(url, key.value, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       headers: authHeader ? { Authorization: authHeader } : {},
       // Strips only a `Bearer sb_…` that supabase-js adds when there is no user
       // header; a forwarded user JWT is untouched.
-      ...(key.kind === 'opaque' ? { fetch: withoutOpaqueBearer() } : {}),
+      fetch: withoutOpaqueBearer(),
     },
   });
 }
