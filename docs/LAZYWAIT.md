@@ -490,10 +490,19 @@ instead of the live config row.) Field-by-field state:
     database) showed Lazywait stored our line verbatim, `amount: 221` included,
     and itself recorded `is_paid: true`, `received_amount: 221`, `balance: 0`.
     The order was the only line; `update-online-payment` had added nothing. So
-    the list reads a different field per line. The line now also carries
-    **`Trans_Amount`** (same value), the name Lazywait's own payment call uses
-    for the paid amount. If the list still reads 0, the next step is to read
-    back an order a cashier settled at the till and copy its line.
+    the list reads a different field per line. `Trans_Amount` was tried next
+    (#509, POS #9) and the list still read 0.00.
+  - **Measured, not guessed (owner's idea, 2026-11-19):** one probe order
+    (POS **#10**, "TEST - DO NOT PREPARE", 13.00, created straight through
+    `pg_net` on owner approval, no deploy) carried a single line with eleven
+    candidate fields, each set to a distinct power of two: `amount` 0.01,
+    `Trans_Amount` 0.02, `paid` 0.04, `paid_amount` 0.08, `amount_paid` 0.16,
+    `payment_amount` 0.32, `value` 0.64, `total` 1.28, `received_amount` 2.56,
+    `tendered_amount` 5.12, `price` 10.24. The list showed **Paid 0.32 /
+    Remaining 12.68**: the Paid column reads **`payment_amount`** and nothing
+    else. The line now carries the order total in `payment_amount`;
+    `Trans_Amount` is dropped. Lazywait sets the order's own `received_amount`
+    to the total from `is_paid` alone, independent of every line field.
   - **The label names the card (owner, 2026-11-19):** `names` is built from
     the brand Moyasar reported (`card_scheme`) and, from the stored `raw`,
     whether it came through Apple Pay: `MADA`/«مدى», `VISA`/«فيزا»,

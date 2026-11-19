@@ -96,13 +96,14 @@ export function posOrderPayments(
   const entry: Record<string, unknown> = {
     names: posPaymentNames(record.card_scheme, sourceTypeOf(record.raw)),
     amount,
-    // Read back from Lazywait (GET /pos/order, order #8, 2026-11-19): it
-    // stored this line verbatim, `amount` included, and set received_amount
-    // 221 / balance 0 / is_paid true on the order, yet the POS list still
-    // showed Paid 0.00. The list evidently reads another field from each line.
-    // `Trans_Amount` is the name Lazywait's own payment call uses for the paid
-    // amount (update-online-payment), so the same value is sent under both.
-    Trans_Amount: amount,
+    // The POS list's Paid column reads `payment_amount`, MEASURED rather than
+    // guessed (2026-11-19). A probe order (#10) carried one line with eleven
+    // candidate fields set to distinct powers of two (0.01, 0.02, 0.04 ...);
+    // the list showed Paid 0.32 / Remaining 12.68 on a 13.00 order, and 0.32
+    // was `payment_amount` alone. `amount` and `Trans_Amount` (tried in #509)
+    // are stored but not counted. `amount` stays: Lazywait keeps it verbatim
+    // and dropping a field it already holds gains nothing.
+    payment_amount: amount,
     Card_Type: posCardType(record.card_scheme),
     Card_Number: maskedCardNumber(record.card_last_four),
     status: 'approved',
