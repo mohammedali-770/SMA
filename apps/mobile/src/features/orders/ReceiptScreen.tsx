@@ -39,11 +39,12 @@ import { openDirections } from '../../lib/openDirections';
 import { isCompletedForReview, shouldRequestReview } from '../onboarding/firstRun';
 import { markReviewAsked, readFirstRun } from '../onboarding/firstRunStore';
 import { requestStoreReview } from '../onboarding/storeReview';
-import { isTerminalOrderStatus, nextReceiptPollMs } from './ordersRefresh';
+import { startReceiptPolling } from './ordersRefresh';
 import { mapOrder } from '../../lib/mappers';
 import { ConfirmationHero } from './view/ConfirmationHero';
 import { orderConfirmationState } from './orderConfirmation';
-import { RECEIPT_WAIT_FOR_NUMBER_MS, showFullReceipt } from './receiptGate';
+import { awaitingBranchNumber } from './receiptGate';
+import { OrderWaitingView } from './view/OrderWaitingView';
 import { ReceiptBody } from './view/ReceiptBody';
 import { ReceiptSkeleton } from './view/Skeletons';
 import type { Order } from '../../types/models';
@@ -104,25 +105,13 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   // fast phase is bounded.
   useFocusEffect(useCallback(() => {
     if (orderRef.current) void refreshSilently();
-    const focusedAt = Date.now();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let cancelled = false;
-
-    const schedule = () => {
-      const current = orderRef.current;
-      if (!current) return;
-      const delay = nextReceiptPollMs(current, Date.now() - focusedAt);
-      if (delay == null) return;  // terminal — stop entirely
-      timer = setTimeout(() => {
-        if (cancelled) return;
-        const now = orderRef.current;
-        if (now && !isTerminalOrderStatus(now.status)) void refreshSilently();
-        schedule();
-      }, delay);
-    };
-    schedule();
-
-    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+    // startReceiptPolling does not need the order to be loaded yet: before
+    // 2026-11-18 this effect returned early without one, and on a fresh
+    // receipt the poll never started (ordersRefresh.ts).
+    return startReceiptPolling({
+      getOrder: () => orderRef.current,
+      refresh: () => { void refreshSilently(); },
+    });
   }, [refreshSilently]));
 
   /**
@@ -198,32 +187,24 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     }
   }, [orderId, refreshSilently, resending, t]);
 
-  // Hold the page until the branch's order number exists (receiptGate.ts):
-  // the skeleton stays up while the order is being sent, bounded so a slow POS
-  // never strands the customer. `waitStart` is when this screen first saw the
-  // in-flight state; the timeout only forces one re-render at the bound.
-  const state = order ? orderConfirmationState(order) : null;
-  const [waitStart, setWaitStart] = useState<number | null>(null);
-  const [, setWaitTick] = useState(0);
-  useEffect(() => {
-    if (state === 'sending_to_branch' && waitStart == null) setWaitStart(Date.now());
-  }, [state, waitStart]);
-  useEffect(() => {
-    if (waitStart == null) return undefined;
-    const t = setTimeout(() => setWaitTick((n) => n + 1), RECEIPT_WAIT_FOR_NUMBER_MS);
-    return () => clearTimeout(t);
-  }, [waitStart]);
-  const holdForNumber = state != null && !showFullReceipt(state, waitStart == null ? 0 : Date.now() - waitStart);
+  // The order page appears only with the branch's order number; until then
+  // the customer sees the waiting window (receiptGate.ts, OrderWaitingView).
+  const waiting = order != null && awaitingBranchNumber(orderConfirmationState(order));
 
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.appBg}>
-      {loading || holdForNumber ? (
+      {loading ? (
         // Shaped like the loaded receipt so the first paint lands without a
         // jump. Rendered in the same `loading` branch; silent refreshes never
         // re-enter it.
         <ReceiptSkeleton />
       ) : error || !order ? (
         <ErrorView message={error ?? t('somethingWentWrong')} onRetry={load} retryLabel={t('retry')} icon={<AlertIcon />} />
+      ) : waiting ? (
+        <OrderWaitingView
+          paid={order.paymentStatus === 'paid' && order.paymentMethod === 'online'}
+          onViewOrders={() => leave('/(tabs)/orders')}
+        />
       ) : (
         <View style={styles.flex}>
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
