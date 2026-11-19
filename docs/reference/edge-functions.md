@@ -97,6 +97,8 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/paymentTestCheckout.ts`
 - `_shared/paymentVerifyTerminal.test.ts`
 - `_shared/paymentWiring.test.ts`
+- `_shared/posPaidFlag.test.ts`
+- `_shared/posPaidFlag.ts`
 - `_shared/publicHost.ts`
 - `_shared/pushDispatchTimeoutWiring.test.ts`
 - `_shared/pushPosSyncCancelled.test.ts`
