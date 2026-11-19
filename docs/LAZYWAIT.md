@@ -483,6 +483,24 @@ instead of the live config row.) Field-by-field state:
   `dropped_after_400: <reason>`. No other status is retried (a 5xx or timeout
   may have created the ticket). Pinned by `lazywaitOrderPayments.test.ts`,
   which drives the real worker.
+  - **First result (SM-2026-000111, POS #8, 08:26 UTC):** the list showed
+    payment type ONLINE CREDIT CARD but still **Paid 0.00 / Remaining 221.00**.
+    Reading the order back (`GET /pos/order`, one read-only call on owner
+    approval, made from SQL through `pg_net` so the key never left the
+    database) showed Lazywait stored our line verbatim, `amount: 221` included,
+    and itself recorded `is_paid: true`, `received_amount: 221`, `balance: 0`.
+    The order was the only line; `update-online-payment` had added nothing. So
+    the list reads a different field per line. The line now also carries
+    **`Trans_Amount`** (same value), the name Lazywait's own payment call uses
+    for the paid amount. If the list still reads 0, the next step is to read
+    back an order a cashier settled at the till and copy its line.
+  - **The label names the card (owner, 2026-11-19):** `names` is built from
+    the brand Moyasar reported (`card_scheme`) and, from the stored `raw`,
+    whether it came through Apple Pay: `MADA`/«مدى», `VISA`/«فيزا»,
+    `MASTERCARD`/«ماستركارد», `AMEX`/«أمريكان إكسبريس», or `APPLE PAY - MADA`
+    / «Apple Pay - مدى»; an unknown brand keeps ONLINE CREDIT CARD
+    (`posPaymentNames`). Measured the same day: 12 of 13 paid card payments
+    were Apple Pay on mada, 1 a Visa card.
 - **Create Order `warnings` are logged (2026-11-19).** Lazywait answers with
   `warnings` when the till would charge something other than what we sent
   (`ORDER_TOTAL_MISMATCH`, with its own figures). They were ignored; the sync
