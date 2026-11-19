@@ -102,3 +102,32 @@ describe('posWarnings: Create Order warnings, bounded for the log', () => {
     expect(typeof out === 'string' ? out.length : JSON.stringify(out).length).toBeLessThanOrEqual(1002);
   });
 });
+
+// Codex review on #508 (P1): masking digit runs in the JSON TEXT turned a
+// float like 28.749999999999996, or a millisecond timestamp, into invalid
+// JSON, and JSON.parse threw. In the worker that throw lands after the ticket
+// was created and before its reference is saved, so a created ticket was
+// treated as unconfirmed. Logging a warning must never throw.
+describe('posWarnings never throws, whatever the warning holds', () => {
+  it('keeps an ordinary float as a number', () => {
+    expect(posWarnings([{ till: { total: 28.749999999999996 } }])).toEqual([
+      { till: { total: 28.749999999999996 } },
+    ]);
+  });
+
+  it('masks a 12+ digit integer such as a millisecond timestamp, without throwing', () => {
+    expect(posWarnings([{ at: 1795071294000 }])).toEqual([{ at: '[digits]' }]);
+  });
+
+  it('masks a card-like digit run inside a string', () => {
+    expect(posWarnings([{ note: 'card 4111111111111111 seen' }])).toEqual([{ note: 'card [digits] seen' }]);
+  });
+
+  it('survives cycles, BigInt and other unserializable values', () => {
+    const cyc: Record<string, unknown> = { code: 'X' };
+    cyc.self = cyc;
+    expect(() => posWarnings([cyc])).not.toThrow();
+    expect(() => posWarnings([{ big: BigInt(1) }])).not.toThrow();
+    expect(() => posWarnings([{ f: () => 1 }])).not.toThrow();
+  });
+});

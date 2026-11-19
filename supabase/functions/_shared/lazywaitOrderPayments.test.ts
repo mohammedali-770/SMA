@@ -220,4 +220,26 @@ describe('Create Order warnings are kept in the sync log', () => {
     await tick();
     expect((recorded()[0].p_response as Row).warnings).toEqual([warning]);
   });
+
+  // Codex review on #508 (P1): a warning holding a float such as
+  // 28.749999999999996 made the first posWarnings throw AFTER the ticket was
+  // created, so the order went to confirmation_required without its POS
+  // reference. A created ticket must be recorded as synced, ref and all.
+  it('a warning with a long float or a timestamp does not stop a created ticket being recorded', async () => {
+    const warning = {
+      code: 'ORDER_TOTAL_MISMATCH',
+      sent_total: 25,
+      till: { total: 28.749999999999996 },
+      at: 1795071294000,
+    };
+    replies.push({ status: 200, body: { ...OK.body, warnings: [warning] } });
+    const res = await tick();
+    expect(res.body).toMatchObject({ synced: 1, confirmation_required: 0 });
+    const log = recorded()[0];
+    expect((log.p_patch as Row).lazywait_sync_state).toBe('synced');
+    expect((log.p_patch as Row).lazywait_ref).toBe('REF_1');
+    expect((log.p_response as Row).warnings).toEqual([
+      { code: 'ORDER_TOTAL_MISMATCH', sent_total: 25, till: { total: 28.749999999999996 }, at: '[digits]' },
+    ]);
+  });
 });

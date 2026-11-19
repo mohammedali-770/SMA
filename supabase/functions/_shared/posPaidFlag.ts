@@ -77,20 +77,41 @@ export function posOrderPayments(
  * Create Order's `warnings`, bounded for the sync log. Lazywait returns them
  * when the till would charge something other than what we sent (example:
  * `ORDER_TOTAL_MISMATCH` with `sent_total` and the till's own figures). They
- * were ignored until 2026-11-19. At most 5 entries and 1 000 characters of
- * JSON, with any run of 12+ digits masked; anything that is not an array, or
- * an empty one, gives null.
+ * were ignored until 2026-11-19. At most 5 entries; any run of 12+ digits in a
+ * string, and any number with 12+ integer digits, is masked; the whole is cut
+ * to 1 000 characters of JSON (returned as that text when cut). Anything that
+ * is not a non-empty array gives null.
+ *
+ * NEVER THROWS. In lazywait-sync this runs after a ticket was created and
+ * before its reference is saved, so a throw here would leave a created ticket
+ * looking unconfirmed. The first version masked digits in the JSON TEXT and
+ * parsed it back, which broke on a float such as 28.749999999999996 or a
+ * millisecond timestamp (Codex review on #508). Values are now cleaned as
+ * values, and any failure gives a fixed string.
  */
 export function posWarnings(raw: unknown): unknown[] | string | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const kept = raw.slice(0, 5);
-  let text: string;
   try {
-    text = JSON.stringify(kept);
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const seen = new WeakSet<object>();
+    const clean = (v: unknown, depth: number): unknown => {
+      if (typeof v === 'string') return v.replace(/\d{12,}/g, '[digits]').slice(0, 300);
+      if (typeof v === 'number') {
+        if (!Number.isFinite(v)) return null;
+        return Math.abs(Math.trunc(v)) >= 1e11 ? '[digits]' : v;
+      }
+      if (typeof v === 'boolean' || v === null) return v;
+      if (typeof v !== 'object' || depth > 4) return null;
+      if (seen.has(v)) return '[cycle]';
+      seen.add(v);
+      if (Array.isArray(v)) return v.slice(0, 20).map((x) => clean(x, depth + 1));
+      const out: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v).slice(0, 30)) out[k.slice(0, 60)] = clean(x, depth + 1);
+      return out;
+    };
+    const kept = raw.slice(0, 5).map((w) => clean(w, 0));
+    const text = JSON.stringify(kept);
+    return text.length > 1000 ? text.slice(0, 1000) : kept;
   } catch {
     return 'unserializable_warnings';
   }
-  const masked = text.replace(/\d{12,}/g, '[digits]');
-  if (masked.length > 1000) return masked.slice(0, 1000);
-  return JSON.parse(masked) as unknown[];
 }
