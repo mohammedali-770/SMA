@@ -50,18 +50,59 @@ export function posIsPaidFlag(
  * ticket goes out exactly as before. Nothing here is new to the POS: the same
  * values already reach it through update-online-payment.
  */
+/**
+ * The payment-type label the POS shows, named after the card brand Moyasar
+ * reported (owner, 2026-11-19: "give the correct payment type like mada visa
+ * master card etc if we get the info from moyasar otherwise it is okay").
+ * Moyasar's `source.company` is stored as `payment_records.card_scheme`, and
+ * `source.type` (`creditcard`, `applepay`) is in the stored `raw`. Apple Pay
+ * is named as such with its card brand. An unknown brand keeps the generic
+ * ONLINE CREDIT CARD label, which is what the owner accepted first.
+ */
+const BRAND_NAMES: Record<string, { en: string; ar: string }> = {
+  mada: { en: 'MADA', ar: 'مدى' },
+  visa: { en: 'VISA', ar: 'فيزا' },
+  master: { en: 'MASTERCARD', ar: 'ماستركارد' },
+  mastercard: { en: 'MASTERCARD', ar: 'ماستركارد' },
+  amex: { en: 'AMEX', ar: 'أمريكان إكسبريس' },
+};
+
+export function posPaymentNames(scheme: unknown, sourceType: unknown): { en: string; ar: string } {
+  const brand = typeof scheme === 'string' ? BRAND_NAMES[scheme.trim().toLowerCase()] : undefined;
+  const applePay = typeof sourceType === 'string' && sourceType.trim().toLowerCase() === 'applepay';
+  if (!brand) return applePay ? { en: 'APPLE PAY', ar: 'Apple Pay' } : { ...ONLINE_PAYMENT_NAMES };
+  return applePay ? { en: `APPLE PAY - ${brand.en}`, ar: `Apple Pay - ${brand.ar}` } : { ...brand };
+}
+
+/** `source.type` from a stored Moyasar payment (`payment_records.raw`), if present. */
+function sourceTypeOf(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const source = (raw as { source?: unknown }).source;
+  return source && typeof source === 'object' ? (source as { type?: unknown }).type : undefined;
+}
+
 export function posOrderPayments(
   paid: true | undefined,
   total: unknown,
-  record: { provider_ref?: unknown; card_scheme?: unknown; card_last_four?: unknown } | null | undefined,
+  record:
+    | { provider_ref?: unknown; card_scheme?: unknown; card_last_four?: unknown; raw?: unknown }
+    | null
+    | undefined,
 ): Array<Record<string, unknown>> | undefined {
   if (paid !== true || !record) return undefined;
   const amount = Math.round((Number(total) + Number.EPSILON) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) return undefined;
   const ref = typeof record.provider_ref === 'string' ? record.provider_ref.trim() : '';
   const entry: Record<string, unknown> = {
-    names: ONLINE_PAYMENT_NAMES,
+    names: posPaymentNames(record.card_scheme, sourceTypeOf(record.raw)),
     amount,
+    // Read back from Lazywait (GET /pos/order, order #8, 2026-11-19): it
+    // stored this line verbatim, `amount` included, and set received_amount
+    // 221 / balance 0 / is_paid true on the order, yet the POS list still
+    // showed Paid 0.00. The list evidently reads another field from each line.
+    // `Trans_Amount` is the name Lazywait's own payment call uses for the paid
+    // amount (update-online-payment), so the same value is sent under both.
+    Trans_Amount: amount,
     Card_Type: posCardType(record.card_scheme),
     Card_Number: maskedCardNumber(record.card_last_four),
     status: 'approved',

@@ -239,7 +239,7 @@ Deno.serve(async (req: Request) => {
           ? admin.from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle()
           : Promise.resolve({ data: null }),
         order.payment_method === 'online' && order.payment_status === 'paid'
-          ? admin.from('payment_records').select('id, provider_ref, card_scheme, card_last_four')
+          ? admin.from('payment_records').select('id, provider_ref, card_scheme, card_last_four, raw')
             .eq('order_id', orderId).eq('status', 'paid')
             .order('confirmed_at', { ascending: false }).limit(1)
           : Promise.resolve({ data: [] as unknown[], error: null }),

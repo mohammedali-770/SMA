@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { posIsPaidFlag, posOrderPayments, posWarnings } from './posPaidFlag.ts';
+import { posIsPaidFlag, posOrderPayments, posPaymentNames, posWarnings } from './posPaidFlag.ts';
 
 const captured = { rows: 1, lookupFailed: false };
 
@@ -36,11 +36,12 @@ describe('posIsPaidFlag: a ticket is created paid only when the payment is certa
 const record = { provider_ref: 'pay_1', card_scheme: 'visa', card_last_four: '4242' };
 
 describe('posOrderPayments: the payment line on a ticket created paid', () => {
-  it('one Online Credit Card line for the total, with the card fields', () => {
+  it('one line for the total, named after the card brand, with the card fields', () => {
     expect(posOrderPayments(true, 64.5, record)).toEqual([
       {
-        names: { en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' },
+        names: { en: 'VISA', ar: 'فيزا' },
         amount: 64.5,
+        Trans_Amount: 64.5,
         Card_Type: 'VISA',
         Card_Number: '****4242',
         status: 'approved',
@@ -50,8 +51,10 @@ describe('posOrderPayments: the payment line on a ticket created paid', () => {
     ]);
   });
 
-  it('rounds the amount to halalas', () => {
-    expect(posOrderPayments(true, '19.999', record)?.[0].amount).toBe(20);
+  it('rounds the amount to halalas, the same under both names', () => {
+    const entry = posOrderPayments(true, '19.999', record)![0];
+    expect(entry.amount).toBe(20);
+    expect(entry.Trans_Amount).toBe(20);
   });
 
   it('nothing unless the ticket is certain to be paid', () => {
@@ -75,10 +78,20 @@ describe('posOrderPayments: the payment line on a ticket created paid', () => {
     expect(entry).not.toHaveProperty('transaction_uuid');
   });
 
-  it('unknown card details still give a valid line', () => {
+  it('unknown card details still give a valid line, with the generic label', () => {
     const entry = posOrderPayments(true, 10, { provider_ref: 'p' })![0];
     expect(entry.Card_Type).toBe('CARD');
     expect(entry.Card_Number).toBe('****');
+    expect(entry.names).toEqual({ en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' });
+  });
+
+  it('Apple Pay is named from the stored Moyasar source', () => {
+    const entry = posOrderPayments(true, 10, {
+      ...record,
+      card_scheme: 'mada',
+      raw: { source: { type: 'applepay' } },
+    })![0];
+    expect(entry.names).toEqual({ en: 'APPLE PAY - MADA', ar: 'Apple Pay - مدى' });
   });
 });
 
@@ -129,5 +142,36 @@ describe('posWarnings never throws, whatever the warning holds', () => {
     expect(() => posWarnings([cyc])).not.toThrow();
     expect(() => posWarnings([{ big: BigInt(1) }])).not.toThrow();
     expect(() => posWarnings([{ f: () => 1 }])).not.toThrow();
+  });
+});
+
+describe('posPaymentNames: the payment type the POS shows', () => {
+  it.each([
+    ['mada', 'creditcard', { en: 'MADA', ar: 'مدى' }],
+    ['visa', 'creditcard', { en: 'VISA', ar: 'فيزا' }],
+    ['master', 'creditcard', { en: 'MASTERCARD', ar: 'ماستركارد' }],
+    ['mastercard', undefined, { en: 'MASTERCARD', ar: 'ماستركارد' }],
+    ['amex', 'creditcard', { en: 'AMEX', ar: 'أمريكان إكسبريس' }],
+    [' MADA ', 'creditcard', { en: 'MADA', ar: 'مدى' }],
+    ['mada', 'applepay', { en: 'APPLE PAY - MADA', ar: 'Apple Pay - مدى' }],
+    ['visa', 'ApplePay', { en: 'APPLE PAY - VISA', ar: 'Apple Pay - فيزا' }],
+  ])('%s via %s', (scheme, type, names) => {
+    expect(posPaymentNames(scheme, type)).toEqual(names);
+  });
+
+  it('an unknown brand keeps the generic label; Apple Pay without a brand says so', () => {
+    for (const scheme of [undefined, null, '', 'unionpay', 7]) {
+      expect(posPaymentNames(scheme, 'creditcard')).toEqual({
+        en: 'ONLINE CREDIT CARD',
+        ar: 'بطاقة ائتمانية',
+      });
+    }
+    expect(posPaymentNames(undefined, 'applepay')).toEqual({ en: 'APPLE PAY', ar: 'Apple Pay' });
+  });
+
+  it('never hands out the shared constant itself, so a caller cannot mutate it', () => {
+    const a = posPaymentNames(undefined, undefined);
+    a.en = 'X';
+    expect(posPaymentNames(undefined, undefined).en).toBe('ONLINE CREDIT CARD');
   });
 });

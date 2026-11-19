@@ -101,6 +101,7 @@ beforeEach(() => {
     provider_ref: 'pay_fixture_1',
     card_scheme: 'mada',
     card_last_four: '1010',
+    raw: { source: { type: 'applepay', company: 'mada' } },
     confirmed_at: new Date().toISOString(),
   });
   db.rpcs.reap_stale_lazywait_syncs = () => ({});
@@ -142,15 +143,16 @@ async function tick() {
 const recorded = () => db.rpcLog.filter((c) => c.name === 'record_lazywait_sync').map((c) => c.args);
 
 describe('a card order certain to be paid', () => {
-  it('is created paid WITH an Online Credit Card payment line for the total', async () => {
+  it('is created paid WITH a payment line for the total, named after the card and Apple Pay', async () => {
     const res = await tick();
     expect(res.body).toMatchObject({ claimed: 1, synced: 1 });
     expect(creates).toHaveLength(1);
     expect(creates[0].is_paid).toBe(true);
     expect(creates[0].order_payments).toEqual([
       {
-        names: { en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' },
+        names: { en: 'APPLE PAY - MADA', ar: 'Apple Pay - مدى' },
         amount: 25,
+        Trans_Amount: 25,
         Card_Type: 'MADA',
         Card_Number: '****1010',
         status: 'approved',
