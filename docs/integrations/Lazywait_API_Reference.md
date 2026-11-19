@@ -45,7 +45,7 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | POST | `/pos/orders/create` | `createOrder` | pickup body **C** (vendor contract 2026-08-24, dev host); delivery **[A]**, gated |
 | PUT | `/pos/orders/:order_ref` | `updateOrder` | `order_items` = **full replacement** **[A]**; `order_ref` in path only |
 | POST | `/pos/orders/update-cash-payment` | `updateCashPayment` | `Trans_Amount` **C** — Tap-frozen, typed only |
-| POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | `Trans_Amount`/`Approval_No`/`Card_Type`/`Card_Number` **C** — Tap-frozen, typed only |
+| POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | **Vendor contract confirmed 2026-11-19, see below.** Live caller is `pushLazywaitOnlinePayment` (`paymentSync.ts`); this typed builder has no caller |
 | POST | `/pos/orders/void-all` | `voidAll` | `cancelation_reason` (documented spelling) **C** |
 
 ### Menu products (6)
@@ -81,6 +81,39 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | Method | Path | Client method | Notes |
 |---|---|---|---|
 | GET | `/platform/branches` | `listBranches` | branch id mapping source |
+
+## `POST /pos/orders/update-online-payment` — vendor contract (owner-supplied 2026-11-19)
+
+Lazywait's own documentation, titled "Record Card Payment": *"Record an
+online/card payment (e.g. from a NearPay terminal) against an order. All of the
+fields below except names/driver_\* are required — a missing one returns 400
+'Missing required fields'."* The table, as published, marks `rrn`, `status`,
+`acquirer_key` and `softpos_key` optional as well, and that is what the call
+was measured against. Response: `{ "success": true }`.
+
+| Field | Type | Required | Vendor description | What we send (`paymentSync.ts`) |
+|---|---|---|---|---|
+| `client_id` | string | yes | Your client ID | the integration's client id |
+| `branch_id` | string | yes | Branch ID | the branch's `lazywait_branch_id` |
+| `order_ref` | string | yes | Order reference ID | the order's `lazywait_ref` |
+| `Trans_Amount` | number | yes | Transaction amount | the server-trusted order total |
+| `tid` | string | yes | NearPay TID | `MOYASAR-APP` (no terminal exists) |
+| `pos_terminal_id` | string | yes | POS terminal ID | `MOYASAR-APP` |
+| `nearpay_terminal_id` | string | yes | NearPay terminal UUID | `MOYASAR-APP` |
+| `Approval_No` | string | yes | Approval / auth code | Moyasar's payment id |
+| `Card_Number` | string | yes | Masked card number (example `****1234`) | `****` + the last four, or `****` alone |
+| `Card_Type` | string | yes | Card scheme (example `VISA`) | the stored scheme upper-cased (`MADA`, `VISA`), else `CARD` |
+| `transaction_uuid` | string | yes | Gateway transaction UUID — idempotency key | Moyasar's payment id |
+| `rrn` | string | no | Retrieval reference number, ≤ 64 chars | not sent |
+| `status` | string | no | `approved`, `reversed` or `refunded` | `approved` |
+| `acquirer_key` | string | no | `snb`, `surepay` or `neopaas` | not sent |
+| `softpos_key` | string | no | `nearpay`, `edfapay` or `neopaas` | not sent |
+| `names` | object | no | Localized payment-method label | `{ en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' }` |
+| `driver_name`, `driver_id` | string | no | Optional driver | not sent |
+
+**Open question for Lazywait:** whether `nearpay_terminal_id` is validated as
+a real terminal UUID. The fixed `MOYASAR-APP` is a value the vendor never
+promised to accept; the first test order after deploy answers it.
 
 ## Field casing (preserve exactly — case-sensitive)
 | Field | Where | Type |
