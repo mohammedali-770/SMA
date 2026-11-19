@@ -41,7 +41,7 @@ describe('posOrderPayments: the payment line on a ticket created paid', () => {
       {
         names: { en: 'VISA', ar: 'فيزا' },
         amount: 64.5,
-        Trans_Amount: 64.5,
+        payment_amount: 64.5,
         Card_Type: 'VISA',
         Card_Number: '****4242',
         status: 'approved',
@@ -54,7 +54,9 @@ describe('posOrderPayments: the payment line on a ticket created paid', () => {
   it('rounds the amount to halalas, the same under both names', () => {
     const entry = posOrderPayments(true, '19.999', record)![0];
     expect(entry.amount).toBe(20);
-    expect(entry.Trans_Amount).toBe(20);
+    expect(entry.payment_amount).toBe(20);
+    // Disproved by the probe order (#10): the list never read it.
+    expect(entry).not.toHaveProperty('Trans_Amount');
   });
 
   it('nothing unless the ticket is certain to be paid', () => {

@@ -238,7 +238,8 @@ Lazywait about it:
   same ticket also carries one payment line for the order total, named after
   the card (`MADA`, `VISA`, `APPLE PAY - MADA`, …; ONLINE CREDIT CARD when the
   brand is unknown), with the card scheme, masked last four and the amount as
-  both `amount` and `Trans_Amount`, because the POS list reads payment lines,
+  both `amount` and `payment_amount`, the field the POS list's Paid column
+  reads (measured with a probe order on 2026-11-19), because the list reads payment lines,
   not `is_paid`. The entry shape is undocumented, so a 400
   with it attached is retried once without it; the order always reaches the
   kitchen. Detail in `LAZYWAIT.md`.

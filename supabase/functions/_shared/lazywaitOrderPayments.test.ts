@@ -152,7 +152,7 @@ describe('a card order certain to be paid', () => {
       {
         names: { en: 'APPLE PAY - MADA', ar: 'Apple Pay - مدى' },
         amount: 25,
-        Trans_Amount: 25,
+        payment_amount: 25,
         Card_Type: 'MADA',
         Card_Number: '****1010',
         status: 'approved',
