@@ -8,7 +8,8 @@ import { describe, expect, it } from 'vitest';
  *
  * WHY THIS EXISTS. Once a card payment is confirmed, `pushLazywaitOnlinePayment`
  * (`paymentSync.ts`) sends Lazywait the order's total, Moyasar's payment id and
- * the word "card". Until 2026-11-13 the record of processing named Moyasar as
+ * the payment type "Online Credit Card" (the bare word "card" until
+ * 2026-11-19). Until 2026-11-13 the record of processing named Moyasar as
  * the only recipient of payment data, and on 2026-11-14 its ordering activity
  * (3) still did not say it. Nothing tied the request to the records, so a field
  * added to it would reach the POS with no record anywhere that it does.
@@ -40,7 +41,7 @@ const PRIVACY_DRAFT = new URL('../../../docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_
 const CUSTOMER_FIELDS: Record<string, RegExp> = {
   Trans_Amount: /order(?:'|’)s total/, // the order total, which is the amount paid
   Approval_No: /Moyasar(?:'|’)s payment id/,
-  Card_Type: /the word "card"/, // always the constant 'card'
+  Card_Type: /the words "Online Credit Card"/, // always the constant ONLINE_PAYMENT_TYPE
 };
 
 /** Our own integration identifiers: about our POS account, not the customer. */
@@ -84,7 +85,8 @@ describe('what the POS receives about a card payment', () => {
   it('means what the records say it means', () => {
     const { body } = postedFields(code(SYNC));
     expect(body).toMatch(/Trans_Amount:\s*round2\(Number\(order\.total\b/);
-    expect(body).toMatch(/Card_Type:\s*'card'/);
+    expect(body).toMatch(/Card_Type:\s*ONLINE_PAYMENT_TYPE\b/);
+    expect(code(SYNC)).toMatch(/export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';/);
     expect(body).toMatch(/Approval_No:\s*approvalNo\b/);
     // The approval number is the Moyasar PAYMENT id: the only caller passes it.
     const verify = code(VERIFY);

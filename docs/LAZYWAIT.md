@@ -477,7 +477,10 @@ instead of the live config row.) Field-by-field state:
   `update-online-payment` call had been refused with HTTP 400 on all 9 card
   orders since 2026-11-18 13:23 UTC, so every card order showed **unpaid** at
   the branch (confirmed by the owner on the POS). That call still runs after
-  payment, unchanged.
+  payment. Since the same day it sends the payment type **"Online Credit
+  Card"** (owner: "send it to Lazywait as Online Credit Card"; it was the bare
+  word `card`), and a refusal is logged with Lazywait's own code and message
+  (`paymentPushError` in `_shared/paymentSync.ts`), not just the HTTP status.
 
 ### Unmapped modifiers — folded into `details`, never dropped, never re-priced
 Only a modifier carrying a `modifiers.lazywait_addon_id` can become a contract
