@@ -175,3 +175,30 @@ describe('a refused payment push is logged with the reason', () => {
     expect(out.length).toBeLessThanOrEqual(240);
   });
 });
+
+// 2026-11-19 06:33 UTC: the log read "payment_push_400 HTTP 400". Lazywait's
+// 400 reply has no `message` field, so the client's generic fallback hid the
+// reason; the raw reply body is logged instead.
+describe('a refusal with no message logs the reply body', () => {
+  it('uses the body when the error is the generic HTTP fallback', async () => {
+    const { paymentPushError } = await import('./paymentSync.ts');
+    expect(paymentPushError({ ok: false, status: 400, code: null, error: 'HTTP 400',
+      text: '{"errors":{"Card_Type":["is required"]}}' }))
+      .toBe('payment_push_400 {"errors":{"Card_Type":["is required"]}}');
+  });
+
+  it('keeps a real message and does not add the body', async () => {
+    const { paymentPushError } = await import('./paymentSync.ts');
+    expect(paymentPushError({ ok: false, status: 400, code: null, error: 'Order not found', text: '{"x":1}' }))
+      .toBe('payment_push_400 Order not found');
+  });
+
+  it('collapses whitespace, masks long digit runs and stays bounded', async () => {
+    const { paymentPushError } = await import('./paymentSync.ts');
+    const out = paymentPushError({ ok: false, status: 400, code: null, error: 'HTTP 400',
+      text: `{\n  "card": "4111111111111111",\n  "pad": "${'y'.repeat(400)}"\n}` })!;
+    expect(out).not.toMatch(/\d{12,}/);
+    expect(out).not.toContain('\n');
+    expect(out.length).toBeLessThanOrEqual(240);
+  });
+});

@@ -241,7 +241,11 @@ Lazywait about it:
   - On 2026-11-19 the payment type changed from the bare `card` to **"Online
     Credit Card"**, the owner's choice.
   - A refusal now logs Lazywait's own code and message (`paymentPushError`), so
-    the next one says why.
+    the next one says why. The first test after that (06:33 UTC) still read only
+    `payment_push_400 HTTP 400`: Lazywait's 400 reply has no `message` field,
+    so the client's generic fallback hid it. Since the next change the raw reply
+    body is logged in that case, whitespace collapsed, long digit runs masked,
+    bounded to 240 characters.
 
 **The post-payment kick uses the publishable key (2026-11-18, #487).**
 `triggerLazywaitSyncOnce` used to send `SUPABASE_ANON_KEY` as `apikey` on its

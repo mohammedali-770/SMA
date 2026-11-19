@@ -81,11 +81,22 @@ export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';
  * Bounded to 240 characters, and any run of 12+ digits is masked, in case a
  * provider message ever echoes a card or phone number. Null on success.
  */
-export function paymentPushError(res: { ok: boolean; status: number; code?: string | null; error?: string | null }): string | null {
+export function paymentPushError(res: {
+  ok: boolean;
+  status: number;
+  code?: string | null;
+  error?: string | null;
+  text?: string | null;
+}): string | null {
   if (res.ok) return null;
   const parts = [`payment_push_${res.status}`];
   if (res.code) parts.push(String(res.code));
-  if (res.error) parts.push(String(res.error));
+  // lazywaitFetch falls back to a bare "HTTP <status>" when the reply has no
+  // `message` field, which is exactly what Lazywait's 400 does (2026-11-19).
+  // The reply body then is the only place the reason lives, so log it.
+  const generic = !res.error || /^HTTP \d{3}$/.test(String(res.error));
+  if (!generic) parts.push(String(res.error));
+  else if (res.text) parts.push(String(res.text).replace(/\s+/g, ' ').trim());
   return parts.join(' ').replace(/\d{12,}/g, '[digits]').slice(0, 240);
 }
 
