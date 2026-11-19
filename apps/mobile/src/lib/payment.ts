@@ -16,6 +16,14 @@
  * a decision made silently on their behalf. `clearIfUnavailable` is the only
  * automatic movement left, and it can only ever take a choice AWAY.
  *
+ * AMENDED 2026-11-19 (owner: "do whatever you raised"): a returning customer's
+ * OWN last choice is remembered, and preselected only when it was ONLINE. That
+ * keeps the reason above intact. A preselected online method commits the
+ * customer to nothing -- Moyasar's page still needs them to enter a card or
+ * confirm Apple Pay -- whereas cash is a promise to have money at the door, so
+ * cash is never preselected, not even when it was last used. An admin default
+ * is still never a preselection. See `rememberedPreselection`.
+ *
  * Note what did NOT change: `app_settings.default_payment_method` still exists
  * and `place_order` still falls back to it when a caller supplies no method at
  * all. That is a SERVER-SIDE floor for a method-less submission, not a UI
@@ -74,6 +82,26 @@ export function clearIfUnavailable(
   platform: string,
 ): PaymentMethod | null {
   return chosen && availableMethods(s, platform).includes(chosen) ? chosen : null;
+}
+
+/**
+ * What to preselect from the customer's own remembered choice, if anything.
+ *
+ * Returns 'online' only when the customer last chose online AND online is
+ * offered now; null otherwise, cash included (see the header for why cash is
+ * never preselected). Like `clearIfUnavailable`, it cannot invent a method.
+ */
+export function rememberedPreselection(
+  s: PaymentMethodSettings,
+  remembered: PaymentMethod | null,
+  platform: string,
+): PaymentMethod | null {
+  return remembered === 'online' && availableMethods(s, platform).includes('online') ? 'online' : null;
+}
+
+/** Parse a stored method; anything unrecognised reads as nothing remembered. */
+export function parseRememberedMethod(raw: string | null | undefined): PaymentMethod | null {
+  return raw === 'online' || raw === 'cash' ? raw : null;
 }
 
 /**

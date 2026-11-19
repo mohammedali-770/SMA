@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { availableMethods, checkoutBlocked, clearIfUnavailable, type PaymentMethodSettings } from './payment';
+import {
+  availableMethods, checkoutBlocked, clearIfUnavailable, parseRememberedMethod, rememberedPreselection,
+  type PaymentMethodSettings,
+} from './payment';
 
 const both: PaymentMethodSettings = {
   onlineEnabled: true,
@@ -51,5 +54,38 @@ describe('availability follows the admin settings', () => {
     expect(clearIfUnavailable(cashOnly, 'online', 'ios')).toBeNull();
     expect(clearIfUnavailable(both, null, 'ios')).toBeNull();
     expect(clearIfUnavailable(cashOnly, 'cash', 'ios')).toBe('cash');
+  });
+});
+
+describe('a remembered choice is preselected only when it was online (2026-11-19)', () => {
+  it('a remembered online choice is preselected while online is offered', () => {
+    expect(rememberedPreselection(both, 'online', 'ios')).toBe('online');
+    expect(rememberedPreselection(onlineOnly, 'online', 'android')).toBe('online');
+  });
+
+  it('cash is never preselected, even when the customer used it last', () => {
+    // Cash is a promise to have money at the door: the 2026-09-14 reason.
+    expect(rememberedPreselection(both, 'cash', 'ios')).toBeNull();
+    expect(rememberedPreselection(cashOnly, 'cash', 'ios')).toBeNull();
+  });
+
+  it('nothing remembered preselects nothing, whatever the admin default says', () => {
+    expect(rememberedPreselection({ ...both, defaultMethod: 'online' }, null, 'ios')).toBeNull();
+    expect(rememberedPreselection({ ...both, defaultMethod: 'cash' }, null, 'ios')).toBeNull();
+  });
+
+  it('never preselects a method that is not offered now', () => {
+    expect(rememberedPreselection(cashOnly, 'online', 'ios')).toBeNull();
+    expect(rememberedPreselection(none, 'online', 'ios')).toBeNull();
+    // The web build cannot host the payment page.
+    expect(rememberedPreselection(both, 'online', 'web')).toBeNull();
+  });
+
+  it('reads only the two known values from storage', () => {
+    expect(parseRememberedMethod('online')).toBe('online');
+    expect(parseRememberedMethod('cash')).toBe('cash');
+    for (const raw of [null, undefined, '', 'card', 'ONLINE', '{"m":"online"}']) {
+      expect(parseRememberedMethod(raw)).toBeNull();
+    }
   });
 });

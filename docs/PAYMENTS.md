@@ -425,6 +425,56 @@ A failed database read answers `pending`. This decision is made before the
 payment configuration is read, so a disabled gateway cannot keep a dead session
 alive.
 
+### After a failed payment, and choosing the method (2026-11-19)
+
+The dialog's actions depend on the state:
+
+- **`failed`, `cancelled` or `expired`:** Try again, **Pay in cash instead**
+  (only while cash is offered), Contact support and Close.
+- **Pending, or an error that may still settle:** no cash button. A cash order
+  placed beside a card charge that could still go through could be paid twice.
+- **Pay in cash instead:** it selects cash and closes the dialog, and the
+  customer still taps Place order. It never places an order by itself.
+- **Contact support:** it opens Legal & support, which lists the support
+  channels the console turns on. Closing the dialog keeps any saved session.
+
+`paymentStatusDialog.test.tsx` pins this by rendering.
+
+**No raw server text.** An error from `payment-initiate` or `payment-verify`
+used to be shown word for word. The functions write their errors in English
+only, so an Arabic-speaking customer read English. Now the customer sees
+localized copy (offline, timeout, or the fallback) and the detail goes to Sentry.
+
+- After a failed initiate, the fallback is `payFailed`.
+- After a failed verify, the fallback is `payUnknown`, because whether money
+  moved is not known.
+
+**A returning customer's last method.**
+
+- The app remembers each account's own last choice on the phone
+  (`lastPaymentMethodStore.ts`).
+- It preselects that choice only when it was **online** and online is offered
+  (`rememberedPreselection`, `lib/payment.ts`).
+- **Cash is never preselected**, even when it was used last. This keeps the
+  2026-09-14 reason for "nothing preselected": cash is a promise to have money
+  ready, while a preselected card commits the customer to nothing, because
+  Moyasar's page still needs them.
+- An admin default is still never a preselection.
+- The memory is applied once, and never over a choice made on the screen.
+
+**Step timings.**
+
+- **What is sent:** one info-level Sentry message per card checkout, titled
+  "card checkout timeline" (`checkoutTimeline.ts`). It carries the milliseconds
+  from the Place order tap to each step: `session_begun`, `page_requested`,
+  `page_ready` (the payment page's first paint), `page_left` and `verified`.
+- **Its tag:** `outcome`, one of `paid`, `pending`, `failed`, `cancelled`,
+  `expired`, `error` or `refused`.
+- **What it never carries:** no id, amount, card detail or name.
+- **When it is sent:** once, at the first outcome. A customer who leaves at the
+  page is counted as `pending`.
+- **Why:** until 2026-11-19 every timing in this document was measured by hand.
+
 ### A checkout the customer replaced by changing the cart
 
 Added 2026-11-18. Until then, a customer who gave up on a card payment and then
@@ -558,7 +608,17 @@ trade-off: a misbehaving page could send the customer to any `https` page inside
 the WebView.
 
 The screen sets `enableApplePay` (iOS), drops `sharedCookiesEnabled`, injects no
-JavaScript, and keeps `setSupportMultipleWindows={false}`. Apple Pay inside a
+JavaScript, and keeps `setSupportMultipleWindows={false}`.
+
+**Never an endless spinner (2026-11-19).** If Moyasar's page has not painted
+20 s after the screen opens (`PAYMENT_PAGE_LOAD_TIMEOUT_MS`, `webviewPolicy.ts`),
+the screen shows the load-error message with Try again and Close. Measured first
+paints take about 1–2 s. A page that paints after the timeout replaces the
+message. Try again restarts the wait.
+
+**The amount is not repeated in our header.** `payment-initiate` does not
+return it, and the checkout screen's figure is a preview. Moyasar's page shows
+the amount it will charge, which is the authoritative one. Apple Pay inside a
 third-party app's WebView on Moyasar's hosted invoice is **not confirmed by
 Moyasar** (§11), so it is a device release gate.
 

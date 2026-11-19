@@ -44,9 +44,10 @@ import { catalog as catalogApi, checkout, compMembership, coupons, loyaltyPrevie
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
-  availableMethods, checkoutBlocked, clearIfUnavailable,
+  availableMethods, checkoutBlocked, clearIfUnavailable, rememberedPreselection,
   type PaymentMethod,
 } from '../../lib/payment';
+import { captureMessage } from '../../lib/observability';
 import { pointInPolygon } from '../../lib/geo';
 import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
@@ -54,7 +55,9 @@ import type { CartItem, LoyaltyRedemptionSettings, OrderType, SavedAddress } fro
 import { cartLineLabel } from '../../utils/format';
 import { describeVerifyResult, recoverPendingSession, refusalDropsSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
-import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
+import { readCheckoutPageReady, startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
+import { createCheckoutTimeline, type CheckoutOutcome, type CheckoutTimeline } from './checkoutTimeline';
+import { loadLastPaymentMethod, saveLastPaymentMethod } from './lastPaymentMethodStore';
 import { CheckoutFooter } from './view/CheckoutFooter';
 import { CheckoutLines } from './view/CheckoutLines';
 import { CouponRow } from './view/CouponRow';
@@ -92,7 +95,7 @@ export function CheckoutScreen() {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, userId } = useAuth();
   // `brand.vatPercentage` IS read now. The VAT row is still a label-only note
   // with no amount — prices are VAT-inclusive, so there is nothing to add — but
   // the copy used to hardcode "15%" while the rate is admin-configurable, so a
@@ -112,7 +115,11 @@ export function CheckoutScreen() {
   // having the money at the door or at the counter, and that is a decision the
   // customer should make on purpose rather than discover after the fact. The
   // Place Order button stays dead, with its own message, until they choose.
+  // Amended 2026-11-19: a returning customer's OWN last choice is preselected
+  // when it was online, never cash (`rememberedPreselection`, lib/payment.ts).
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [rememberedMethod, setRememberedMethod] = useState<PaymentMethod | null>(null);
+  const rememberAppliedRef = useRef(false);
   // The SHARED address book, not a private copy. This screen stays mounted while
   // the customer edits addresses in Profile, so a local fetched-once list would
   // keep offering an address that has since been edited or deleted.
@@ -191,6 +198,8 @@ export function CheckoutScreen() {
   // Place Order, could push two payment WebViews and fire two verifies for the
   // same session.
   const payRunningRef = useRef(false);
+  // Step timings for the current card checkout (checkoutTimeline.ts).
+  const timelineRef = useRef<CheckoutTimeline | null>(null);
   // Disables Place Order while an interrupted payment is still being resolved on
   // mount, so the user can't start a second run before recovery decides.
   const [recovering, setRecovering] = useState(true);
@@ -213,6 +222,26 @@ export function CheckoutScreen() {
     setPaymentMethod((prev) => clearIfUnavailable(payment, prev, Platform.OS));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment.onlineEnabled, payment.cashEnabled]);
+
+  // The customer's own last choice, for this account on this device.
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    void loadLastPaymentMethod(userId).then((m) => { if (live) setRememberedMethod(m); });
+    return () => { live = false; };
+  }, [userId]);
+
+  // Apply it ONCE, and never over a choice the customer has already made on
+  // this screen. Only a remembered ONLINE choice that is offered now is ever
+  // applied (rememberedPreselection); cash is never preselected.
+  useEffect(() => {
+    if (rememberAppliedRef.current) return;
+    const preselect = rememberedPreselection(payment, rememberedMethod, Platform.OS);
+    if (!preselect) return;
+    rememberAppliedRef.current = true;
+    setPaymentMethod((prev) => prev ?? preselect);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rememberedMethod, payment.onlineEnabled, payment.cashEnabled]);
 
   // Preselect ONCE, as soon as the shared book has settled. The rule is
   // unchanged — the address carried in the order context wins, then the
@@ -691,6 +720,7 @@ export function CheckoutScreen() {
     // clear it. A cash order placed now could then sit under a payable invoice
     // the run is about to open: two orders, one paid (review of 2026-11-12).
     if (payRunningRef.current) return;
+    timelineRef.current = paymentMethod === 'online' ? createCheckoutTimeline() : null;
     setError(null);
     setPlacing(true);
     try {
@@ -839,6 +869,7 @@ export function CheckoutScreen() {
         paymentMethod,
       };
       const isOnline = paymentMethod === 'online';
+      if (userId && paymentMethod) void saveLastPaymentMethod(userId, paymentMethod);
       if (isOnline) {
         // Any interrupted charge was already resolved at the top of placeOrder,
         // so beginning a new session here is safe.
@@ -847,6 +878,7 @@ export function CheckoutScreen() {
         // zero-total online order (fully covered) is settled server-side and comes
         // back with order_id already set → straight to the receipt.
         const session = await checkout.begin(orderInput);
+        timelineRef.current?.mark('session_begun');
         if (session.order_id) {
           cart.clear();
           router.replace(`/receipt/${session.order_id}`);
@@ -889,7 +921,7 @@ export function CheckoutScreen() {
       await savePendingSession(sessionId, Date.now(), cartKey);
       setPayFlow({ state: 'opening', sessionId });
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
-      if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
+      if (init.status === 'already_paid' && init.orderId) { reportTimeline('paid'); void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
         if (refusalDropsSession(init)) {
           // Moyasar will not invoice a total under 1.00 SAR, so nothing can ever
@@ -899,8 +931,10 @@ export function CheckoutScreen() {
           await clearPendingSession();
           setPayFlow(null);
           setError(t('payBelowMinimum'));
+          reportTimeline('refused');
           return;
         }
+        reportTimeline('refused');
         setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });
         // NOT dropped blindly. This refusal is made before THIS call opens an
         // attempt, but the session may already hold an earlier one whose invoice
@@ -920,16 +954,26 @@ export function CheckoutScreen() {
         // WebView owns the UI while it is up. The redirect result is NEVER
         // trusted; verifyPaymentSession (server) below decides the outcome.
         setPayFlow(null);
+        timelineRef.current?.mark('page_requested');
         const result = await openInAppCheckout(sessionId, init.checkoutUrl);
+        const pageReadyAt = readCheckoutPageReady(sessionId);
+        if (pageReadyAt != null) timelineRef.current?.mark('page_ready', pageReadyAt);
+        timelineRef.current?.mark('page_left');
         await verifyPaymentSession(sessionId, { dismissed: result === 'dismissed' });
       } else {
         await verifyPaymentSession(sessionId);
       }
     } catch (e) {
-      // Shows the server's error text as it is. payment-initiate writes it in
-      // English only, so an Arabic-speaking customer reads English here; that
-      // is recorded in docs/OWNER_ACTIONS.md and this change does not alter it.
-      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      // Never the server's raw text: payment-initiate writes it in English
+      // only, so an Arabic-speaking customer read English here until
+      // 2026-11-19. The customer gets localized copy (offline, timeout, or
+      // "could not process the payment"); the detail goes to Sentry.
+      reportTimeline('error');
+      setPayFlow({
+        state: 'error',
+        sessionId,
+        message: failureMessage(e, t, { subsystem: 'payment', op: 'initiate', fallbackKey: 'payFailed' }),
+      });
     } finally {
       payRunningRef.current = false;
     }
@@ -966,7 +1010,8 @@ export function CheckoutScreen() {
     setPayBusy(true);
     try {
       const res = await payments.verifySession(sessionId);
-      if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
+      timelineRef.current?.mark('verified');
+      if (res.status === 'paid' && res.orderId) { reportTimeline('paid'); void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
       // Only an EXPLICITLY terminal outcome (failed/cancelled/expired/refunded)
       // clears the persisted session — the same set recovery uses, read through
       // describeVerifyResult. An 'unknown' status — and 'paid' without a resolved
@@ -979,13 +1024,20 @@ export function CheckoutScreen() {
       // An automatic verify that simply lands on pending keeps the neutral copy.
       // Terminal/declined states never show a raw provider error — only safe strings.
       const shown = describeVerifyResult(res, { dismissed: opts?.dismissed });
+      reportTimeline(shown.state);
       if (shown.terminal) void clearPendingSession();
       setPayFlow({ state: shown.state, sessionId, message: t(shown.messageKey) });
     } catch (e) {
       // Transient verify error — KEEP the persisted session so recovery can
       // resolve it on the next launch / checkout entry (never a new charge).
-      // Raw server text, as in the catch in runOnlinePayment above.
-      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      // Localized, as in the catch in runOnlinePayment above; an unrecognised
+      // failure reads payUnknown, because whether money moved is not known.
+      reportTimeline('error');
+      setPayFlow({
+        state: 'error',
+        sessionId,
+        message: failureMessage(e, t, { subsystem: 'payment', op: 'verify', fallbackKey: 'payUnknown' }),
+      });
     } finally {
       setPayBusy(false);
     }
@@ -994,6 +1046,36 @@ export function CheckoutScreen() {
   // Dismiss the payment modal without paying. In the session flow no order exists
   // yet, so we simply close and keep the cart intact for a retry.
   const dismissPayFlow = () => setPayFlow(null);
+
+  // After a TERMINAL outcome only (the dialog offers it nowhere else): that
+  // session is dead and already cleared, so nothing is abandoned. This selects
+  // cash and closes the dialog; the customer still places the order
+  // themselves, because cash is a promise to have the money ready.
+  const useCashInstead = () => {
+    setPaymentMethod('cash');
+    setPayFlow(null);
+  };
+
+  // The Legal & support screen lists the support contacts the console turns on.
+  // Closing the dialog keeps any saved session, so recovery still resolves it.
+  const openHelp = () => {
+    setPayFlow(null);
+    router.push('/legal');
+  };
+
+  // One info-level Sentry message per card checkout, at its first outcome:
+  // durations and the outcome word only (checkoutTimeline.ts).
+  const reportTimeline = (outcome: CheckoutOutcome) => {
+    const tl = timelineRef.current;
+    if (!tl || !tl.claimReport()) return;
+    captureMessage('card checkout timeline', {
+      level: 'info',
+      subsystem: 'payment',
+      op: 'checkout_timeline',
+      tags: { outcome },
+      extra: tl.marks(),
+    });
+  };
 
   // Retry after a TERMINAL payment (failed/cancelled/expired): that session is
   // dead server-side, so clear it and begin a brand-new checkout. Never reuse a
@@ -1256,12 +1338,16 @@ export function CheckoutScreen() {
           statusFailed: t('payStatusFailed'),
           statusCancelled: t('payStatusCancelled'),
           statusExpired: t('payStatusExpired'),
+          useCash: t('payUseCash'),
+          getHelp: t('payGetHelp'),
         }}
         onContinue={() => payFlow?.sessionId && void runOnlinePayment(payFlow.sessionId)}
         onVerifyAgain={() => payFlow?.sessionId && void verifyPaymentSession(payFlow.sessionId)}
         onResume={() => payFlow?.sessionId && void runOnlinePayment(payFlow.sessionId)}
         onRetryFresh={() => void retryFresh()}
         onClose={dismissPayFlow}
+        onUseCash={payMethods.includes('cash') ? useCashInstead : undefined}
+        onGetHelp={openHelp}
       />
 
       {/* Confirm before changing order type — it can change the branch, delivery
