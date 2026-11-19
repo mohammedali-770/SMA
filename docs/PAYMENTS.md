@@ -246,6 +246,15 @@ Lazywait about it:
     so the client's generic fallback hid it. Since the next change the raw reply
     body is logged in that case, whitespace collapsed, long digit runs masked,
     bounded to 240 characters.
+  - That log then read `Missing required fields` (test order, 06:57 UTC). Since
+    the next change the call also sends `transaction_uuid` (Moyasar's payment
+    id, the same value as `Approval_No`) and `Card_Number`, the card's last four
+    digits **masked** as `************1234` (`maskedCardNumber`). The full card
+    number never reaches our servers; the last four come from the `paid`
+    `payment_records` row, and a missing or malformed value sends no
+    `Card_Number` at all. Owner-approved 2026-11-19. The privacy-policy draft
+    (`legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`) and
+    `RECORD_OF_PROCESSING.md` rows 3 and 15 name both fields.
 
 **The post-payment kick uses the publishable key (2026-11-18, #487).**
 `triggerLazywaitSyncOnce` used to send `SUPABASE_ANON_KEY` as `apikey` on its

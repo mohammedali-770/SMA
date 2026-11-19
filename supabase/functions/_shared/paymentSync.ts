@@ -75,6 +75,17 @@ export async function triggerLazywaitSyncOnce(admin: SupabaseClient): Promise<vo
 export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';
 
 /**
+ * The card number as the POS may see it: twelve asterisks and the last four
+ * digits, so it is shaped like a card number but carries nothing beyond what a
+ * paper receipt prints. Anything that is not exactly four digits yields
+ * undefined, so the field is left out rather than sent wrong.
+ */
+export function maskedCardNumber(lastFour: unknown): string | undefined {
+  const s = typeof lastFour === 'string' ? lastFour.trim() : '';
+  return /^\d{4}$/.test(s) ? `************${s}` : undefined;
+}
+
+/**
  * The sync-log error for a refused payment push: the HTTP status, plus
  * Lazywait's own code and message, so a refusal can be diagnosed from our logs
  * (until 2026-11-19 only the status was kept, and nine 400s said nothing).
@@ -125,6 +136,20 @@ export async function pushLazywaitOnlinePayment(
   const branchId = (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id;
   if (!branchId) return;
 
+  // Lazywait refuses this call without Card_Number and transaction_uuid
+  // ("Missing required fields", read in our log 2026-11-19 06:57 UTC). The
+  // owner approved sending both the same day:
+  //   - transaction_uuid: Moyasar's payment id, already sent as Approval_No,
+  //     so nothing new leaves us;
+  //   - Card_Number: the card's LAST FOUR digits only, masked. The full number
+  //     never reaches our servers; the last four are stored on the paid
+  //     payment record when Moyasar confirms the payment.
+  const { data: paidRecord } = await admin
+    .from('payment_records').select('card_last_four')
+    .eq('order_id', order.id).eq('status', 'paid')
+    .order('confirmed_at', { ascending: false }).limit(1).maybeSingle();
+  const cardNumber = maskedCardNumber((paidRecord as { card_last_four?: unknown } | null)?.card_last_four);
+
   const res = await lazywaitFetch(lw, {
     method: 'POST',
     path: '/pos/orders/update-online-payment',
@@ -135,6 +160,8 @@ export async function pushLazywaitOnlinePayment(
       Trans_Amount: round2(Number(order.total ?? 0)), // server-trusted paid amount
       Approval_No: approvalNo,
       Card_Type: ONLINE_PAYMENT_TYPE,
+      Card_Number: cardNumber,
+      transaction_uuid: approvalNo,
     },
     timeoutMs: 12000,
   });

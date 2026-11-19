@@ -481,6 +481,11 @@ instead of the live config row.) Field-by-field state:
   Card"** (owner: "send it to Lazywait as Online Credit Card"; it was the bare
   word `card`), and a refusal is logged with Lazywait's own code and message
   (`paymentPushError` in `_shared/paymentSync.ts`), not just the HTTP status.
+  That log read `Missing required fields`, so the call now also sends
+  `transaction_uuid` (Moyasar's payment id) and `Card_Number` (the last four
+  digits, masked as `************1234`; omitted when unknown). Whether that is
+  the complete set Lazywait requires is measured by the next test order, not
+  assumed.
 
 ### Unmapped modifiers — folded into `details`, never dropped, never re-priced
 Only a modifier carrying a `modifiers.lazywait_addon_id` can become a contract
@@ -1025,8 +1030,10 @@ the local order paid, the confirmation (`_shared/moyasarVerify.ts`, reached from
 `payment-webhook`, `payment-verify` or the admin re-verify) best-effort calls
 `POST /pos/orders/update-online-payment` with the **server-trusted** total (only
 if the order already has a `lazywait_ref`). Never called from the frontend; never
-fatal. It sends `Card_Type: 'card'` whatever the Moyasar source was (mada, Apple
-Pay), `_shared/paymentSync.ts`.
+fatal. It sends `Card_Type: 'Online Credit Card'` whatever the Moyasar source was
+(mada, Apple Pay), `Approval_No` and `transaction_uuid` (both Moyasar's payment
+id) and `Card_Number` (last four, masked), `_shared/paymentSync.ts`. *Changed
+2026-11-19: this said `Card_Type: 'card'`.*
 
 ## Webhook receiver (`lazywait-webhook`)
 Verifies `X-LazyWait-Signature` = HMAC-SHA256 **hex** of the body with the
