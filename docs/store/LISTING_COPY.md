@@ -45,6 +45,14 @@ switch was off on 2026-11-11 (read-only), so the copy below is still true and is
 (`OWNER_ACTIONS.md` §47.15 and §47.18), rewrite the "Payment" lines in both
 languages and in the release notes, and publish the new listing.
 
+**Read live 2026-11-19 04:22 UTC: `online_payment_enabled` is TRUE**, for
+testing, so C-CASH is false today. Nothing is published from this file yet, so
+no customer reads a false claim. **Before any store submission**, either switch
+online payment off or rewrite the "Payment" lines above, in both languages and
+in the release notes. The 2026-11-19 checkout change (a remembered card choice,
+"Pay in cash instead" after a failed card payment) adds no new claim: it
+changes neither which methods exist nor how prices are shown.
+
 **C-REDEEM was added on 2026-11-14 and the copy is not changed.** The sentence
 is true: points come off at checkout on any pickup order large enough for the
 minimum. It was recorded when the checkout summary was corrected to show the

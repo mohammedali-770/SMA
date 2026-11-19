@@ -21,7 +21,12 @@
  *                      session (never a new charge); Check again re-verifies.
  *   error              transient; the session may still be alive → resume it.
  *   failed/cancelled/  terminal server-side → a FRESH session, never a reused
- *   expired            one.
+ *   expired            one. Also "Pay in cash instead" when cash is offered:
+ *                      the session is already dead, so switching method
+ *                      abandons nothing.
+ *
+ * Every settled state (not opening/verifying) offers "Help & support", which
+ * opens the screen holding the support contacts the console configures.
  */
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
@@ -51,6 +56,10 @@ export interface PaymentStatusLabels {
   statusFailed: string;
   statusCancelled: string;
   statusExpired: string;
+  /** "Pay in cash instead" — shown only with onUseCash, on terminal states. */
+  useCash: string;
+  /** "Help & support". */
+  getHelp: string;
 }
 
 const IN_FLIGHT: PayState[] = ['opening', 'verifying'];
@@ -68,6 +77,8 @@ export function PaymentStatusDialog({
   onResume,
   onRetryFresh,
   onClose,
+  onUseCash,
+  onGetHelp,
 }: {
   /** null closes the dialog. */
   state: PayState | null;
@@ -79,6 +90,9 @@ export function PaymentStatusDialog({
   onResume: () => void;
   onRetryFresh: () => void;
   onClose: () => void;
+  /** Omitted when cash is not offered; then the button is not shown. */
+  onUseCash?: () => void;
+  onGetHelp: () => void;
 }) {
   const styles = useStyles();
   const colors = useThemeColors();
@@ -117,8 +131,14 @@ export function PaymentStatusDialog({
             ) : state === 'error' ? (
               <Button label={labels.tryAgain} onPress={onResume} loading={busy} variant="primary" />
             ) : (
-              <Button label={labels.tryAgain} onPress={onRetryFresh} loading={busy} variant="primary" />
+              <>
+                <Button label={labels.tryAgain} onPress={onRetryFresh} loading={busy} variant="primary" />
+                {onUseCash ? (
+                  <Button label={labels.useCash} onPress={onUseCash} disabled={busy} variant="secondary" />
+                ) : null}
+              </>
             )}
+            <Button label={labels.getHelp} onPress={onGetHelp} variant="ghost" />
             {/* Ghost, not secondary: with three outlined buttons stacked, the
                 dismissal read as loud as the retry. Close is the way out, not
                 a third thing to consider. */}

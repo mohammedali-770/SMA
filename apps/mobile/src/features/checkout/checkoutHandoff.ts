@@ -22,6 +22,8 @@ interface Handoff {
   checkoutUrl: string;
   resolve: (r: CheckoutHandoffResult) => void;
   settled: boolean;
+  /** When Moyasar's page first painted (Date.now()); timing only, see checkoutTimeline.ts. */
+  pageReadyAt?: number;
 }
 
 let current: Handoff | null = null;
@@ -58,4 +60,19 @@ export function settleCheckoutHandoff(sessionId: string, result: CheckoutHandoff
     current.settled = true;
     current.resolve(result);
   }
+}
+
+/**
+ * Record when the payment page first painted, for the checkout timeline. Only
+ * the first paint of a live handoff counts; anything else is ignored.
+ */
+export function markCheckoutPageReady(sessionId: string, at: number): void {
+  if (current && !current.settled && current.sessionId === sessionId && current.pageReadyAt == null) {
+    current.pageReadyAt = at;
+  }
+}
+
+/** The first-paint time recorded for this session's handoff, settled or not. */
+export function readCheckoutPageReady(sessionId: string): number | null {
+  return current && current.sessionId === sessionId ? (current.pageReadyAt ?? null) : null;
 }

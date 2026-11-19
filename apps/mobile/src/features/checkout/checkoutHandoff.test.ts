@@ -49,3 +49,29 @@ describe('checkoutHandoff', () => {
     await expect(p).resolves.toBe('dismissed');
   });
 });
+
+describe('payment page first paint (timing only)', () => {
+  it('records the first paint of the live handoff and keeps it after settling', async () => {
+    const { startCheckoutHandoff, markCheckoutPageReady, readCheckoutPageReady, settleCheckoutHandoff } =
+      await import('./checkoutHandoff');
+    void startCheckoutHandoff('s-paint', 'https://checkout.example/1');
+    expect(readCheckoutPageReady('s-paint')).toBeNull();
+    markCheckoutPageReady('s-paint', 1_000);
+    markCheckoutPageReady('s-paint', 2_000);
+    expect(readCheckoutPageReady('s-paint')).toBe(1_000);
+    settleCheckoutHandoff('s-paint', 'completed');
+    expect(readCheckoutPageReady('s-paint')).toBe(1_000);
+  });
+
+  it('ignores a paint for another session or after settling', async () => {
+    const { startCheckoutHandoff, markCheckoutPageReady, readCheckoutPageReady, settleCheckoutHandoff } =
+      await import('./checkoutHandoff');
+    void startCheckoutHandoff('s-a', 'https://checkout.example/a');
+    markCheckoutPageReady('s-other', 1_000);
+    expect(readCheckoutPageReady('s-a')).toBeNull();
+    expect(readCheckoutPageReady('s-other')).toBeNull();
+    settleCheckoutHandoff('s-a', 'dismissed');
+    markCheckoutPageReady('s-a', 3_000);
+    expect(readCheckoutPageReady('s-a')).toBeNull();
+  });
+});

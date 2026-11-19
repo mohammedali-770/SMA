@@ -32,8 +32,8 @@ import { Button } from '../../design-system/ui/Button';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { SUPABASE_URL } from '../../lib/env';
-import { readCheckoutHandoff, settleCheckoutHandoff, type CheckoutHandoffResult } from '../../features/checkout/checkoutHandoff';
-import { decideNavigation, safeHostForLog, type WebviewNavConfig } from '../../features/checkout/webviewPolicy';
+import { markCheckoutPageReady, readCheckoutHandoff, settleCheckoutHandoff, type CheckoutHandoffResult } from '../../features/checkout/checkoutHandoff';
+import { decideNavigation, PAYMENT_PAGE_LOAD_TIMEOUT_MS, safeHostForLog, type WebviewNavConfig } from '../../features/checkout/webviewPolicy';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 
@@ -68,6 +68,9 @@ export default function PaymentCheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [firstLoaded, setFirstLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Separate from `failed`: a page that is merely slow may still paint, and
+  // when it does it replaces the message. A real load error does not.
+  const [timedOut, setTimedOut] = useState(false);
   const webRef = useRef<WebView>(null);
   const settledRef = useRef(false);
 
@@ -126,8 +129,17 @@ export default function PaymentCheckoutScreen() {
     if (decideNavigation(nav.url, cfg).decision === 'complete') finish('completed');
   };
 
+  // Never leave the customer on a spinner: if the page has not painted after
+  // PAYMENT_PAGE_LOAD_TIMEOUT_MS, offer Try again / Close. Re-armed by reload.
+  useEffect(() => {
+    if (!checkoutUrl || firstLoaded || failed || timedOut) return;
+    const timer = setTimeout(() => setTimedOut(true), PAYMENT_PAGE_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [checkoutUrl, firstLoaded, failed, timedOut]);
+
   const reload = () => {
     setFailed(false);
+    setTimedOut(false);
     setLoading(true);
     webRef.current?.reload();
   };
@@ -167,7 +179,13 @@ export default function PaymentCheckoutScreen() {
             onShouldStartLoadWithRequest={onShouldStart}
             onNavigationStateChange={onNavStateChange}
             onLoadStart={() => setLoading(true)}
-            onLoadEnd={() => { setLoading(false); setFirstLoaded(true); }}
+            onLoadEnd={() => {
+              setLoading(false);
+              setFirstLoaded(true);
+              setTimedOut(false);
+              // Timing only (checkoutTimeline.ts); the first paint wins.
+              if (sessionId) markCheckoutPageReady(sessionId, Date.now());
+            }}
             onError={() => { setLoading(false); setFailed(true); }}
             onHttpError={() => { setLoading(false); setFailed(true); }}
             // The hosted page and the bank's 3-D Secure need JS, DOM storage and
@@ -197,7 +215,7 @@ export default function PaymentCheckoutScreen() {
           />
         ) : null}
 
-        {failed ? (
+        {failed || timedOut ? (
           <View style={styles.overlay}>
             <Text variant="heading" align="center">{t('payScreenError')}</Text>
             <View style={styles.errActions}>

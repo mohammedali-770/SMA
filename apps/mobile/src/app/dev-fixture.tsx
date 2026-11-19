@@ -180,12 +180,16 @@ function FixturePaymentDialog({ state }: { state: PayState }) {
         statusFailed: t('payStatusFailed'),
         statusCancelled: t('payStatusCancelled'),
         statusExpired: t('payStatusExpired'),
+        useCash: t('payUseCash'),
+        getHelp: t('payGetHelp'),
       }}
       onContinue={noop}
       onVerifyAgain={noop}
       onResume={noop}
       onRetryFresh={noop}
       onClose={noop}
+      onUseCash={noop}
+      onGetHelp={noop}
     />
   );
 }

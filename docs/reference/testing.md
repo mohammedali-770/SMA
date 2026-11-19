@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**290 TypeScript test files declaring 4261 test blocks, plus 98 SQL suites.**
+**294 TypeScript test files declaring 4297 test blocks, plus 98 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -163,7 +163,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-105 files, 1408 declared test blocks.
+109 files, 1444 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -190,15 +190,18 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 49 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 31 | decideQuantityChange |
-| `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
+| `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 7 | checkoutHandoff |
+| `apps/mobile/src/features/checkout/checkoutTimeline.test.ts` | 6 | checkout timeline |
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/loyaltySettingsReread.test.ts` | 25 | mapLoyaltyRedemption — a bad row is never looser than no row |
+| `apps/mobile/src/features/checkout/paymentUxWiring.test.ts` | 12 | the customer never reads raw server text after a payment error |
 | `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 36 | parsePendingSession |
 | `apps/mobile/src/features/checkout/pendingSessionStore.test.ts` | 3 | savePendingSession keeps a checkout tied to the cart it was begun for |
 | `apps/mobile/src/features/checkout/previewParity.test.ts` | 8 | checkout preview matches compute_order_snapshot (PG-31) |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 51 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
+| `apps/mobile/src/features/checkout/view/paymentStatusDialog.test.tsx` | 5 | payment dialog actions |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 19 | decideNavigation — allow (Moyasar hosted page and 3-D Secure) |
 | `apps/mobile/src/features/menu/bannerFetchOwnership.test.ts` | 5 | banner fetch ownership |
 | `apps/mobile/src/features/menu/categoryFocus.test.ts` | 17 | categoryFocusReducer |
@@ -223,6 +226,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 14 | isTerminalOrderStatus |
 | `apps/mobile/src/features/orders/receiptGate.test.ts` | 10 | the order page appears only with the branch order number (owner, 2026-11-18) |
+| `apps/mobile/src/features/orders/vatInvoiceNote.test.ts` | 6 | VAT invoice note on the receipt |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
 | `apps/mobile/src/features/profile/addressForm.test.ts` | 34 | validateAddressForm — a complete address |
@@ -250,7 +254,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/orderability.test.ts` | 25 | requiredCount |
 | `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
 | `apps/mobile/src/lib/orderSelectGrantParity.test.ts` | 6 | customer order select ↔ database grant parity |
-| `apps/mobile/src/lib/payment.test.ts` | 7 | online payment is offered only in the native app |
+| `apps/mobile/src/lib/payment.test.ts` | 12 | online payment is offered only in the native app |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/readTimeoutFetch.test.ts` | 17 | isTimedRead — the boundary |
 | `apps/mobile/src/lib/sentryAndroidMapping.test.ts` | 5 | Sentry Android R8 mapping upload |

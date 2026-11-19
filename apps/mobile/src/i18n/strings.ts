@@ -202,6 +202,8 @@ export const STRINGS = {
     compEndedBody: 'Complimentary ordering is no longer active on your account, so this order is now full price. Check the total and confirm again.',
     vat: 'VAT ({rate}%, included)',
     vatIncluded: 'VAT (included)',
+    vatInvoicePickup: 'Your VAT invoice is issued by the branch and handed to you when you collect your order.',
+    vatInvoiceDelivery: 'Your VAT invoice is issued by the branch and handed to you by the delivery driver.',
     total: 'Total',
     placeOrder: 'Confirm & Order',
     placingOrder: 'Placing your order…',
@@ -217,6 +219,8 @@ export const STRINGS = {
     payPending: 'Payment is still pending.',
     payUnknown: 'We could not confirm the payment. Please contact support if an amount was deducted.',
     payUnavailable: 'Online payment is unavailable right now.',
+    payUseCash: 'Pay in cash instead',
+    payGetHelp: 'Contact support',
     // Moyasar will not take an online payment under 1.00 SAR, which redeeming
     // points can leave. Shown in place of payUnavailable for that refusal.
     // Points are all or nothing (the switch is on or off), so the choices are
@@ -581,6 +585,8 @@ export const STRINGS = {
     compEndedBody: 'لم تعد الضيافة مفعّلة على حسابك، لذا أصبح هذا الطلب بالسعر الكامل. راجع الإجمالي ثم أكّد مرة أخرى.',
     vat: 'ضريبة القيمة المضافة ({rate}٪ شاملة)',
     vatIncluded: 'ضريبة القيمة المضافة (شاملة)',
+    vatInvoicePickup: 'تصدر الفاتورة الضريبية من الفرع وتُسلَّم لك عند استلام طلبك.',
+    vatInvoiceDelivery: 'تصدر الفاتورة الضريبية من الفرع ويسلّمها لك مندوب التوصيل.',
     total: 'الإجمالي',
     placeOrder: 'تأكيد وإرسال الطلب',
     placingOrder: 'جارٍ إرسال طلبك…',
@@ -596,6 +602,8 @@ export const STRINGS = {
     payPending: 'الدفع قيد المعالجة.',
     payUnknown: 'تعذّر تأكيد الدفع. يرجى التواصل مع الدعم إذا تم خصم مبلغ.',
     payUnavailable: 'الدفع الإلكتروني غير متاح حالياً.',
+    payUseCash: 'الدفع نقداً بدلاً من ذلك',
+    payGetHelp: 'التواصل مع الدعم',
     payBelowMinimum: 'يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',

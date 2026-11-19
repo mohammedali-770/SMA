@@ -148,3 +148,11 @@ function sessionFromRaw(raw: string): string | undefined {
   }
   return UUID_RE.test(v) ? v : undefined;
 }
+
+/**
+ * How long the payment screen waits for Moyasar's page to FIRST paint before
+ * offering "Try again" and "Close" instead of a spinner. Measured first paints
+ * on build 30 took about 1-2 s, so 20 s only ever fires on a page that is not
+ * coming. A page that paints after the timeout still replaces the message.
+ */
+export const PAYMENT_PAGE_LOAD_TIMEOUT_MS = 20_000;

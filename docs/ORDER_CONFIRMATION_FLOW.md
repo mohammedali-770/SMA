@@ -2469,6 +2469,24 @@ Consequences worth holding in mind:
 
 Full behaviour, administration and deploy order: `docs/DISCOUNTS_CAMPAIGNS.md`.
 
+## 10f-2. The app's receipt is not the VAT invoice (2026-11-19)
+
+The Lazywait POS issues the tax invoice at the branch (owner, 2026-11-19). The
+app's receipt shows the VAT amount but carries no VAT number or ZATCA QR, so a
+customer could take it for the tax invoice. Under the total it now says where
+the real one comes from:
+
+- pickup: "Your VAT invoice is issued by the branch and handed to you when you
+  collect your order." / «تصدر الفاتورة الضريبية من الفرع وتُسلَّم لك عند استلام طلبك.»
+- delivery: "Your VAT invoice is issued by the branch and handed to you by the
+  delivery driver." / «تصدر الفاتورة الضريبية من الفرع ويسلّمها لك مندوب التوصيل.»
+
+There is no note on a cancelled order or one with nothing charged, because no
+tax invoice follows it (`vatInvoiceNote.ts`, pinned by `vatInvoiceNote.test.ts`).
+**This puts a duty on the branches:** the cashier and the delivery driver must
+hand the printed invoice over. The Arabic is engineering-drafted and has not had
+a native read.
+
 ## 10g. The receipt says whether the points are EARNED or still owed
 
 Since `20260918120000` an order's loyalty points are a promise until the order
