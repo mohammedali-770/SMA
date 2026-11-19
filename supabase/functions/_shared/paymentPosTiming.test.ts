@@ -98,7 +98,7 @@ describe('when the POS receives a card payment', () => {
         order_ref: 'LW-ORDER-1',
         Trans_Amount: 64,
         Approval_No: 'pay_pos_1',
-        Card_Type: 'card',
+        Card_Type: 'Online Credit Card',
       });
     }
   });
@@ -153,5 +153,25 @@ describe('the confirmation answers before the POS handoff', () => {
     expect(posPosts.some((p) => p.path === '/functions/v1/lazywait-sync')).toBe(true);
     expect(updates()).toHaveLength(1);
     expect(updates()[0].body).toMatchObject({ order_ref: 'LW-ORDER-BG', Approval_No: 'pay_pos_bg' });
+  });
+});
+
+// 2026-11-19: nine update-online-payment refusals were logged as a bare
+// `payment_push_400`, which said nothing about why.
+describe('a refused payment push is logged with the reason', () => {
+  it('keeps the status, the provider code and the provider message', async () => {
+    const { paymentPushError } = await import('./paymentSync.ts');
+    expect(paymentPushError({ ok: true, status: 200, code: null, error: null })).toBeNull();
+    expect(paymentPushError({ ok: false, status: 400, code: 'VALIDATION', error: 'Card_Type is invalid' }))
+      .toBe('payment_push_400 VALIDATION Card_Type is invalid');
+    expect(paymentPushError({ ok: false, status: 0, code: null, error: null })).toBe('payment_push_0');
+  });
+
+  it('masks long digit runs and stays bounded', async () => {
+    const { paymentPushError } = await import('./paymentSync.ts');
+    const out = paymentPushError({ ok: false, status: 400, code: null, error: `card 4111111111111111 ${'x'.repeat(400)}` })!;
+    expect(out).not.toMatch(/\d{12,}/);
+    expect(out).toContain('[digits]');
+    expect(out.length).toBeLessThanOrEqual(240);
   });
 });

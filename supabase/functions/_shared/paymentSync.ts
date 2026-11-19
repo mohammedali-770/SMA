@@ -68,6 +68,28 @@ export async function triggerLazywaitSyncOnce(admin: SupabaseClient): Promise<vo
 }
 
 /**
+ * The payment type the POS records for an app card payment (owner,
+ * 2026-11-19: "send it to Lazywait as Online Credit Card"). Until then it was
+ * the bare word 'card', and every call was refused with HTTP 400.
+ */
+export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';
+
+/**
+ * The sync-log error for a refused payment push: the HTTP status, plus
+ * Lazywait's own code and message, so a refusal can be diagnosed from our logs
+ * (until 2026-11-19 only the status was kept, and nine 400s said nothing).
+ * Bounded to 240 characters, and any run of 12+ digits is masked, in case a
+ * provider message ever echoes a card or phone number. Null on success.
+ */
+export function paymentPushError(res: { ok: boolean; status: number; code?: string | null; error?: string | null }): string | null {
+  if (res.ok) return null;
+  const parts = [`payment_push_${res.status}`];
+  if (res.code) parts.push(String(res.code));
+  if (res.error) parts.push(String(res.error));
+  return parts.join(' ').replace(/\d{12,}/g, '[digits]').slice(0, 240);
+}
+
+/**
  * POST /pos/orders/update-online-payment with the SERVER-TRUSTED paid total, once
  * the order has a lazywait_ref (i.e. it's been created in the POS). Logged + safe.
  */
@@ -101,7 +123,7 @@ export async function pushLazywaitOnlinePayment(
       order_ref: lazywaitRef,
       Trans_Amount: round2(Number(order.total ?? 0)), // server-trusted paid amount
       Approval_No: approvalNo,
-      Card_Type: 'card',
+      Card_Type: ONLINE_PAYMENT_TYPE,
     },
     timeoutMs: 12000,
   });
@@ -112,6 +134,6 @@ export async function pushLazywaitOnlinePayment(
     direction: 'push',
     status: res.ok ? 'success' : 'failed',
     request: { endpoint: 'update-online-payment', order_ref: lazywaitRef },
-    error: res.ok ? null : `payment_push_${res.status}`,
+    error: paymentPushError(res),
   }).then(() => {}, () => {});
 }
