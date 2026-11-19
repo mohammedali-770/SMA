@@ -41,13 +41,26 @@ const PRIVACY_DRAFT = new URL('../../../docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_
 const CUSTOMER_FIELDS: Record<string, RegExp> = {
   Trans_Amount: /order(?:'|’)s total/, // the order total, which is the amount paid
   Approval_No: /Moyasar(?:'|’)s payment id/,
-  Card_Type: /the words "Online Credit Card"/, // always the constant ONLINE_PAYMENT_TYPE
-  Card_Number: /last four digits/, // masked: twelve asterisks + the last four (2026-11-19)
+  Card_Type: /card scheme \(such as mada or Visa\) and its last four digits/, // MADA, VISA, ... from the paid payment record (2026-11-19)
+  Card_Number: /last four digits/, // masked: four asterisks + the last four (2026-11-19)
   transaction_uuid: /Moyasar(?:'|’)s payment id/, // the same id as Approval_No (2026-11-19)
 };
 
-/** Our own integration identifiers: about our POS account, not the customer. */
-const INTEGRATION_FIELDS = ['client_id', 'branch_id', 'order_ref'];
+/**
+ * Our own integration identifiers and fixed values: about our POS account or
+ * the payment channel, never the customer. The three terminal ids and the
+ * label are constants; status is always 'approved'.
+ */
+const INTEGRATION_FIELDS = [
+  'client_id',
+  'branch_id',
+  'order_ref',
+  'tid',
+  'pos_terminal_id',
+  'nearpay_terminal_id',
+  'status',
+  'names',
+];
 
 /** Source without comments, so prose that quotes the code cannot satisfy a check. */
 function code(url: URL): string {
@@ -87,8 +100,16 @@ describe('what the POS receives about a card payment', () => {
   it('means what the records say it means', () => {
     const { body } = postedFields(code(SYNC));
     expect(body).toMatch(/Trans_Amount:\s*round2\(Number\(order\.total\b/);
-    expect(body).toMatch(/Card_Type:\s*ONLINE_PAYMENT_TYPE\b/);
-    expect(code(SYNC)).toMatch(/export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';/);
+    expect(body).toMatch(/Card_Type:\s*cardType\b/);
+    expect(code(SYNC)).toMatch(/const cardType = posCardType\(paid\?\.card_scheme\)/);
+    // The fixed values really are fixed: no customer data can ride in them.
+    for (const f of ['tid', 'pos_terminal_id', 'nearpay_terminal_id']) {
+      expect(body).toMatch(new RegExp(`\\b${f}:\\s*APP_PAYMENT_TERMINAL\\b`));
+    }
+    expect(code(SYNC)).toMatch(/export const APP_PAYMENT_TERMINAL = 'MOYASAR-APP';/);
+    expect(body).toMatch(/\bstatus:\s*'approved'/);
+    expect(body).toMatch(/\bnames:\s*ONLINE_PAYMENT_NAMES\b/);
+    expect(code(SYNC)).toMatch(/export const ONLINE_PAYMENT_NAMES = \{ en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' \} as const;/);
     expect(body).toMatch(/Approval_No:\s*approvalNo\b/);
     expect(body).toMatch(/transaction_uuid:\s*approvalNo\b/);
     expect(body).toMatch(/Card_Number:\s*cardNumber\b/);
@@ -140,7 +161,7 @@ describe('the privacy draft tells customers', () => {
   it('in English, in the full section and in the line to publish', () => {
     expect(
       count(
-        "Lazywait — the point-of-sale system in our branches, which receives your order so the kitchen can prepare it. If you pay online, it can also receive the amount paid, the last four digits of your card and Moyasar's reference for the payment.",
+        "Lazywait — the point-of-sale system in our branches, which receives your order so the kitchen can prepare it. If you pay online, it can also receive the amount paid, your card's type (such as mada or Visa) and its last four digits, and Moyasar's reference for the payment.",
       ),
     ).toBe(2);
   });
@@ -148,7 +169,7 @@ describe('the privacy draft tells customers', () => {
   it('in Arabic, in the full section and in the line to publish', () => {
     expect(
       count(
-        'Lazywait — نظام نقاط البيع في فروعنا، ويستقبل طلبك ليتمكن المطبخ من تحضيره. وعند الدفع الإلكتروني، قد يستقبل أيضاً المبلغ المدفوع وآخر أربعة أرقام من بطاقتك والرقم المرجعي للدفعة لدى Moyasar.',
+        'Lazywait — نظام نقاط البيع في فروعنا، ويستقبل طلبك ليتمكن المطبخ من تحضيره. وعند الدفع الإلكتروني، قد يستقبل أيضاً المبلغ المدفوع ونوع بطاقتك (مثل مدى أو Visa) وآخر أربعة أرقام منها، والرقم المرجعي للدفعة لدى Moyasar.',
       ),
     ).toBe(2);
   });

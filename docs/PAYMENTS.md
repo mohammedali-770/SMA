@@ -255,6 +255,18 @@ Lazywait about it:
     `Card_Number` at all. Owner-approved 2026-11-19. The privacy-policy draft
     (`legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`) and
     `RECORD_OF_PROCESSING.md` rows 3 and 15 name both fields.
+  - The test order after that deploy (SM-2026-000109, 07:24 UTC) was refused
+    the same way. Lazywait's own documentation for the call, supplied by the
+    owner the same day, settled it: every field except `rrn`, `status`,
+    `acquirer_key`, `softpos_key`, `names` and `driver_*` is required, among
+    them three terminal ids (`tid`, `pos_terminal_id`, `nearpay_terminal_id`)
+    the call was written for a card terminal to send. An app payment has no
+    terminal, so all three carry the fixed `MOYASAR-APP`. `Card_Type` is the
+    **card scheme** (`MADA`, `VISA`, from the paid payment record), and the
+    "Online Credit Card" label moved to `names` (`ONLINE CREDIT CARD` /
+    «بطاقة ائتمانية», Lazywait's example strings) with `status: 'approved'`.
+    The card number follows Lazywait's example shape, `****1234`. The contract
+    is recorded in `integrations/Lazywait_API_Reference.md`.
 
 **The post-payment kick uses the publishable key (2026-11-18, #487).**
 `triggerLazywaitSyncOnce` used to send `SUPABASE_ANON_KEY` as `apikey` on its

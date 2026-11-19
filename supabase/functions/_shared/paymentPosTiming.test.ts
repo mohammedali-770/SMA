@@ -92,14 +92,23 @@ describe('when the POS receives a card payment', () => {
     await webhook(payment); // and again
     expect(updates()).toHaveLength(2);
 
-    // Every one carries the same three customer facts the records name.
+    // Every one carries the customer facts the records name, and every field
+    // Lazywait's documentation marks required (read 2026-11-19).
     for (const u of updates()) {
-      expect(u.body).toMatchObject({
+      expect(u.body).toEqual({
+        client_id: 'CID_TEST',
+        branch_id: 'LWB_1',
         order_ref: 'LW-ORDER-1',
         Trans_Amount: 64,
+        tid: 'MOYASAR-APP',
+        pos_terminal_id: 'MOYASAR-APP',
+        nearpay_terminal_id: 'MOYASAR-APP',
         Approval_No: 'pay_pos_1',
-        Card_Type: 'Online Credit Card',
+        Card_Number: '****1010',
+        Card_Type: 'MADA',
         transaction_uuid: 'pay_pos_1',
+        status: 'approved',
+        names: { en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' },
       });
     }
   });
@@ -204,20 +213,37 @@ describe('a refusal with no message logs the reply body', () => {
   });
 });
 
-// 2026-11-19 06:57 UTC: Lazywait answered "Missing required fields". The owner
-// approved sending the card's last four digits (masked) and Moyasar's payment
-// id as transaction_uuid.
+// 2026-11-19: Lazywait answered "Missing required fields" twice. Its own
+// documentation for update-online-payment then showed the full required set,
+// including three terminal ids an app payment does not have.
 describe('the card number the POS receives is masked to the last four', () => {
-  it('twelve asterisks and the last four digits', async () => {
+  it('four asterisks and the last four digits, as Lazywait\'s example shows', async () => {
     const { maskedCardNumber } = await import('./paymentSync.ts');
-    expect(maskedCardNumber('1234')).toBe('************1234');
-    expect(maskedCardNumber(' 0042 ')).toBe('************0042');
+    expect(maskedCardNumber('1234')).toBe('****1234');
+    expect(maskedCardNumber(' 0042 ')).toBe('****0042');
   });
 
-  it('anything but exactly four digits leaves the field out', async () => {
+  it('anything but exactly four digits sends the asterisks alone (the field is required)', async () => {
     const { maskedCardNumber } = await import('./paymentSync.ts');
     for (const bad of [null, undefined, '', '123', '12345', '4111111111111111', 'abcd', 1234]) {
-      expect(maskedCardNumber(bad)).toBeUndefined();
+      expect(maskedCardNumber(bad)).toBe('****');
+    }
+  });
+});
+
+describe('the card type the POS receives is the card scheme', () => {
+  it('upper-cases what Moyasar reports', async () => {
+    const { posCardType } = await import('./paymentSync.ts');
+    expect(posCardType('mada')).toBe('MADA');
+    expect(posCardType('visa')).toBe('VISA');
+    expect(posCardType(' master ')).toBe('MASTER');
+    expect(posCardType('amex')).toBe('AMEX');
+  });
+
+  it('sends CARD when the scheme is missing or odd (the field is required)', async () => {
+    const { posCardType } = await import('./paymentSync.ts');
+    for (const bad of [null, undefined, '', 'x', '4111111111111111', 'a b', 'visa;drop', 'x'.repeat(30), 7]) {
+      expect(posCardType(bad)).toBe('CARD');
     }
   });
 });
