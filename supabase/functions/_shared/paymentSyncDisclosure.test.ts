@@ -42,6 +42,8 @@ const CUSTOMER_FIELDS: Record<string, RegExp> = {
   Trans_Amount: /order(?:'|’)s total/, // the order total, which is the amount paid
   Approval_No: /Moyasar(?:'|’)s payment id/,
   Card_Type: /the words "Online Credit Card"/, // always the constant ONLINE_PAYMENT_TYPE
+  Card_Number: /last four digits/, // masked: twelve asterisks + the last four (2026-11-19)
+  transaction_uuid: /Moyasar(?:'|’)s payment id/, // the same id as Approval_No (2026-11-19)
 };
 
 /** Our own integration identifiers: about our POS account, not the customer. */
@@ -88,6 +90,9 @@ describe('what the POS receives about a card payment', () => {
     expect(body).toMatch(/Card_Type:\s*ONLINE_PAYMENT_TYPE\b/);
     expect(code(SYNC)).toMatch(/export const ONLINE_PAYMENT_TYPE = 'Online Credit Card';/);
     expect(body).toMatch(/Approval_No:\s*approvalNo\b/);
+    expect(body).toMatch(/transaction_uuid:\s*approvalNo\b/);
+    expect(body).toMatch(/Card_Number:\s*cardNumber\b/);
+    expect(code(SYNC)).toMatch(/const cardNumber = maskedCardNumber\(/);
     // The approval number is the Moyasar PAYMENT id: the only caller passes it.
     const verify = code(VERIFY);
     const calls = [...verify.matchAll(/pushLazywaitOnlinePayment\(([\s\S]*?)\)\s*\.catch/g)];
@@ -135,7 +140,7 @@ describe('the privacy draft tells customers', () => {
   it('in English, in the full section and in the line to publish', () => {
     expect(
       count(
-        "Lazywait — the point-of-sale system in our branches, which receives your order so the kitchen can prepare it. If you pay online, it can also receive the amount paid and Moyasar's reference for the payment.",
+        "Lazywait — the point-of-sale system in our branches, which receives your order so the kitchen can prepare it. If you pay online, it can also receive the amount paid, the last four digits of your card and Moyasar's reference for the payment.",
       ),
     ).toBe(2);
   });
@@ -143,7 +148,7 @@ describe('the privacy draft tells customers', () => {
   it('in Arabic, in the full section and in the line to publish', () => {
     expect(
       count(
-        'Lazywait — نظام نقاط البيع في فروعنا، ويستقبل طلبك ليتمكن المطبخ من تحضيره. وعند الدفع الإلكتروني، قد يستقبل أيضاً المبلغ المدفوع والرقم المرجعي للدفعة لدى Moyasar.',
+        'Lazywait — نظام نقاط البيع في فروعنا، ويستقبل طلبك ليتمكن المطبخ من تحضيره. وعند الدفع الإلكتروني، قد يستقبل أيضاً المبلغ المدفوع وآخر أربعة أرقام من بطاقتك والرقم المرجعي للدفعة لدى Moyasar.',
       ),
     ).toBe(2);
   });

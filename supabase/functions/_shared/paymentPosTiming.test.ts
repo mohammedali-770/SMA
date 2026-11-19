@@ -99,6 +99,7 @@ describe('when the POS receives a card payment', () => {
         Trans_Amount: 64,
         Approval_No: 'pay_pos_1',
         Card_Type: 'Online Credit Card',
+        transaction_uuid: 'pay_pos_1',
       });
     }
   });
@@ -200,5 +201,23 @@ describe('a refusal with no message logs the reply body', () => {
     expect(out).not.toMatch(/\d{12,}/);
     expect(out).not.toContain('\n');
     expect(out.length).toBeLessThanOrEqual(240);
+  });
+});
+
+// 2026-11-19 06:57 UTC: Lazywait answered "Missing required fields". The owner
+// approved sending the card's last four digits (masked) and Moyasar's payment
+// id as transaction_uuid.
+describe('the card number the POS receives is masked to the last four', () => {
+  it('twelve asterisks and the last four digits', async () => {
+    const { maskedCardNumber } = await import('./paymentSync.ts');
+    expect(maskedCardNumber('1234')).toBe('************1234');
+    expect(maskedCardNumber(' 0042 ')).toBe('************0042');
+  });
+
+  it('anything but exactly four digits leaves the field out', async () => {
+    const { maskedCardNumber } = await import('./paymentSync.ts');
+    for (const bad of [null, undefined, '', '123', '12345', '4111111111111111', 'abcd', 1234]) {
+      expect(maskedCardNumber(bad)).toBeUndefined();
+    }
   });
 });
