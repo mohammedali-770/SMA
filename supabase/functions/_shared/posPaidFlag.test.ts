@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { posIsPaidFlag, posOrderPayments, posPaymentNames, posWarnings } from './posPaidFlag.ts';
+import {
+  maskedCardNumber,
+  posCardType,
+  posIsPaidFlag,
+  posOrderPayments,
+  posPaymentNames,
+  posWarnings,
+} from './posPaidFlag.ts';
 
 const captured = { rows: 1, lookupFailed: false };
 
@@ -175,5 +182,35 @@ describe('posPaymentNames: the payment type the POS shows', () => {
     const a = posPaymentNames(undefined, undefined);
     a.en = 'X';
     expect(posPaymentNames(undefined, undefined).en).toBe('ONLINE CREDIT CARD');
+  });
+});
+
+// Moved here from paymentPosTiming.test.ts on 2026-11-19, with the helpers,
+// when the separate update-online-payment call was removed.
+describe('the card number the POS receives is masked to the last four', () => {
+  it("four asterisks and the last four digits, as Lazywait's example shows", () => {
+    expect(maskedCardNumber('1234')).toBe('****1234');
+    expect(maskedCardNumber(' 0042 ')).toBe('****0042');
+  });
+
+  it('anything but exactly four digits sends the asterisks alone', () => {
+    for (const bad of [null, undefined, '', '123', '12345', '4111111111111111', 'abcd', 1234]) {
+      expect(maskedCardNumber(bad)).toBe('****');
+    }
+  });
+});
+
+describe('the card type the POS receives is the card scheme', () => {
+  it('upper-cases what Moyasar reports', () => {
+    expect(posCardType('mada')).toBe('MADA');
+    expect(posCardType('visa')).toBe('VISA');
+    expect(posCardType(' master ')).toBe('MASTER');
+    expect(posCardType('amex')).toBe('AMEX');
+  });
+
+  it('sends CARD when the scheme is missing or odd', () => {
+    for (const bad of [null, undefined, '', 'x', '4111111111111111', 'a b', 'visa;drop', 'x'.repeat(30), 7]) {
+      expect(posCardType(bad)).toBe('CARD');
+    }
   });
 });

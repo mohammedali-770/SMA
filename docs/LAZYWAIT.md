@@ -164,6 +164,9 @@ Deno-only modules, so Vitest cannot execute them).
   *(2026-11-12: the payment freeze was lifted for repository work on
   2026-11-11, when the owner chose Moyasar. The Moyasar-only change did not touch
   this fallback, so the residual risk above still stands.)*
+  *(2026-11-19: CLOSED by removal. `pushLazywaitOnlinePayment` was deleted, so
+  `paymentSync.ts` no longer calls Lazywait at all and holds no `base_url`
+  fallback; the payment reaches the POS on the ticket, through lazywait-sync.)*
 
 ## Configuration (never committed)
 Set with the admin **Lazywait POS** card, or via SQL (service role / SQL editor):
@@ -527,8 +530,9 @@ instead of the live config row.) Field-by-field state:
   paid". Why it was needed: read live 2026-11-19, the separate
   `update-online-payment` call had been refused with HTTP 400 on all 9 card
   orders since 2026-11-18 13:23 UTC, so every card order showed **unpaid** at
-  the branch (confirmed by the owner on the POS). That call still runs after
-  payment. Since the same day it sends the payment type **"Online Credit
+  the branch (confirmed by the owner on the POS). That call ran after payment
+  until it was **removed on 2026-11-19** (see "The separate payment call is
+  removed" below). Since the same day it sends the payment type **"Online Credit
   Card"** (owner: "send it to Lazywait as Online Credit Card"; it was the bare
   word `card`), and a refusal is logged with Lazywait's own code and message
   (`paymentPushError` in `_shared/paymentSync.ts`), not just the HTTP status.
@@ -1092,6 +1096,18 @@ the three terminal ids as the fixed `MOYASAR-APP`, plus `status: 'approved'`
 and the label `names` ("ONLINE CREDIT CARD" / «بطاقة ائتمانية»),
 `_shared/paymentSync.ts`. *Changed 2026-11-19: this said `Card_Type: 'card'`,
 then `'Online Credit Card'`.*
+
+**REMOVED 2026-11-19 — the paragraph above is history.** The call was deleted
+(owner: "remove it"). Once the ticket's own payment line worked (POS #11:
+Grand total 222.00 / Paid 222.00 / Remaining 0.00, APPLE PAY - MADA), the
+separate call was accepted by Lazywait and recorded nothing, and it would have
+counted the payment twice had it ever started to. The confirmation now only
+kicks `lazywait-sync`; the payment travels on the ticket as its
+`order_payments` line, created paid (`posOrderPayments`). The four payment
+functions carry the change only once redeployed. `paymentPosTiming.test.ts`
+drives the real handlers and finds no POS request on any confirmation, and
+`paymentSyncDisclosure.test.ts` fails if `update-online-payment` reappears in
+`paymentSync.ts`, `moyasarVerify.ts` or `lazywait-sync`.
 
 ## Webhook receiver (`lazywait-webhook`)
 Verifies `X-LazyWait-Signature` = HMAC-SHA256 **hex** of the body with the

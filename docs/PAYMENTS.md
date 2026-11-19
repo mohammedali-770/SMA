@@ -243,9 +243,15 @@ Lazywait about it:
   not `is_paid`. The entry shape is undocumented, so a 400
   with it attached is retried once without it; the order always reaches the
   kitchen. Detail in `LAZYWAIT.md`.
-- **`POST /pos/orders/update-online-payment` (`pushLazywaitOnlinePayment`).**
-  This records the payment itself: the amount, Moyasar's payment id and the
-  payment type. Without it, the POS list shows paid 0.00 and no payment type.
+- **`POST /pos/orders/update-online-payment` (`pushLazywaitOnlinePayment`) —
+  REMOVED 2026-11-19** (owner: "remove it"). It never made the list show the
+  payment, even once accepted; the ticket's own payment line did (POS #11:
+  Paid 222.00 / Remaining 0.00). Kept it would have counted the payment twice
+  if Lazywait ever started recording it. The confirmation now only kicks
+  `lazywait-sync`. The history below is kept because it is how the required
+  fields, and then the `payment_amount` field, were found.
+  It was meant to record the payment itself: the amount, Moyasar's payment id
+  and the payment type.
   - It was refused with HTTP 400 on every card order from 2026-11-18 13:23 UTC.
   - On 2026-11-19 the payment type changed from the bare `card` to **"Online
     Credit Card"**, the owner's choice.

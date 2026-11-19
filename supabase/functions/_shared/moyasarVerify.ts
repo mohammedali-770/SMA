@@ -46,7 +46,7 @@ import { moyasarFetch } from './moyasarHttp.ts';
 import { allowTestModeCheckout, logTestModeAllowed } from './paymentTestCheckout.ts';
 
 export { selectInvoicePayment } from './moyasar.ts';
-import { runAfterResponse, triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from './paymentSync.ts';
+import { runAfterResponse, triggerLazywaitSyncOnce } from './paymentSync.ts';
 
 const FETCH_TIMEOUT_MS = 12_000;
 
@@ -490,7 +490,6 @@ export async function validateAndConfirmMoyasarPayment(
         }).then(() => {}, () => {});
         return { outcome: 'failed', paid: false, reason: 'confirm_failed' };
       }
-      confirmedOrder = (data ?? null) as Record<string, unknown> | null;
       orderId = String(attempt.order_id ?? '');
       // Store safe card display fields (the session path does this inside finalize).
       await admin.from('payment_records').update({
@@ -500,19 +499,19 @@ export async function validateAndConfirmMoyasarPayment(
       }).eq('id', attempt.id).then(() => {}, () => {});
     }
 
-    // Paid -> hand the order to the POS, then attach the online payment. Best-effort;
-    // a POS hiccup must never undo a confirmed payment (the worker/reaper reconcile).
-    // AFTER the response (runAfterResponse): the order already exists, and the
-    // customer's receipt does not wait on the POS, so neither does this answer.
+    // Paid -> hand the order to the POS. Best-effort; a POS hiccup must never
+    // undo a confirmed payment (the worker/reaper reconcile). AFTER the response
+    // (runAfterResponse): the order already exists, and the customer's receipt
+    // does not wait on the POS, so neither does this answer.
+    //
+    // The payment itself travels ON the ticket, as its `order_payments` line
+    // (posOrderPayments, lazywait-sync), created paid in the same call. The
+    // separate update-online-payment call that used to follow here was removed
+    // on 2026-11-19 (owner: "remove it"): Lazywait accepted it but recorded
+    // nothing, and it would count the payment twice if it ever started to.
     await runAfterResponse(async () => {
       try {
         await triggerLazywaitSyncOnce(admin);
-        const { data: fresh } = orderId
-          ? await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
-          : { data: null };
-        await pushLazywaitOnlinePayment(
-          admin, (fresh ?? confirmedOrder) as Record<string, unknown> | null, paymentId,
-        ).catch(() => {});
       } catch { /* the once-a-minute sync and the reaper reconcile */ }
     });
     return { outcome: 'paid', paid: true, orderId };
