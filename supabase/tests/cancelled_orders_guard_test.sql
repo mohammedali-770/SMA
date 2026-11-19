@@ -3,6 +3,16 @@
 -- (migration 20261012120000_cancelled_orders_guard.sql; card-payment gaps
 -- PG-03 and PG-27, and docs/OWNER_ACTIONS.md §47.13).
 --
+-- AMENDED for 20261018120000_refund_cancelled_paid_orders (the owner's
+-- decision of 2026-11-19, "do the auto refund"): a paid card order is now
+-- refunded automatically AT its cancellation, once, with reason
+-- 'order_cancelled'. What this suite still pins is the 20261012120000 rule:
+-- the POS-failure refund (order_refund_due) never fires for a cancelled order,
+-- so a cancelled order never gets a SECOND refund from that path. CASE 7's
+-- fixtures are inserted already cancelled, the shape the new rule never
+-- enrols, and CASE 13 now asserts the one cancellation refund deliberately.
+-- The new rule itself: supabase/tests/refund_cancelled_paid_orders_test.sql.
+--
 -- Every GUARD case fails on the chain before that migration and passes with
 -- it. Every HONEST case passes on both: it is the flow the guard must not
 -- break. Each raises 'CASE n FAILED: ...'. To see every case on an older
@@ -35,8 +45,9 @@
 --                           unaffected
 --   CASE 13  guard   PG-03  the gap's own story, end to end: a paid order that never
 --                           reached the branch is cancelled by an administrator,
---                           and then neither Resend, the worker nor the refund
---                           trigger acts on it
+--                           and then neither Resend nor the worker acts on it,
+--                           and the POS-failure rule adds no second refund to
+--                           the one cancellation refund (since 20261018120000)
 --   CASE 14  g+h            the money-path pair, and grants: anon executes none of
 --                           the six, the app keeps what it calls
 --   CASE 15  honest  PG-03  Resend: a customer who does not own a cancelled order
@@ -348,8 +359,12 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- CASE 7 — the refund trigger: no path enrols a cancelled order
+-- CASE 7 — the refund trigger: no POS-failure path enrols a cancelled order
 -- ---------------------------------------------------------------------------
+-- Since 20261018120000 a cancelled paid card order IS enrolled, once, by the
+-- write that cancels it. These fixtures are inserted already cancelled (with
+-- triggers off), which that rule deliberately never enrols, so what this case
+-- pins is unchanged: the POS-failure rule never fires for a cancelled order.
 do $$
 declare
   v_by_resend   uuid := pg_temp.new_order(null, 'cancelled', 'online', 'paid', 'syncing', 3);
@@ -565,9 +580,15 @@ end $$;
 -- CASE 13 — the gap's story, end to end
 -- ---------------------------------------------------------------------------
 -- A paid card order never reached the branch. The customer calls to cancel, an
--- administrator cancels it in the console and refunds it by hand. The app still
--- offered Resend; before the migration three taps printed a ticket and, after
--- three failures, queued an automatic refund for money already returned.
+-- administrator cancels it in the console. The app still offered Resend; before
+-- 20261012120000 three taps printed a ticket and, after three failures, queued
+-- an automatic refund on top of the hand refund staff made then.
+--
+-- CHANGED DELIBERATELY for 20261018120000 (the owner's decision of 2026-11-19,
+-- "do the auto refund"): the hand refund is retired, and the cancellation
+-- itself now enrols exactly one automatic refund, reason 'order_cancelled'.
+-- The fixture therefore carries the captured payment a real card order has,
+-- and the case asserts that one refund and that the POS failures add nothing.
 do $$
 declare
   v_c     uuid := pg_temp.new_customer();
@@ -580,6 +601,8 @@ begin
   insert into auth.users (id, email) values (v_admin, 'cancelled-guard-admin@x');
   update public.profiles set role = 'admin' where id = v_admin;
   v_id := pg_temp.new_order(v_c, 'received', 'online', 'paid', 'failed');
+  insert into public.payment_records (order_id, provider, provider_ref, status, amount, currency, mode, confirmed_at)
+    values (v_id, 'moyasar', 'cog_pay_' || replace(v_id::text, '-', ''), 'paid', 25, 'SAR', 'test', now());
 
   perform set_config('test.auth_uid', v_admin::text, true);
   perform set_config('test.is_admin', 'true', true);
@@ -588,6 +611,11 @@ begin
   perform pg_temp.as_nobody();
   if (select status from public.orders where id = v_id) <> 'cancelled' then
     raise exception 'CASE 13 FAILED: the fixture was not cancelled';
+  end if;
+  if (select refund_state from public.orders where id = v_id) <> 'pending'
+     or (select count(*) from public.order_refunds where order_id = v_id) <> 1
+     or (select reason from public.order_refunds where order_id = v_id) is distinct from 'order_cancelled' then
+    raise exception 'CASE 13 FAILED: the cancellation did not enrol exactly one order_cancelled refund';
   end if;
 
   for i in 1..3 loop
@@ -606,15 +634,15 @@ begin
   select count(*) into v_n from public.claim_lazywait_sync_batch(100) where id = v_id;
   if v_n <> 0 then raise exception 'CASE 13 FAILED: the batch claim took the re-queued cancelled order'; end if;
 
-  -- And when its POS failures run out, no automatic refund is queued on top of
-  -- the hand refund.
+  -- And when its POS failures run out, no second refund is queued on top of
+  -- the cancellation refund.
   update public.orders set lazywait_sync_state = 'failed', pos_customer_retry_count = 3, sync_last_error = 'http_500'
    where id = v_id;
-  if (select refund_state from public.orders where id = v_id) <> 'none'
-     or exists (select 1 from public.order_refunds where order_id = v_id) then
-    raise exception 'CASE 13 FAILED: an automatic refund was queued for a cancelled order';
+  if (select count(*) from public.order_refunds where order_id = v_id) <> 1
+     or (select reason from public.order_refunds where order_id = v_id) is distinct from 'order_cancelled' then
+    raise exception 'CASE 13 FAILED: a second automatic refund was queued for a cancelled order';
   end if;
-  raise notice 'CASE 13 ok: once cancelled, the order is never resent, sent or refunded automatically';
+  raise notice 'CASE 13 ok: once cancelled, the order is never resent or sent, and is refunded exactly once';
 end $$;
 
 -- ---------------------------------------------------------------------------

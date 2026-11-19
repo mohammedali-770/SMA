@@ -1394,15 +1394,29 @@ Ambiguous orders fail the third and fourth clauses, so **an order Lazywait may
 have accepted is never auto-refunded**. Cash orders fail the first, so a
 non-prepaid final failure shows the same apology with no refund language.
 
-**A cancelled order is never enrolled** (`20261012120000`, written 2026-11-14,
-not applied). The trigger that enrols refunds, `set_order_refund_enrollment`,
-now checks `status <> 'cancelled'` before it asks `order_refund_due()`, which
-is unchanged and takes no status. The reason: a cancelled paid order is refunded
-by hand in Moyasar's dashboard while that is the procedure (`OWNER_ACTIONS.md`
-§47.20; whether it should be automatic is gap PG-13, an owner decision), so an
-automatic refund after three failed resends would be a second one. A refund
-enrolled before the order was cancelled is not stopped: it is already a refund
-in progress, and the customer is shown it.
+**A cancelled order is never enrolled by this rule** (`20261012120000`,
+written 2026-11-14, applied 2026-11-14). The trigger that enrols refunds,
+`set_order_refund_enrollment`, checks `status <> 'cancelled'` before it asks
+`order_refund_due()`, which is unchanged and takes no status. The reason then: a
+cancelled paid order was refunded by hand in Moyasar's dashboard, so an
+automatic refund after three failed resends would have been a second one. A
+refund enrolled before the order was cancelled is not stopped: it is already a
+refund in progress, and the customer is shown it.
+
+**AMENDED: a cancelled paid card order is enrolled at its cancellation**
+(`20261018120000_refund_cancelled_paid_orders`, written 2026-11-19, NOT
+applied; `MIGRATIONS.md` §70). The owner's decision of 2026-11-19, "do the auto
+refund" (gap PG-13), retires the hand procedure. Once the file is applied the
+same trigger has a second branch, which enrols a refund when an UPDATE makes an
+order cancelled and paid (the old row was not both), and the order is
+`payment_method = 'online'`, `total > 0`, `refund_state = 'none'`, with a
+`payment_records` row in status `paid`. The ledger row carries reason
+`order_cancelled` and the captured payment's full amount. An INSERT of an order
+already cancelled, and any later write to an order already cancelled and paid,
+enrol nothing, so nothing cancelled before the apply is enrolled. The rule above
+still never fires for a cancelled order, so a cancelled order gets one refund at
+most: an order already refunding when it is cancelled keeps that refund and its
+reason.
 
 A BEFORE trigger stamps `refund_state = 'pending'` atomically with whatever drove
 the order terminal; an AFTER trigger opens one `order_refunds` ledger row with a

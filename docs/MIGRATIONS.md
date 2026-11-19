@@ -58,6 +58,18 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-19 (refund on cancel) — `20261018120000_refund_cancelled_paid_orders`
+> is written, validated and NOT applied (§70, ledger row 123).** The owner's
+> decision of 2026-11-19, "do the auto refund": a paid card order that is
+> cancelled is refunded automatically, in full. **Read live 2026-11-19 05:10
+> UTC: 167 history rows, latest `20261118120101`, and `20261017120000_advisor_fixes`
+> IS applied** (by name), although ledger row 122 and §69 on the default branch
+> still say otherwise; that record is not this change's to rewrite. So on merge
+> the outstanding set is exactly ONE, this file: 162 files = 159 applied + 2
+> superseded (rows 8-9) + 1 unapplied. ONE is the dangerous shape: "apply the
+> outstanding migration" has a plausible referent. Two function bodies, no
+> row, no deploy; money path asserted by the file. **Name the target by version.**
+
 > **Updated 2026-11-18 (advisor fixes) — `20261017120000_advisor_fixes` is
 > written, validated and NOT applied (§69, ledger row 122).** On merge it is the
 > ONLY unapplied file: 161 files = 158 applied + 2 superseded (rows 8-9) + 1
@@ -1764,6 +1776,7 @@ production.
 | 120 | 20261015120000 | cancelled_order_followups | `133245864b0a` | 20261118045145 | cancelled_order_followups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 04:51:45 UTC** on explicit owner approval ("Apply 20261015120000 and deploy push-dispatch", naming the file by version), via MCP `apply_migration`, **one call, target named explicitly**. §67, `OWNER_ACTIONS.md` §57. §9-B.7: the merged copy (merged in #478 as `0dd6a20`; sha256 `133245864b0a80edeedc3e7d272cb2ccaf42ebcab838367ee2585d268000185b`, 521 lines / 29 041 bytes) was sent verbatim. It carries no `\u` escape, and there was no transport deviation. **THE FIRST ATTEMPT, ON 2026-11-17, LANDED NOTHING:** it was interrupted by a container restart. A read-only check afterwards found history still at 164 and both pre-images in place (`begin_lazywait_create_attempt` `c67adf40dece53accd70637f07fd5ae3` / 1 235, `requeue_lazywait_order` `45d8e8a0d08a1d4f75d4dba84c744452` / 1 869). The second call landed. **Outcomes, md5(prosrc) / length, equal to the hashes pre-computed from the merged file before sending:** `begin_lazywait_create_attempt` `365fcc1b8d82a95eac196076740bd957` / 1 854; `requeue_lazywait_order` `5b83a99cb110ec14bb99deb2c839e0fc` / 2 062; one overload each. **Grants, read afterwards:** `anon` executes neither; `authenticated` executes only `requeue_lazywait_order`; `service_role` executes `begin_lazywait_create_attempt`. **Rolled-back fixtures:** 0 branches (`name_en`) and 0 orders (`order_number`) starting `VERIFY-20261015120000-` survive. 0 orders were in a `syncing`, `pending` or `retrying` sync state at the time; 82 orders in all. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`). Live history **164 → 165**. **Version NOT aligned** (§9-D). **`push-dispatch` was deployed** after this row was verified, the same day under the same approval: version 9 → **10**, ACTIVE, `verify_jwt` false as `supabase/config.toml`, ezbr_sha256 `ba959385…`. Its 8 bundle files, from the default branch at `0dd6a20`, read back from Supabase byte-identical, and only `push-dispatch/index.ts` differs from v9. A `pos_sync` event for a cancelled order is now closed `superseded` and sends none of the four POS-outcome pushes. No smoke request was sent. Reconciled by name against the default branch at `0dd6a20`: 159 files = 157 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -10032,3 +10045,153 @@ unchanged.
    public.is_staff());` and `drop index` of the 21 names. Neither loses data.
 
 Steps: `docs/OWNER_ACTIONS.md` §59.
+
+## 70. A cancelled paid card order is refunded automatically — WRITTEN 2026-11-19, NOT APPLIED (ledger row 123)
+
+`20261018120000_refund_cancelled_paid_orders.sql`. **Written 2026-11-19 on
+branch `feat/refund-cancelled-paid-20261119`, validated on a local chain,
+awaiting owner approval.** The owner's decision of 2026-11-19, in
+conversation: "do the auto refund" (gap PG-13, `OWNER_ACTIONS.md` §47.20 and
+§61). Section number 70 follows §69, `20261017120000`, written 2026-11-18 and
+unapplied as recorded on the default branch. Version `20261017120000` was
+taken, so this file is `20261018120000`; it sorts after every file on the
+default branch at `db6aa8f`.
+
+sha256 `63e2ad30e1b0335155afc5a663f007fee84144f603a0c2e8cdb800da22d4eb87`, 529 lines / 31 366 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape, and its two new function bodies carry no comment line, so an apply
+that trims comments for transport stores exactly the repository bodies.
+
+### What it changes
+
+- **`set_order_refund_enrollment`** (BEFORE INSERT OR UPDATE on `orders`)
+  keeps its 20261012120000 branch exactly, and gains an `elsif` that sets
+  `refund_state = 'pending'` and `refund_required_at` when all hold: the write
+  is an UPDATE; the new row is `cancelled` and `paid` and the old row was not
+  both; `payment_method = 'online'`; `coalesce(total, 0) > 0`;
+  `refund_state = 'none'` (the column is NOT NULL, default `'none'`); and a
+  `payment_records` row for the order has status `paid`. That covers an
+  administrator cancelling a paid card order, and a captured payment confirmed
+  onto an order already cancelled (`confirm_order_payment` writes its `paid`
+  payment row before it updates the order).
+- **`open_order_refund_record`** (AFTER) records reason `order_cancelled` for
+  a cancelled order and `pos_delivery_failed_after_customer_retries`
+  otherwise. Payment row chosen, amount (the captured payment's, so in full),
+  idempotency key `refund_<order id hex>`, SECURITY DEFINER, `search_path` and
+  grants are unchanged. `order_refunds.reason` has no CHECK.
+
+### What it does not do
+
+- **No backfill.** An INSERT of an order already cancelled, and any later write
+  to an order already cancelled and paid, enrol nothing. An order cancelled
+  before the apply is never refunded by this file.
+- **`order_refund_due` is unchanged**, and the file proves it by reading
+  `md5(prosrc)` and `md5(pg_get_functiondef)` before and comparing after.
+- An order already refunding (the POS-failure path), refunded or failed keeps
+  its one refund and its reason when cancelled.
+- Duplicate payments stay by hand (D2). Dashboard refunds are still not
+  recorded (PG-14). The worker, the claim, the back-off, R14 and R18 are
+  unchanged; a cancellation refund is an ordinary `order_refunds` row to them.
+- No row written, no grant changed, no trigger re-bound. **No deploy
+  implied.** **MONEY PATH UNTOUCHED**, asserted before and after:
+  `place_order` `12b6816d256c29b76edf947ae1a7ea77`, `compute_order_snapshot`
+  `22e2d42935459e7bf93abb2941b56325` (`md5(pg_get_functiondef(oid))`).
+- The customer's copy for an order with a refund in progress is unchanged
+  ("we could not send your order …"), which is not true of a cancelled order
+  the branch received. That is an app change (`PAYMENTS.md` §6).
+
+### Pre-images and post-images, measured on the local chain
+
+| Function | Pre-image `md5(prosrc)` | Content hash (comments and whitespace removed) | Post-image `md5(prosrc)` | Post-image `md5(pg_get_functiondef)` |
+| --- | --- | --- | --- | --- |
+| `set_order_refund_enrollment` | `9a4933ea83d69149b7f823ea6f412f66` (615), the §64 body, live byte-identical at that apply | `ad171355ac20a33fbf1e8823f36c51ec` | `ae3484c4ee1cea8fdc1bb6e5c4bda58f` (971) | `7aaea8e780fcd73ee3ec31c29dfb028e` |
+| `open_order_refund_record` | `140778650aaea14bd32d4e087ae68ad9` (1 139), the §55 body | `f360a345632a726828394619365ae2f4` | `4629460bd7b642a8727b21bb30b87a63` (927) | `54851dafd4822c03029249b77a35fc76` |
+| `order_refund_due` (not replaced) | `da53a4aaf041ac91036eaacfc8d58863` (378) on the chain | — | unchanged | `b4c54ea9611d3430aac6057ab7d3e0e0` on the chain |
+
+The pre-image guard accepts the exact hash, the content hash (a live body
+trimmed of comments) or this file's own body (a re-apply). The post-image is
+shorter than the pre-image for `open_order_refund_record` because its comment
+lines moved out of the body. **Check which side of the apply a hash describes
+before calling a mismatch** (CLAUDE.md §8).
+
+### What the file checks
+
+Outcomes first, in a sub-transaction aborted by a final `raise`, with explicit
+order numbers so no `SM-` number is drawn: a paid card order cancelled
+(one row, reason `order_cancelled`, amount 10.00, the payment's
+`provider_ref`, the deterministic key), cash, unpaid, comped, no paid payment
+row, already refunded, inserted cancelled and paid, a later write to each, a
+POS-failure refund then cancelled (one row, original reason), and a payment
+captured after the cancellation (enrolled). The rollback is proven. Then the
+comment-stripped text (eight statement-shaped clauses; with the new branch cut
+out the body hashes as the pre-image; with the old literal put back
+`open_order_refund_record` does too), SECURITY DEFINER and `search_path`, both
+triggers still bound, grants (anon and authenticated execute neither function,
+service_role keeps `open_order_refund_record`, and neither client role can
+UPDATE `orders`, which is what lets an invoker-rights trigger read
+`payment_records`), `order_refund_due` and the money path.
+
+### Validation
+
+- Local chain harness (`.github/sql-ci/run.sh`, Postgres 16 + PostGIS),
+  2026-11-19: **162 migrations applied; 99 suites run, 97 passed, 2
+  quarantined, 0 new failures**. The base chain, run the same way first, gave
+  161 / 98 / 96 / 2 / 0. The six idempotence report-only entries are the same
+  six before and after. The file re-applies as a no-op. The existing-data
+  stage applied it onto seeded rows with no existing row changed.
+- Paired suite `supabase/tests/refund_cancelled_paid_orders_test.sql`, 11
+  cases, cancelling through `admin_set_order_status` as an administrator and
+  capturing through `confirm_order_payment`. **On the base chain CASES 1, 2 and
+  10 fail** (the guard cases); the eight honest cases pass on both.
+- `cancelled_orders_guard_test.sql` CASE 13 pinned "a cancelled order is
+  refunded by hand, never automatically". It was changed deliberately, with a
+  comment citing the owner's decision: its fixture now carries a captured
+  payment, and it asserts exactly one `order_cancelled` refund and that the
+  POS-failure rule adds no second one. CASE 7's fixtures are inserted already
+  cancelled, which the new rule never enrols; it gained a comment and its
+  assertions are unchanged.
+- **Mutation checks**, eight mutants, each applied onto a chain that holds
+  this file and then run against both suites:
+
+  | Mutant | Migration's own block | Paired suite |
+  | --- | --- | --- |
+  | transition check dropped | killed (inserted-cancelled probe enrolled) | killed (CASE 9) |
+  | `payment_method = 'online'` dropped | killed (cash probe) | killed (CASE 3) |
+  | paid `payment_records` EXISTS dropped | killed (no-record probe) | killed (CASE 6) |
+  | `refund_state = 'none'` dropped | killed (already-refunded probe) | killed (CASE 7) |
+  | reason reverted to the old literal | killed | killed (CASES 1, 10; guard suite CASE 13) |
+  | cancellation branch removed | killed | killed (CASES 1, 2, 10; guard suite CASE 13) |
+  | `total > 0` dropped | killed (comped probe) | killed (CASE 5) |
+  | `tg_op = 'UPDATE'` dropped | killed (text check only) | **survived** |
+
+  The `tg_op` mutant survives every outcome test because on INSERT `old` is
+  NULL, which already makes the transition test NULL, and the payment row
+  cannot exist before the order. The clause is kept as the stated intent and
+  pinned by the text check.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must hold, or stop:
+   ```sql
+   select p.proname, md5(p.prosrc), length(p.prosrc)
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('set_order_refund_enrollment', 'open_order_refund_record', 'order_refund_due');
+   -- set_order_refund_enrollment 9a4933ea… (615), open_order_refund_record 14077865… (1 139)
+   select md5(pg_get_functiondef('public.place_order'::regproc)),
+          md5(pg_get_functiondef('public.compute_order_snapshot'::regproc));
+   -- 12b6816d256c29b76edf947ae1a7ea77 | 22e2d42935459e7bf93abb2941b56325
+   select count(*) from public.orders
+    where status = 'cancelled' and payment_status = 'paid' and payment_method = 'online'
+      and refund_state = 'none';
+   -- how many cancelled paid card orders this file will NOT refund (no backfill)
+   ```
+2. Apply `20261018120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: both post-image hashes above; `order_refund_due`
+   unchanged; the money-path pair unchanged; no `VERIFY-20261018120000-` order
+   or branch survived; `order_refunds` unchanged in count.
+4. Rollback, if ever wanted: re-create the two pre-image bodies (section 3 of
+   `20261012120000` and section 3 of `20261003120000`). Neither loses data; a
+   refund already enrolled keeps running.
+
+Steps: `docs/OWNER_ACTIONS.md` §61.

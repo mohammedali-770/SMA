@@ -632,30 +632,62 @@ Moyasar but without Apple Pay.
 
 ### What is automatic, and what is not
 
-The refund worker (`payment-refund`) refunds orders that were **paid but
-provably never reached the branch**. Postgres decides that
-(`order_refund_due()`, [Order confirmation flow §6](ORDER_CONFIRMATION_FLOW.md)),
-not the worker.
+The refund worker (`payment-refund`) refunds two kinds of order. Postgres
+decides which, not the worker:
 
-**Not covered today:**
+- **paid but provably never reached the branch** (`order_refund_due()`,
+  [Order confirmation flow §6](ORDER_CONFIRMATION_FLOW.md)), reason
+  `pos_delivery_failed_after_customer_retries`;
+- **a paid card order that is cancelled**, reason `order_cancelled`, once
+  `20261018120000_refund_cancelled_paid_orders` is applied (`MIGRATIONS.md`
+  §70). **Written 2026-11-19, NOT applied.** The owner's decision of
+  2026-11-19: "do the auto refund". The write that makes an online order
+  cancelled and paid enrols one refund for the full captured amount when a
+  `paid` `payment_records` row exists, the total is above zero and the order
+  has no refund yet. That covers an administrator cancelling a paid order and
+  a captured payment confirmed onto an order already cancelled. A cash order, an
+  unpaid order, a comped order (total 0) and an order with no paid payment row
+  are never sent to Moyasar. An order cancelled before the apply is **not**
+  enrolled: there is no backfill.
 
-- **A cancelled paid order that the branch accepted.** It gets no refund row.
-  The 2026-11-12 review reproduced this on a local chain. It predates this
-  change. The owner's answer "Automatic via Moyasar" therefore is not yet fully
-  implemented; covering it needs an owner decision and its own change.
-- **Any cancelled paid order, since `20261012120000` was applied (2026-11-14).**
-  Before that, a cancelled order that the branch never received could be enrolled
-  by the rule above, after three failed resends, on top of the hand refund staff had
-  already made (gap PG-03). The trigger now skips a cancelled order. A refund
-  enrolled *before* the order was cancelled still runs, so look at the order's
-  refund status before refunding it by hand.
+**The refund job was switched on 2026-11-19 at 04:47 UTC** on the owner's
+approval ("do the auto refund"): cron job 6, `payment-refund-worker`, active,
+with 0 refunds queued at that moment (`OWNER_ACTIONS.md` §47.16). So, once
+`20261018120000` is applied, a cancelled paid card order is refunded on the
+next run, within about five minutes.
+
+**The hand procedure for cancelled orders is retired from the apply.** Until
+`20261018120000` is applied, a cancelled paid order still gets no automatic
+refund (the trigger has skipped cancelled orders since `20261012120000`, gap
+PG-03) and is refunded by hand in Moyasar's dashboard, as before. **After the
+apply, staff must not also refund a cancelled order by hand.** It would not pay
+the customer twice: Moyasar's documentation says a refund is made only from a
+`paid` or `captured` payment and for at most its amount (Moyasar API reference
+§3.2, read from Moyasar's public documentation, not tested), so the worker's
+attempt after a full hand refund is expected to be refused with a 4xx. The
+worker writes that refund `failed`, and R14 `REFUND_FAILED` raises a critical
+incident for a refund that was in fact made, which then stays open until
+dashboard refunds are recorded (gap PG-14). A refund enrolled *before* the
+order was cancelled (the POS-failure path) keeps running, and cancelling it
+adds no second refund.
+
+**What the customer reads, stated rather than buried.** An order with a refund
+in progress shows the refund state, as it always has: "Sorry — we could not
+send your order because the ordering service is unavailable. Your payment will
+be refunded automatically." For a cancelled order that the branch did receive,
+the first half is not true. Changing that copy is an app change, not part of
+`20261018120000`.
+
+**Still not automatic:**
+
 - **A duplicate payment** (§10). Nothing refunds it automatically. **Decided
   2026-11-17 (refund draft D2): duplicates are refunded by hand** from Moyasar's
   dashboard, from the R15 listing on the "Refunds and payments needing
   attention" card. That is the design, not a gap.
+- **A cancelled paid order before `20261018120000` is applied**, as above.
 
-Either one is refunded by hand in Moyasar's dashboard today. That is a live
-money action and an owner approval (§5 of CLAUDE.md). **A refund made in the
+Either one is refunded by hand in Moyasar's dashboard. That is a live money
+action and an owner approval (§5 of CLAUDE.md). **A refund made in the
 dashboard is not recorded on the order yet.** The owner decided on 2026-11-17
 that it should be, automatically, from Moyasar's `refunded` notification (gap
 PG-14). That is its own later change; until it lands, keep the written refund
@@ -699,8 +731,9 @@ that change lands.
 
 ### How the worker runs
 
-1. The `payment-refund-worker` cron job (every 5 minutes, **disabled since
-   2026-07-29**) calls `invoke_payment_refund_processor()`.
+1. The `payment-refund-worker` cron job (every 5 minutes; disabled from
+   2026-07-29, **switched on 2026-11-19 at 04:47 UTC** on the owner's approval)
+   calls `invoke_payment_refund_processor()`.
 2. The driver returns without sending unless: exactly one payment row, enabled,
    provider `moyasar` (after `20261003120000`; before it, the gate is `tap`),
    a non-blank `secret_config.refund_trigger_secret` on that row, and the
@@ -738,8 +771,8 @@ day, and every newer refund waited. Since `20261013120000` was applied and
 (`MIGRATIONS.md` §68); live since that file was applied on 2026-11-18
 (05:55:54 UTC, ledger row 121).** Before it, a refund that could not finish was
 tried on every run, every 5 minutes, for ever, and raised nothing until it was
-`failed`. The refund job's cron is still inactive, so no refund runs until it is
-turned on (`OWNER_ACTIONS.md` §47.16).
+`failed`. The refund job's cron was inactive when this was written; it was
+switched on 2026-11-19 at 04:47 UTC (`OWNER_ACTIONS.md` §47.16).
 
 - **Back-off.** Each release as `pending` sets `order_refunds.next_attempt_at`,
   and `claim_order_refund` takes only refunds that are due. The wait after the
