@@ -9,6 +9,7 @@ import {
   timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
+import { posIsPaidFlag } from '../_shared/posPaidFlag.ts';
 
 /**
  * lazywait-sync — server-side POS sync worker (invoked by a schedule/cron, NOT
@@ -228,13 +229,23 @@ Deno.serve(async (req: Request) => {
       // CRM fallback) and were costing ~0.69 s serially for no reason. All three
       // run before the pre-send gate, so a rejection still lands on the
       // proven-not-sent path.
-      const [{ data: branch }, { data: items }, profileRow] = await Promise.all([
+      // The fourth read is the captured-payment check behind `is_paid`
+      // (posPaidFlag.ts). It runs only for an online order the row says is
+      // paid, so a cash order costs nothing extra.
+      const [{ data: branch }, { data: items }, profileRow, capturedPaymentRead] = await Promise.all([
         admin.from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle(),
         admin.from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', orderId),
         order.customer_id
           ? admin.from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle()
           : Promise.resolve({ data: null }),
+        order.payment_method === 'online' && order.payment_status === 'paid'
+          ? admin.from('payment_records').select('id').eq('order_id', orderId).eq('status', 'paid').limit(1)
+          : Promise.resolve({ data: [] as unknown[], error: null }),
       ]);
+      const posIsPaid = posIsPaidFlag(order as { payment_method?: unknown; payment_status?: unknown }, {
+        rows: Array.isArray(capturedPaymentRead.data) ? capturedPaymentRead.data.length : 0,
+        lookupFailed: Boolean(capturedPaymentRead.error),
+      });
 
       // `ORDER_ITEM_SELECT` is a plain string, so supabase-js cannot parse the
       // select at the type level and infers its GenericStringError fallback.
@@ -309,10 +320,10 @@ Deno.serve(async (req: Request) => {
       }
 
       // ---- Build the confirmed Create Order payload ------------------------
-      // `isPaid` is deliberately NOT passed: `is_paid` is a confirmed contract
-      // field, but telling a cashier an order needs no cash is a financial
-      // signal and payment work is frozen (CLAUDE.md §6). Wiring it is a
-      // separate owner decision.
+      // `isPaid` is passed ONLY when the payment is certain (owner, 2026-11-19):
+      // an online order the row says is paid AND a captured payment record
+      // written by the server after Moyasar confirmed it. The ticket is created
+      // paid in the same call, never marked paid afterwards. See posPaidFlag.ts.
       //
       // Order TOTALS are passed as of 2026-08-27 (Q9). That is a different
       // thing from `is_paid`: it tells the branch what the order is worth, not
@@ -331,6 +342,7 @@ Deno.serve(async (req: Request) => {
         // `Total 0.00`. It is a note, not the `is_paid` contract flag — see
         // CreateOrderInput.
         isComped: Boolean(order.is_comped),
+        isPaid: posIsPaid,
         customerId: crmCustomerId,
         customerPhone: (order.customer_phone as string | null) ?? null,
         // The destination, for a delivery order. Read from the SNAPSHOT rather
