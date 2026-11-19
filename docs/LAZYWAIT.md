@@ -396,8 +396,10 @@ instead of the live config row.) Field-by-field state:
   POS's own payment state, which is the financial signal CLAUDE.md §6 reserves
   for a separate owner decision; this only annotates the field that already
   carries the customer's instructions, and states what the order **is** rather
-  than instructing the cashier what to collect. `lazywait.test.ts` pins both the
-  label and the continued absence of `isPaid`. Comped orders themselves are
+  than instructing the cashier what to collect. `lazywait.test.ts` pins the
+  label. (`is_paid` itself is sent since 2026-11-19, for a card order with a
+  captured payment only; a comped order has none, so it never gets it. See the
+  payment-flag note below.) Comped orders themselves are
   documented in `docs/DISCOUNTS_CAMPAIGNS.md`.
 
   **LIVE since 2026-08-26 12:46 UTC**, when `lazywait-sync` was redeployed to
@@ -462,11 +464,20 @@ instead of the live config row.) Field-by-field state:
   is still not sent**: it is optional, `tax` says the same thing, and a
   percentage is the one field that might invite the POS to recompute
   `subtotal × 1.15`.
-- **`is_paid` is supported but not wired.** It is a confirmed field, but telling
-  a cashier an order needs no cash is a financial signal and payment work was
-  frozen (CLAUDE.md §6) when this was written. Wiring it is still a separate
-  owner decision. *(2026-11-12: the provider is now Moyasar; `is_paid` is still
-  not sent.)*
+- **`is_paid` is sent, for a certain card payment only (owner decision,
+  2026-11-19).** The owner's rule: a card order goes to Lazywait as paid when
+  its ticket is created, never sent first and marked paid later, and only when
+  the payment is 100% done. `posIsPaidFlag` (`_shared/posPaidFlag.ts`) returns
+  `true` only when the claimed order row is `payment_method = 'online'` and
+  `payment_status = 'paid'` **and** a `payment_records` row for it has status
+  `paid`. Only the server writes that row, after fetching the payment from
+  Moyasar itself. A cash order, an unpaid or comped order, or a failed lookup
+  sends no flag, so the failure direction is "shown unpaid", never "shown
+  paid". Why it was needed: read live 2026-11-19, the separate
+  `update-online-payment` call had been refused with HTTP 400 on all 9 card
+  orders since 2026-11-18 13:23 UTC, so every card order showed **unpaid** at
+  the branch (confirmed by the owner on the POS). That call still runs after
+  payment, unchanged.
 
 ### Unmapped modifiers — folded into `details`, never dropped, never re-priced
 Only a modifier carrying a `modifiers.lazywait_addon_id` can become a contract
@@ -817,9 +828,10 @@ Two fields stay deliberately unsent:
   information. A percentage is exactly the field that might invite the POS to
   recompute `subtotal × 1.15` and print 32.20 on a 28.00 order. Not worth the
   tidiness on a customer-facing money figure.
-- **`is_paid`** — still the CLAUDE.md §6 financial signal reserved for a separate
-  owner decision. Telling a branch what an order is *worth* is not the same as
-  telling the POS it has been *settled*.
+- **`is_paid`** — sent since 2026-11-19, but only for a card order with a
+  captured payment (see "`is_paid` is sent" above). Telling a branch what an
+  order is *worth* is still not the same as telling the POS it has been
+  *settled*, which is why the flag needs the captured payment record.
 
 A comped order now prints `Subtotal 9.00 / Discount 9.00 / Total 0.00` beside the
 COMPLIMENTARY label, which explains itself.
@@ -828,9 +840,9 @@ COMPLIMENTARY label, which explains itself.
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
 `order_deliveries[]` element shape — the vendor's own **pickup** sample sends it
 EMPTY next to `order_payments[]`/`order_taxes[]`, so it is a POS-side collection
-rather than caller input — `order_status_id`, `tax_percentage` (see the payload
-section: `tax` carries the same information without inviting a recompute), and
-`is_paid` (CLAUDE.md §6).
+rather than caller input — `order_status_id` and `tax_percentage` (see the
+payload section: `tax` carries the same information without inviting a
+recompute). `is_paid` left this list on 2026-11-19 (above).
 
 **The money fields are no longer on this list.** `subtotal`, `discount`, `tax`,
 `total` and `order_delivery_fee` have been sent since 2026-08-27; Q9 was answered

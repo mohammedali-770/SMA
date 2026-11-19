@@ -603,7 +603,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(r.ok && (r.payload.order_items as { price: number }[])[0].price).toBe(25.01);
   });
 
-  it('sends is_paid only when the caller sets it — the live worker does not (payment freeze)', () => {
+  it('sends is_paid only when the caller sets it', () => {
     const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
     expect(buildCreateOrderPayload(base).ok && 'is_paid' in (buildCreateOrderPayload(base) as { payload: Record<string, unknown> }).payload).toBe(false);
     const paid = buildCreateOrderPayload({ ...base, isPaid: false });
@@ -802,19 +802,23 @@ describe('lazywait-sync worker wiring (source contract)', () => {
     expect(workerSrc).toContain('mapOrderItemRows(');
   });
 
-  it('forwards the order note, the CRM id and the phone, and does NOT set is_paid', () => {
+  // Changed 2026-11-19 (owner: send a card order to Lazywait as paid only when
+  // the payment is certain, never mark it paid afterwards). The worker now sets
+  // is_paid, and ONLY through posIsPaidFlag, which needs a captured payment.
+  it('forwards the order note, the CRM id and the phone, and sets is_paid only via posIsPaidFlag', () => {
     expect(workerSrc).toContain('orderDetails: (order.notes as string | null)');
     expect(workerSrc).toContain('customerId: crmCustomerId');
     expect(workerSrc).toContain('customerPhone: (order.customer_phone as string | null)');
-    // `is_paid` is a confirmed field but a financial signal to the cashier;
-    // wiring it is a separate owner decision under the payment freeze.
-    expect(workerSrc).not.toMatch(/\bisPaid\s*:/);
+    expect(workerSrc.match(/\bisPaid\s*:/g) ?? []).toHaveLength(1);
+    expect(workerSrc).toContain('isPaid: posIsPaid,');
+    expect(workerSrc).toContain('const posIsPaid = posIsPaidFlag(');
+    expect(workerSrc).toMatch(
+      /from\('payment_records'\)\.select\('id'\)\.eq\('order_id', orderId\)\.eq\('status', 'paid'\)/,
+    );
   });
 
   it('forwards the comp flag, which is the ONLY comp signal the branch gets', () => {
     expect(workerSrc).toContain('isComped: Boolean(order.is_comped)');
-    // And it still does not reach for the financial flag to do it.
-    expect(workerSrc).not.toMatch(/\bisPaid\s*:/);
   });
 
   it('never logs the customer phone into the sync request metadata', () => {
