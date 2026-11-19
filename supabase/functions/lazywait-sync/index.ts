@@ -9,7 +9,7 @@ import {
   timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
-import { posIsPaidFlag } from '../_shared/posPaidFlag.ts';
+import { posIsPaidFlag, posOrderPayments, posWarnings } from '../_shared/posPaidFlag.ts';
 
 /**
  * lazywait-sync — server-side POS sync worker (invoked by a schedule/cron, NOT
@@ -239,7 +239,9 @@ Deno.serve(async (req: Request) => {
           ? admin.from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle()
           : Promise.resolve({ data: null }),
         order.payment_method === 'online' && order.payment_status === 'paid'
-          ? admin.from('payment_records').select('id').eq('order_id', orderId).eq('status', 'paid').limit(1)
+          ? admin.from('payment_records').select('id, provider_ref, card_scheme, card_last_four')
+            .eq('order_id', orderId).eq('status', 'paid')
+            .order('confirmed_at', { ascending: false }).limit(1)
           : Promise.resolve({ data: [] as unknown[], error: null }),
       ]);
       const posIsPaid = posIsPaidFlag(order as { payment_method?: unknown; payment_status?: unknown }, {
@@ -521,15 +523,48 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown> }>(lw, {
+      // The payment line for a ticket created paid (posOrderPayments). Its
+      // shape is not documented, so a 400 with it attached is retried ONCE
+      // without it: a 400 is a validation refusal, so no ticket exists yet and
+      // re-sending cannot duplicate one. Any other status is handled exactly as
+      // before. The order always reaches the kitchen; only the payment line
+      // can be lost, and the log says so.
+      const orderPayments = posOrderPayments(
+        posIsPaid,
+        order.total,
+        Array.isArray(capturedPaymentRead.data)
+          ? (capturedPaymentRead.data[0] as Record<string, unknown> | undefined)
+          : undefined,
+      );
+      if (orderPayments) built.payload.order_payments = orderPayments;
+      let orderPaymentsOutcome: string | null = orderPayments ? 'sent' : null;
+
+      let res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown>; warnings?: unknown }>(lw, {
         method: 'POST', path: '/pos/orders/create', body: built.payload, timeoutMs: 15000,
       });
+      if (orderPayments && res.status === 400) {
+        orderPaymentsOutcome = `dropped_after_400: ${safeErr(res.error || res.text).slice(0, 160)}`;
+        delete built.payload.order_payments;
+        res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown>; warnings?: unknown }>(lw, {
+          method: 'POST', path: '/pos/orders/create', body: built.payload, timeoutMs: 15000,
+        });
+      }
 
       const outcome = classifyCreateOrderResult({ status: res.status, data: res.data, error: res.error });
       const attempt = Number(order.sync_attempt_count ?? 0) + 1;
       const nowIso = new Date().toISOString();
       const priorFailureAt = (order.first_pos_sync_failure_at as string | null) ?? null;
-      const trimmedResponse = { success: res.data?.success ?? res.ok, order_ref: outcome.orderRef };
+      // `warnings` is how the POS says it would charge something different from
+      // what we sent (e.g. ORDER_TOTAL_MISMATCH with the till's own figures).
+      // Kept in the sync log so a price disagreement is visible instead of
+      // silently ignored; it carries money figures and codes, never customer
+      // data, and is bounded.
+      const trimmedResponse = {
+        success: res.data?.success ?? res.ok,
+        order_ref: outcome.orderRef,
+        warnings: posWarnings(res.data?.warnings),
+        order_payments: orderPaymentsOutcome,
+      };
       const reqMeta = { order_items_count: mappedItems.length, branch_id: built.payload.branch_id };
 
       // ---- OK: a usable order_ref -> the ONLY path that says "confirmed" ----
@@ -634,7 +669,8 @@ Deno.serve(async (req: Request) => {
           first_pos_sync_failure_at: priorFailureAt ?? nowIso,
           sync_last_error: safeErr(res.error) || outcome.reason,
         },
-        p_log_status: 'failed', p_error: outcome.reason, p_notify_status: 'pos_failed',
+        p_log_status: 'failed', p_request: reqMeta, p_response: trimmedResponse,
+        p_error: outcome.reason, p_notify_status: 'pos_failed',
       });
     } catch (e) {
       // Unexpected error. If the request may already have left (marker set),

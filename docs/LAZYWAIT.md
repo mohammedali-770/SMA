@@ -464,6 +464,30 @@ instead of the live config row.) Field-by-field state:
   is still not sent**: it is optional, `tax` says the same thing, and a
   percentage is the one field that might invite the POS to recompute
   `subtotal × 1.15`.
+- **`order_payments` carries the card payment, for the same orders
+  (2026-11-19).** With only `is_paid`, the receipt printed "Paid" but the POS
+  order list showed paid 0.00 and no payment type, even once
+  `update-online-payment` was accepted (SM-2026-000110, 07:51 UTC): that call
+  is built for a card terminal in the branch, and the list reads the order's
+  own payment lines, which we always sent empty. Owner: "just fill it with
+  Online Credit Card for now". A ticket created paid now carries one line
+  (`posOrderPayments`, `_shared/posPaidFlag.ts`): `names` "ONLINE CREDIT CARD" /
+  «بطاقة ائتمانية», `amount` = the order total, `Card_Type` (the scheme, e.g.
+  `MADA`), `Card_Number` (`****` + last four), `status: 'approved'`, and
+  `Approval_No`/`transaction_uuid` (Moyasar's payment id). **Lazywait does not
+  document the entry shape**; it mirrors the sibling lists and its own
+  update-online-payment fields. So a Create Order answered **400** while the
+  line is attached is re-sent **once** without it: a 400 is a validation
+  refusal, so no ticket exists and the retry cannot duplicate one. The order
+  always reaches the kitchen; the sync log's `order_payments` says `sent` or
+  `dropped_after_400: <reason>`. No other status is retried (a 5xx or timeout
+  may have created the ticket). Pinned by `lazywaitOrderPayments.test.ts`,
+  which drives the real worker.
+- **Create Order `warnings` are logged (2026-11-19).** Lazywait answers with
+  `warnings` when the till would charge something other than what we sent
+  (`ORDER_TOTAL_MISMATCH`, with its own figures). They were ignored; the sync
+  log now keeps them (`posWarnings`: at most 5, 1 000 characters, long digit
+  runs masked). A terminal refusal now logs its response as well.
 - **`is_paid` is sent, for a certain card payment only (owner decision,
   2026-11-19).** The owner's rule: a card order goes to Lazywait as paid when
   its ticket is created, never sent first and marked paid later, and only when
@@ -851,7 +875,8 @@ COMPLIMENTARY label, which explains itself.
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
 `order_deliveries[]` element shape — the vendor's own **pickup** sample sends it
 EMPTY next to `order_payments[]`/`order_taxes[]`, so it is a POS-side collection
-rather than caller input — `order_status_id` and `tax_percentage` (see the
+rather than caller input (`order_payments[]` is no longer sent empty for a card
+order created paid, 2026-11-19, above) — `order_status_id` and `tax_percentage` (see the
 payload section: `tax` carries the same information without inviting a
 recompute). `is_paid` left this list on 2026-11-19 (above).
 

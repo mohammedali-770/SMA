@@ -234,6 +234,12 @@ Lazywait about it:
   already marked paid, and only for a certain payment: an online order the row
   says is paid **and** a `payment_records` row with status `paid`. This makes
   the receipt print "Paid".
+- **`order_payments` on Create Order (2026-11-19, `posOrderPayments`).** The
+  same ticket also carries one payment line, "ONLINE CREDIT CARD" for the
+  order total with the card scheme and masked last four, because the POS list
+  reads payment lines, not `is_paid`. The entry shape is undocumented, so a 400
+  with it attached is retried once without it; the order always reaches the
+  kitchen. Detail in `LAZYWAIT.md`.
 - **`POST /pos/orders/update-online-payment` (`pushLazywaitOnlinePayment`).**
   This records the payment itself: the amount, Moyasar's payment id and the
   payment type. Without it, the POS list shows paid 0.00 and no payment type.
