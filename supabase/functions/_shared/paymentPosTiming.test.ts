@@ -12,16 +12,20 @@ vi.mock('./supabaseClient.ts', () => ({
  * WHEN the branch POS is told about a card payment. Gap PG-09 in
  * `docs/readiness/20261113-card-payments-gaps.md`.
  *
- * `docs/RECORD_OF_PROCESSING.md` activity 15 says what Lazywait receives for a
- * card order (the total, Moyasar's payment id, the word "card") and when: each
- * time our server confirms the payment while the POS holds the order, so more
- * than once, and possibly after the POS gains the order. The first version of
- * that sentence said "once, and nothing sends it later", which review showed
- * false on 2026-11-14. This drives the REAL payment-initiate and payment-webhook
- * handlers over the in-memory fakes (paymentFakes.ts) and counts the requests
- * to the POS, so the record and the code cannot drift apart unnoticed. (A staff
- * re-check, `payment-test-config`'s `verify_order`, reaches the same
- * confirmation through `verifyMoyasarAttempt`; it is not driven here.)
+ * Since 2026-11-19 the answer is: only on the ticket itself. lazywait-sync
+ * creates it paid, with one `order_payments` line (posPaidFlag.ts,
+ * lazywaitOrderPayments.test.ts). The confirmation used to follow up with a
+ * separate update-online-payment call, sent on every confirmation while the
+ * POS held the order; Lazywait accepted it and recorded nothing, and it would
+ * have counted the payment twice had it ever started to, so the owner had it
+ * removed ("remove it"). `docs/RECORD_OF_PROCESSING.md` activities 3 and 15
+ * say the same.
+ *
+ * This drives the REAL payment-initiate and payment-webhook handlers over the
+ * in-memory fakes (paymentFakes.ts) and counts the requests to the POS, so the
+ * record and the code cannot drift apart unnoticed. (A staff re-check,
+ * `payment-test-config`'s `verify_order`, reaches the same confirmation
+ * through `verifyMoyasarAttempt`; it is not driven here.)
  */
 
 let db: FakePaymentDb;
@@ -70,47 +74,25 @@ async function paidSession() {
 
 const updates = () => posPosts.filter((p) => p.path.endsWith('/pos/orders/update-online-payment'));
 
-describe('when the POS receives a card payment', () => {
-  it('sends nothing while the POS does not hold the order', async () => {
+describe('a confirmation never posts the payment to the POS', () => {
+  it('nothing is sent while the POS does not hold the order, however often it is confirmed', async () => {
     const { payment, order } = await paidSession();
-    expect(updates()).toHaveLength(0);
-    // Everything else is in place (the branch is mapped); only the POS
-    // reference is missing, and a repeated confirmation still sends nothing.
     order.branch_id = 'br000000-0000-4000-8000-000000000001';
     await webhook(payment);
     expect(updates()).toHaveLength(0);
+    expect(posPosts).toHaveLength(0);
   });
 
-  it('sends it again on every later confirmation, once the POS holds the order', async () => {
+  it('nothing is sent once the POS holds the order either (removed 2026-11-19)', async () => {
     const { payment, order } = await paidSession();
     // lazywait-sync has since created the order in the POS.
     order.lazywait_ref = 'LW-ORDER-1';
     order.branch_id = 'br000000-0000-4000-8000-000000000001';
-
     await webhook(payment); // Moyasar repeats its notification
-    expect(updates()).toHaveLength(1);
     await webhook(payment); // and again
-    expect(updates()).toHaveLength(2);
-
-    // Every one carries the customer facts the records name, and every field
-    // Lazywait's documentation marks required (read 2026-11-19).
-    for (const u of updates()) {
-      expect(u.body).toEqual({
-        client_id: 'CID_TEST',
-        branch_id: 'LWB_1',
-        order_ref: 'LW-ORDER-1',
-        Trans_Amount: 64,
-        tid: 'MOYASAR-APP',
-        pos_terminal_id: 'MOYASAR-APP',
-        nearpay_terminal_id: 'MOYASAR-APP',
-        Approval_No: 'pay_pos_1',
-        Card_Number: '****1010',
-        Card_Type: 'MADA',
-        transaction_uuid: 'pay_pos_1',
-        status: 'approved',
-        names: { en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' },
-      });
-    }
+    expect(updates()).toHaveLength(0);
+    // No sync trigger secret is configured here, so no POS request of any kind.
+    expect(posPosts).toHaveLength(0);
   });
 });
 
@@ -124,24 +106,35 @@ describe('the confirmation answers before the POS handoff', () => {
 
   beforeEach(() => {
     deferred = [];
-    rt.EdgeRuntime = { waitUntil: (p) => { deferred.push(p); } };
+    rt.EdgeRuntime = {
+      waitUntil: (p) => {
+        deferred.push(p);
+      },
+    };
     // The POS kick is configured, so the handoff starts with a request to
     // lazywait-sync, which the gate below holds open, as a slow POS would.
     setEnv('SUPABASE_PUBLISHABLE_KEYS', JSON.stringify({ default: 'sb_publishable_fixture' }));
     const lw = db.rows('integration_settings').find((r) => r.provider_type === 'lazywait');
     (lw!.secret_config as Record<string, unknown>).sync_trigger_secret = 'sync_fixture';
     // Hold every POS request open until the test releases it.
-    const gate = new Promise<void>((r) => { releasePos = r; });
+    const gate = new Promise<void>((r) => {
+      releasePos = r;
+    });
     const inner = (globalThis as { fetch: typeof fetch }).fetch;
-    (globalThis as Record<string, unknown>).fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    (globalThis as Record<string, unknown>).fetch = async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ) => {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
       if (url.hostname !== 'api.moyasar.com') await gate;
       return inner(input, init);
     };
   });
-  afterEach(() => { delete rt.EdgeRuntime; });
+  afterEach(() => {
+    delete rt.EdgeRuntime;
+  });
 
-  it('returns paid while the POS request is still open, then sends it in the background', async () => {
+  it('returns paid while the POS kick is still open, then sends it in the background', async () => {
     const session = db.session({ total: 64 });
     const init = await call('payment-initiate', { checkoutSessionId: session.id, language: 'en' });
     const payment = moyasar.pay(String(init.body.invoiceId), 'pay_pos_bg', 'paid');
@@ -160,90 +153,8 @@ describe('the confirmation answers before the POS handoff', () => {
     order0().branch_id = 'br000000-0000-4000-8000-000000000001';
     releasePos();
     await Promise.all(deferred);
-    expect(posPosts.some((p) => p.path === '/functions/v1/lazywait-sync')).toBe(true);
-    expect(updates()).toHaveLength(1);
-    expect(updates()[0].body).toMatchObject({ order_ref: 'LW-ORDER-BG', Approval_No: 'pay_pos_bg' });
-  });
-});
-
-// 2026-11-19: nine update-online-payment refusals were logged as a bare
-// `payment_push_400`, which said nothing about why.
-describe('a refused payment push is logged with the reason', () => {
-  it('keeps the status, the provider code and the provider message', async () => {
-    const { paymentPushError } = await import('./paymentSync.ts');
-    expect(paymentPushError({ ok: true, status: 200, code: null, error: null })).toBeNull();
-    expect(paymentPushError({ ok: false, status: 400, code: 'VALIDATION', error: 'Card_Type is invalid' }))
-      .toBe('payment_push_400 VALIDATION Card_Type is invalid');
-    expect(paymentPushError({ ok: false, status: 0, code: null, error: null })).toBe('payment_push_0');
-  });
-
-  it('masks long digit runs and stays bounded', async () => {
-    const { paymentPushError } = await import('./paymentSync.ts');
-    const out = paymentPushError({ ok: false, status: 400, code: null, error: `card 4111111111111111 ${'x'.repeat(400)}` })!;
-    expect(out).not.toMatch(/\d{12,}/);
-    expect(out).toContain('[digits]');
-    expect(out.length).toBeLessThanOrEqual(240);
-  });
-});
-
-// 2026-11-19 06:33 UTC: the log read "payment_push_400 HTTP 400". Lazywait's
-// 400 reply has no `message` field, so the client's generic fallback hid the
-// reason; the raw reply body is logged instead.
-describe('a refusal with no message logs the reply body', () => {
-  it('uses the body when the error is the generic HTTP fallback', async () => {
-    const { paymentPushError } = await import('./paymentSync.ts');
-    expect(paymentPushError({ ok: false, status: 400, code: null, error: 'HTTP 400',
-      text: '{"errors":{"Card_Type":["is required"]}}' }))
-      .toBe('payment_push_400 {"errors":{"Card_Type":["is required"]}}');
-  });
-
-  it('keeps a real message and does not add the body', async () => {
-    const { paymentPushError } = await import('./paymentSync.ts');
-    expect(paymentPushError({ ok: false, status: 400, code: null, error: 'Order not found', text: '{"x":1}' }))
-      .toBe('payment_push_400 Order not found');
-  });
-
-  it('collapses whitespace, masks long digit runs and stays bounded', async () => {
-    const { paymentPushError } = await import('./paymentSync.ts');
-    const out = paymentPushError({ ok: false, status: 400, code: null, error: 'HTTP 400',
-      text: `{\n  "card": "4111111111111111",\n  "pad": "${'y'.repeat(400)}"\n}` })!;
-    expect(out).not.toMatch(/\d{12,}/);
-    expect(out).not.toContain('\n');
-    expect(out.length).toBeLessThanOrEqual(240);
-  });
-});
-
-// 2026-11-19: Lazywait answered "Missing required fields" twice. Its own
-// documentation for update-online-payment then showed the full required set,
-// including three terminal ids an app payment does not have.
-describe('the card number the POS receives is masked to the last four', () => {
-  it('four asterisks and the last four digits, as Lazywait\'s example shows', async () => {
-    const { maskedCardNumber } = await import('./paymentSync.ts');
-    expect(maskedCardNumber('1234')).toBe('****1234');
-    expect(maskedCardNumber(' 0042 ')).toBe('****0042');
-  });
-
-  it('anything but exactly four digits sends the asterisks alone (the field is required)', async () => {
-    const { maskedCardNumber } = await import('./paymentSync.ts');
-    for (const bad of [null, undefined, '', '123', '12345', '4111111111111111', 'abcd', 1234]) {
-      expect(maskedCardNumber(bad)).toBe('****');
-    }
-  });
-});
-
-describe('the card type the POS receives is the card scheme', () => {
-  it('upper-cases what Moyasar reports', async () => {
-    const { posCardType } = await import('./paymentSync.ts');
-    expect(posCardType('mada')).toBe('MADA');
-    expect(posCardType('visa')).toBe('VISA');
-    expect(posCardType(' master ')).toBe('MASTER');
-    expect(posCardType('amex')).toBe('AMEX');
-  });
-
-  it('sends CARD when the scheme is missing or odd (the field is required)', async () => {
-    const { posCardType } = await import('./paymentSync.ts');
-    for (const bad of [null, undefined, '', 'x', '4111111111111111', 'a b', 'visa;drop', 'x'.repeat(30), 7]) {
-      expect(posCardType(bad)).toBe('CARD');
-    }
+    // The background work is the kick of lazywait-sync, and only that.
+    expect(posPosts.map((p) => p.path)).toEqual(['/functions/v1/lazywait-sync']);
+    expect(updates()).toHaveLength(0);
   });
 });

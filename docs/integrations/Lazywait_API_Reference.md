@@ -45,7 +45,7 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | POST | `/pos/orders/create` | `createOrder` | pickup body **C** (vendor contract 2026-08-24, dev host); delivery **[A]**, gated |
 | PUT | `/pos/orders/:order_ref` | `updateOrder` | `order_items` = **full replacement** **[A]**; `order_ref` in path only |
 | POST | `/pos/orders/update-cash-payment` | `updateCashPayment` | `Trans_Amount` **C** — Tap-frozen, typed only |
-| POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | **Vendor contract confirmed 2026-11-19, see below.** Live caller is `pushLazywaitOnlinePayment` (`paymentSync.ts`); this typed builder has no caller |
+| POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | **Vendor contract confirmed 2026-11-19, see below.** **No caller since 2026-11-19**: `pushLazywaitOnlinePayment` was removed; the payment travels on the Create Order ticket (`order_payments`) |
 | POST | `/pos/orders/void-all` | `voidAll` | `cancelation_reason` (documented spelling) **C** |
 
 ### Menu products (6)
@@ -111,9 +111,11 @@ was measured against. Response: `{ "success": true }`.
 | `names` | object | no | Localized payment-method label | `{ en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' }` |
 | `driver_name`, `driver_id` | string | no | Optional driver | not sent |
 
-**Open question for Lazywait:** whether `nearpay_terminal_id` is validated as
-a real terminal UUID. The fixed `MOYASAR-APP` is a value the vendor never
-promised to accept; the first test order after deploy answers it.
+**Answered, then moot:** the call was accepted with `MOYASAR-APP` in all three
+terminal ids (SM-2026-000110), so they are not validated as real terminals. It
+recorded nothing visible in the POS list, and was removed on 2026-11-19. The
+payment line on Create Order is what the list reads; its Paid column takes
+`payment_amount` (measured with probe order #10, see `LAZYWAIT.md`).
 
 ## Field casing (preserve exactly — case-sensitive)
 | Field | Where | Type |

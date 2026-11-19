@@ -1,4 +1,30 @@
-import { maskedCardNumber, ONLINE_PAYMENT_NAMES, posCardType } from './paymentSync.ts';
+/**
+ * The generic payment-method label (owner, 2026-11-19: "send it to Lazywait as
+ * Online Credit Card"), used when the card brand is unknown. Both strings are
+ * the ones Lazywait's own documentation uses for `names`.
+ */
+export const ONLINE_PAYMENT_NAMES = { en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' } as const;
+
+/**
+ * The card scheme as the POS expects it (`Card_Type`, "Card scheme", e.g.
+ * VISA). Moyasar reports it in lower case (`mada`, `visa`, `master`), stored on
+ * the paid payment record. An unknown or odd value sends CARD.
+ */
+export function posCardType(scheme: unknown): string {
+  const s = typeof scheme === 'string' ? scheme.trim().toUpperCase() : '';
+  return /^[A-Z][A-Z0-9_]{1,19}$/.test(s) ? s : 'CARD';
+}
+
+/**
+ * The card number as the POS may see it: four asterisks and the last four
+ * digits, the shape Lazywait's own example uses ("****1234"), so it carries
+ * nothing beyond what a paper receipt prints. Anything that is not exactly four
+ * digits sends the asterisks alone.
+ */
+export function maskedCardNumber(lastFour: unknown): string {
+  const s = typeof lastFour === 'string' ? lastFour.trim() : '';
+  return /^\d{4}$/.test(s) ? `****${s}` : '****';
+}
 
 /**
  * Whether a POS ticket may be created as PAID (`is_paid: true` on Create Order).
@@ -47,8 +73,9 @@ export function posIsPaidFlag(
  *
  * Only for a ticket already certain to be paid (`paid === true` from
  * posIsPaidFlag) and a positive total. Anything else returns undefined and the
- * ticket goes out exactly as before. Nothing here is new to the POS: the same
- * values already reach it through update-online-payment.
+ * ticket goes out exactly as before. Since 2026-11-19 this line is the ONLY
+ * way the payment reaches the POS: the separate update-online-payment call was
+ * removed, having been accepted without recording anything.
  */
 /**
  * The payment-type label the POS shows, named after the card brand Moyasar
