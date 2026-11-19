@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**294 TypeScript test files declaring 4297 test blocks, plus 99 SQL suites.**
+**294 TypeScript test files declaring 4298 test blocks, plus 99 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -164,7 +164,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-109 files, 1444 declared test blocks.
+109 files, 1445 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -223,7 +223,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/orders/branchNumberCard.test.ts` | 5 | the receipt never shows a pending branch number |
 | `apps/mobile/src/features/orders/cancelledOrderWiring.test.ts` | 5 | cancelled order wiring |
 | `apps/mobile/src/features/orders/loyaltyEarnState.test.ts` | 7 | loyaltyEarnState |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 25 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 26 | reference and channel safety |
 | `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 14 | isTerminalOrderStatus |
 | `apps/mobile/src/features/orders/receiptGate.test.ts` | 10 | the order page appears only with the branch order number (owner, 2026-11-18) |

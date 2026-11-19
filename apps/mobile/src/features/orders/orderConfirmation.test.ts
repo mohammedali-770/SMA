@@ -1,3 +1,4 @@
+import { STRINGS } from '../../i18n/strings';
 import { describe, expect, it } from 'vitest';
 import {
   CUSTOMER_RESEND_LIMIT,
@@ -261,11 +262,36 @@ describe('cancelled orders (gap PG-03)', () => {
     expect(state).not.toBe('final_failure_refund_pending');
     expect(confirmationPresentation(state).bodyKey).not.toBe('oc_failed_refund_pending_body');
   });
-  it('keeps a refund that exists as the story, as the server does', () => {
-    expect(orderConfirmationState(order({ refundState: 'pending' }))).toBe('final_failure_refund_pending');
-    expect(orderConfirmationState(order({ refundState: 'processing' }))).toBe('final_failure_refund_pending');
-    expect(orderConfirmationState(order({ refundState: 'refunded' }))).toBe('final_failure_refunded');
-    expect(orderConfirmationState(order({ refundState: 'failed' }))).toBe('final_failure_refund_failed');
+  // Changed 2026-11-19 (owner: "do the auto refund", 20261018120000). The
+  // refund is still the story, but a cancelled order now says it was
+  // CANCELLED with its refund. The POS-failure copy ("we could not send your
+  // order because the ordering service is unavailable") is false for an order
+  // the branch received and then cancelled.
+  it('keeps a refund that exists as the story, told as a cancellation', () => {
+    expect(orderConfirmationState(order({ refundState: 'pending' }))).toBe('cancelled_refund_pending');
+    expect(orderConfirmationState(order({ refundState: 'processing' }))).toBe('cancelled_refund_pending');
+    expect(orderConfirmationState(order({ refundState: 'refunded' }))).toBe('cancelled_refunded');
+    expect(orderConfirmationState(order({ refundState: 'failed' }))).toBe('cancelled_refund_failed');
+    for (const refundState of ['pending', 'processing', 'refunded', 'failed']) {
+      const p = confirmationPresentation(orderConfirmationState(order({ refundState })));
+      expect(p.titleKey).toBe('oc_cancelled');
+      expect(p.bodyKey).toMatch(/^oc_cancelled_refund/);
+      expect(p.canResend).toBe(false);
+    }
+  });
+
+  it('the cancelled-refund copy never claims the order failed to send', () => {
+    for (const lang of ['en', 'ar'] as const) {
+      for (const key of [
+        'oc_cancelled_refund_pending_body',
+        'oc_cancelled_refunded_body',
+        'oc_cancelled_refund_failed_body',
+      ] as const) {
+        const text = STRINGS[lang][key];
+        expect(text.length).toBeGreaterThan(10);
+        expect(text).not.toMatch(/could not send|ordering service|تعذر إرسال|خدمة الطلبات/);
+      }
+    }
   });
   it('changes nothing for an order that is not cancelled', () => {
     for (const status of [

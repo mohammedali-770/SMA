@@ -61,12 +61,14 @@ to Production.**
 > **Updated 2026-11-19 (refund on cancel) — `20261018120000_refund_cancelled_paid_orders`
 > is written, validated and NOT applied (§70, ledger row 123).** The owner's
 > decision of 2026-11-19, "do the auto refund": a paid card order that is
-> cancelled is refunded automatically, in full. As recorded on the default
-> branch at `db6aa8f` (not re-read live by this change), on merge the
-> outstanding set is TWO: `20261017120000` (§69) and this file. 162 files =
-> 158 applied + 2 superseded (rows 8-9) + 2 unapplied, against 166 live
-> history rows as last recorded. Two function bodies, no row, no deploy; money
-> path asserted by the file. **Name the target by version.**
+> cancelled is refunded automatically, in full. **Read live 2026-11-19 05:10
+> UTC: 167 history rows, latest `20261118120101`, and `20261017120000_advisor_fixes`
+> IS applied** (by name), although ledger row 122 and §69 on the default branch
+> still say otherwise; that record is not this change's to rewrite. So on merge
+> the outstanding set is exactly ONE, this file: 162 files = 159 applied + 2
+> superseded (rows 8-9) + 1 unapplied. ONE is the dangerous shape: "apply the
+> outstanding migration" has a plausible referent. Two function bodies, no
+> row, no deploy; money path asserted by the file. **Name the target by version.**
 
 > **Updated 2026-11-18 (advisor fixes) — `20261017120000_advisor_fixes` is
 > written, validated and NOT applied (§69, ledger row 122).** On merge it is the

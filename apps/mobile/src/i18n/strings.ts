@@ -409,6 +409,9 @@ export const STRINGS = {
     // cancelled card order is refunded automatically is an open owner decision.
     oc_cancelled: 'Order cancelled',
     oc_cancelled_body: 'Your order was cancelled. Contact support if this is unexpected.',
+    oc_cancelled_refund_pending_body: 'Your order was cancelled. Your payment is being refunded to your card automatically.',
+    oc_cancelled_refunded_body: 'Your order was cancelled and your payment has been refunded. It can take a few business days to appear on your card.',
+    oc_cancelled_refund_failed_body: 'Your order was cancelled. We could not complete your refund automatically, so our team will refund you and contact you.',
     // Shown when Resend is pressed on a screen loaded before the cancellation.
     // The server's refusal message says the same in English.
     oc_resend_cancelled: 'This order was cancelled, so it was not sent to the branch.',
@@ -767,6 +770,9 @@ export const STRINGS = {
     oc_resend_failed: 'تعذر الإرسال في الوقت الحالي. فضلاً حاول مرة أخرى بعد قليل.',
     oc_cancelled: 'تم إلغاء الطلب',
     oc_cancelled_body: 'تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع.',
+    oc_cancelled_refund_pending_body: 'تم إلغاء طلبك، ويجري استرداد المبلغ إلى بطاقتك تلقائياً.',
+    oc_cancelled_refunded_body: 'تم إلغاء طلبك واسترداد المبلغ. قد يستغرق ظهوره في بطاقتك بضعة أيام عمل.',
+    oc_cancelled_refund_failed_body: 'تم إلغاء طلبك. تعذّر إتمام الاسترداد تلقائياً، وسيتولى فريقنا ذلك ويتواصل معك.',
     oc_resend_cancelled: 'تم إلغاء هذا الطلب، لذلك لم يُرسل إلى الفرع.',
     oc_refund_status: 'حالة الاسترداد',
     oc_refund_pending: 'الاسترداد قيد المعالجة',

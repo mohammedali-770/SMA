@@ -303,6 +303,21 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
+**AMENDED 2026-11-19 — `20261018120000_refund_cancelled_paid_orders` is
+written, validated and UNAPPLIED, and on merge it is the ONLY unapplied file.**
+Read live 2026-11-19 05:10 UTC: 167 history rows, latest `20261118120101`, and
+`20261017120000_advisor_fixes` is APPLIED, although the paragraph below and
+`docs/MIGRATIONS.md` row 122 still describe it as unapplied. On merge: 162
+repository files = 159 applied + 2 superseded (rows 8-9) + 1 unapplied. The
+owner's decision of 2026-11-19, "do the auto refund": cancelling a paid card
+order enrols one automatic refund in full, reason `order_cancelled`;
+transition-only, no backfill. Two function bodies; no row, no deploy; money
+path self-asserted (`12b6816d…` / `22e2d429…`). The refund job
+(`payment-refund-worker`, cron job 6) was switched on 2026-11-19 04:47 UTC on
+the owner's approval, with 0 refunds queued. **Name the target by version.**
+Detail: `docs/MIGRATIONS.md` §70 (ledger row 123); steps:
+`docs/OWNER_ACTIONS.md` §61.
+
 **AMENDED 2026-11-18 (later) — `20261017120000_advisor_fixes` is written,
 validated and UNAPPLIED, so on merge the outstanding set is exactly ONE: that
 file** (branch `db/advisor-fixes-20261118`). Moyasar is not in it: the Moyasar

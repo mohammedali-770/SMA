@@ -26,7 +26,17 @@ export type CustomerOrderState =
    * function this file mirrors takes no status. The server's resend refusal
    * reports the same name (20261012120000).
    */
-  | 'order_cancelled';
+  | 'order_cancelled'
+  /**
+   * A cancelled order whose payment is being, or has been, refunded. Since
+   * 20261018120000 cancelling a paid card order refunds it automatically
+   * (owner, 2026-11-19), so the customer must read "cancelled, refund on its
+   * way" -- not the POS-failure copy, which says the order never reached the
+   * branch and is false for an order the branch received.
+   */
+  | 'cancelled_refund_pending'
+  | 'cancelled_refunded'
+  | 'cancelled_refund_failed';
 
 export interface OrderConfirmationInput {
   orderType?: string | null;
@@ -125,7 +135,8 @@ export type ConfirmationBodyKey =
   | 'oc_not_sent_paid_body' | 'oc_not_sent_unpaid_body'
   | 'oc_failed_refund_pending_body' | 'oc_failed_refunded_body'
   | 'oc_failed_refund_failed_body' | 'oc_failed_unpaid_body'
-  | 'oc_cancelled_body';
+  | 'oc_cancelled_body'
+  | 'oc_cancelled_refund_pending_body' | 'oc_cancelled_refunded_body' | 'oc_cancelled_refund_failed_body';
 export interface ConfirmationPresentation {
   titleKey: ConfirmationTitleKey; bodyKey: ConfirmationBodyKey; tone: ConfirmationTone;
   success: boolean; canResend: boolean;
@@ -166,6 +177,9 @@ const PRESENTATION: Record<CustomerOrderState, ConfirmationPresentation> = {
   final_failure_refund_failed:{titleKey:'oc_failed',bodyKey:'oc_failed_refund_failed_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
   unpaid_final_failure:{titleKey:'oc_failed',bodyKey:'oc_failed_unpaid_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
   order_cancelled:{titleKey:'oc_cancelled',bodyKey:'oc_cancelled_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
+  cancelled_refund_pending:{titleKey:'oc_cancelled',bodyKey:'oc_cancelled_refund_pending_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
+  cancelled_refunded:{titleKey:'oc_cancelled',bodyKey:'oc_cancelled_refunded_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
+  cancelled_refund_failed:{titleKey:'oc_cancelled',bodyKey:'oc_cancelled_refund_failed_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},
 };
 export function confirmationPresentation(s:CustomerOrderState):ConfirmationPresentation{return PRESENTATION[s];}
 
@@ -189,6 +203,14 @@ const REFUND_LIFECYCLE = new Set(['pending', 'processing', 'refunded', 'failed']
  * which takes no status, and orderConfirmationSqlParity.test.ts pins the two.
  */
 export function orderConfirmationState(o:{status?:string|null;orderType?:string|null;paymentMethod?:string|null;paymentStatus?:string|null;lazywaitSyncState?:string|null;lazywaitRef?:unknown;syncBlockedReason?:string|null;syncNextAttemptAt?:string|null;posCreateAttemptedAt?:string|null;posCustomerRetryCount?:number|null;refundState?:string|null;}):CustomerOrderState{
-  if(o.status==='cancelled'&&!REFUND_LIFECYCLE.has(o.refundState??'none'))return 'order_cancelled';
+  if(o.status==='cancelled'){
+    // A cancelled order never shows the POS story: whether it reached the
+    // branch no longer matters, only what happens to the money (2026-11-19).
+    const r=o.refundState??'none';
+    if(!REFUND_LIFECYCLE.has(r))return 'order_cancelled';
+    if(r==='refunded')return 'cancelled_refunded';
+    if(r==='failed')return 'cancelled_refund_failed';
+    return 'cancelled_refund_pending';
+  }
   return deriveCustomerOrderState({orderType:o.orderType,paymentMethod:o.paymentMethod,paymentStatus:o.paymentStatus,syncState:o.lazywaitSyncState,ref:o.lazywaitRef,blockedReason:o.syncBlockedReason,nextAttemptAt:o.syncNextAttemptAt,posCreateAttemptedAt:o.posCreateAttemptedAt,customerRetryCount:o.posCustomerRetryCount,refundState:o.refundState});
 }
