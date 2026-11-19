@@ -4762,6 +4762,11 @@ language.
 
 ### 47.16 Make sure `refund_trigger_secret` exists, and re-enable the refund job
 
+**DONE 2026-11-19.** The refund job was switched on at 04:47 UTC on the
+owner's approval ("do the auto refund"): cron job 6, `payment-refund-worker`,
+active, with 0 refunds queued at that moment. The steps below are kept as the
+record of how, and as the way to stop it (`active := false`).
+
 **Only after 47.3 and 47.4, and before 47.18.** The secret lives in the payment
 row's `secret_config`, not in Vault. Both the refund driver and `payment-refund`
 read it there, and no migration creates it.
@@ -4934,7 +4939,16 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
 
 ### 47.20 Decisions the code leaves to you
 
-- **A cancelled paid order is NOT refunded automatically.** The owner's answer on
+- ~~**A cancelled paid order is NOT refunded automatically.**~~ **DECIDED
+  2026-11-19: "do the auto refund". Superseded once
+  `20261018120000_refund_cancelled_paid_orders` is applied (§61).** From the
+  apply, the cancellation of a paid card order enrols one automatic refund in
+  full (reason `order_cancelled`), and **staff must not also refund a cancelled
+  order by hand**: Moyasar's documentation says a refund is made only from a
+  paid or captured payment and for at most its amount, so the automatic attempt
+  after a hand refund is expected to be refused, not paid twice, but it then
+  raises a critical R14 `REFUND_FAILED` incident for a refund that was made.
+  Until the apply, the paragraph below still applies. The owner's answer on
   2026-11-11 was "automatic via Moyasar". The code enrols an automatic refund in
   one case only: a paid order that never reached the POS after the customer's
   resends (`order_refund_due`, reason `pos_delivery_failed_after_customer_retries`).
@@ -5723,6 +5737,45 @@ test, or use a branch whose POS you can ignore.
 the order reads paid, and the function logs show
 `"event":"payment_test_mode_allowed"`, once from `payment-initiate` and once
 from the confirmation.
+
+## 61. A cancelled paid card order is refunded automatically — one apply
+
+**Opened 2026-11-19.** Your decision, 2026-11-19: "do the auto refund". A paid
+card order that is cancelled is refunded automatically, in full, by the refund
+job that was switched on the same morning (§47.16). Until now the database
+deliberately skipped cancelled orders, because staff refunded them by hand
+(§47.20, gap PG-13). That is in `20261018120000_refund_cancelled_paid_orders`.
+
+What it does: the write that makes an online order cancelled and paid opens one
+refund for the captured amount, reason `order_cancelled`, when a paid payment
+record exists, the total is above zero and the order has no refund yet. Nothing
+cancelled before the apply is refunded: there is no backfill. Cash, unpaid and
+comped orders are never sent to Moyasar. Duplicates stay by hand (D2). Detail:
+[`MIGRATIONS.md`](MIGRATIONS.md) §70 and [`PAYMENTS.md`](PAYMENTS.md) §6.
+
+**It is a database change only. No deploy is implied:** `payment-refund`
+already refunds any queued refund.
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Merge the pull request.** Nothing changes in Production on merge.
+2. **Apply `20261018120000` by name**, after re-hashing the merged copy against
+   [`MIGRATIONS.md`](MIGRATIONS.md) §70 and the read-only checks listed there.
+   Never "the outstanding migrations": on merge it sits beside
+   `20261017120000` (§59) as recorded on the default branch, and an instruction
+   that names no version is not an instruction to apply either.
+3. **From the apply, stop refunding cancelled orders by hand.** Before
+   refunding anything by hand, look at the order's refund status in the
+   console.
+
+**Done looks like:** §70 marked APPLIED with ledger row 123 filled in, and
+§47.20's first bullet closed.
+
+**Not decided here, still yours:** the customer's wording. An order with a
+refund in progress reads "we could not send your order because the ordering
+service is unavailable. Your payment will be refunded automatically", which is
+not true of a cancelled order the branch received. That is an app change and a
+build (§47.17).
 
 ## Owner-action closeout rule
 

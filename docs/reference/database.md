@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **161**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261017120000_advisor_fixes.sql`.
+Migration files in the repository: **162**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261018120000_refund_cancelled_paid_orders.sql`.
 
 ## Tables
 
@@ -232,7 +232,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `normalize_manual_pos_sync_notification` | 1 | `20260813143000_manual_only_pos_resend.sql` |
 | `normalize_modifier_availability` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `normalize_variant_availability` | 1 | `20260923120000_branch_variant_availability.sql` |
-| `open_order_refund_record` | 2 | `20261003120000_moyasar_only_payments.sql` |
+| `open_order_refund_record` | 3 | `20261018120000_refund_cancelled_paid_orders.sql` |
 | `operations_alert_settings_get` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alert_settings_safe` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alert_settings_update` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
@@ -313,7 +313,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `set_loyalty_safe_reason` | 2 | `20260724190000_loyalty_reason_history_safe.sql` |
 | `set_modifier_snooze` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `set_order_number` | 3 | `20261006120000_rls_initplan_live_board_order_year.sql` |
-| `set_order_refund_enrollment` | 2 | `20261012120000_cancelled_orders_guard.sql` |
+| `set_order_refund_enrollment` | 3 | `20261018120000_refund_cancelled_paid_orders.sql` |
 | `set_payment_settings` | 1 | `20260709140000_payment_methods.sql` |
 | `set_pos_sync_deadline` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `set_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
