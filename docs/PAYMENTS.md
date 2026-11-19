@@ -227,6 +227,22 @@ documented by Moyasar; a page that ignores it is unharmed.
 | Console: Online Payment switch guard | `src/lib/onlinePaymentGate.ts` |
 | Post-payment POS handoff (kick + online-payment attach) | `supabase/functions/_shared/paymentSync.ts` |
 
+**How a card payment reaches the POS (2026-11-19).** Two things tell
+Lazywait about it:
+
+- **`is_paid` on Create Order (#503, `lazywait-sync`).** The ticket is created
+  already marked paid, and only for a certain payment: an online order the row
+  says is paid **and** a `payment_records` row with status `paid`. This makes
+  the receipt print "Paid".
+- **`POST /pos/orders/update-online-payment` (`pushLazywaitOnlinePayment`).**
+  This records the payment itself: the amount, Moyasar's payment id and the
+  payment type. Without it, the POS list shows paid 0.00 and no payment type.
+  - It was refused with HTTP 400 on every card order from 2026-11-18 13:23 UTC.
+  - On 2026-11-19 the payment type changed from the bare `card` to **"Online
+    Credit Card"**, the owner's choice.
+  - A refusal now logs Lazywait's own code and message (`paymentPushError`), so
+    the next one says why.
+
 **The post-payment kick uses the publishable key (2026-11-18, #487).**
 `triggerLazywaitSyncOnce` used to send `SUPABASE_ANON_KEY` as `apikey` on its
 kick of `lazywait-sync`. After the legacy keys are deactivated, the gateway
