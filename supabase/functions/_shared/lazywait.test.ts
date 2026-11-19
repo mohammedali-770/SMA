@@ -813,8 +813,12 @@ describe('lazywait-sync worker wiring (source contract)', () => {
     expect(workerSrc).toContain('isPaid: posIsPaid,');
     expect(workerSrc).toContain('const posIsPaid = posIsPaidFlag(');
     expect(workerSrc).toMatch(
-      /from\('payment_records'\)\.select\('id'\)\.eq\('order_id', orderId\)\.eq\('status', 'paid'\)/,
+      /from\('payment_records'\)\.select\('id, provider_ref, card_scheme, card_last_four'\)\s*\.eq\('order_id', orderId\)\.eq\('status', 'paid'\)/,
     );
+    // The payment line (2026-11-19) rides on the same certainty: built only by
+    // posOrderPayments from posIsPaid, and attached in exactly one place.
+    expect(workerSrc).toContain('const orderPayments = posOrderPayments(\n        posIsPaid,');
+    expect(workerSrc.match(/payload\.order_payments\s*=/g) ?? []).toHaveLength(1);
   });
 
   it('forwards the comp flag, which is the ONLY comp signal the branch gets', () => {
