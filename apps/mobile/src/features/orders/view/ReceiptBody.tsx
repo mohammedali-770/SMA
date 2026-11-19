@@ -26,6 +26,7 @@ import { orderDisplayNumber } from '../../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../../lib/payment';
 import { formatRiyadhDateTime, orderLineLabel } from '../../../utils/format';
 import { loyaltyEarnState } from '../loyaltyEarnState';
+import { vatInvoiceNoteKey } from '../vatInvoiceNote';
 import { ReceiptRow } from './ReceiptRow';
 import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
@@ -38,6 +39,7 @@ export function ReceiptBody({ order }: { order: Order }) {
 
   const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
   const earnState = loyaltyEarnState(order);
+  const vatNoteKey = vatInvoiceNoteKey(order);
   const methodText =
     methodKey === 'online' ? t('payOnline')
     : methodKey === 'cash_delivery' ? t('cashOnDelivery')
@@ -141,6 +143,11 @@ export function ReceiptBody({ order }: { order: Order }) {
           <ReceiptRow label={t('vatIncluded')} amount={order.vatAmount} muted />
           <View style={styles.divider} />
           <ReceiptRow label={t('total')} amount={order.total} strong big />
+          {/* The POS issues the tax invoice at the branch, so this receipt is
+              not it: say where the customer gets it (vatInvoiceNote.ts). */}
+          {vatNoteKey ? (
+            <Text variant="caption" tone="tertiary">{t(vatNoteKey)}</Text>
+          ) : null}
 
           {/* POINTS ARE A PROMISE UNTIL THE ORDER SETTLES, and this row has to
               say which it is. `order.loyaltyPointsEarned` is written at
