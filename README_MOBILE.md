@@ -27,7 +27,7 @@ The static Expo configuration is in [`apps/mobile/app.json`](apps/mobile/app.jso
 | --- | --- |
 | Expo project | `spicy-meal` |
 | EAS project ID | `c8422901-b27a-40b3-91c7-b6ce99d97936` |
-| iOS bundle identifier | `com.spicymeal.app` |
+| iOS bundle identifier | `sa.com.spicymeal.app` (company Apple account, Team ID `62V8923H9K`, since 2026-11-18; was `com.spicymeal.app` on the personal account) |
 | Android package | `sa.com.spicymeal.app` |
 | Deep-link scheme | `spicymeal://` |
 | Web base URL | `/app` |

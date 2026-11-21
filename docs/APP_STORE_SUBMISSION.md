@@ -17,7 +17,7 @@
 
 | thing | state |
 | --- | --- |
-| App Store Connect app record | exists — ASC App ID **6800210683**, bundle `com.spicymeal.app` |
+| App Store Connect app record | **moved 2026-11-18 to the company account** (First Taste Trading Company, Team ID `62V8923H9K`): new record **"Spicy Meal SA"** (temporary name), ASC App ID **6836319823**, bundle `sa.com.spicymeal.app`, primary language Arabic. The personal-account record (ASC App ID 6800210683, bundle `com.spicymeal.app`) stays on TestFlight until the first company build passes its device check, then is removed. Rows below that describe builds, keys and TestFlight groups describe the OLD record |
 | ASC API key in EAS | working — `W7LY8D9FKX` (`[Expo] EAS Submit kROBQixX90`), read and write both exercised 2026-09-16 |
 | TestFlight groups | **3 already exist** on the app record, reported by the CLI before it scheduled |
 | newest iOS build | **1.0.0 (27)**, `c285ee99-5566-41bf-9832-fe15175795ce`, commit `0969b1f8`, FINISHED 2026-09-20 17:05 UTC |
