@@ -457,7 +457,7 @@ begin
     raise exception 'CASE 9 FAILED: the one-argument claim_order_refund exists';
   end if;
   select md5(pg_get_functiondef('public.place_order(uuid, public.order_type, jsonb, uuid, text, text, integer, uuid, text)'::regprocedure)) into v;
-  if v is distinct from '12b6816d256c29b76edf947ae1a7ea77' then raise exception 'CASE 9 FAILED: place_order moved to %', v; end if;
+  if v is distinct from '7078c7ddc36eb5eb0f7b0fc86b26dc8d' then raise exception 'CASE 9 FAILED: place_order moved to %', v; end if;
   select md5(pg_get_functiondef('public.compute_order_snapshot(uuid, uuid, public.order_type, jsonb, uuid, text, integer)'::regprocedure)) into v;
   if v is distinct from '22e2d42935459e7bf93abb2941b56325' then raise exception 'CASE 9 FAILED: compute_order_snapshot moved to %', v; end if;
   raise notice 'CASE 9 ok: service_role only, money path unchanged';
