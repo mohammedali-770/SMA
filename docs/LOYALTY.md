@@ -290,7 +290,7 @@ legitimately earn nothing.
 ## 3b. Points held by an open card checkout — WRITTEN 2026-11-22, NOT APPLIED
 
 `supabase/migrations/20261019120000_loyalty_points_reservation.sql`
-(`docs/MIGRATIONS.md` §71). Until it is applied, everything below describes the
+(`docs/MIGRATIONS.md` §72). Until it is applied, everything below describes the
 branch, not Production.
 
 **The problem.** A card order is priced when its checkout session opens and
