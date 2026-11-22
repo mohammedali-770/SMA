@@ -643,7 +643,7 @@ change would allow different wording, the alternative is in an
 
    **2026-11-22: such a change is written, not applied**
    (`20261023120000_payment_records_retention_and_limits`, `MIGRATIONS.md`
-   §71). Once applied, a payment record that belongs to an order is kept with
+   §73). Once applied, a payment record that belongs to an order is kept with
    the order, unchanged, whether the account is erased by the deletion
    processor or the Auth user is deleted directly. A record that belongs to no
    order is still deleted with its checkout session, as today. That includes a
