@@ -40,6 +40,11 @@ export type FailureKind =
   | 'order_open_limit'
   | 'order_hourly_limit'
   | 'order_quantity_limit'
+  /**
+   * Loyalty points held by the customer's own card checkout that is still open
+   * (place_order and the points-covered checkout, 20261019120000).
+   */
+  | 'order_points_reserved'
   /** Anything we have not taught this module to recognise. */
   | 'unknown';
 
@@ -61,6 +66,7 @@ const MESSAGE_KEY: Record<FailureKind, StringKey> = {
   order_open_limit: 'errOrderOpenLimit',
   order_hourly_limit: 'errOrderHourlyLimit',
   order_quantity_limit: 'errOrderQuantityLimit',
+  order_points_reserved: 'errOrderPointsReserved',
   unknown: 'somethingWentWrong',
 };
 
@@ -100,6 +106,8 @@ export function describeFailure(err: unknown): Failure {
       ? 'order_hourly_limit'
     : /order_items_quantity_max/.test(s)
       ? 'order_quantity_limit'
+    : /loyalty points are held by a card payment that is still open/.test(s)
+      ? 'order_points_reserved'
     : /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
       ? 'network_blocked'
     : /rate.?limit|too many requests|\b429\b|too many attempts/.test(s)

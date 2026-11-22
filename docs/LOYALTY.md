@@ -287,6 +287,44 @@ It **never blocks an order**: any failure renders nothing, the same rule
 `refreshAvailability` follows. The line is hidden at 0 points, because an item may
 legitimately earn nothing.
 
+## 3b. Points held by an open card checkout — WRITTEN 2026-11-22, NOT APPLIED
+
+`supabase/migrations/20261019120000_loyalty_points_reservation.sql`
+(`docs/MIGRATIONS.md` §72). Until it is applied, everything below describes the
+branch, not Production.
+
+**The problem.** A card order is priced when its checkout session opens and
+debits its points only when the payment is confirmed, up to an hour later.
+Nothing held those points in between, so the same balance could pay for a cash
+order and the card order, or for two card orders, and the second order kept
+its full discount for points that were no longer there. Cancelling such an
+order then refunded points it had never taken. Four high audit findings,
+all reproduced on the chain; reachable only once card payments are on.
+
+**The rule.** Points a card checkout will redeem are **held** for as long as
+its payment can still be captured: the session is unpaid and inside its
+30-minute window, or it holds a payment attempt that has not expired (up to 60
+minutes), or Moyasar has already reported the payment and the order is not yet
+written. `loyalty_points_reserved` computes it, from the same columns the
+payment path acts on.
+
+| Where | What it does with held points |
+| --- | --- |
+| Cash order (`place_order`) | Refuses a redemption that would dip into them: P0001, hint `loyalty_points_reserved`. The customer sees `errOrderPointsReserved`, "Some of your points are held by a card payment that is still open. Turn off points for this order, or try again once that payment is finished." (Arabic engineering-drafted, needs a native read), from the next EAS build; the generic apology before it. With nothing held, nothing changes |
+| A second card payment (`begin_session_attempt`) | Refuses to open the attempt, as it already did for a live session, now also for an expired session whose attempt is still live. The app shows `payFailed`, unchanged |
+| Points-covered checkout (zero total) | Refused like a cash order |
+| The card order being paid | Never refused: the money has been taken. It debits what the balance still holds, writes **that** to `orders.loyalty_points_redeemed`, and records any difference in `loyalty_redemption_shortfalls` for an administrator to review. The discount stays as charged |
+| Cancellation (`admin_set_order_status`) | Refunds what the order's `redeem` ledger rows took, less any redemption refund already made, the way the earn reversal already reads `earn` rows. It no longer reads `orders.loyalty_points_redeemed` |
+
+Because checkout sends the whole balance when points are on (§7 item 3), a
+customer with a card payment still open will usually be refused points on a
+cash order rather than given fewer. That is deliberate: a discount quietly
+smaller than the one chosen is a price change. The refusal ends when the card
+payment finishes, fails or expires.
+
+**Unchanged:** pickup-only (§2), exclusion (§3), multipliers (§5), comp members
+and the `earn_pending` promotion. Their suites run unchanged against the file.
+
 ## 4. Expiry — a fixed calendar reset (`loyalty_expiry_enabled`, default OFF)
 
 > **THE MECHANISM IS LIVE IN PRODUCTION since 2026-09-09 06:53:34 UTC. EXPIRY IS
@@ -576,6 +614,7 @@ Production read-only and found 0 campaigns, so no live campaign was shown wrong.
 | `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
 | `src/lib/mappers.test.ts` · `productEditMapper.test.ts` | The admin mappers read and default both columns, and the generic edit contract carries neither |
 | `supabase/tests/loyalty_reason_history_safe_test.sql` · `loyalty_reason_no_order_number_test.sql` | Ledger-reason semantics (pre-existing) |
+| `supabase/tests/loyalty_points_reservation_test.sql` | §3b: held points refused to cash, to a second card attempt and to a points-covered checkout, for exactly as long as the hold lasts; a card order that finds its points gone records the debit and the shortfall; cancellation refunds the ledger, netted |
 
 Two guards are worth knowing about because they caught real mistakes while this
 was being written:
