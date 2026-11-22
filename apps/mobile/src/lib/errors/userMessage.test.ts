@@ -91,6 +91,7 @@ describe('order refusals from place_customer_order', () => {
     ['You already have 5 orders in progress. Please wait until one is ready before placing another.', 'order_open_limit', 'errOrderOpenLimit'],
     ['You have placed 10 orders in the last hour. Please try again later.', 'order_hourly_limit', 'errOrderHourlyLimit'],
     ['order_items_quantity_max: at most 50 of one item per order line.', 'order_quantity_limit', 'errOrderQuantityLimit'],
+    ['Some of your loyalty points are held by a card payment that is still open. Order without points, or try again after that payment finishes.', 'order_points_reserved', 'errOrderPointsReserved'],
   ] as const;
 
   it.each(REFUSALS)('maps %j to its own copy', (raw, kind, key) => {
@@ -119,6 +120,19 @@ describe('order refusals from place_customer_order', () => {
     expect(sql).toContain("'You already have %s orders in progress. Please wait until one is ready before placing another.'");
     expect(sql).toContain("'You have placed %s orders in the last hour. Please try again later.'");
     expect(sql).toContain("message    = 'order_items_quantity_max: at most 50 of one item per order line.';");
+  });
+
+  it('matches the held-points refusal 20261019120000 raises', () => {
+    // place_order and the points-covered checkout raise it; the cash order and
+    // checkout.begin both render through failureMessage.
+    const sql = readFileSync(
+      resolve(__dirname, '../../../../../supabase/migrations/20261019120000_loyalty_points_reservation.sql'),
+      'utf8',
+    );
+    expect(sql).toContain(
+      "message = 'Some of your loyalty points are held by a card payment that is still open. Order without points, or try again after that payment finishes.',",
+    );
+    expect(sql).toContain("hint    = 'loyalty_points_reserved';");
   });
 
   it('leaves other order errors on the generic apology, as before', () => {
