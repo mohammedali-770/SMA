@@ -82,7 +82,19 @@ done < <(find "$MIGRATIONS_DIR" -maxdepth 1 -name '*.sql' | sort)
 printf '\n  %d migrations applied cleanly.\n' "$migration_count"
 
 # ---------------------------------------------------------------------------
-step "Idempotence — re-applying the chain (REPORT ONLY)"
+step "Idempotence — re-applying the chain on a throwaway clone (REPORT ONLY)"
+# The replay runs on a CLONE of the freshly built chain, never on the template the
+# suites are cloned from. A replay re-runs every older migration, and an older file
+# that no longer matches a body a later migration moved refuses and rolls back,
+# leaving the older bodies from the files that did re-run. Replaying in place put
+# that mixed state under every suite: a later migration that legitimately changed
+# a function an earlier file pins made unrelated suites fail (the watchdog matrix
+# and six refund and POS suites), on a database state no production run ever has.
+# The suites must see the state a fresh apply produces, which is what a fresh
+# Supabase project gets.
+REPLAY_DB="sma_chain_replay"
+dropdb --if-exists "$REPLAY_DB"
+createdb -T "$TEMPLATE_DB" "$REPLAY_DB"
 # Non-fatal, deliberately. Some migrations are intentionally NOT re-runnable:
 # the Lazywait and refund schedulers refuse with "a cron job named X already
 # exists; verify/remove it before enabling this driver", which is a guard
@@ -92,12 +104,13 @@ step "Idempotence — re-applying the chain (REPORT ONLY)"
 # migration that could not be retried after a partial failure.
 idem_failed=0
 while IFS= read -r f; do
-  if ! psql_on "$TEMPLATE_DB" -f "$f" >/dev/null 2>"$ERR"; then
+  if ! psql_on "$REPLAY_DB" -f "$f" >/dev/null 2>"$ERR"; then
     bad "not idempotent: $(basename "$f")"
     sed 's/^/        /' "$ERR"
     idem_failed=1
   fi
 done < <(find "$MIGRATIONS_DIR" -maxdepth 1 -name '*.sql' | sort)
+dropdb --if-exists "$REPLAY_DB"
 if [ "$idem_failed" -eq 0 ]; then
   ok "chain re-applies cleanly"
 else
@@ -106,8 +119,8 @@ fi
 
 # ---------------------------------------------------------------------------
 step "Test-harness contract"
-# AFTER the idempotence replay: replaying the chain would overwrite the
-# function overrides this installs.
+# The idempotence replay ran on its own clone and is already dropped, so nothing
+# it did reaches the template this installs the overrides into.
 psql_on "$TEMPLATE_DB" -f "$HERE/harness.sql"
 ok "harness.sql"
 

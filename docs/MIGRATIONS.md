@@ -2348,6 +2348,26 @@ contain, and Production holds shapes this fixture does not. It is report-only
 until it has run clean on real pull requests; making it blocking is one line
 (`SQL_CI_EXISTING_DATA_BLOCKING: '1'` in `sql-suites.yml`) and an owner decision.
 
+**A-note — the idempotence replay runs on a throwaway clone, not on the database the
+suites use (changed 2026-11-22).** `run.sh` used to re-apply the whole chain onto
+the template database in place and then clone that template for every suite. A
+replay re-runs every older file, and an older file whose pre-image check no longer
+matches a body a LATER migration moved refuses and rolls back, so the suites ran
+against a mixed state in which some functions held older bodies: a state no
+Production database has. It surfaced when a migration moved `claim_order_refund`:
+the replay of `20261016120000` then refused, the watchdog function stayed at an
+older body, the watchdog matrix and six refund and POS suites failed, and
+`order_refund_claim_liveness_test.sql` blocked on a row lock (the older claim body
+does not skip locked rows) until the 20-minute job limit. The replay now runs on a
+clone of the freshly built chain (`sma_chain_replay`), is still REPORT ONLY, and
+the clone is dropped before `harness.sql` and the seed go onto the template.
+Measured on the same chain with and without the change: with it, 100 suites pass,
+2 are quarantined and 0 fail; without it, the liveness suite stalled past nine
+minutes before it was stopped. The consequence for migration authors: a file no
+longer has to keep every EARLIER file's replay working for its own suites to be
+meaningful, though a file should still re-run cleanly where it can (§72 is an example). The replay-state guards already in `20261013120000` and
+`20261016120000` are harmless and stay as they are.
+
 **B. Pre-live gate** (all read-only)
 1. Verify the repository base commit.
 2. Verify the current live migration count and latest version.
