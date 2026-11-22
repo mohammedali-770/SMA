@@ -280,8 +280,13 @@ describe('payment-initiate hands the app only a Moyasar checkout URL', () => {
         "if (!checkoutUrl) return refuseCheckoutUrl(attempt.checkout_url, 'reused');",
       );
     }
-    expect(src).not.toMatch(/checkoutUrl: (?:attempt\.checkout_url|invoiceUrl|String\()/);
-    expect(count(src, 'customerCheckoutUrl(')).toBe(3);
+    // The stored invoice a losing concurrent start answers with (F-EFP-07-001)
+    // goes through the same check.
+    const stored = section(src, 'const answerWithStoredInvoice = async (', 'if (attempt.reused === true && !attempt.provider_checkout_ref) {');
+    expect(stored).toContain('const checkoutUrl = customerCheckoutUrl(row.checkout_url, params.lang);');
+    expect(stored).toContain("if (!checkoutUrl) return refuseCheckoutUrl(row.checkout_url, 'reused');");
+    expect(src).not.toMatch(/checkoutUrl: (?:attempt\.checkout_url|row\.checkout_url|invoiceUrl|String\()/);
+    expect(count(src, 'customerCheckoutUrl(')).toBe(4);
   });
 
   it('fails closed with a 502 and one log line naming only the scheme and host', () => {
@@ -331,10 +336,18 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     '$flow flow: checks the configured mode before an attempt is opened',
     ({ flow, fn, begin }) => {
       const body = fnBody(src, fn);
+      // Updated deliberately 2026-11-22 (F-EFP-05-001): the switch is asked for
+      // the customer who owns the row, read before the check.
+      const table = flow === 'order' ? 'orders' : 'checkout_sessions';
+      const owner = body.indexOf(`testCustomer = await owningCustomerId(admin, '${table}', `);
       const check = body.indexOf(
-        `if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('${flow}', 'configured');`,
+        `if (!allowTestModeCheckout(testCustomer)) return refuseTestModeCheckout('${flow}', 'configured');`,
       );
-      expect(check).toBeGreaterThan(body.indexOf('const m = resolveMoyasarConfig('));
+      expect(block(body, "if (m.mode !== 'live') {")).toContain(
+        `if (!allowTestModeCheckout(testCustomer)) return refuseTestModeCheckout('${flow}', 'configured');`,
+      );
+      expect(owner).toBeGreaterThan(body.indexOf('const m = resolveMoyasarConfig('));
+      expect(check).toBeGreaterThan(owner);
       expect(check).toBeLessThan(body.indexOf(begin));
     },
   );
@@ -344,10 +357,10 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     ({ flow, fn, begin }) => {
       const body = fnBody(src, fn);
       const check = body.indexOf(
-        `if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('${flow}', 'attempt');`,
+        `if (!testAttemptAllowed(m.mode, attempt.mode, testCustomer)) return refuseTestModeCheckout('${flow}', 'attempt');`,
       );
       expect(block(body, "if (attempt.mode !== 'live') {")).toContain(
-        `if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('${flow}', 'attempt');`,
+        `if (!testAttemptAllowed(m.mode, attempt.mode, testCustomer)) return refuseTestModeCheckout('${flow}', 'attempt');`,
       );
       expect(check).toBeGreaterThan(body.indexOf(begin));
       expect(check).toBeLessThan(
@@ -364,19 +377,31 @@ describe('payment-initiate refuses customer checkout in TEST mode', () => {
     expect(refusal).toMatch(/console\.warn\(JSON\.stringify\(\{[^}]*reason: 'test_mode'/);
   });
 
-  it('the exception is the switch alone, and only while the gateway is configured in TEST', () => {
+  // Updated deliberately 2026-11-22 (F-EFP-05-001): the switch alone admitted
+  // every customer. It now needs the row owner to be on the allowlist.
+  it('the exception is the switch plus the allowlist, and only while the gateway is configured in TEST', () => {
     expect(fnBody(src, 'function testAttemptAllowed(')).toContain(
-      "return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout();",
+      "return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout(customerId);",
     );
-    expect(count(src, 'allowTestModeCheckout()')).toBe(3);
-    expect(count(src, 'testAttemptAllowed(m.mode, attempt.mode)')).toBe(2);
+    expect(count(src, 'allowTestModeCheckout(')).toBe(3);
+    expect(count(src, 'allowTestModeCheckout(testCustomer)')).toBe(2);
+    expect(count(src, 'testAttemptAllowed(m.mode, attempt.mode, testCustomer)')).toBe(2);
+    expect(fnBody(src, 'async function owningCustomerId(')).toContain(
+      "await admin.from(table).select('customer_id').eq('id', id).maybeSingle();",
+    );
     expect(src).toContain(
       "import { allowTestModeCheckout, logTestModeAllowed } from '../_shared/paymentTestCheckout.ts';",
     );
     const helper = stripComments(
       readFileSync(new URL('./paymentTestCheckout.ts', import.meta.url), 'utf8'),
     );
-    expect(helper).toContain("return Deno.env.get(PAYMENT_ALLOW_TEST_CHECKOUT_ENV) === 'true';");
+    expect(helper).toContain("if (Deno.env.get(PAYMENT_ALLOW_TEST_CHECKOUT_ENV) !== 'true') return false;");
+    expect(helper).toContain(
+      'return testCheckoutCustomerIds(Deno.env.get(PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS_ENV)).has(id);',
+    );
+    expect(helper).toContain(
+      "export const PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS_ENV = 'PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS';",
+    );
     expect(helper).toContain("export const PAYMENT_ALLOW_TEST_CHECKOUT_ENV = 'PAYMENT_ALLOW_TEST_CHECKOUT';");
   });
 
@@ -429,8 +454,12 @@ describe('a TEST-mode attempt never confirms an order', () => {
       '.update({ provider_ref: paymentId })',
     );
     // Updated deliberately 2026-11-18: the refusal now sits inside the
-    // testing-phase exception, and only the exact switch opens it.
-    const refused = block(block(paid, "if (attempt.mode !== 'live') {"), "if (!(attempt.mode === 'test' && allowTestModeCheckout())) {");
+    // testing-phase exception, and only the exact switch opens it. And
+    // 2026-11-22 (F-EFP-05-001): only for the attempt's owner, if listed.
+    const testBlock = block(paid, "if (attempt.mode !== 'live') {");
+    expect(testBlock).toContain("const owner = attempt.mode === 'test' ? await attemptOwnerId(admin, attempt) : null;");
+    const refused = block(testBlock, "if (!(attempt.mode === 'test' && allowTestModeCheckout(owner))) {");
+    expect(count(verify, 'allowTestModeCheckout(')).toBe(1);
     expect(refused).toContain("return { outcome: 'failed', paid: false, reason: 'test_mode_attempt' };");
     expect(refused).toContain("status: 'failed', failure_code: 'test_mode_attempt',");
     expect(count(refused, 'console.')).toBe(1);

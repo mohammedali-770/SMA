@@ -2152,6 +2152,18 @@ mirrored server-side by `order_item_note_is_acceptable`). That protects the
 kitchen's ability to read the ticket, not the database: ten lines each carrying
 280 characters is not something anybody can work from.
 
+**On the card path the bound is applied when the checkout session is created,
+not only in finalize** (`20261023120000`, written 2026-11-22, not applied;
+audit finding F-DBM-17-001). The `order_items` trigger runs only when
+`finalize_checkout_session` inserts the lines, which is after Moyasar has
+captured the payment, so a session carrying a 141-character note could be paid
+and then never become an order. `trg_checkout_sessions_item_note_length` walks
+`snapshot->'items'` with the same predicate and refuses with the same message,
+`Item note is too long`, before any money moves. It mirrors
+`trg_checkout_sessions_note_length` for the order note. The shipped app caps the
+note at 140, so only a request the app never sends is affected. Until the file
+is applied, Production still refuses such a note only in finalize.
+
 **Three write paths carry it, and that is the fragile part.** A note is data the
 INSERT must carry, so — unlike the order note, which a trigger can bound after
 the fact — a trigger cannot supply it. `place_order` (cash), `compute_order_snapshot`

@@ -640,6 +640,18 @@ change would allow different wording, the alternative is in an
    with its own §5 approval, landed before the session. Then the bracketed
    wording replaces today's, and the deletion page and the record of processing
    are corrected.
+
+   **2026-11-22: such a change is written, not applied**
+   (`20261023120000_payment_records_retention_and_limits`, `MIGRATIONS.md`
+   §73). Once applied, a payment record that belongs to an order is kept with
+   the order, unchanged, whether the account is erased by the deletion
+   processor or the Auth user is deleted directly. A record that belongs to no
+   order is still deleted with its checkout session, as today. That includes a
+   payment Moyasar captured that never became an order (for example one whose
+   finalize failed), so the bracketed sentence "A payment record that belongs
+   to no order ... is kept while your account is open" would be true, and
+   nothing longer would be. Until the file is applied, today's wording is the
+   true one.
 2. **PRIV-2 (gap PG-24). A payment that never became an order has no time limit except account
    deletion** (fact-check finding 5). A declined or abandoned attempt keeps the
    sanitized payment in `raw` (card network, last four, issuer, decline

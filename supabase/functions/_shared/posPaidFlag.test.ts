@@ -58,6 +58,18 @@ describe('posOrderPayments: the payment line on a ticket created paid', () => {
     ]);
   });
 
+  // F-EFP-05-001: a TEST-mode payment moved no money, and the branch must be
+  // able to see that on the ticket. Only the label changes.
+  it('a TEST-mode payment is labelled as a test in both languages, nothing else changes', () => {
+    const live = posOrderPayments(true, 64.5, { ...record, mode: 'live' })![0];
+    const test = posOrderPayments(true, 64.5, { ...record, mode: 'test' })![0];
+    expect(live.names).toEqual({ en: 'VISA', ar: 'فيزا' });
+    expect(test.names).toEqual({ en: 'TEST - VISA', ar: 'اختبار - فيزا' });
+    expect({ ...test, names: null }).toEqual({ ...live, names: null });
+    // No mode (an older row): the ordinary label.
+    expect(posOrderPayments(true, 64.5, record)![0].names).toEqual({ en: 'VISA', ar: 'فيزا' });
+  });
+
   it('rounds the amount to halalas, the same under both names', () => {
     const entry = posOrderPayments(true, '19.999', record)![0];
     expect(entry.amount).toBe(20);

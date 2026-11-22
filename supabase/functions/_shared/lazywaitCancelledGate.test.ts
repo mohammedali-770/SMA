@@ -136,9 +136,16 @@ async function tick() {
   return { status: res.status, body: await res.json() };
 }
 
-describe('lazywait-sync, told order_cancelled by the gate', () => {
+/**
+ * 20261022120000_pos_resend_refund_guards adds two more refusals at the same
+ * place in the gate, parked the same way: 'refund_started' (the order's money
+ * is going, or has gone, back) and 'order_progressed' (the branch already has
+ * it ready, out for delivery or delivered). The worker needs no change for
+ * them either, and the same three properties must hold for each.
+ */
+describe.each(['order_cancelled', 'refund_started', 'order_progressed'])('lazywait-sync, told %s by the gate', (answer) => {
   it('sends nothing, writes nothing, and says why', async () => {
-    runWith('order_cancelled');
+    runWith(answer);
     const res = await tick();
 
     expect(res.status).toBe(200);
@@ -165,7 +172,7 @@ describe('lazywait-sync, told order_cancelled by the gate', () => {
       order_id: ORDER_ID,
       outcome: 'not_ready',
       sent: false,
-      gate_status: 'order_cancelled',
+      gate_status: answer,
     });
   });
 });

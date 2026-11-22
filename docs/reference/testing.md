@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**298 TypeScript test files declaring 4367 test blocks, plus 102 SQL suites.**
+**299 TypeScript test files declaring 4391 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -118,10 +118,12 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/order_refund_claim_liveness_test.sql`
 - `supabase/tests/otp_login_rate_limit_test.sql`
 - `supabase/tests/otp_retention_sweep_test.sql`
+- `supabase/tests/payment_records_retention_and_limits_test.sql`
 - `supabase/tests/payment_refund_visibility_test.sql`
 - `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/place_order_variants_test.sql`
 - `supabase/tests/platform_rollup_suppression_test.sql`
+- `supabase/tests/pos_resend_refund_guards_test.sql`
 - `supabase/tests/product_variants_guest_read_test.sql`
 - `supabase/tests/promo_disclosure_test.sql`
 - `supabase/tests/prune_operational_run_history_test.sql`
@@ -285,7 +287,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-135 files, 1844 declared test blocks.
+135 files, 1845 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -299,7 +301,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
-| `src/components/admin/LazywaitPanel.test.tsx` | 6 | LazywaitPanel |
+| `src/components/admin/LazywaitPanel.test.tsx` | 7 | LazywaitPanel |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
@@ -427,7 +429,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-51 files, 1039 declared test blocks.
+52 files, 1062 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -446,7 +448,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
-| `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | lazywait-sync, told order_cancelled by the gate |
+| `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | the control: the same fixture, answered ready_to_send |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/lazywaitOrderPayments.test.ts` | 8 | a card order certain to be paid |
@@ -458,14 +460,15 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
 | `supabase/functions/_shared/paymentAfterResponse.test.ts` | 3 | runAfterResponse |
 | `supabase/functions/_shared/paymentInitiateGuards.test.ts` | 11 | no invoice outlives its attempt (C1 part 4) |
+| `supabase/functions/_shared/paymentInitiateSingleInvoice.test.ts` | 14 | the loser cannot close the winner’s attempt |
 | `supabase/functions/_shared/paymentPosTiming.test.ts` | 3 | a confirmation never posts the payment to the POS |
 | `supabase/functions/_shared/paymentRefundQueue.test.ts` | 8 | one stuck refund no longer takes every claim of a run |
 | `supabase/functions/_shared/paymentSyncDisclosure.test.ts` | 8 | what the POS receives about a card payment |
 | `supabase/functions/_shared/paymentSyncKick.test.ts` | 4 | triggerLazywaitSyncOnce — the post-payment POS kick |
-| `supabase/functions/_shared/paymentTestCheckout.test.ts` | 12 | allowTestModeCheckout() |
+| `supabase/functions/_shared/paymentTestCheckout.test.ts` | 20 | allowTestModeCheckout() |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
 | `supabase/functions/_shared/paymentWiring.test.ts` | 80 | payment functions talk to Moyasar only |
-| `supabase/functions/_shared/posPaidFlag.test.ts` | 28 | posIsPaidFlag: a ticket is created paid only when the payment is certain |
+| `supabase/functions/_shared/posPaidFlag.test.ts` | 29 | posIsPaidFlag: a ticket is created paid only when the payment is certain |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |

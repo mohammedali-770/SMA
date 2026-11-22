@@ -5738,6 +5738,45 @@ the order reads paid, and the function logs show
 `"event":"payment_test_mode_allowed"`, once from `payment-initiate` and once
 from the confirmation.
 
+**Amended 2026-11-22 — the switch now needs a list of customers too (audit
+finding F-EFP-05-001). Written on `fix/payment-initiate-single-invoice-20261122`,
+NOT deployed.** As built on 2026-11-18 the switch admitted EVERY signed-in
+customer: while it was on, anyone with Moyasar's published test cards could pay
+a real order for nothing. Once the new code is deployed, a test card is accepted
+only when `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` AND the customer who
+owns the order is listed in a second Edge Function secret,
+**`PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`**: a comma-separated list of customer
+profile ids (UUIDs), normally just your own test accounts. Unset, nobody is
+admitted. Detail: [`PAYMENTS.md`](PAYMENTS.md) §3. The same branch also fixes
+F-EFP-07-001 (two starts at once could leave a payable invoice no order
+matches; `PAYMENTS.md` §2, "One attempt, one invoice") and labels a test payment
+`TEST - …` on the POS ticket.
+
+The steps, each its own approval (CLAUDE.md §5; the merge itself is on your
+explicit word, and the secret and each deploy are separate approvals):
+
+1. **Merge the pull request.** Nothing changes in Production on merge.
+2. **If you are still testing with test cards, set
+   `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` first** (Supabase → Edge Functions →
+   Secrets) to your test account's profile id. The deployed functions do not
+   read it, so on its own it changes nothing. Skip this, and from step 3 test
+   cards are refused for everyone, which is the safe failure.
+3. **Redeploy five functions together**, from the default branch, with their
+   `verify_jwt` from `supabase/config.toml`: `payment-initiate`,
+   `payment-verify`, `payment-webhook`, `payment-test-config` (its bundle
+   includes `_shared/moyasarVerify.ts`) and `lazywait-sync` (the POS label).
+   `payment-return`, `payment-refund` and `payment-admin-test-return` are
+   unchanged. A new `payment-initiate` beside an old `payment-webhook` would
+   still refuse unlisted customers at the start, but not re-check at
+   confirmation, so deploy them together.
+4. **Before launch:** delete both secrets, `PAYMENT_ALLOW_TEST_CHECKOUT` and
+   `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` (step 6 above, and
+   [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)).
+
+**Done looks like:** a test card from a listed account still pays as before,
+and the same attempt from any other account answers `{status:'disabled',
+reason:'test_mode'}` with nothing opened.
+
 ## 61. A cancelled paid card order is refunded automatically — one apply
 
 **Opened 2026-11-19.** Your decision, 2026-11-19: "do the auto refund". A paid
