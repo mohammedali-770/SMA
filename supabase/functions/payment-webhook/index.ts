@@ -3,11 +3,11 @@ import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
   HANDLED_WEBHOOK_TYPES, NOT_A_DUPLICATE_FILTER, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice,
-  matchesAnyWebhookSecret, parseWebhookEnvelope, resolveMoyasarConfig, verifyWebhookSecretToken,
-  webhookVerificationLogRow, type MoyasarWebhookEnvelope,
+  mapMoyasarPaymentStatus, matchesAnyWebhookSecret, parseWebhookEnvelope, resolveMoyasarConfig,
+  verifyWebhookSecretToken, webhookVerificationLogRow, type MoyasarWebhookEnvelope,
 } from '../_shared/moyasar.ts';
 import {
-  retrieveMoyasarPayment, validateAndConfirmMoyasarPayment, type MoyasarAttempt,
+  findAttemptForSiblingInvoice, retrieveMoyasarPayment, validateAndConfirmMoyasarPayment, type MoyasarAttempt,
 } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -171,8 +171,41 @@ async function handleMoyasarWebhook(
       .eq('provider', 'moyasar').eq('provider_ref', paymentId).or(NOT_A_DUPLICATE_FILTER).maybeSingle();
     rec = (data ?? null) as MoyasarAttempt | null;
   }
+
+  // A SIBLING INVOICE (F-EFP-07-001): the payment's invoice is not the one any
+  // attempt stores, but it was created for one, by a concurrent start whose
+  // invoice lost the persist, before payment-initiate cancelled such invoices
+  // or after a cancel that did not land. Found through the invoice's own
+  // metadata, fetched with our key (findAttemptForSiblingInvoice says why that
+  // is reliable). Also asked when the payment id found an attempt storing a
+  // DIFFERENT invoice: that is a replay after a sibling payment confirmed, and
+  // binding it against the stored invoice could only report a mismatch.
+  let sibling = false;
+  if (invoiceId && (!rec || String(rec.provider_checkout_ref ?? '') !== invoiceId)) {
+    const found = await findAttemptForSiblingInvoice(admin, m.secretKey, mode, invoiceId, select);
+    if (found.kind === 'retry') return json({ status: 'retry', reason: 'could not read invoice' }, 503);
+    if (found.kind === 'admin_test' && !rec) {
+      await admin.from('integration_sync_logs').insert({
+        provider: 'moyasar', order_id: null, direction: 'webhook', status: 'skipped',
+        request: { payment_id: paymentId.slice(0, 64) }, error: 'admin_test payment ignored',
+      }).then(() => {}, () => {});
+      return json({ status: 'acknowledged', reason: 'admin_test' }, 200);
+    }
+    if (found.kind === 'found' && (!rec || rec.id === found.attempt.id)) {
+      rec = found.attempt;
+      sibling = true;
+    }
+  }
+
   if (!rec) {
-    // Unknown payment — acknowledge (so Moyasar stops retrying) and flag for review.
+    // Unknown payment — acknowledge (so Moyasar stops retrying) and flag for
+    // review. Loudly: if it settled, a customer may have been charged with no
+    // order, and this row and line are the only trace of it.
+    console.error(JSON.stringify({
+      event: 'moyasar_unknown_payment',
+      payment_id: paymentId.slice(0, 64), invoice_id: invoiceId.slice(0, 64),
+      payment_status: String(payment.status ?? '').slice(0, 20), type: evt.type.slice(0, 40),
+    }));
     await admin.from('integration_sync_logs').insert({
       provider: 'moyasar', order_id: null, direction: 'webhook', status: 'skipped',
       request: { payment_id: paymentId.slice(0, 64), invoice_id: invoiceId.slice(0, 64) },
@@ -196,6 +229,18 @@ async function handleMoyasarWebhook(
     // Transient at Moyasar's end. Return a non-2xx so their retry schedule brings
     // the event back rather than dropping it after we changed nothing.
     return json({ status: 'retry', reason: 'could not retrieve payment' }, 503);
+  }
+
+  if (sibling) {
+    // Only a SETTLED payment on a sibling invoice is acted on. Anything else
+    // (a decline, a void) is not money held, and recording it would write a
+    // sibling's payment over the attempt the customer is still paying.
+    const settled = mapMoyasarPaymentStatus(retrieved.body.status).outcome === 'paid';
+    console.warn(JSON.stringify({
+      event: 'moyasar_sibling_invoice_payment', attempt: String(rec.id).slice(0, 36),
+      invoice_id: invoiceId.slice(0, 64), payment_id: paymentId.slice(0, 64), settled,
+    }));
+    if (!settled) return json({ status: 'acknowledged', reason: 'sibling invoice payment not settled' }, 200);
   }
 
   const result = await validateAndConfirmMoyasarPayment(admin, rec, retrieved.body, { liveMode: evt.live });

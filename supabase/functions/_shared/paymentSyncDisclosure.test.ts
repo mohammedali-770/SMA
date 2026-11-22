@@ -105,7 +105,7 @@ describe('what the POS receives about a card payment', () => {
     expect(code(LINE)).toMatch(/const ref = typeof record\.provider_ref === 'string'/);
     // The worker passes the order total and the paid record carrying Moyasar's payment id.
     expect(code(WORKER)).toMatch(/posOrderPayments\(\s*posIsPaid,\s*order\.total,/);
-    expect(code(WORKER)).toMatch(/select\('id, provider_ref, card_scheme, card_last_four, raw'\)/);
+    expect(code(WORKER)).toMatch(/select\('id, provider_ref, card_scheme, card_last_four, raw, mode'\)/);
   });
 
   it('is sent only on the ticket: the separate payment call stays removed', () => {

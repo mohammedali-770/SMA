@@ -7,7 +7,7 @@ import {
   sanitizeMoyasarInvoice, type CheckoutLanguage,
 } from '../_shared/moyasar.ts';
 import { moyasarFetch } from '../_shared/moyasarHttp.ts';
-import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
+import { cancelMoyasarInvoice, findInvoiceByReference } from '../_shared/moyasarVerify.ts';
 import { allowTestModeCheckout, logTestModeAllowed } from '../_shared/paymentTestCheckout.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
@@ -27,8 +27,9 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * card can never pay for a real order; see refuseTestModeCheckout(). Sandbox
  * testing is the console's admin test (payment-test-config `test_checkout`).
  * The one exception is the testing-phase switch PAYMENT_ALLOW_TEST_CHECKOUT
- * (exactly 'true'; _shared/paymentTestCheckout.ts), which must be unset before
- * card payments go live; see testAttemptAllowed().
+ * (exactly 'true'), and only for a customer listed in
+ * PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS (_shared/paymentTestCheckout.ts). It must
+ * be unset before card payments go live; see testAttemptAllowed().
  *
  * A total under Moyasar's invoice minimum (1.00 SAR) is refused before any
  * attempt is opened; see refuseBelowMinimum().
@@ -161,13 +162,19 @@ async function createMoyasarInvoice(
     }));
   }
 
-  const persistAndReturn = async (invoice: Record<string, unknown>): Promise<Response> => {
+  // `created`: THIS call's own POST made the invoice, so its URL has never left
+  // the server. An invoice adopted by reconciliation may be one another call
+  // created and handed out, and is never cancelled here.
+  const persistAndReturn = async (invoice: Record<string, unknown>, created: boolean): Promise<Response> => {
     const invoiceId = String(invoice.id ?? '');
     const invoiceUrl = String(invoice.url ?? '');
+    // Every write that closes the attempt is guarded on `provider_checkout_ref
+    // is null`, like the persist below: a racing call that already stored an
+    // invoice, and handed out its URL, keeps its attempt open.
     if (!invoiceId || !invoiceUrl) {
       await admin.from('payment_records').update({
         status: 'failed', failure_code: 'no_invoice_url', raw: sanitizeMoyasarInvoice(invoice),
-      }).eq('id', attemptId).then(() => {}, () => {});
+      }).eq('id', attemptId).is('provider_checkout_ref', null).then(() => {}, () => {});
       return json({ error: 'Could not start the payment. Please try again.' }, 502);
     }
     // Refused before anything is stored, and the attempt is closed, so the next
@@ -176,7 +183,7 @@ async function createMoyasarInvoice(
     if (!checkoutUrl) {
       await admin.from('payment_records').update({
         status: 'failed', failure_code: 'checkout_url_rejected', raw: sanitizeMoyasarInvoice(invoice),
-      }).eq('id', attemptId).then(() => {}, () => {});
+      }).eq('id', attemptId).is('provider_checkout_ref', null).then(() => {}, () => {});
       return refuseCheckoutUrl(invoiceUrl, 'created');
     }
 
@@ -185,20 +192,31 @@ async function createMoyasarInvoice(
     // for an invoice we failed to store would let the customer pay something we
     // can never match back to their order. The URL is stored as Moyasar
     // returned it; the language is the request's, so it is applied on the way out.
-    const { error: persistErr } = await admin.from('payment_records').update({
+    //
+    // ONLY ONTO AN ATTEMPT THAT HAS NO INVOICE YET (F-EFP-07-001). Two
+    // concurrent starts for one attempt can both create an invoice: the second
+    // is handed the attempt as reused with no invoice id, and its reconcile
+    // cannot see a create still in transit. An unconditional write kept the
+    // later id while the other caller had already handed out its own URL, and
+    // a payment on that invoice matched nothing. So the first write wins, and
+    // the rows it changed say whether it was this one.
+    const { data: persisted, error: persistErr } = await admin.from('payment_records').update({
       provider_checkout_ref: invoiceId,
       checkout_url: invoiceUrl,
       raw: sanitizeMoyasarInvoice(invoice),
       last_verified_at: new Date().toISOString(),
       failure_code: null,
       failure_message_safe: null,
-    }).eq('id', attemptId);
+    }).eq('id', attemptId).is('provider_checkout_ref', null).select('id');
     if (persistErr) {
       console.error('Moyasar invoice persist failed', String(persistErr.message ?? '').slice(0, 200));
       // The invoice exists at Moyasar. A retry reuses THIS attempt, whose
       // reference_transaction is already in that invoice's metadata, so the
       // reconciliation lookup below will adopt it rather than create a second one.
       return json({ error: 'Could not start the payment. Please try again.' }, 502);
+    }
+    if (!Array.isArray(persisted) || persisted.length === 0) {
+      return await answerWithStoredInvoice(invoiceId, created);
     }
 
     const { outcome } = mapMoyasarInvoiceStatus(invoice.status);
@@ -210,13 +228,50 @@ async function createMoyasarInvoice(
     }, 200);
   };
 
+  /**
+   * The persist matched no row: another call stored an invoice on this attempt
+   * first. Its URL may already be open on the customer's screen, so it is the
+   * one answered, and an invoice THIS call created is cancelled: nobody was
+   * handed its URL, and left payable it would be a second way to pay the same
+   * checkout. A cancel that does not land is logged loudly; a payment on that
+   * invoice is still matched to this attempt by the webhook, through the
+   * reference_transaction in the invoice's metadata.
+   */
+  const answerWithStoredInvoice = async (invoiceId: string, created: boolean): Promise<Response> => {
+    const { data: row, error: rowErr } = await admin.from('payment_records')
+      .select('provider_checkout_ref, checkout_url, status').eq('id', attemptId).maybeSingle();
+    const storedRef = String(row?.provider_checkout_ref ?? '');
+    if (created && storedRef !== invoiceId) {
+      const cancelled = await cancelMoyasarInvoice(m.secretKey, invoiceId);
+      const event = cancelled.ok ? 'moyasar_duplicate_invoice_cancelled' : 'moyasar_duplicate_invoice_not_cancelled';
+      const line = JSON.stringify({
+        event, attempt: String(attemptId).slice(0, 36), invoice: invoiceId.slice(0, 64), http_status: cancelled.status,
+      });
+      if (cancelled.ok) console.warn(line);
+      else console.error(line);
+    }
+    if (rowErr || !row || !storedRef || !row.checkout_url || row.status !== 'initiated') {
+      console.error(JSON.stringify({
+        event: 'payment_initiate_refused', reason: 'stored_invoice_unreadable', attempt: String(attemptId).slice(0, 36),
+      }));
+      return json({ error: 'Could not start the payment. Please try again.' }, 502);
+    }
+    const checkoutUrl = customerCheckoutUrl(row.checkout_url, params.lang);
+    if (!checkoutUrl) return refuseCheckoutUrl(row.checkout_url, 'reused');
+    return json({
+      provider: 'moyasar', mode: m.mode, invoiceId: storedRef, checkoutUrl,
+      expiryMinutes: m.expiryMinutes,
+      ...params.extra,
+    }, 200);
+  };
+
   // A reused attempt with no stored invoice means an EARLIER create left us
   // uncertain. Reconcile before creating anything: Moyasar documents no
   // idempotency on invoice creation, so a blind retry could open a second
   // invoice for the same order (see findInvoiceByReference).
   if (attempt.reused === true && !attempt.provider_checkout_ref) {
     const found = await findInvoiceByReference(m.secretKey, referenceTransaction);
-    if (found.ok && found.invoice) return await persistAndReturn(found.invoice);
+    if (found.ok && found.invoice) return await persistAndReturn(found.invoice, false);
     if (!found.ok) {
       // We could not establish whether an invoice already exists. Creating one
       // now risks a duplicate, so refuse and let the customer try again — the
@@ -225,7 +280,7 @@ async function createMoyasarInvoice(
         failure_code: 'reconcile_unavailable',
         failure_message_safe: 'Could not reach the payment provider.',
         last_verified_at: new Date().toISOString(),
-      }).eq('id', attemptId).then(() => {}, () => {});
+      }).eq('id', attemptId).is('provider_checkout_ref', null).then(() => {}, () => {});
       return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
     }
     // found.ok && !found.invoice: Moyasar positively reports no such invoice, so
@@ -284,12 +339,12 @@ async function createMoyasarInvoice(
     // creation, so a retry could create a second invoice. Reconcile instead.
     console.error('Moyasar invoice request error', e instanceof Error ? e.message : 'error');
     const found = await findInvoiceByReference(m.secretKey, referenceTransaction);
-    if (found.ok && found.invoice) return await persistAndReturn(found.invoice);
+    if (found.ok && found.invoice) return await persistAndReturn(found.invoice, false);
     await admin.from('payment_records').update({
       failure_code: 'network_unreachable',
       failure_message_safe: 'Could not reach the payment provider.',
       last_verified_at: new Date().toISOString(),
-    }).eq('id', attemptId).then(() => {}, () => {});
+    }).eq('id', attemptId).is('provider_checkout_ref', null).then(() => {}, () => {});
     return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
   }
 
@@ -301,11 +356,11 @@ async function createMoyasarInvoice(
       status: 'failed', failure_code: `create_${resp.status}`,
       failure_message_safe: 'Could not start payment.',
       raw: sanitizeMoyasarInvoice(result),
-    }).eq('id', attemptId).then(() => {}, () => {});
+    }).eq('id', attemptId).is('provider_checkout_ref', null).then(() => {}, () => {});
     return json({ error: 'Could not start the payment. Please try again.' }, 502);
   }
 
-  return await persistAndReturn(result);
+  return await persistAndReturn(result, true);
 }
 
 /**
@@ -365,9 +420,13 @@ function refuseTestModeCheckout(flow: 'order' | 'session', check: 'configured' |
 
 /**
  * The testing-phase exception to refuseTestModeCheckout (owner request,
- * 2026-11-18). With PAYMENT_ALLOW_TEST_CHECKOUT exactly 'true', a customer may
- * pay a real order with Moyasar TEST keys and test cards. Unset, or anything
- * else, this is false and both checks refuse exactly as they always have.
+ * 2026-11-18). With PAYMENT_ALLOW_TEST_CHECKOUT exactly 'true', a customer
+ * LISTED in PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS may pay a real order with
+ * Moyasar TEST keys and test cards. Unset, or anything else, or a customer who
+ * is not listed, and both checks refuse exactly as they always have. Until
+ * 2026-11-22 the list did not exist and the switch admitted every customer
+ * (F-EFP-05-001). The customer is the one who OWNS the order or session, read
+ * from the database (owningCustomerId), never a value in the request.
  *
  * Narrower than "the switch is on": a TEST attempt proceeds only while the
  * gateway is still CONFIGURED in TEST. A reused TEST attempt can outlive a
@@ -375,8 +434,23 @@ function refuseTestModeCheckout(flow: 'order' | 'session', check: 'configured' |
  * then would let a test card pay a real order on a live gateway, even with the
  * switch left on by mistake.
  */
-function testAttemptAllowed(configuredMode: string, attemptMode: unknown): boolean {
-  return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout();
+function testAttemptAllowed(configuredMode: string, attemptMode: unknown, customerId: string | null): boolean {
+  return attemptMode === 'test' && configuredMode === 'test' && allowTestModeCheckout(customerId);
+}
+
+/**
+ * The customer who owns the order or checkout session, for the test-checkout
+ * allowlist. Read with the SERVICE-ROLE client: `authenticated` cannot select
+ * `orders.customer_id`, and the row's owner, not the caller, is who the test
+ * payment would pay for. Asked only when the gateway is in TEST mode. null when
+ * it cannot be read, which the allowlist never matches.
+ */
+async function owningCustomerId(
+  admin: SupabaseClient, table: 'orders' | 'checkout_sessions', id: string,
+): Promise<string | null> {
+  const { data, error } = await admin.from(table).select('customer_id').eq('id', id).maybeSingle();
+  if (error || !data?.customer_id) return null;
+  return String(data.customer_id);
 }
 
 /**
@@ -438,7 +512,11 @@ async function initiateMoyasar(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
-  if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('order', 'configured');
+  let testCustomer: string | null = null;
+  if (m.mode !== 'live') {
+    testCustomer = await owningCustomerId(admin, 'orders', String(order.id));
+    if (!allowTestModeCheckout(testCustomer)) return refuseTestModeCheckout('order', 'configured');
+  }
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_payment_attempt', {
     p_order_id: order.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -453,7 +531,7 @@ async function initiateMoyasar(
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
   if (attempt.mode !== 'live') {
-    if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('order', 'attempt');
+    if (!testAttemptAllowed(m.mode, attempt.mode, testCustomer)) return refuseTestModeCheckout('order', 'attempt');
     logTestModeAllowed({ fn: 'payment-initiate', flow: 'order', attempt: String(attempt.attempt_id).slice(0, 36) });
   }
 
@@ -518,7 +596,11 @@ async function initiateMoyasarForSession(
     console.error('Moyasar config unusable', m.reason);
     return json({ error: 'Online payment is not available' }, 400);
   }
-  if (m.mode !== 'live' && !allowTestModeCheckout()) return refuseTestModeCheckout('session', 'configured');
+  let testCustomer: string | null = null;
+  if (m.mode !== 'live') {
+    testCustomer = await owningCustomerId(admin, 'checkout_sessions', String(session.id));
+    if (!allowTestModeCheckout(testCustomer)) return refuseTestModeCheckout('session', 'configured');
+  }
 
   const { data: rows, error: beginErr } = await admin.rpc('begin_session_attempt', {
     p_session_id: session.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
@@ -533,7 +615,7 @@ async function initiateMoyasarForSession(
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
   if (attempt.mode !== 'live') {
-    if (!testAttemptAllowed(m.mode, attempt.mode)) return refuseTestModeCheckout('session', 'attempt');
+    if (!testAttemptAllowed(m.mode, attempt.mode, testCustomer)) return refuseTestModeCheckout('session', 'attempt');
     logTestModeAllowed({ fn: 'payment-initiate', flow: 'session', attempt: String(attempt.attempt_id).slice(0, 36) });
   }
 

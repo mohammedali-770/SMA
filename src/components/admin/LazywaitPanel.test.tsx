@@ -114,6 +114,23 @@ describe('LazywaitPanel', () => {
     expect(lazywaitMonitor).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    'refund_in_progress: This order\'s payment is being refunded or has been refunded (refund pending). An order whose money is going back is never sent to the branch.',
+    'order_in_progress: This order is already ready. The branch is handling it, so it is not sent to the POS again.',
+  ])('shows a refused Retry of a refunded or progressed order as it is: %s', async (refusal) => {
+    // Neither the feed nor the client mirror sees refund_state or
+    // orders.status, so the panel still offers Retry; requeue_lazywait_order
+    // refuses it (20261022120000) and the panel must show why, not a success.
+    lazywaitMonitor.mockResolvedValue([
+      row({ lazywait_sync_state: 'dead_letter', sync_last_error: 'http_429', sync_attempt_count: 4 }),
+    ]);
+    requeueLazywait.mockRejectedValue(new Error(refusal));
+    render(<LazywaitPanel disabled={false} />);
+    fireEvent.click(await screen.findByText('Retry'));
+    expect(await screen.findByText(refusal)).toBeTruthy();
+    expect(screen.queryByText('Order re-queued for Lazywait sync')).toBeNull();
+  });
+
   it('shows the server error when the feed is refused', async () => {
     lazywaitMonitor.mockRejectedValue(new Error('Only staff may read the Lazywait sync monitor'));
     render(<LazywaitPanel disabled={false} />);

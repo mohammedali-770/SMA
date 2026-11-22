@@ -66,9 +66,9 @@ Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-1
 
 | Function | `verify_jwt` | Responsibility |
 | --- | --- | --- |
-| `payment-initiate` | true | Opens (or reuses) a Moyasar invoice for the customer's own checkout session or order. Refuses customer checkout while the gateway is in TEST mode (`{status:'disabled', reason:'test_mode'}`), so a test card can never pay for a real order, unless the testing-phase secret `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` (`docs/PAYMENTS.md` §3; it must be unset before going live). A missing or disabled row, or one naming another provider, answers `{status:'disabled'}`; a total under 1.00 SAR answers `{status:'disabled', reason:'amount_below_minimum'}`; an unusable key or webhook token answers an error |
+| `payment-initiate` | true | Opens (or reuses) a Moyasar invoice for the customer's own checkout session or order. Refuses customer checkout while the gateway is in TEST mode (`{status:'disabled', reason:'test_mode'}`), so a test card can never pay for a real order, unless the testing-phase secret `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` AND the order's owner is listed in `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` (`docs/PAYMENTS.md` §3; both must be unset before going live). Two concurrent starts for one attempt open one invoice: only the first is stored, and the other start cancels its own (`docs/PAYMENTS.md` §2). A missing or disabled row, or one naming another provider, answers `{status:'disabled'}`; a total under 1.00 SAR answers `{status:'disabled', reason:'amount_below_minimum'}`; an unusable key or webhook token answers an error |
 | `payment-verify` | true | The verification the app trusts: fetches the invoice and its payment from Moyasar and confirms only a clean `paid` |
-| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed. A `webhook_verification` event's one-time code is stored in `integration_sync_logs` for the console, never logged |
+| `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed. A `webhook_verification` event's one-time code is stored in `integration_sync_logs` for the console, never logged. A paid invoice no attempt stores is matched through its own metadata's `reference_transaction` (`docs/PAYMENTS.md` §2); a payment nothing matches is logged as `moyasar_unknown_payment` |
 | `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
 | `payment-refund` | false | Refund worker, Moyasar refunds only. Fails closed without `refund_trigger_secret` in the payment row's `secret_config` (sent as `x-refund-secret`); automated scheduling (the `payment-refund-worker` cron job) is off |
 | `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
@@ -100,7 +100,14 @@ The Edge runtime provides the Supabase runtime credentials needed by server func
 
 ### Provider configuration
 
-`MOYASAR_PROXY_URL` is the one payment value held as an Edge Function secret rather than in the payment row. It is an `http://` or `https://` proxy URL and usually carries the proxy's credentials, so it is treated as a secret: never logged, never returned. Setting it is an owner action.
+`MOYASAR_PROXY_URL` is the payment value held as an Edge Function secret rather than in the payment row. It is an `http://` or `https://` proxy URL and usually carries the proxy's credentials, so it is treated as a secret: never logged, never returned. Setting it is an owner action.
+
+Two testing-phase switches are Edge Function secrets too, and both must be deleted before card payments go live (`docs/PAYMENTS.md` §3):
+
+- `PAYMENT_ALLOW_TEST_CHECKOUT` — exactly `true` lets a TEST-mode payment pay a real order, and only for a customer listed in the next one;
+- `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` — a comma-separated list of customer profile ids (UUIDs) the switch admits. Unset or empty admits nobody; an entry that is not a UUID is ignored. It holds customer ids, so it is never logged. Added 2026-11-22 (audit finding F-EFP-05-001).
+
+Setting either is an owner action.
 
 Provider secrets are read server-side from the approved integration/secret storage paths and must never be returned to a client.
 

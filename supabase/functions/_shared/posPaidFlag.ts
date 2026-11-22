@@ -101,6 +101,16 @@ export function posPaymentNames(scheme: unknown, sourceType: unknown): { en: str
   return applePay ? { en: `APPLE PAY - ${brand.en}`, ar: `Apple Pay - ${brand.ar}` } : { ...brand };
 }
 
+/**
+ * Prefix for the payment label of a TEST-mode payment (`payment_records.mode`
+ * = 'test'), which moved no money. Since 2026-11-18 the testing-phase switch
+ * (paymentTestCheckout.ts) lets a listed customer pay a real order with a
+ * Moyasar test card, and the order still reaches the branch as a paid ticket;
+ * without this the ticket showed an ordinary approved card payment
+ * (F-EFP-05-001). The Arabic is engineering-drafted and needs a native read.
+ */
+export const TEST_PAYMENT_PREFIX = { en: 'TEST - ', ar: 'اختبار - ' } as const;
+
 /** `source.type` from a stored Moyasar payment (`payment_records.raw`), if present. */
 function sourceTypeOf(raw: unknown): unknown {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -112,7 +122,7 @@ export function posOrderPayments(
   paid: true | undefined,
   total: unknown,
   record:
-    | { provider_ref?: unknown; card_scheme?: unknown; card_last_four?: unknown; raw?: unknown }
+    | { provider_ref?: unknown; card_scheme?: unknown; card_last_four?: unknown; raw?: unknown; mode?: unknown }
     | null
     | undefined,
 ): Array<Record<string, unknown>> | undefined {
@@ -120,8 +130,12 @@ export function posOrderPayments(
   const amount = Math.round((Number(total) + Number.EPSILON) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0) return undefined;
   const ref = typeof record.provider_ref === 'string' ? record.provider_ref.trim() : '';
+  const label = posPaymentNames(record.card_scheme, sourceTypeOf(record.raw));
+  const names = record.mode === 'test'
+    ? { en: `${TEST_PAYMENT_PREFIX.en}${label.en}`, ar: `${TEST_PAYMENT_PREFIX.ar}${label.ar}` }
+    : label;
   const entry: Record<string, unknown> = {
-    names: posPaymentNames(record.card_scheme, sourceTypeOf(record.raw)),
+    names,
     amount,
     // The POS list's Paid column reads `payment_amount`, MEASURED rather than
     // guessed (2026-11-19). A probe order (#10) carried one line with eleven
