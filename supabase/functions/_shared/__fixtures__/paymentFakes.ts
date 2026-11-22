@@ -833,6 +833,8 @@ export class FakeMoyasar {
   requests: string[] = [];
   /** When set, every request throws, as a refused proxy or a dead network does. */
   unreachable = false;
+  /** When set, `PUT /invoices/{id}/cancel` answers 500 and cancels nothing. */
+  cancelFails = false;
   private seq = 0;
 
   pay(invoiceId: string, paymentId: string, status: string): FakePayment {
@@ -893,6 +895,18 @@ export class FakeMoyasar {
       };
       this.invoices.set(inv.id, inv);
       return reply(201, inv);
+    }
+    // PUT /v1/invoices/{id}/cancel: only an invoice nothing is paying, as
+    // Moyasar documents it (https://docs.moyasar.com/api/invoices/06-cancel-invoice).
+    if (kind === 'invoices' && method === 'PUT' && id && action === 'cancel') {
+      if (this.cancelFails) return reply(500, { type: 'api_error', message: 'cancel failed' });
+      const inv = this.invoices.get(decodeURIComponent(id));
+      if (!inv) return reply(404, { type: 'not_found', message: 'Object not found' });
+      if (inv.status !== 'initiated' || inv.payments.some((p) => p.status !== 'failed')) {
+        return reply(400, { type: 'invalid_request_error', message: 'Invoice cannot be canceled' });
+      }
+      inv.status = 'canceled';
+      return reply(200, inv);
     }
     if (kind === 'invoices' && method === 'GET' && id) {
       const inv = this.invoices.get(decodeURIComponent(id));

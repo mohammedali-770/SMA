@@ -170,14 +170,19 @@ such a remainder.
 | Read an invoice + its payments | `GET /v1/invoices/{id}` |
 | Reconcile an ambiguous create | `GET /v1/invoices?metadata[reference_transaction]=…` |
 | Read a payment (authoritative confirmation) | `GET /v1/payments/{id}` |
-| Cancel an unpaid invoice the customer replaced (changed cart) | `PUT /v1/invoices/{id}/cancel` |
+| Cancel an unpaid invoice the customer replaced (changed cart), or one a losing concurrent start created | `PUT /v1/invoices/{id}/cancel` |
 | Refund | `POST /v1/payments/{id}/refund` |
 | Credential check (creates nothing) | `GET /v1/payments/{a-nonexistent-uuid}` |
 
 Every one of these goes through `moyasarFetch()` (§1.0). `PUT
-/v1/invoices/{id}/cancel` is used since 2026-11-18 for one case only: dropping
-a checkout the customer replaced with a different cart, when no payment on its
-invoice is anything but `failed` (`docs/PAYMENTS.md` §4). Whether to cancel an
+/v1/invoices/{id}/cancel` is used since 2026-11-18 for dropping a checkout the
+customer replaced with a different cart, when no payment on its invoice is
+anything but `failed` (`docs/PAYMENTS.md` §4), and since 2026-11-22 for one more
+case: the invoice a `payment-initiate` call created and then could not store,
+because a concurrent start for the same attempt had stored its own first. Its URL
+was never handed out (`docs/PAYMENTS.md` §2, "One attempt, one invoice").
+`GET /v1/invoices/{id}` is also used since 2026-11-22 by the webhook, to read the
+metadata of a paid invoice no attempt stores (§7, below the binding table). Whether to cancel an
 older invoice when a new attempt opens on the SAME checkout is still an open
 question (`docs/PAYMENTS.md` §11).
 
@@ -295,6 +300,12 @@ The reason for that strictness: if a second invoice were created and the custome
 paid the first, our stored `invoice_id` would not match, verification would
 refuse to confirm, and the customer would be charged for an order that never
 completes.
+
+Reconciliation cannot see an invoice whose create is still in transit, so two
+concurrent starts for one attempt could each create one (F-EFP-07-001). Since
+2026-11-22 only the first stored invoice is kept, the other start cancels its own
+and answers with the stored one, and the webhook can match a payment on a sibling
+invoice through its metadata (§7; `docs/PAYMENTS.md` §2).
 
 Backing that up, the DB-level one-active-attempt partial unique indexes
 (`payment_records_one_active_idx`, `payment_records_one_active_session_idx`) are
@@ -503,6 +514,18 @@ our invoice. Confirmed present on the payment object (§ metadata example).
 **`metadata` is deliberately NOT part of the binding.** Moyasar does not document
 metadata propagating from an invoice to the payment that settles it, so requiring
 it would reject legitimate payments. It is written for human reconciliation only.
+
+**One place reads the INVOICE's metadata, to find an attempt (2026-11-22).** A
+payment whose `invoice_id` no attempt stores (a sibling invoice left by two
+concurrent starts, F-EFP-07-001) would otherwise be an `unknown payment` with the
+customer charged. `payment-webhook` fetches that invoice by id with our own
+secret key and reads `metadata.reference_transaction`, which `payment-initiate`
+wrote and which documented fields of the invoice object carry (§3.1, response).
+That is reliable where payment metadata is not: only a holder of our key can
+create an invoice in our account. The one attempt carrying that reference is
+taken only if its stored mode is the key's mode and the invoice's amount and
+currency are the attempt's; the payment is then bound against THAT invoice by
+the table above, field by field. Only a settled payment is acted on.
 
 **Mode is bound by construction.** Test and live key spaces are disjoint, and the
 secret key is always resolved from the **attempt's stored mode**, so a live

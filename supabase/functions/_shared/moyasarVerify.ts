@@ -32,6 +32,7 @@ import {
   closedInvoiceOutcome,
   confirmMessageKey,
   fromMinorUnits,
+  isAdminTestInvoice,
   isGenuineConfirmation,
   isMoyasarIpNotAllowed,
   isOrderAlreadyPaidByAnother,
@@ -40,6 +41,7 @@ import {
   sanitizeMoyasarInvoice,
   sanitizeMoyasarPayment,
   selectInvoicePayment,
+  toMinorUnits,
   type MoyasarOutcome,
 } from './moyasar.ts';
 import { moyasarFetch } from './moyasarHttp.ts';
@@ -279,6 +281,23 @@ async function recordDuplicatePayment(
 }
 
 /**
+ * The customer who owns an attempt: its checkout session's, or its order's.
+ * Service-role reads (`authenticated` cannot select `orders.customer_id`).
+ * null when it cannot be read, which the test-checkout allowlist never matches,
+ * so an unreadable owner refuses a TEST confirmation rather than admitting it.
+ */
+async function attemptOwnerId(admin: SupabaseClient, attempt: MoyasarAttempt): Promise<string | null> {
+  const [table, id] = attempt.checkout_session_id
+    ? ['checkout_sessions', attempt.checkout_session_id] as const
+    : ['orders', attempt.order_id] as const;
+  if (!id) return null;
+  const { data, error } = await admin.from(table).select('customer_id').eq('id', id).maybeSingle()
+    .then((r) => r, () => ({ data: null, error: { message: 'read threw' } }));
+  if (error || !data?.customer_id) return null;
+  return String(data.customer_id);
+}
+
+/**
  * Validate a retrieved Moyasar payment against the stored attempt and, if it is
  * a clean `paid`/`captured`, confirm the order paid and hand it to the POS.
  * Returns a coarse outcome; never throws.
@@ -335,11 +354,16 @@ export async function validateAndConfirmMoyasarPayment(
     // admin sandbox invoice has no attempt row, so it never reaches this.
     //
     // The one exception is the testing-phase switch PAYMENT_ALLOW_TEST_CHECKOUT
-    // (exactly 'true'; paymentTestCheckout.ts, owner request 2026-11-18): with
-    // it on, a TEST attempt confirms exactly as a live one does. Unset, this
-    // refuses as it always has. It must be unset before card payments go live.
+    // (exactly 'true'; paymentTestCheckout.ts, owner request 2026-11-18), and
+    // only for a customer listed in PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS: then a
+    // TEST attempt confirms exactly as a live one does. The customer is the one
+    // who OWNS the attempt's session or order, read here rather than trusted
+    // from whoever opened the attempt, so the list is consulted again at
+    // confirmation (F-EFP-05-001). Unset, unlisted, or unreadable, this refuses
+    // as it always has. It must be unset before card payments go live.
     if (attempt.mode !== 'live') {
-      if (!(attempt.mode === 'test' && allowTestModeCheckout())) {
+      const owner = attempt.mode === 'test' ? await attemptOwnerId(admin, attempt) : null;
+      if (!(attempt.mode === 'test' && allowTestModeCheckout(owner))) {
         console.warn(JSON.stringify({
           event: 'moyasar_confirm_refused', reason: 'test_mode_attempt', attempt: String(attempt.id).slice(0, 36),
         }));
@@ -686,4 +710,81 @@ export async function findInvoiceByReference(
   } catch {
     return { ok: false, invoice: null };
   }
+}
+
+/**
+ * The attempt a payment on a SIBLING invoice belongs to: an invoice that is not
+ * the one stored on the attempt, but was created for it (F-EFP-07-001).
+ *
+ * How one exists. Two concurrent payment-initiate calls for one attempt can
+ * both create an invoice. payment-initiate now stores only the first and
+ * cancels the other, but a cancel can fail, and invoices orphaned before that
+ * fix may still be payable. A payment on one carries an `invoice_id` that no
+ * attempt stores, so the lookup by `provider_checkout_ref` misses it, and the
+ * customer would be charged with no order.
+ *
+ * WHY THE METADATA IS TRUSTWORTHY HERE, when checkPaymentBinding refuses to bind
+ * on a PAYMENT's metadata. That refusal is because Moyasar does not document
+ * metadata propagating from an invoice to its payment. This reads the INVOICE's
+ * own metadata, which Moyasar documents on the invoice object (create and
+ * fetch), fetched server-to-server by id with our own secret key. Only a holder
+ * of that key can create an invoice in our account, and payment-initiate writes
+ * the attempt's `reference_transaction` into every invoice it creates. The
+ * chain is: the webhook's payment id, re-fetched by the caller → its
+ * `invoice_id` → that invoice, fetched here → its `reference_transaction` → the
+ * one attempt carrying it (`'sm_' || gen_random_uuid()`, one per attempt).
+ *
+ * Before an attempt is adopted, the invoice's amount and currency must be the
+ * attempt's and the attempt's stored mode must be the mode whose key fetched
+ * it. The attempt is returned as a VIEW bound to the sibling invoice
+ * (`provider_checkout_ref` set to it), so checkPaymentBinding's invoice check
+ * holds for this payment and every other field is still checked. The row itself
+ * keeps the invoice it stores.
+ *
+ *  - `found`: adopt `attempt` for this payment;
+ *  - `admin_test`: the console's sandbox invoice, recognised by its metadata;
+ *  - `retry`: the invoice could not be read now (no answer, or a 5xx), so the
+ *    caller asks Moyasar to deliver again rather than acknowledging;
+ *  - `none`: nothing matches.
+ */
+export type SiblingInvoiceResult =
+  | { kind: 'found'; attempt: MoyasarAttempt }
+  | { kind: 'admin_test' }
+  | { kind: 'retry' }
+  | { kind: 'none'; why: string };
+
+export async function findAttemptForSiblingInvoice(
+  admin: SupabaseClient,
+  secretKey: string,
+  mode: 'test' | 'live',
+  invoiceId: string,
+  select: string,
+): Promise<SiblingInvoiceResult> {
+  if (!secretKey || !invoiceId) return { kind: 'none', why: 'no_key_or_invoice' };
+  const got = await retrieveMoyasarInvoice(secretKey, invoiceId);
+  if (!got.ok) {
+    return got.status === 0 || got.status >= 500 ? { kind: 'retry' } : { kind: 'none', why: 'invoice_not_found' };
+  }
+  const invoice = got.body;
+  if (String(invoice.id ?? '') !== invoiceId) return { kind: 'none', why: 'invoice_id_mismatch' };
+  if (isAdminTestInvoice(invoice)) return { kind: 'admin_test' };
+  const meta = (invoice.metadata ?? {}) as Record<string, unknown>;
+  const ref = String(meta.reference_transaction ?? '').trim();
+  if (!ref) return { kind: 'none', why: 'no_reference' };
+
+  const { data, error } = await admin.from('payment_records').select(select)
+    .eq('provider', 'moyasar').eq('reference_transaction', ref)
+    .or(NOT_A_DUPLICATE_FILTER).limit(2);
+  if (error) return { kind: 'retry' };
+  const rows = (Array.isArray(data) ? data : []) as unknown as MoyasarAttempt[];
+  if (rows.length !== 1) return { kind: 'none', why: rows.length === 0 ? 'no_attempt' : 'ambiguous_reference' };
+  const attempt = rows[0];
+
+  if (String(attempt.mode ?? '') !== mode) return { kind: 'none', why: 'mode_mismatch' };
+  const currency = String(attempt.currency ?? 'SAR').toUpperCase();
+  if (String(invoice.currency ?? '').toUpperCase() !== currency) return { kind: 'none', why: 'currency_mismatch' };
+  if (Number(invoice.amount) !== toMinorUnits(Number(attempt.amount), currency)) {
+    return { kind: 'none', why: 'amount_mismatch' };
+  }
+  return { kind: 'found', attempt: { ...attempt, provider_checkout_ref: invoiceId } };
 }

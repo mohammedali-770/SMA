@@ -513,6 +513,14 @@ instead of the live config row.) Field-by-field state:
     / «Apple Pay - مدى»; an unknown brand keeps ONLINE CREDIT CARD
     (`posPaymentNames`). Measured the same day: 12 of 13 paid card payments
     were Apple Pay on mada, 1 a Visa card.
+  - **A TEST payment says so (2026-11-22, audit finding F-EFP-05-001; on
+    the branch, not yet deployed):** when the paid record's `mode` is `test`
+    (a Moyasar test card, admitted only by the testing-phase switch for a
+    listed customer, `docs/PAYMENTS.md` §3), the label is prefixed
+    `TEST - ` / «اختبار - », for example `TEST - VISA` / «اختبار - فيزا». The
+    worker's paid-record read now also selects `mode`. Every other field, and
+    `status: 'approved'`, is unchanged. The Arabic is engineering-drafted and
+    needs a native read. Deploy implied: `lazywait-sync`.
 - **Create Order `warnings` are logged (2026-11-19).** Lazywait answers with
   `warnings` when the till would charge something other than what we sent
   (`ORDER_TOTAL_MISMATCH`, with its own figures). They were ignored; the sync

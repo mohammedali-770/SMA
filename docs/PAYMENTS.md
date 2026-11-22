@@ -185,6 +185,59 @@ An attempt with under three minutes left (the invoice would live less than
 two) is closed without an invoice, and the next start opens a fresh one. The invoice lifetime is the console's "invoice
 expiry" field: 30 minutes by default, held between 5 and 60.
 
+### One attempt, one invoice: two starts at once (2026-11-22)
+
+Audit finding F-EFP-07-001. `begin_*_attempt` commits an attempt before its
+invoice exists, and hands it to a second, concurrent start as reused with no
+invoice id. That start reconciles by reference (`findInvoiceByReference`), but
+Moyasar cannot list an invoice whose create is still in transit, so it creates
+a second one. Both used to store their invoice id with an unconditional write:
+the row kept the later id, while the other start had already handed out its own
+URL. A payment on that invoice matched no attempt, the webhook acknowledged it as
+`unknown payment`, and the customer was charged with no order. A remount or
+cold start of the checkout while the first create is in flight is enough
+(`CheckoutScreen` recovery answers `resume`); the window is the create's
+in-transit time, up to its 15 s timeout.
+
+Since 2026-11-22, on this branch (not yet deployed):
+
+- **The first stored invoice wins.** `payment-initiate` stores an invoice id
+  only on an attempt that has none (`.is('provider_checkout_ref', null)`), and
+  reads the rows the write changed. Every write in that step that closes or
+  annotates the attempt carries the same guard, so a start that loses the race,
+  or whose create fails, cannot close the attempt the winner handed out.
+- **The loser answers with the stored invoice**, so both starts open the same
+  page, and **cancels the invoice it created itself**
+  (`PUT /v1/invoices/{id}/cancel`): its URL never left the server, and left
+  payable it would be a second way to pay one checkout. An invoice adopted by
+  reconciliation is never cancelled, because another start may have handed it
+  out. Log lines: `moyasar_duplicate_invoice_cancelled`, or
+  `moyasar_duplicate_invoice_not_cancelled` (an error) when the cancel did not
+  land.
+- **The webhook can still find the attempt for a payment on such a sibling
+  invoice** (`findAttemptForSiblingInvoice`, `_shared/moyasarVerify.ts`), for an
+  orphan made before this fix or one whose cancel failed. It fetches the
+  payment's invoice by id with our own key, reads the `reference_transaction`
+  we wrote into its metadata, and takes the one attempt carrying it, if that
+  attempt's mode is the key's mode and its amount and currency are the
+  invoice's. This is not the payment-metadata binding the Moyasar reference
+  rules out: it reads the INVOICE's own metadata, which only a holder of our
+  secret key can have written. Only a settled payment is acted on; it is then
+  confirmed through the ordinary binding against that invoice, so a second
+  payment on the stored invoice becomes a recorded duplicate (§10). Log line:
+  `moyasar_sibling_invoice_payment`. An invoice that cannot be read now answers
+  503, so Moyasar delivers again. The console's sandbox invoice is recognised
+  here by its own metadata and logged `admin_test payment ignored`.
+- **A payment nothing matches is logged loudly**: an error line
+  `moyasar_unknown_payment` with the payment and invoice ids and the payment's
+  status, beside the existing `unknown payment` row in `integration_sync_logs`.
+
+`payment-verify` is unchanged: once the webhook confirms a sibling payment it
+answers from the session's (or order's) own paid state. It does not list
+invoices, so a sibling payment whose webhook never arrives is still found only
+by hand (the `unknown payment` row and the loud log line). Tests:
+`_shared/paymentInitiateSingleInvoice.test.ts`.
+
 ### An attempt stays open after a declined card
 
 A declined, voided or failed **payment** does not close its attempt. The
@@ -413,14 +466,32 @@ It is an Edge Function secret. **Only the exact string `true` turns it on.**
 exactly as they are, which is the production default. It is read on every
 request by `allowTestModeCheckout()` in `_shared/paymentTestCheckout.ts`.
 
-With it on:
+**It admits only the customers named in a second secret,
+`PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`** (since 2026-11-22, audit finding
+F-EFP-05-001; on this branch, not yet deployed). Until then the switch admitted
+every signed-in customer of the public app, so while it was on anyone holding
+Moyasar's published test cards could have real food sent to a kitchen for no
+money. The value is a comma-separated list of customer profile ids (UUIDs),
+for example the owner's own test accounts. Spaces and letter case are ignored;
+an entry that is not a UUID is ignored, never matched. Unset or empty, nobody is
+admitted, so the switch alone now does nothing. The customer checked is the one
+who **owns** the order or checkout session (`customer_id`, read by the server
+with the service-role client), never a value in the request, and it is checked
+twice: when `payment-initiate` opens the attempt, and again at confirmation, for
+the owner of the attempt's session or order. So a TEST attempt opened while a
+customer was listed does not confirm once they are not, and it can never confirm
+for anyone else's checkout. An owner that cannot be read refuses. Neither value
+is a credential, but the list holds customer ids, so it is kept as a secret and
+never logged.
 
-- `payment-initiate` lets a customer pay an order or a checkout session while
+With both on, for a listed customer:
+
+- `payment-initiate` lets them pay an order or a checkout session while
   the gateway is in TEST mode. The invoice is opened with the TEST key, so only
   Moyasar's test cards pay it;
 - the confirmation (`validateAndConfirmMoyasarPayment`, reached by
-  `payment-webhook`, `payment-verify` and the console's re-verify) confirms a
-  TEST attempt exactly as it confirms a live one;
+  `payment-webhook`, `payment-verify` and the console's re-verify) confirms
+  their TEST attempt exactly as it confirms a live one;
 - each one writes a log line, `{"event":"payment_test_mode_allowed", …}`.
 
 What it does **not** change: live mode, the 1.00 SAR minimum, the checkout-URL
@@ -440,7 +511,12 @@ secret is unset **before** the switch to live (§9 B).
 like any card order (a real kitchen ticket), earns loyalty points on delivery,
 and appears in reports and `payment_records` with `mode = 'test'` (the console
 labels such a record "Test payment"). Cancelling a paid one refunds it through
-Moyasar with the TEST key, which moves no real money.
+Moyasar with the TEST key, which moves no real money. **Since 2026-11-22 the
+ticket says so**: the payment line's label is prefixed `TEST - ` /
+«اختبار - » when the paid record's mode is `test` (`posOrderPayments`,
+`_shared/posPaidFlag.ts`; `docs/LAZYWAIT.md`), so the branch no longer sees an
+ordinary approved card payment. The status sent stays `approved`, because
+Lazywait's accepted values are not documented.
 
 ---
 
@@ -1160,7 +1236,8 @@ succeeds only for 200.00 to 300.00 SAR, and the admin test invoice is fixed at
 ### B. Live (a small real payment and its automatic refund)
 
 - [ ] **`PAYMENT_ALLOW_TEST_CHECKOUT` is unset** in the Edge Function secrets
-      (§3), before the switch to live and before Online Payment goes on.
+      (§3), before the switch to live and before Online Payment goes on, and
+      **`PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` is deleted** with it.
 - [ ] Before step 14 of §7: Moyasar's written answer on which payment methods
       and card schemes its hosted page offers on our account
       (`OWNER_ACTIONS.md` §47.19; gap PG-11, a gate); each of the 12 gaps that
@@ -1317,8 +1394,9 @@ For the owner:
 - whether the webhook verification code may stay readable by accountants;
 - whether to cancel the previous invoice at Moyasar when a new attempt opens
   on the SAME checkout (`PUT /v1/invoices/{id}/cancel`). It is used since
-  2026-11-18 only to drop a checkout the customer replaced with a different
-  cart (§4).
+  2026-11-18 to drop a checkout the customer replaced with a different cart
+  (§4), and since 2026-11-22 for the invoice a losing concurrent start created
+  for the SAME attempt (§2, "One attempt, one invoice"), which nobody was handed.
 
 ---
 
@@ -1429,6 +1507,11 @@ Customer-facing:
 - `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00. It names the total before points, not the order, because the minimum is judged after any coupon.
 - payment screen footer: «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.»
 - web stand-in: «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.»
+
+Staff-facing, added 2026-11-22: the POS payment-line prefix for a TEST payment,
+«اختبار - » (before the card label, for example «اختبار - فيزا»), in
+`_shared/posPaidFlag.ts` (`TEST_PAYMENT_PREFIX`). Branch staff read it on the
+ticket.
 
 Staff-facing: the Moyasar panel, payment card, receipt and Settings strings
 added on 2026-11-11 (in `MoyasarPaymentPanel.tsx`, `PaymentDetails.tsx`,
