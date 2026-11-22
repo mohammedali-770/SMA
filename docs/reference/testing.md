@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**298 TypeScript test files declaring 4364 test blocks, plus 100 SQL suites.**
+**298 TypeScript test files declaring 4366 test blocks, plus 101 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -59,6 +59,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/branch_variant_availability_test.sql`
 - `supabase/tests/cancelled_order_followups_test.sql`
 - `supabase/tests/cancelled_orders_guard_test.sql`
+- `supabase/tests/catalog_delete_open_checkout_guard_test.sql`
 - `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/checkout_session_input_match_test.sql`
@@ -283,7 +284,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-135 files, 1842 declared test blocks.
+135 files, 1844 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -364,7 +365,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/legal/legalPage.test.ts` | 26 | slugForType |
 | `src/legal/prerender.test.ts` | 17 | escapeHtml — the whole reason this module can use string concatenation |
 | `src/lib/adminPushApi.test.ts` | 7 | sendAdminPushConfirmation |
-| `src/lib/api.test.ts` | 6 | admin.deleteBranch |
+| `src/lib/api.test.ts` | 8 | admin.deleteBranch |
 | `src/lib/auditGate.test.ts` | 26 | audit gate — the real 2026-11-18 web shape |
 | `src/lib/banners.test.ts` | 17 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
