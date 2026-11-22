@@ -108,6 +108,18 @@ servers: Moyasar's terms forbid it
    then re-fetches the payment itself and runs the same confirmation. A webhook
    body is never evidence of payment.
 
+**Between steps 1 and 6 the menu rows the cart names must still exist.** The
+session freezes product, size and option ids, and step 6 inserts them as
+order-line foreign keys. Hard-deleting one in that window made the insert fail
+after the money was captured: a payment with no order, and no automatic refund
+(audit finding F-X03-001). `20261021120000_catalog_delete_open_checkout_guard`
+(**written 2026-11-22, NOT applied**, `MIGRATIONS.md` §71) refuses that delete
+with 55006 and tells the administrator to deactivate the item instead, while any
+session that names it can still be paid: inside its window, or with an unsettled
+attempt whose invoice closed less than 24 hours ago. Deactivating
+(`is_active = false`) was always safe and stays allowed. Until the file is
+applied, deactivate rather than delete a menu item while card payments are on.
+
 ### The older order-first path, and why it can no longer pay a cancelled order
 
 `payment-initiate` also accepts an `orderId`: pay for an order that already
@@ -694,7 +706,7 @@ decides which, not the worker:
 - **paid but provably never reached the branch** (`order_refund_due()`,
   [Order confirmation flow §6](ORDER_CONFIRMATION_FLOW.md)), reason
   `pos_delivery_failed_after_customer_retries`. **Once
-  `20261022120000_pos_resend_refund_guards` is applied (`MIGRATIONS.md` §71;
+  `20261022120000_pos_resend_refund_guards` is applied (`MIGRATIONS.md` §75;
   written 2026-11-22, NOT applied), only while the order is still `received`**
   (audit F-X04-002). Until then an order the branch fulfilled by hand during a
   POS failure was enrolled too, and a delivered order was refunded in full. After

@@ -58,6 +58,15 @@ to Production.**
 > `online_payment_enabled` is false; the rest of the go-live is
 > `docs/OWNER_ACTIONS.md` §47.6 onwards.
 
+> **Updated 2026-11-22 (catalogue delete guard) — `20261021120000_catalog_delete_open_checkout_guard`
+> is written, validated and NOT applied (§71, ledger row 124).** Audit finding
+> F-X03-001: a product, size or option hard-deleted while a customer is paying
+> for it left the captured payment with no order. New trigger functions on three
+> catalogue tables; no existing function redefined, no row, no deploy. No live
+> read was made by this change, so this banner does not restate the outstanding
+> count. `20261021120000` sorts after every other file, and an older unapplied
+> file still sorts ahead of it. **Name the target by version.**
+
 > **Updated 2026-11-19 (refund on cancel) — `20261018120000_refund_cancelled_paid_orders`
 > is written, validated and NOT applied (§70, ledger row 123).** The owner's
 > decision of 2026-11-19, "do the auto refund": a paid card order that is
@@ -1777,7 +1786,8 @@ production.
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
-| 124 | 20261022120000 | pos_resend_refund_guards | `21229514999b` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version**, after 20261012120000, 20261015120000, 20261016120000 and 20261018120000 | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Audit findings F-X04-001, F-X03-002, F-X04-002 (high, confirmed). `begin_lazywait_create_attempt` refuses and parks an order with any refund lifecycle (`refund_started`) or one already ready, out for delivery or delivered (`order_progressed`); `request_customer_pos_resend` refuses an order whose status left `received` (`order_in_progress`); `requeue_lazywait_order` refuses any refund lifecycle and any status but `received`; `claim_order_refund` takes a refund only while its order is `received` or `cancelled`; new BEFORE trigger `set_orders_refund_progress_guard` undoes the POS-failure enrolment on a progressed order and refuses any status change but cancelling while a refund is pending, processing or refunded. No signature, no row written, no grant widened. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 124 | 20261021120000 | catalog_delete_open_checkout_guard | `92501c99ac08` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Audit finding F-X03-001 (confirmed, high): hard-deleting a product, size or option while a customer is paying for it made `finalize_checkout_session` fail on an order-line FK after capture, leaving a payment with no order. New objects only: two helpers and one BEFORE DELETE OR UPDATE OF id trigger function, bound on `products`, `product_variants` and `modifiers`, refusing with 55006 while a session that names the row can still be paid. No existing function redefined (`finalize_checkout_session`, `insert_order_from_snapshot`, `compute_order_snapshot` and `place_order` asserted unmoved, against pre-images read by the file itself). No row written, no grant changed on an existing object. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 128 | 20261022120000 | pos_resend_refund_guards | `21229514999b` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version**, after 20261012120000, 20261015120000, 20261016120000 and 20261018120000 | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §75. Audit findings F-X04-001, F-X03-002, F-X04-002 (high, confirmed). `begin_lazywait_create_attempt` refuses and parks an order with any refund lifecycle (`refund_started`) or one already ready, out for delivery or delivered (`order_progressed`); `request_customer_pos_resend` refuses an order whose status left `received` (`order_in_progress`); `requeue_lazywait_order` refuses any refund lifecycle and any status but `received`; `claim_order_refund` takes a refund only while its order is `received` or `cancelled`; new BEFORE trigger `set_orders_refund_progress_guard` undoes the POS-failure enrolment on a progressed order and refuses any status change but cancelling while a refund is pending, processing or refunded. No signature, no row written, no grant widened. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -10197,7 +10207,174 @@ UPDATE `orders`, which is what lets an invoker-rights trigger read
 
 Steps: `docs/OWNER_ACTIONS.md` §61.
 
-## 71. The POS and refunds stop contradicting each other — WRITTEN 2026-11-22, NOT APPLIED (ledger row 124)
+## 71. A menu item cannot be hard-deleted while a customer is paying for it — WRITTEN 2026-11-22, NOT APPLIED (ledger row 124)
+
+`20261021120000_catalog_delete_open_checkout_guard.sql`. **Written 2026-11-22
+on branch `fix/catalog-delete-open-checkout-20261122`, validated on a local
+chain, awaiting owner approval.** The owner's instruction of 2026-11-22, "pause
+the audit and fix the high findings first": audit finding **F-X03-001**
+(`docs/readiness/20261119-full-audit-plan/results/cross/X03-payments-refunds.md`,
+verdict confirmed, high). Section and row numbers follow §70 / row 123 on the
+default branch at `fe53628`; a sibling fix written the same day may need them
+renumbered at merge.
+
+sha256 `92501c99ac089f780f2151a910fdc13c49ab0fe3049cc97f7714b05781489f39`, 414 lines / 22 586 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape.
+
+### The defect
+
+A card checkout freezes the cart in `checkout_sessions.snapshot` and creates
+the order only after Moyasar has captured the money:
+`finalize_checkout_session` → `insert_order_from_snapshot` inserts
+`items[].product_id`, `items[].variant_id` and `items[].modifiers[].modifier_id`
+into `order_items` / `order_item_modifiers`, each a live FK. Those FKs are
+`ON DELETE SET NULL`, which lets an administrator delete a row old orders name,
+but does not let a later INSERT name a row that is gone. Deleting the product
+(its sizes go by CASCADE), one size, or one option — or a whole option group,
+which cascades to its options — in that window made finalize fail with 23503.
+finalize has no exception handler and accepts an `expired` session on purpose,
+so every retry failed the same way: money captured, no order, and no refund path
+(`order_refunds.order_id` is NOT NULL). Reproduced on a clone of the chain at
+`fe53628` with the verdict's script: product, size-only and option-only deletes
+each gave `23503` on `order_items_product_id_fkey`, `order_items_variant_id_fkey`
+and `order_item_modifiers_modifier_id_fkey`; a control and `is_active = false`
+both finalized.
+
+Reachable only once card payments are on in LIVE mode
+(`app_settings.online_payment_enabled`), as `docs/PAYMENTS.md` §1 records they
+are not.
+
+### What it changes
+
+New objects only:
+
+- `checkout_snapshot_references_catalog(snapshot, table, id)` — immutable; does
+  the snapshot name this row in the exact key `insert_order_from_snapshot`
+  inserts? Lax jsonpath, so a malformed snapshot is no match rather than an
+  error.
+- `checkout_session_may_still_capture(session)` — SECURITY DEFINER, stable.
+  True when `order_id IS NULL AND status IN ('pending_payment','expired')` (what
+  finalize accepts) **and** either the session is `pending_payment` inside
+  `expires_at`, or it has a `payment_records` attempt in `initiated`,
+  `authorized` or `failed` whose invoice window
+  (`coalesce(expires_at, created_at + 60 min)`) closed less than **24 hours**
+  ago.
+- `guard_catalog_delete_open_checkout()` — SECURITY DEFINER trigger function,
+  bound `BEFORE DELETE OR UPDATE OF id ... FOR EACH ROW` on `products`,
+  `product_variants` and `modifiers`. Raises **55006** with a message that is
+  itself the instruction: *"This product cannot be deleted while a customer is
+  paying for an order that contains it. Deactivate the product instead …"*.
+  The console shows only `error.message` (`src/lib/api.ts` `wrapDelete` →
+  `WriteErrorBanner`), so the instruction is in the message, not the hint.
+
+**Why 24 hours and why `failed` counts.** `payment-verify` says an expired
+attempt keeps its invoice and a payment made on it in time can settle late, and
+`begin_session_attempt` marks an expired attempt `failed` locally without asking
+Moyasar. So neither an attempt's expiry nor a local `failed` proves the money
+was not taken. The grace bounds the cost: a delete waits at most a day after an
+abandoned checkout.
+
+**Why there is no role exemption**, unlike the address guard: a cascaded delete
+(option group → options, product → sizes) runs as the table owner, so a
+`current_user <> 'authenticated'` exemption would let a group delete through.
+No server-side path deletes these rows (no function body in `public`, no Edge
+Function). A support delete waits for the checkout like the console.
+
+### What it does not do
+
+- **No existing function is redefined.** The file reads `pg_get_functiondef`
+  hashes of `finalize_checkout_session`, `insert_order_from_snapshot`,
+  `compute_order_snapshot` and `place_order` before it runs and asserts them
+  unmoved after, without hard-coding any value. No row written, no deploy.
+- `categories` needs no guard: `products_category_id_fkey` is RESTRICT, and the
+  file asserts that. Join and availability tables carry no order-line FK.
+- `is_active = false` and every other UPDATE except of `id` are unaffected.
+- TRUNCATE fires no row trigger (it fails on the order-line FKs without
+  CASCADE). A session priced in the same instant as the delete is not locked
+  against; closing that needs a lock inside `begin_checkout_session`, which this
+  file does not redefine.
+- **A separate defect found while testing, not fixed here:** a product whose
+  size has ever been **ordered** cannot be hard-deleted at all, before or after
+  this file. The product's `SET NULL` rewrites the order line while the cascaded
+  size delete has not yet nulled `variant_id`, and the rewrite fails on
+  `order_items_variant_id_fkey`. Deleting the size first works. It refuses
+  rather than corrupts, so it costs an administrator a confusing error, not
+  money.
+
+### What the file checks
+
+Exactly one of each new function; the three triggers bound, enabled, BEFORE,
+ROW, `DELETE OR UPDATE OF id`; **every** FK from `order_items` and
+`order_item_modifiers` points at a guarded table (so a new order-line FK fails
+the apply); `products_category_id_fkey` still RESTRICT; SECURITY DEFINER and a
+pinned `search_path`; neither `anon` nor `authenticated` can execute any of the
+three. Then it **calls** both helpers without writing: the matcher on synthetic
+snapshots (product, size and option found; a foreign id, a wrong key and a
+non-array `items` not found), and the window on in-memory session rows (open →
+true; lapsed with no attempt, already ordered, consumed → false). Last, the four
+pre-image hashes.
+
+### Validation
+
+- Clone of the chain at `fe53628`, 2026-11-22: the file applies cleanly and its
+  block passes. The verdict's reproduction afterwards: control and
+  deactivation finalize; product, size-only and option-only deletes are refused
+  with 55006 and the message above.
+- Paired suite `supabase/tests/catalog_delete_open_checkout_guard_test.sql`, 11
+  cases, deletes run as `authenticated` with the admin claim (PostgREST's
+  shape): product refused and the payment then finalizes into a full order;
+  size and option refused; option group → options and product → sizes cascades
+  refused by the child trigger; an open session with no attempt yet; a lapsed
+  attempt inside the grace, `initiated` and locally `failed`, refused and still
+  finalizable; past the grace, lapsed with no attempt, cancelled, refunded and
+  consumed allowed (consumed keeps history with ids SET NULL); deactivating
+  product, size and option allowed and still finalizes; `UPDATE OF id` refused;
+  an unrelated product deletable; `service_role` and owner refused; the message
+  alone carries the instruction. **On the base chain CASE 1 fails.**
+- All 100 suites on a clone with the file: 97 passed, 2 quarantined
+  (`known-failing.txt`), and `server_input_bounds_test` failed at its dblink
+  step on peer authentication, identically on the base chain (this sandbox's
+  socket auth, not the change).
+- **Mutation checks**, twelve mutants with the verification block removed, each
+  run against the suite; the block's own verdict on the same mutant alongside:
+
+  | Mutant | Paired suite | Migration's own block |
+  | --- | --- | --- |
+  | `modifiers` trigger dropped | killed (CASE 2b) | killed |
+  | `product_variants` trigger dropped | killed (CASE 2a) | killed |
+  | session window inverted | killed (CASE 4) | killed |
+  | `failed` attempts not counted | killed (CASE 5b) | passes |
+  | grace unbounded | killed (CASE 5c) | passes |
+  | grace zero | killed (CASE 5a) | passes |
+  | session state filters dropped | killed (CASE 6b) | killed |
+  | `current_user` role exemption added | killed (CASE 1) | passes |
+  | UPDATE never guarded | killed (CASE 8) | passes |
+  | option matcher reads the wrong key | killed (CASE 2b) | killed |
+  | raise made unreachable | killed (CASE 1) | passes |
+  | cascades exempted (`pg_trigger_depth() > 1`) | killed (CASE 3a) | passes |
+
+  Every mutant is killed by the suite. The block does not write, so the
+  behaviour that needs real sessions and attempts is the suite's to prove.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first:
+   ```sql
+   select count(*) from supabase_migrations.schema_migrations where name = 'catalog_delete_open_checkout_guard';
+   -- 0
+   select count(*) from pg_trigger where tgname like 'trg_%_guard_open_checkout';
+   -- 0
+   ```
+2. Apply `20261021120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the three triggers exist and are enabled, and no
+   row changed. No probe delete is needed: the file's own block calls both
+   helpers, and the paired suite proves the refusal on the local chain.
+4. Rollback, if ever wanted: drop the three triggers and the three functions.
+   Nothing else depends on them.
+## 75. The POS and refunds stop contradicting each other — WRITTEN 2026-11-22, NOT APPLIED (ledger row 128)
+
+_Renumbered from §71 / ledger row 124 when #512 merged first and took those numbers. Comments inside this file\'s migration and suite that say "MIGRATIONS.md §71" mean this section._
 
 `20261022120000_pos_resend_refund_guards.sql`. **Written 2026-11-22 on branch
 `fix/pos-resend-refund-guards-20261122`, validated on a local chain, awaiting
