@@ -117,3 +117,42 @@ describe('admin.deleteBranch', () => {
     expect(deleteEq).toHaveBeenCalledWith('id', 'b1');
   });
 });
+
+// F-X03-001 (migration 20261021120000): the server refuses a product delete with
+// 55006 while a customer is paying for an order that contains it, and the
+// refusal's MESSAGE is the instruction ("Deactivate the product instead…").
+// The console shows only `error.message` (AppContext -> WriteErrorBanner), so
+// this pins that the message reaches it verbatim rather than a generic error.
+describe('admin.deleteProduct', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function wireProductDelete(deleteError: unknown) {
+    const deleteEq = vi.fn(() => Promise.resolve({ error: deleteError }));
+    const del = vi.fn(() => ({ eq: deleteEq }));
+    vi.mocked(supabase.from).mockImplementation(((table: string) => {
+      if (table === 'products') return { delete: del };
+      throw new Error(`unexpected table queried: ${table}`);
+    }) as unknown as typeof supabase.from);
+    return { del, deleteEq };
+  }
+
+  it('rejects with the server refusal verbatim when an open checkout names the product', async () => {
+    const message =
+      'This product cannot be deleted while a customer is paying for an order that contains it. ' +
+      'Deactivate the product instead (set it inactive, or switch it off in branch availability): ' +
+      'it leaves the menu straight away and the payment still becomes an order. ' +
+      'It can be deleted once that checkout has finished.';
+    const { deleteEq } = wireProductDelete({ code: '55006', message, hint: 'not shown by the console' });
+    const err = await captureError(() => admin.deleteProduct('p1'));
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe(message);
+    expect(deleteEq).toHaveBeenCalledWith('id', 'p1');
+  });
+
+  it('resolves when the server deletes the product', async () => {
+    const { del, deleteEq } = wireProductDelete(null);
+    await expect(admin.deleteProduct('p1')).resolves.toBeUndefined();
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(deleteEq).toHaveBeenCalledWith('id', 'p1');
+  });
+});
