@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**297 TypeScript test files declaring 4362 test blocks, plus 102 SQL suites.**
+**297 TypeScript test files declaring 4362 test blocks, plus 103 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -117,6 +117,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/order_refund_claim_liveness_test.sql`
 - `supabase/tests/otp_login_rate_limit_test.sql`
 - `supabase/tests/otp_retention_sweep_test.sql`
+- `supabase/tests/payment_records_retention_and_limits_test.sql`
 - `supabase/tests/payment_refund_visibility_test.sql`
 - `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/place_order_variants_test.sql`
