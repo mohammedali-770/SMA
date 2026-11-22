@@ -37,6 +37,8 @@ Other documents:
 
 ## 1. Live state, read-only, 2026-11-11
 
+> **Updated 2026-11-22: a read-only query made during a migration apply (07:14 UTC) returned `app_settings.online_payment_enabled` = `true`.** Every statement below that card payments are off, or that `online_payment_enabled` is false, is the state of 2026-11-11 to 2026-11-13 and is history. Nothing else about the payment settings was re-read then, and the payment row's mode and enabled state in particular were not. Re-read before acting on any of it.
+>
 > **Updated 2026-11-13, evening: the sandbox test is DONE** (§7 step 6,
 > `OWNER_ACTIONS.md` §47.7-47.9). The payment row is now **enabled, in TEST
 > mode**, since 18:17:02 UTC, because the sandbox refuses a disabled row; this
@@ -113,7 +115,7 @@ session freezes product, size and option ids, and step 6 inserts them as
 order-line foreign keys. Hard-deleting one in that window made the insert fail
 after the money was captured: a payment with no order, and no automatic refund
 (audit finding F-X03-001). `20261021120000_catalog_delete_open_checkout_guard`
-(**written 2026-11-22, NOT applied**, `MIGRATIONS.md` §71) refuses that delete
+(**applied 2026-11-22**, `MIGRATIONS.md` §71) refuses that delete
 with 55006 and tells the administrator to deactivate the item instead, while any
 session that names it can still be paid: inside its window, or with an unsettled
 attempt whose invoice closed less than 24 hours ago. Deactivating
@@ -731,9 +733,9 @@ dialog) is in flight. Older builds keep a short window here; see §12.
 
 ### A checkout whose order details changed (audit F-X02-001)
 
-Written 2026-11-22, **not yet live**: it needs the migration
-`20261020120000_checkout_session_input_match` applied and an app build carrying
-the client half. The section above covered a changed **cart** only, because the
+Written 2026-11-22. The migration
+`20261020120000_checkout_session_input_match` is **applied** (2026-11-22). The
+client half is **not yet live**: it needs an app build carrying it. The section above covered a changed **cart** only, because the
 cart key stands for the items. A customer who opened a card payment for a pickup
 order, closed the page, and switched to delivery — or changed branch, address,
 coupon, points or notes — kept the same key. Either the app resumed the old
@@ -843,7 +845,7 @@ decides which, not the worker:
   [Order confirmation flow §6](ORDER_CONFIRMATION_FLOW.md)), reason
   `pos_delivery_failed_after_customer_retries`. **Once
   `20261022120000_pos_resend_refund_guards` is applied (`MIGRATIONS.md` §75;
-  written 2026-11-22, NOT applied), only while the order is still `received`**
+  applied 2026-11-22), only while the order is still `received`**
   (audit F-X04-002). Until then an order the branch fulfilled by hand during a
   POS failure was enrolled too, and a delivered order was refunded in full. After
   the apply, staff cannot move an order on while its refund is pending,
@@ -853,7 +855,7 @@ decides which, not the worker:
   is cancelled, which refunds it through the cancellation path below;
 - **a paid card order that is cancelled**, reason `order_cancelled`, once
   `20261018120000_refund_cancelled_paid_orders` is applied (`MIGRATIONS.md`
-  §70). **Written 2026-11-19, NOT applied.** The owner's decision of
+  §70). **Written 2026-11-19; applied (live `20261119051739`, found by a live read on 2026-11-22).** The owner's decision of
   2026-11-19: "do the auto refund". The write that makes an online order
   cancelled and paid enrols one refund for the full captured amount when a
   `paid` `payment_records` row exists, the total is above zero and the order

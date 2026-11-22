@@ -77,7 +77,7 @@ Approval for one action is not blanket approval for later actions.
 **What keeps it safe while it is off.** Each is code in this repository, with tests:
 - customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
 - an attempt opened in TEST mode never confirms an order or a checkout session;
-- **the one exception to both (added 2026-11-18, owner request, testing phase only):** the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT`, exactly `true`, lets a customer pay a real order with Moyasar TEST keys and test cards, and confirms it. Unset, nothing changes. Setting it is a §5 action, and it **must be unset before card payments go live** (`docs/PAYMENTS.md` §3, `docs/OWNER_ACTIONS.md` §60);
+- **the one exception to both (added 2026-11-18, owner request, testing phase only):** the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT`, exactly `true`, lets a customer pay a real order with Moyasar TEST keys and test cards, and confirms it. Unset, nothing changes. Setting it is a §5 action, and it **must be unset before card payments go live** (`docs/PAYMENTS.md` §3, `docs/OWNER_ACTIONS.md` §60). **Narrowed in #513 (merged 2026-11-22, `4791e50`) but NOT yet deployed, so until the five payment functions are redeployed the sentence above is still the live behaviour.** Once deployed, the flag alone admits nobody: the order's owner must also be listed in the Edge Function secret `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` (comma-separated profile ids, read from the database server-side and applied at initiate and again at confirmation); unset or empty admits nobody and any error fails closed. Set that secret **before** deploying, or test cards are refused for everyone. It too must be deleted before card payments go live;
 - the console's Online Payment switch opens only for an enabled, live Moyasar row. **It guards the console, not the setting:** `set_payment_settings` checks `is_admin()` alone;
 - the web build (`/app`) never offers online payment;
 - payment history is data: the `tap` rows stay and are shown read-only.
@@ -302,6 +302,33 @@ The superseded statement was **112 repository files / 117 live rows / exactly ON
 Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
+
+**Current position 2026-11-22, read live AFTER the five audit-fix applies: 167
+repository files on the default branch / 173 live history rows / 164 applied by
+exact name, 1 applied under a longer name (row 15), 2 superseded (rows 8-9), 0
+unapplied — NOTHING IS OUTSTANDING, and this supersedes every paragraph below
+that calls any of these files written or unapplied.** Latest live version
+`20261122072301`. On the owner's approval naming each by version, five files
+merged in #512, #514, #515, #516 and #517 were applied in one call each, in this
+order, each followed by a read-only check of every stored body against hashes
+pre-computed from the merged file: `20261022120000_pos_resend_refund_guards`
+(06:49:37 UTC, ledger row 128), `20261019120000_loyalty_points_reservation`
+(07:06:59, row 125), `20261020120000_checkout_session_input_match` (07:15:47,
+row 127), `20261021120000_catalog_delete_open_checkout_guard` (07:18:17, row 124)
+and `20261023120000_payment_records_retention_and_limits` (07:23:01, row 126).
+Live history **168 → 173**. **The money-path pair moved once, by intent:**
+`place_order` `12b6816d…` → **`7078c7ddc36eb5eb0f7b0fc86b26dc8d`**,
+`compute_order_snapshot` unchanged at `22e2d429…`; treat the new `place_order`
+hash as the baseline and do not quote the old pair as current. The reconciliation
+also found rows 122 (`advisor_fixes`, live `20261118120101`) and 123
+(`refund_cancelled_paid_orders`, live `20261119051739`) APPLIED although the
+ledger said NOT APPLIED; those applies were never recorded, so who applied them
+is not known, and both were measured. **Applied is not delivered:** the app
+halves (the checkout key and total check, the refusal copy and its Arabic)
+reach customers only with the next EAS build, and #513's payment functions are
+merged but NOT deployed (§6). With nothing outstanding the rule does not relax:
+the next file written is the next referent. **Name the target by version.**
+Detail: `docs/MIGRATIONS.md` §69-§75 and rows 122-128.
 
 **AMENDED 2026-11-19 — `20261018120000_refund_cancelled_paid_orders` is
 written, validated and UNAPPLIED, and on merge it is the ONLY unapplied file.**
