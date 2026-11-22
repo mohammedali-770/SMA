@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LIVE_PUBLIC, SECRETS, type FakeMoyasar, type FakePaymentDb } from './__fixtures__/paymentFakes.ts';
 import { call, currentDb, freshRuntime, setEnv } from './__fixtures__/paymentRuntime.ts';
-import { PAYMENT_ALLOW_TEST_CHECKOUT_ENV, allowTestModeCheckout } from './paymentTestCheckout.ts';
+import {
+  PAYMENT_ALLOW_TEST_CHECKOUT_ENV,
+  PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS_ENV,
+  allowTestModeCheckout,
+  testCheckoutCustomerIds,
+} from './paymentTestCheckout.ts';
 
 vi.mock('./supabaseClient.ts', () => ({
   adminClient: () => currentDb().client(),
@@ -17,13 +22,21 @@ vi.mock('./supabaseClient.ts', () => ({
  * Unset, or any value but the exact string 'true', both refusals stand exactly
  * as before: payment-initiate answers {status:'disabled', reason:'test_mode'}
  * and opens nothing, and a TEST attempt is never confirmed. Exactly 'true', a
- * customer pays a real order with the TEST key, and it confirms as a live
- * payment does.
+ * customer LISTED in PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS pays a real order with
+ * the TEST key, and it confirms as a live payment does. Any other customer is
+ * refused exactly as with the switch off (F-EFP-05-001: until 2026-11-22 the
+ * switch admitted every signed-in customer).
+ *
+ * The customer is the one who owns the session or order (the fixtures' default
+ * `customer_id`, OWNER below), never anything in the request.
  */
 
 const TEST_PUBLIC = { ...LIVE_PUBLIC, mode: 'test' };
 const NOT_ON = [undefined, 'TRUE', '1', '', ' true', 'yes'] as const;
 const TEST_MODE_REFUSAL = { status: 'disabled', reason: 'test_mode' };
+/** The fixtures' default customer, who owns every session and order below unless stated. */
+const OWNER = 'c0000000-0000-4000-8000-000000000001';
+const STRANGER = 'c0000000-0000-4000-8000-0000000000ff';
 
 let db: FakePaymentDb;
 let moyasar: FakeMoyasar;
@@ -37,7 +50,11 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-const switchTo = (value: string | undefined) => setEnv(PAYMENT_ALLOW_TEST_CHECKOUT_ENV, value);
+/** Set the switch; the list names OWNER unless a list is given (null: the list is unset). */
+const switchTo = (value: string | undefined, list: string | null = OWNER) => {
+  setEnv(PAYMENT_ALLOW_TEST_CHECKOUT_ENV, value);
+  setEnv(PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS_ENV, list ?? undefined);
+};
 
 /** The structured log lines written, parsed, with the given event name. */
 function logged(event: string): Record<string, unknown>[] {
@@ -66,11 +83,31 @@ function testWebhook(payment: Record<string, unknown>) {
 describe('allowTestModeCheckout()', () => {
   it("is true only for the exact string 'true'", () => {
     switchTo('true');
-    expect(allowTestModeCheckout()).toBe(true);
+    expect(allowTestModeCheckout(OWNER)).toBe(true);
     for (const v of NOT_ON) {
       switchTo(v);
-      expect(allowTestModeCheckout(), JSON.stringify(v)).toBe(false);
+      expect(allowTestModeCheckout(OWNER), JSON.stringify(v)).toBe(false);
     }
+  });
+
+  it('is true only for a listed customer', () => {
+    switchTo('true', `${OWNER}`);
+    expect(allowTestModeCheckout(STRANGER)).toBe(false);
+    for (const nobody of [null, '', ' , ']) {
+      switchTo('true', nobody);
+      expect(allowTestModeCheckout(OWNER), JSON.stringify(nobody)).toBe(false);
+    }
+    switchTo('true', ` ${STRANGER} ,${OWNER.toUpperCase()} `);
+    expect(allowTestModeCheckout(OWNER)).toBe(true);
+    expect(allowTestModeCheckout(STRANGER)).toBe(true);
+  });
+
+  it('never matches a missing or malformed customer id, or a malformed entry', () => {
+    switchTo('true', `${OWNER},*,not-a-uuid,`);
+    for (const id of [undefined, null, '', '*', 'not-a-uuid', 42, { id: OWNER }, [OWNER]]) {
+      expect(allowTestModeCheckout(id), JSON.stringify(id)).toBe(false);
+    }
+    expect([...testCheckoutCustomerIds(`${OWNER},*,not-a-uuid,`)]).toEqual([OWNER]);
   });
 
   it('fails closed when the environment cannot be read', () => {
@@ -84,7 +121,7 @@ describe('allowTestModeCheckout()', () => {
       },
     };
     try {
-      expect(allowTestModeCheckout()).toBe(false);
+      expect(allowTestModeCheckout(OWNER)).toBe(false);
     } finally {
       g.Deno = deno;
     }
@@ -129,6 +166,38 @@ describe('payment-initiate in TEST mode', () => {
     expect(logged('payment_test_mode_allowed')).toEqual([
       expect.objectContaining({ fn: 'payment-initiate', flow: 'order' }),
     ]);
+  });
+
+  it("switch 'true': a customer who is not listed is refused in both flows, nothing opened", async () => {
+    switchTo('true', STRANGER);
+    const session = db.session();
+    expect((await call('payment-initiate', { checkoutSessionId: session.id })).body).toEqual(
+      TEST_MODE_REFUSAL,
+    );
+    const order = db.order();
+    expect((await call('payment-initiate', { orderId: order.id })).body).toEqual(TEST_MODE_REFUSAL);
+    expect(db.rows('payment_records')).toHaveLength(0);
+    expect(moyasar.posts).toHaveLength(0);
+    expect(logged('payment_test_mode_allowed')).toHaveLength(0);
+  });
+
+  it("switch 'true' with no list: nobody is admitted", async () => {
+    switchTo('true', null);
+    const session = db.session();
+    expect((await call('payment-initiate', { checkoutSessionId: session.id })).body).toEqual(
+      TEST_MODE_REFUSAL,
+    );
+    expect(moyasar.posts).toHaveLength(0);
+  });
+
+  it('the customer is the owner of the row, whatever the request says', async () => {
+    switchTo('true', OWNER);
+    const session = db.session({ customer_id: STRANGER });
+    const res = await call('payment-initiate', {
+      checkoutSessionId: session.id, customerId: OWNER, customer_id: OWNER,
+    });
+    expect(res.body).toEqual(TEST_MODE_REFUSAL);
+    expect(moyasar.posts).toHaveLength(0);
   });
 
   it("switch 'true': the minimum still applies", async () => {
@@ -211,6 +280,55 @@ describe('confirming a TEST attempt', () => {
     expect(logged('moyasar_confirm_refused')).toEqual([
       expect.objectContaining({ reason: 'test_mode_attempt' }),
     ]);
+  });
+
+  // F-EFP-05-001: the list is consulted again at confirmation, for the owner of
+  // the attempt's session, so an attempt opened while a customer was listed is
+  // not confirmable once they are not.
+  it('a customer taken off the list before confirmation: refused, no order', async () => {
+    const { session, payment } = await paidTestSession();
+    switchTo('true', STRANGER);
+    expect((await testWebhook(payment)).body).toMatchObject({ status: 'acknowledged', outcome: 'failed' });
+    expect((await call('payment-verify', { checkoutSessionId: session.id })).body.status).toBe('failed');
+    expect(db.rows('orders')).toHaveLength(0);
+    expect(db.attempts({ checkout_session_id: session.id })[0]).toMatchObject({
+      status: 'failed',
+      failure_code: 'test_mode_attempt',
+    });
+  });
+
+  it("a TEST attempt on another customer's session is not confirmable for them", async () => {
+    // An allowed customer's attempt opened normally, then a TEST attempt that
+    // belongs to a stranger's session (however it came to exist): only the
+    // first may confirm.
+    const { payment } = await paidTestSession();
+    const theirs = db.session({ customer_id: STRANGER });
+    setEnv(PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS_ENV, `${OWNER},${STRANGER}`);
+    const init = await call('payment-initiate', { checkoutSessionId: theirs.id });
+    expect(init.status).toBe(200);
+    const theirPayment = moyasar.pay(String(init.body.invoiceId), 'pay_test_theirs', 'paid');
+    switchTo('true', OWNER);
+    expect((await testWebhook(theirPayment)).body).toMatchObject({ status: 'acknowledged', outcome: 'failed' });
+    expect(db.rows('checkout_sessions').find((r) => r.id === theirs.id)!.order_id).toBeNull();
+    expect((await testWebhook(payment)).body.status).toBe('paid');
+    expect(db.rows('orders').map((o) => o.customer_id)).toEqual([OWNER]);
+  });
+
+  it("an order-first TEST attempt is decided by the order's owner too", async () => {
+    switchTo('true', OWNER);
+    const order = db.order();
+    const init = await call('payment-initiate', { orderId: order.id });
+    expect(init.status).toBe(200);
+    const payment = moyasar.pay(String(init.body.invoiceId), 'pay_test_order', 'paid');
+    switchTo('true', STRANGER);
+    expect((await testWebhook(payment)).body).toMatchObject({ status: 'acknowledged', outcome: 'failed' });
+    expect(db.rows('orders')[0].payment_status).toBe('pending');
+    switchTo('true', OWNER);
+    const order2 = db.order();
+    const init2 = await call('payment-initiate', { orderId: order2.id });
+    const payment2 = moyasar.pay(String(init2.body.invoiceId), 'pay_test_order2', 'paid');
+    expect((await testWebhook(payment2)).body.status).toBe('paid');
+    expect(db.rows('orders').find((o) => o.id === order2.id)!.payment_status).toBe('paid');
   });
 
   it('switch unset at confirmation: payment-verify refuses it too', async () => {
