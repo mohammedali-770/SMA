@@ -705,7 +705,16 @@ decides which, not the worker:
 
 - **paid but provably never reached the branch** (`order_refund_due()`,
   [Order confirmation flow §6](ORDER_CONFIRMATION_FLOW.md)), reason
-  `pos_delivery_failed_after_customer_retries`;
+  `pos_delivery_failed_after_customer_retries`. **Once
+  `20261022120000_pos_resend_refund_guards` is applied (`MIGRATIONS.md` §75;
+  written 2026-11-22, NOT applied), only while the order is still `received`**
+  (audit F-X04-002). Until then an order the branch fulfilled by hand during a
+  POS failure was enrolled too, and a delivered order was refunded in full. After
+  the apply, staff cannot move an order on while its refund is pending,
+  processing or refunded (the console shows "refund_in_progress: … Cancel the
+  order instead."), and `claim_order_refund` takes a refund only while its order
+  is `received` or `cancelled`. An order staff moved on and then cannot fulfil
+  is cancelled, which refunds it through the cancellation path below;
 - **a paid card order that is cancelled**, reason `order_cancelled`, once
   `20261018120000_refund_cancelled_paid_orders` is applied (`MIGRATIONS.md`
   §70). **Written 2026-11-19, NOT applied.** The owner's decision of

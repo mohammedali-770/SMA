@@ -20,7 +20,9 @@
 --
 --   CASE 1   guard   PG-03  Resend: a cancelled order is refused, with a reason and
 --                           a message, and nothing about the order moves
---   CASE 2   honest  PG-03  Resend: an eligible order in each non-cancelled status is still re-queued
+--   CASE 2   honest  PG-03  Resend: an eligible RECEIVED order is still re-queued
+--                           (AMENDED for 20261022120000: the other statuses are
+--                           refused as order_in_progress)
 --   CASE 3   guard   PG-03  Resend: an order nobody owns any more is refused
 --                           (the NULL-safe ownership test)
 --   CASE 4   guard   PG-03  Resend: a cancelled order whose refund exists keeps the
@@ -30,8 +32,8 @@
 --   CASE 6   g+h     PG-03  claim_lazywait_sync_batch: never a cancelled order, still
 --                           orders in every other status, in queue order
 --   CASE 7   g+h     PG-03  the refund trigger: a cancelled order is enrolled by no
---                           path; an eligible never-cancelled order still is, in
---                           every other status
+--                           path; an eligible RECEIVED order still is (AMENDED for
+--                           20261022120000: a progressed one is not)
 --   CASE 8   guard   PG-27  place_customer_order refuses 'online' however written,
 --                           and creates nothing
 --   CASE 9   guard   PG-27  place_customer_order refuses a call with no method that
@@ -227,6 +229,12 @@ end $$;
 -- re-queued. Every status is probed, so a guard that also refused a later
 -- status (a paid order that failed to send while it was being prepared) fails.
 -- ---------------------------------------------------------------------------
+-- AMENDED for 20261022120000_pos_resend_refund_guards (audit F-X04-001). The
+-- paragraph above is the rule that finding records as the defect: a Resend on an
+-- order staff have moved on sends a second ticket for food already being made
+-- or handed over. A received order is still re-queued exactly once; the four
+-- later statuses are now refused with reason order_in_progress and left as they
+-- were. Full behaviour: supabase/tests/pos_resend_refund_guards_test.sql CASE 1.
 do $$
 declare
   v_c   uuid := pg_temp.new_customer();
@@ -235,7 +243,16 @@ declare
   v_st  public.order_status;
   o     public.orders;
 begin
-  foreach v_st in array array['received', 'preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+  foreach v_st in array array['preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_id := pg_temp.new_order(v_c, v_st, 'cash', 'pending', 'failed');
+    v_res := pg_temp.resend_as(v_c, v_id);
+    select * into o from public.orders where id = v_id;
+    if v_res->>'outcome' is distinct from 'unavailable' or v_res->>'reason' is distinct from 'order_in_progress'
+       or o.lazywait_sync_state <> 'failed' or o.pos_customer_retry_count <> 0 then
+      raise exception 'CASE 2 FAILED: a % order was not refused as order_in_progress: % (% / %)', v_st, v_res, o.lazywait_sync_state, o.pos_customer_retry_count;
+    end if;
+  end loop;
+  foreach v_st in array array['received']::public.order_status[] loop
     v_id := pg_temp.new_order(v_c, v_st, 'cash', 'pending', 'failed');
     v_res := pg_temp.resend_as(v_c, v_id);
     if v_res->>'outcome' is distinct from 'accepted' then
@@ -246,7 +263,7 @@ begin
       raise exception 'CASE 2 FAILED: the % resend did not queue exactly one send (% / %)', v_st, o.lazywait_sync_state, o.pos_customer_retry_count;
     end if;
   end loop;
-  raise notice 'CASE 2 ok: an eligible order in each of the five non-cancelled statuses is re-queued once';
+  raise notice 'CASE 2 ok: an eligible received order is re-queued once; the four later statuses are order_in_progress';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -416,16 +433,21 @@ begin
     raise exception 'CASE 7 FAILED: an eligible paid order did not get exactly one refund record';
   end if;
 
-  -- And in every other status: the trigger skips "cancelled", nothing more.
+  -- AMENDED for 20261022120000_pos_resend_refund_guards (audit F-X04-002). This
+  -- loop used to require enrolment in every other status ("the trigger skips
+  -- cancelled, nothing more"), which is the defect: a delivered order refunded in
+  -- full. The POS-failure refund is now enrolled only while the order is
+  -- received; an order staff have moved on is cancelled to be refunded. Full
+  -- behaviour: supabase/tests/pos_resend_refund_guards_test.sql CASE 6.
   foreach v_status in array array['preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
     v_id := pg_temp.new_order(null, v_status, 'online', 'paid', 'pending', 3);
     update public.orders set lazywait_sync_state = 'dead_letter' where id = v_id;
-    if (select refund_state from public.orders where id = v_id) <> 'pending'
-       or (select count(*) from public.order_refunds where order_id = v_id) <> 1 then
-      raise exception 'CASE 7 FAILED: an eligible paid % order was not enrolled', v_status;
+    if (select refund_state from public.orders where id = v_id) <> 'none'
+       or (select count(*) from public.order_refunds where order_id = v_id) <> 0 then
+      raise exception 'CASE 7 FAILED: a paid % order was enrolled for the POS-failure refund', v_status;
     end if;
   end loop;
-  raise notice 'CASE 7 ok: no path enrols a cancelled order, and an eligible one is still enrolled in every other status';
+  raise notice 'CASE 7 ok: no path enrols a cancelled order, an eligible received one is still enrolled, and a progressed one is not';
 end $$;
 
 -- ---------------------------------------------------------------------------
