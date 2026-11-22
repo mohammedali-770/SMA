@@ -119,7 +119,10 @@
 -- ---------------------------------------------------------------------------
 -- 0. The shortfall record
 -- ---------------------------------------------------------------------------
-create table public.loyalty_redemption_shortfalls (
+-- Every create in this file is guarded, so the file re-applies cleanly: the
+-- SQL CI replays the whole chain, which puts every earlier body back, and this
+-- file must then land again to restore its own.
+create table if not exists public.loyalty_redemption_shortfalls (
   id                      uuid primary key default gen_random_uuid(),
   -- No foreign key, on the order_status_audit precedent (20261007120000): an
   -- append-only row must neither block nor vanish with the row it describes.
@@ -140,6 +143,7 @@ comment on table public.loyalty_redemption_shortfalls is
 
 alter table public.loyalty_redemption_shortfalls enable row level security;
 
+drop policy if exists loyalty_redemption_shortfalls_admin_read on public.loyalty_redemption_shortfalls;
 create policy loyalty_redemption_shortfalls_admin_read
   on public.loyalty_redemption_shortfalls
   for select to authenticated
@@ -151,9 +155,11 @@ revoke all on table public.loyalty_redemption_shortfalls from public, anon, auth
 grant select on table public.loyalty_redemption_shortfalls to authenticated;
 grant all on table public.loyalty_redemption_shortfalls to service_role;
 
+drop trigger if exists append_only_rows on public.loyalty_redemption_shortfalls;
 create trigger append_only_rows
   before update or delete on public.loyalty_redemption_shortfalls
   for each row execute function public.audit_rows_are_append_only();
+drop trigger if exists append_only_truncate on public.loyalty_redemption_shortfalls;
 create trigger append_only_truncate
   before truncate on public.loyalty_redemption_shortfalls
   for each statement execute function public.audit_rows_are_append_only();
