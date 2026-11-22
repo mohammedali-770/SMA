@@ -29,6 +29,13 @@ export interface PendingSession {
    * return link, which never knows the cart. See `recoverPendingSession`.
    */
   cartKey?: string | null;
+  /**
+   * The CARD checkout key it was begun under (checkoutSessionKey): the cart key
+   * plus every other input sent to begin_checkout_session. Null for a record
+   * written by an older build, or when the checkout was resumed rather than
+   * begun. See `checkoutChangedSince`.
+   */
+  checkoutKey?: string | null;
 }
 
 /** Parse a stored record; null if absent, malformed, or wrong-shaped. */
@@ -41,6 +48,7 @@ export function parsePendingSession(raw: string | null | undefined): PendingSess
         sessionId: o.sessionId,
         at: typeof o.at === 'number' ? o.at : 0,
         cartKey: typeof o.cartKey === 'string' && o.cartKey.length > 0 ? o.cartKey : null,
+        checkoutKey: typeof o.checkoutKey === 'string' && o.checkoutKey.length > 0 ? o.checkoutKey : null,
       };
     }
   } catch {
@@ -50,8 +58,18 @@ export function parsePendingSession(raw: string | null | undefined): PendingSess
 }
 
 /** Serialize a pending session for storage. */
-export function serializePendingSession(sessionId: string, at: number, cartKey: string | null = null): string {
-  return JSON.stringify(cartKey ? { sessionId, at, cartKey } : { sessionId, at });
+export function serializePendingSession(
+  sessionId: string,
+  at: number,
+  cartKey: string | null = null,
+  checkoutKey: string | null = null,
+): string {
+  return JSON.stringify({
+    sessionId,
+    at,
+    ...(cartKey ? { cartKey } : {}),
+    ...(checkoutKey ? { checkoutKey } : {}),
+  });
 }
 
 /**
@@ -62,6 +80,17 @@ export function serializePendingSession(sessionId: string, at: number, cartKey: 
  */
 export function cartChangedSince(pending: PendingSession, currentCartKey: string | null | undefined): boolean {
   return Boolean(pending.cartKey && currentCartKey && pending.cartKey !== currentCartKey);
+}
+
+/**
+ * Was the saved checkout begun for different ORDER DETAILS than the ones on
+ * screen now: order type, branch, address, coupon, points or notes, as well as
+ * the items (audit F-X02-001)? Only when both keys are known, as with
+ * cartChangedSince: an unknown key is treated as the same checkout, and the
+ * total check before payment (sessionTotalMatchesShown) still stands.
+ */
+export function checkoutChangedSince(pending: PendingSession, currentCheckoutKey: string | null | undefined): boolean {
+  return Boolean(pending.checkoutKey && currentCheckoutKey && pending.checkoutKey !== currentCheckoutKey);
 }
 
 /** The result of verifySession, narrowed to what the decision needs. */
@@ -191,6 +220,12 @@ export async function recoverPendingSession(deps: {
    * without them an unresolved checkout is always resumed.
    */
   currentCartKey?: string | null;
+  /**
+   * The card checkout key for the details now on screen. Passed only where the
+   * customer has chosen them (Place Order), never on screen entry, where the
+   * screen's defaults are not a choice.
+   */
+  currentCheckoutKey?: string | null;
   abandon?: (sessionId: string) => Promise<VerifyOutcome>;
 }): Promise<RecoverResult> {
   const pending = await deps.read();
@@ -219,7 +254,12 @@ export async function recoverPendingSession(deps: {
   // cancelling its invoice at Moyasar; otherwise it answers pending and THAT
   // checkout is resumed, exactly as before, because a payment under way must
   // never be abandoned for a second charge.
-  if (deps.abandon && cartChangedSince(pending, deps.currentCartKey)) {
+  // Since F-X02-001 "a different order" also means different order details
+  // with the same items: the server would otherwise invoice the old total.
+  if (
+    deps.abandon &&
+    (cartChangedSince(pending, deps.currentCartKey) || checkoutChangedSince(pending, deps.currentCheckoutKey))
+  ) {
     let res2: VerifyOutcome | null = null;
     try {
       res2 = await deps.abandon(pending.sessionId);

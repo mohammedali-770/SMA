@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   cartChangedSince,
+  checkoutChangedSince,
   decidePendingAction,
   describeVerifyResult,
   parsePendingSession,
@@ -15,16 +16,16 @@ import {
 describe('parsePendingSession', () => {
   it('round-trips a saved session', () => {
     const raw = serializePendingSession('sess-1', 1234);
-    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: null });
+    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: null, checkoutKey: null });
   });
   it('round-trips the cart key a checkout was begun for', () => {
     const raw = serializePendingSession('sess-1', 1234, 'cart-a');
-    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: 'cart-a' });
+    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: 'cart-a', checkoutKey: null });
   });
   it('reads a record from an older build, which has no cart key, as unknown', () => {
-    expect(parsePendingSession('{"sessionId":"s","at":5}')).toEqual({ sessionId: 's', at: 5, cartKey: null });
-    expect(parsePendingSession('{"sessionId":"s","cartKey":""}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
-    expect(parsePendingSession('{"sessionId":"s","cartKey":7}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
+    expect(parsePendingSession('{"sessionId":"s","at":5}')).toEqual({ sessionId: 's', at: 5, cartKey: null, checkoutKey: null });
+    expect(parsePendingSession('{"sessionId":"s","cartKey":""}')).toEqual({ sessionId: 's', at: 0, cartKey: null, checkoutKey: null });
+    expect(parsePendingSession('{"sessionId":"s","cartKey":7}')).toEqual({ sessionId: 's', at: 0, cartKey: null, checkoutKey: null });
   });
   it('returns null for absent / empty', () => {
     expect(parsePendingSession(null)).toBeNull();
@@ -37,8 +38,18 @@ describe('parsePendingSession', () => {
     expect(parsePendingSession('{"sessionId":""}')).toBeNull();
     expect(parsePendingSession('{"sessionId":123}')).toBeNull();
   });
+  it('round-trips the card checkout key a checkout was begun under', () => {
+    const raw = serializePendingSession('sess-1', 1234, 'cart-a', 'chk-a');
+    expect(parsePendingSession(raw)).toEqual({ sessionId: 'sess-1', at: 1234, cartKey: 'cart-a', checkoutKey: 'chk-a' });
+    expect(JSON.parse(serializePendingSession('sess-1', 1, null, null))).toEqual({ sessionId: 'sess-1', at: 1 });
+  });
+  it('reads a record without a checkout key (older build) as unknown', () => {
+    expect(parsePendingSession('{"sessionId":"s","at":5,"cartKey":"c"}')).toEqual({ sessionId: 's', at: 5, cartKey: 'c', checkoutKey: null });
+    expect(parsePendingSession('{"sessionId":"s","checkoutKey":""}')?.checkoutKey).toBeNull();
+    expect(parsePendingSession('{"sessionId":"s","checkoutKey":9}')?.checkoutKey).toBeNull();
+  });
   it('defaults a missing timestamp to 0', () => {
-    expect(parsePendingSession('{"sessionId":"s"}')).toEqual({ sessionId: 's', at: 0, cartKey: null });
+    expect(parsePendingSession('{"sessionId":"s"}')).toEqual({ sessionId: 's', at: 0, cartKey: null, checkoutKey: null });
   });
 });
 
@@ -306,5 +317,75 @@ describe('recoverPendingSession — a checkout the customer replaced by changing
     expect(abandon).not.toHaveBeenCalled();
     expect(paid).toEqual({ kind: 'receipt', orderId: 'o' });
     expect(dead).toEqual({ kind: 'cleared' });
+  });
+});
+
+describe('checkoutChangedSince', () => {
+  it('is true only when both checkout keys are known and differ', () => {
+    expect(checkoutChangedSince({ sessionId: 's', at: 0, checkoutKey: 'a' }, 'b')).toBe(true);
+    expect(checkoutChangedSince({ sessionId: 's', at: 0, checkoutKey: 'a' }, 'a')).toBe(false);
+    expect(checkoutChangedSince({ sessionId: 's', at: 0, checkoutKey: null }, 'b')).toBe(false);
+    expect(checkoutChangedSince({ sessionId: 's', at: 0 }, 'b')).toBe(false);
+    expect(checkoutChangedSince({ sessionId: 's', at: 0, checkoutKey: 'a' }, null)).toBe(false);
+    expect(checkoutChangedSince({ sessionId: 's', at: 0, checkoutKey: 'a' }, undefined)).toBe(false);
+  });
+});
+
+// Audit F-X02-001: the same items, but the customer switched pickup to
+// delivery (or changed branch, address, coupon, points or notes). The cart key
+// did not move, so the old checkout was resumed and its old total charged.
+describe('recoverPendingSession — a checkout the customer replaced by changing the order details', () => {
+  const old: PendingSession = { sessionId: 'sess-old', at: 100, cartKey: 'cart-meal', checkoutKey: 'chk-pickup' };
+  const stillOpen = async () => ({ status: 'pending' }) as VerifyOutcome;
+
+  it('asks to abandon it when only the checkout key changed, and begins anew once cancelled', async () => {
+    const clear = vi.fn(async () => {});
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear,
+      currentCartKey: 'cart-meal', currentCheckoutKey: 'chk-delivery', abandon,
+    });
+    expect(abandon).toHaveBeenCalledWith('sess-old');
+    expect(res).toEqual({ kind: 'cleared' });
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it('resumes it when a payment on it is under way (the screen then checks the total)', async () => {
+    const abandon = vi.fn(async () => ({ status: 'pending' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear: async () => {},
+      currentCartKey: 'cart-meal', currentCheckoutKey: 'chk-delivery', abandon,
+    });
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+  });
+
+  it('does not ask when the details are the same', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear: async () => {},
+      currentCartKey: 'cart-meal', currentCheckoutKey: 'chk-pickup', abandon,
+    });
+    expect(abandon).not.toHaveBeenCalled();
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+  });
+
+  it('on screen entry (no checkout key passed) behaves exactly as before', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => old, verify: stillOpen, clear: async () => {}, currentCartKey: 'cart-meal', abandon,
+    });
+    expect(abandon).not.toHaveBeenCalled();
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-old' });
+  });
+
+  it('still abandons on an item change when the record has no checkout key', async () => {
+    const abandon = vi.fn(async () => ({ status: 'cancelled' }) as VerifyOutcome);
+    const res = await recoverPendingSession({
+      read: async () => ({ sessionId: 'sess-old', at: 1, cartKey: 'cart-meal', checkoutKey: null }),
+      verify: stillOpen, clear: async () => {},
+      currentCartKey: 'cart-water', currentCheckoutKey: 'chk-any', abandon,
+    });
+    expect(abandon).toHaveBeenCalledOnce();
+    expect(res).toEqual({ kind: 'cleared' });
   });
 });

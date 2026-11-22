@@ -40,6 +40,14 @@ export type FailureKind =
   | 'order_open_limit'
   | 'order_hourly_limit'
   | 'order_quantity_limit'
+  /**
+   * begin_checkout_session refused to answer a card checkout with a session
+   * priced for different inputs under the same key (20261020120000, audit
+   * F-X02-001). 'open': that session has a payment that may still complete;
+   * 'placed': an order already exists for the key.
+   */
+  | 'checkout_session_open'
+  | 'checkout_session_placed'
   /** Anything we have not taught this module to recognise. */
   | 'unknown';
 
@@ -61,6 +69,8 @@ const MESSAGE_KEY: Record<FailureKind, StringKey> = {
   order_open_limit: 'errOrderOpenLimit',
   order_hourly_limit: 'errOrderHourlyLimit',
   order_quantity_limit: 'errOrderQuantityLimit',
+  checkout_session_open: 'checkoutEarlierPaymentOpen',
+  checkout_session_placed: 'checkoutAlreadyPlaced',
   unknown: 'somethingWentWrong',
 };
 
@@ -100,6 +110,10 @@ export function describeFailure(err: unknown): Failure {
       ? 'order_hourly_limit'
     : /order_items_quantity_max/.test(s)
       ? 'order_quantity_limit'
+    : /checkout_session_mismatch: payment_open/.test(s)
+      ? 'checkout_session_open'
+    : /checkout_session_mismatch: order_placed/.test(s)
+      ? 'checkout_session_placed'
     : /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
       ? 'network_blocked'
     : /rate.?limit|too many requests|\b429\b|too many attempts/.test(s)

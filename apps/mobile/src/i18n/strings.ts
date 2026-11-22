@@ -226,6 +226,12 @@ export const STRINGS = {
     // Points are all or nothing (the switch is on or off), so the choices are
     // the switch and cash. It said "Use fewer points" until 2026-11-14 (PG-05).
     payBelowMinimum: 'Online payment needs a total of at least 1.00 SAR. Turn off points for this order, or pay in cash.',
+    // A card checkout's session must be for exactly what the screen shows
+    // (audit F-X02-001, 20261020120000). Shown instead of opening a payment
+    // page that would charge a different amount, or for a different order.
+    checkoutTotalChanged: 'The total for this order has changed. Check your order details and try again.',
+    checkoutEarlierPaymentOpen: 'A card payment you started earlier, for different order details, may still be in progress. Please try again in a few minutes.',
+    checkoutAlreadyPlaced: 'An order was already placed from this checkout. Check your orders before ordering again.',
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
     // One-word state for the payment status pill. The sentence underneath
@@ -608,6 +614,11 @@ export const STRINGS = {
     payUseCash: 'الدفع نقداً بدلاً من ذلك',
     payGetHelp: 'التواصل مع الدعم',
     payBelowMinimum: 'يتطلب الدفع الإلكتروني ألا يقل الإجمالي عن 1.00 ريال. أوقف استبدال النقاط في هذا الطلب، أو ادفع نقداً.',
+    // ENGINEERING-DRAFTED, NOT YET READ BY A NATIVE SPEAKER (F-X02-001,
+    // 2026-11-22). The three lines below need a native read before release.
+    checkoutTotalChanged: 'تغيّر إجمالي هذا الطلب. راجع تفاصيل طلبك ثم حاول مرة أخرى.',
+    checkoutEarlierPaymentOpen: 'قد تكون عملية دفع بالبطاقة بدأتها سابقاً لتفاصيل طلب مختلفة لا تزال قيد التنفيذ. يرجى المحاولة مرة أخرى بعد بضع دقائق.',
+    checkoutAlreadyPlaced: 'تم تقديم طلب من عملية الدفع هذه بالفعل. راجع طلباتك قبل الطلب مرة أخرى.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
     payStatusPending: 'قيد المعالجة',

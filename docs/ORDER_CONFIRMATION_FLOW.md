@@ -67,6 +67,18 @@ pays by card through the checkout session (§6a) and sends `cash` here, so there
 is no app key for it. Until this, a direct API call could create an unpaid
 online order that waits for a payment and blocks its owner's account deletion.
 
+**The card checkout session is refused, too, when its key is reused for other
+details** (written 2026-11-22, not applied: `20261020120000`, audit F-X02-001).
+`begin_checkout_session` used to return the existing session for a key whatever
+the call asked for, so a changed order type, branch, address, coupon, points or
+notes produced the OLD order at the OLD total. It now reuses a session only for
+the same inputs; otherwise it replaces a session nothing can still pay, or
+refuses with *checkout_session_mismatch: payment_open* / *order_placed*
+(SQLSTATE P0001, app keys `checkoutEarlierPaymentOpen` / `checkoutAlreadyPlaced`).
+The app's card key now covers every input, and it opens no payment page whose
+session total differs from the screen (`checkoutTotalChanged`). Detail:
+[`PAYMENTS.md`](PAYMENTS.md) §4, "A checkout whose order details changed".
+
 ## 3. The states
 
 | State | Meaning | Success hero? | Resend? | Branch number? |

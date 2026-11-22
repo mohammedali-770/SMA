@@ -1777,6 +1777,7 @@ production.
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 124 | 20261020120000 | checkout_session_input_match | `4df49c5593d2` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Audit F-X02-001 (high): `begin_checkout_session` reused a live or settled session for the same key whatever the call asked for, so a changed order type, branch, address, coupon, points or notes was invoiced at the OLD total and produced the OLD order. Adds `checkout_sessions.input_fingerprint`; the lookup reuses only on a matching fingerprint, retires a `pending_payment` session whose attempts are all dead to `expired` and prices a new one, and otherwise raises `checkout_session_mismatch: payment_open` / `order_placed` (P0001). An unknown branch is refused before the lookup. Redefines `begin_checkout_session` only. No row written, grants re-stated unchanged. No deploy implied; the app half ships in an EAS build. **MONEY PATH UNTOUCHED** (`place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `finalize_checkout_session`, `begin_session_attempt` asserted unmoved against pre-images read by the file). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -10195,3 +10196,138 @@ UPDATE `orders`, which is what lets an invoker-rights trigger read
    refund already enrolled keeps running.
 
 Steps: `docs/OWNER_ACTIONS.md` §61.
+
+## 71. A card checkout session is reused only for the inputs it was priced on — WRITTEN 2026-11-22, NOT APPLIED (ledger row 124)
+
+`20261020120000_checkout_session_input_match.sql`. **Written 2026-11-22 on
+branch `fix/checkout-session-input-match-20261122`, validated on a local chain,
+awaiting owner approval.** Audit finding F-X02-001 (high, verdict confirmed),
+fixed on the owner's instruction of 2026-11-22 to fix the high findings first.
+Section 71 and row 124 follow §70 / row 123 on the default branch at
+`fe53628`; sibling fix branches were written the same day and may need these
+numbers moved at merge.
+
+sha256 `4df49c5593d20b6fd8f2dcbc5410b373b6d7c8ff7b26d51f484a05d1abff101b`, 477 lines / 25 520 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape. The new body keeps the comment lines the 20260826110000 body had, so an
+apply that trims comments for transport stores a different `prosrc` from the
+repository's; compare by the post-image below only for an untrimmed apply.
+
+### What it changes
+
+- **`checkout_sessions.input_fingerprint`** (text, nullable): sha256 over the
+  branch, order type, items, address, coupon, notes and points of the call,
+  with a version tag. Rows written before the file have NULL and match nothing.
+- **`begin_checkout_session`**, derived from `20260826110000` (live chain body
+  byte-identical to that file). An unknown or NULL branch is refused before
+  the lookup, with `compute_order_snapshot`'s sentence. The lookup locks the
+  row and reuses it only when the fingerprint matches. Otherwise a settled
+  session raises `checkout_session_mismatch: order_placed`; a
+  `pending_payment` session whose every attempt is dead is set to `expired`
+  and a new session is priced under the same key; any other raises
+  `checkout_session_mismatch: payment_open`. Both are P0001 with a DETAIL.
+  **Dead** means `failed` with `invoice_canceled`, or `failed` with no invoice
+  and no charge reference. An expired invoice is not dead: a slow 3-D Secure
+  payment can still settle on it. `expired`, never `cancelled`, because
+  `finalize_checkout_session` still accepts an expired session, so money that
+  did settle still becomes an order; `guard_address_delete_live_checkout`
+  treats `expired` like `pending_payment` for the same reason.
+- Grants re-stated as `20260712170000` left them: `from public, anon`, execute
+  to `authenticated`.
+
+### What it does not do
+
+- No other function is redefined. `begin_session_attempt`, `place_order`,
+  `insert_order_from_snapshot`, `finalize_checkout_session` and
+  `compute_order_snapshot` are read into a session setting at the top of the
+  file and asserted unmoved at the end (`md5(pg_get_functiondef)`). On the
+  local chain the money-path pair is `12b6816d256c29b76edf947ae1a7ea77` /
+  `22e2d42935459e7bf93abb2941b56325` before and after.
+- No row written, no Edge Function changed. **No deploy implied.**
+- It cannot fix an installed build's **resume** path: that build reopens a
+  saved checkout without calling `begin_checkout_session`. The app half
+  (`PAYMENTS.md` §4, "A checkout whose order details changed") does, and ships
+  in an EAS build.
+
+### Pre-image and post-image, measured on the local chain
+
+| | `md5(prosrc)` (length) | `md5(pg_get_functiondef)` |
+| --- | --- | --- |
+| pre-image (`20260826110000`) | `1cc3338fa22994e7483a90d8b3f64e49` (6 408) | `11931d256328894ba4e935f1bb800f5d` |
+| post-image | `bb7292aa64d8ac6d7c3a11b30a477b30` (9 228) | `5e274a8d2e8be25af9343f41b80df177` |
+
+### What the file checks
+
+Exactly one overload; SECURITY DEFINER and `search_path=public`; the column;
+21 statement-shaped clauses read from the comment-stripped body (every
+fingerprint field, the comparison, the lock, both refusals in order, the
+attempt guard and both halves of the dead predicate, the retirement as
+`expired`, the branch check, the payment gate and the zero-total call); exactly
+two `return v_existing`; no `'cancelled'` literal; `anon` cannot and
+`authenticated` can execute. It then **calls** the function twice as a caller
+who owns nothing: an unknown branch must answer P0001 *The selected branch is
+not available*, and an existing branch with a fresh key must stop at the
+payment gate or at pricing rather than on an unresolved name. Neither writes a
+row. Last, the five pre-images.
+
+### Validation
+
+- Reproduction (before / after), on clones of the local chain at `fe53628`:
+  same key, pickup 64.00 then delivery + address + `SEEDFIX10` returned the
+  **same** pickup session at 64.00, and an unknown branch also returned it;
+  after the file the second call returns a new delivery session at 69.00
+  (fee 15.00, discount 10.00), the first is `expired`, and the unknown branch
+  is refused.
+- Paired suite `supabase/tests/checkout_session_input_match_test.sql`, 10
+  cases, as `authenticated` with the attempt and finalize steps as
+  `service_role`: identical retry; each of the seven inputs changed alone; the
+  verdict's end-to-end run (cancelled invoice, then delivery is invoiced and
+  finalized as a delivery order with the coupon); seven attempt shapes that
+  must refuse; two dead attempts that must not; the retired session refuses a
+  new attempt, releases its points and still finalizes a late capture; settled
+  returned or refused; unknown and NULL branch, also over an open attempt and
+  with payment off; a NULL-fingerprint row; per-customer keys and grants. It
+  fails on the base chain.
+- Related suites on a chain with the file, each also on the base chain, all
+  pass on both: `account_deletion_lock`, `advisor_fixes`,
+  `cancelled_orders_guard`, `checkout_preview_parity`,
+  `checkout_session_address_fk`, `comp_members`, `export_my_data`,
+  `loyalty_earn_snapshot_path`, `moyasar_begin_attempt`, `order_note_length`,
+  `rls_initplan_live_board_order_year`. All 100 suites on the migrated chain:
+  97 pass, the 2 quarantined fail as listed, and `server_input_bounds` fails
+  only at its dblink case for want of a second connection in this sandbox,
+  identically on the base chain. The file re-applies as a no-op.
+- **Mutation checks**, eight mutants of the function, each applied without the
+  verification block and run against the suite, then applied whole:
+
+  | Mutant | Paired suite | File's own block |
+  | --- | --- | --- |
+  | reuse whatever the fingerprint | killed (CASE 2) | killed |
+  | attempt guard removed | killed (CASE 4) | killed |
+  | any `failed` attempt counts as dead | killed (CASE 4) | killed |
+  | retired as `cancelled` | killed (CASE 2) | killed |
+  | branch check removed | killed (CASE 8) | killed |
+  | notes left out of the fingerprint | killed (CASE 2) | killed |
+  | settled session not refused | killed (CASE 7) | killed |
+  | cancelled invoice not counted as dead | killed (CASE 3) | killed |
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must hold, or stop:
+   ```sql
+   select md5(prosrc), length(prosrc) from pg_proc where proname = 'begin_checkout_session';
+   -- 1cc3338fa22994e7483a90d8b3f64e49 (6 408), or that body trimmed of comments
+   select count(*) from public.checkout_sessions
+    where status = 'pending_payment' and expires_at > now();
+   -- live sessions; each will match nothing after the apply (NULL fingerprint)
+   select online_payment_enabled from public.app_settings where id = true;
+   ```
+2. Apply `20261020120000` by name. Never "the outstanding migrations": the
+   frozen Moyasar file still sorts ahead of everything.
+3. Afterwards, read-only: the post-image above (untrimmed apply), the column
+   present, `has_function_privilege('anon', …)` false, the money-path pair
+   unchanged, `checkout_sessions` unchanged in count.
+4. The app half reaches customers only in the next EAS build. Either may go
+   first (`PAYMENTS.md` §4).
+5. Rollback, if ever wanted: re-create the `20260826110000` body. The column
+   can stay; nothing else reads it.

@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **162**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261018120000_refund_cancelled_paid_orders.sql`.
+Migration files in the repository: **163**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261020120000_checkout_session_input_match.sql`.
 
 ## Tables
 
@@ -43,7 +43,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `campaign_redemptions` | `20260728120000_discounts_campaigns.sql` | 0 | 1 |
 | `campaigns` | `20260728120000_discounts_campaigns.sql` | 0 | 5 |
 | `categories` | `20260707120200_catalog.sql` | 1 | 3 |
-| `checkout_sessions` | `20260712160000_checkout_sessions.sql` | 1 | 1 |
+| `checkout_sessions` | `20260712160000_checkout_sessions.sql` | 2 | 1 |
 | `comp_member_audit` | `20260826090000_comp_members.sql` | 1 | 1 |
 | `comp_members` | `20260826090000_comp_members.sql` | 1 | 1 |
 | `coupons` | `20260707120400_coupons.sql` | 0 | 1 |
@@ -132,7 +132,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `audit_admin_table_change` | 1 | `20261007120000_audit_trail.sql` |
 | `audit_order_status_change` | 1 | `20261007120000_audit_trail.sql` |
 | `audit_rows_are_append_only` | 1 | `20261007120000_audit_trail.sql` |
-| `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
+| `begin_checkout_session` | 4 | `20261020120000_checkout_session_input_match.sql` |
 | `begin_lazywait_create_attempt` | 2 | `20261015120000_cancelled_order_followups.sql` |
 | `begin_payment_attempt` | 3 | `20261012120000_cancelled_orders_guard.sql` |
 | `begin_session_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |

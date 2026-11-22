@@ -1054,8 +1054,9 @@ describe('the app asks to abandon only a checkout begun for a DIFFERENT cart', (
   });
 
   it('records the cart key only when a checkout is begun, so a resume keeps its own', () => {
-    expect(screen).toContain('await runOnlinePayment(session.id, cart.idempotencyKey);');
-    expect(screen).toContain('await savePendingSession(sessionId, Date.now(), cartKey);');
+    // Since F-X02-001 the card checkout key is recorded alongside the cart key.
+    expect(screen).toContain('await runOnlinePayment(session.id, cart.idempotencyKey, checkoutKey);');
+    expect(screen).toContain('await savePendingSession(sessionId, Date.now(), cartKey, checkoutKey);');
     expect(count(screen, 'runOnlinePayment(session.id')).toBe(1);
     expect(screen).toContain("else if (rec.kind === 'resume') { void runOnlinePayment(rec.sessionId); }");
   });

@@ -126,3 +126,30 @@ describe('order refusals from place_customer_order', () => {
     expect(describeFailure(new Error('Edge Function returned a non-2xx status code')).kind).toBe('unknown');
   });
 });
+
+// Audit F-X02-001 (20261020120000): begin_checkout_session refuses to answer a
+// card checkout with a session priced for different inputs under the same key.
+describe('card checkout session refusals from begin_checkout_session', () => {
+  const REFUSALS = [
+    ['checkout_session_mismatch: payment_open', 'checkout_session_open', 'checkoutEarlierPaymentOpen'],
+    ['checkout_session_mismatch: order_placed', 'checkout_session_placed', 'checkoutAlreadyPlaced'],
+  ] as const;
+
+  it.each(REFUSALS)('maps %j to its own copy in both languages', (raw, kind, key) => {
+    const f = describeFailure(new Error(raw));
+    expect(f.kind).toBe(kind);
+    expect(f.messageKey).toBe(key);
+    expect(STRINGS.en[key]).toBeTruthy();
+    expect(STRINGS.ar[key]).toBeTruthy();
+    expect(STRINGS.ar[key]).not.toBe(STRINGS.en[key]);
+  });
+
+  it('matches the messages the migration actually raises', () => {
+    const sql = readFileSync(
+      resolve(__dirname, '../../../../../supabase/migrations/20261020120000_checkout_session_input_match.sql'),
+      'utf8',
+    );
+    expect(sql).toContain("raise exception 'checkout_session_mismatch: payment_open'");
+    expect(sql).toContain("raise exception 'checkout_session_mismatch: order_placed'");
+  });
+});

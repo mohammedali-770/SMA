@@ -449,6 +449,26 @@ export const checkout = {
       p_loyalty_points: input.loyaltyPoints ?? 0,
       p_idempotency_key: input.idempotencyKey ?? null,
     })),
+  /**
+   * The server total of one of the caller's own sessions (RLS
+   * checkout_sessions_select_own), or null when it cannot be read. The checkout
+   * screen compares it with the total it shows before it reopens a saved
+   * checkout's payment page (F-X02-001).
+   */
+  sessionTotal: async (sessionId: string): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('checkout_sessions')
+        .select('total')
+        .eq('id', sessionId)
+        .maybeSingle();
+      if (error || !data) return null;
+      const n = Number((data as { total: unknown }).total);
+      return Number.isFinite(n) ? n : null;
+    } catch {
+      return null;
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
