@@ -5752,8 +5752,8 @@ F-EFP-07-001 (two starts at once could leave a payable invoice no order
 matches; `PAYMENTS.md` §2, "One attempt, one invoice") and labels a test payment
 `TEST - …` on the POS ticket.
 
-The steps, each its own approval (CLAUDE.md §5; payment work is under the §6
-freeze, so merging it needs your explicit go-ahead as well):
+The steps, each its own approval (CLAUDE.md §5; the merge itself is on your
+explicit word, and the secret and each deploy are separate approvals):
 
 1. **Merge the pull request.** Nothing changes in Production on merge.
 2. **If you are still testing with test cards, set
