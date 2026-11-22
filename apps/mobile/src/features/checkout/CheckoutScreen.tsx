@@ -38,6 +38,7 @@ import {
 } from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal, type PreviewInput } from './previewTotals';
+import { checkoutSessionKey, sessionTotalMatchesShown } from './checkoutSessionKey';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
 import { catalog as catalogApi, checkout, compMembership, coupons, loyaltyPreview, orders, payments } from '../../services/api';
@@ -816,6 +817,22 @@ export function CheckoutScreen() {
         return;
       }
 
+      // The card checkout's key covers EVERY input begin_checkout_session
+      // receives, not only the items (audit F-X02-001): the cart key alone let a
+      // changed order type, branch, address, coupon, points or notes reuse the
+      // old session, so the customer paid the old total for the old order. The
+      // address is the one sent below: the selected saved address, for delivery
+      // only (an unusable one is refused there before anything is sent).
+      const checkoutKey = checkoutSessionKey(cart.idempotencyKey, {
+        branchId: selectedBranch.id,
+        orderType,
+        items: cart.toOrderItems(),
+        addressId: orderType === 'delivery' ? addressId : null,
+        couponCode: couponResult?.ok ? couponCode.trim() : null,
+        notes: normalizeOrderNote(notes),
+        loyaltyPoints: redeemingPoints,
+      });
+
       // Resolve any interrupted online payment FIRST — before creating ANY new
       // order, cash included. Otherwise a customer with an unresolved online charge
       // could switch to cash and place a second order while that charge may still
@@ -825,13 +842,27 @@ export function CheckoutScreen() {
         read: loadPendingSession,
         verify: (id) => payments.verifySession(id),
         clear: clearPendingSession,
-        // A checkout begun for a different cart is dropped, if nobody has
-        // started paying it, instead of reopening the old amount.
+        // A checkout begun for a different cart, or for different order
+        // details, is dropped, if nobody has started paying it, instead of
+        // reopening the old amount.
         currentCartKey: cart.idempotencyKey,
+        currentCheckoutKey: checkoutKey,
         abandon: (id) => payments.abandonSession(id),
       });
       if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
-      if (rec.kind === 'resume') { await runOnlinePayment(rec.sessionId); return; }
+      if (rec.kind === 'resume') {
+        // The checkout that must be resumed (a payment on it may be under way)
+        // can be for other details than the ones on screen. Its page would
+        // charge its own total, so it is opened only when that total is the
+        // one shown; otherwise, or when it cannot be read, nothing is opened.
+        const resumedTotal = await checkout.sessionTotal(rec.sessionId);
+        if (!sessionTotalMatchesShown(resumedTotal, totals.total)) {
+          setError(t(resumedTotal === null ? 'somethingWentWrong' : 'checkoutEarlierPaymentOpen'));
+          return;
+        }
+        await runOnlinePayment(rec.sessionId);
+        return;
+      }
 
       // Resolve the delivery address. Checkout SELECTS one; it never writes one.
       //
@@ -865,7 +896,9 @@ export function CheckoutScreen() {
         couponCode: couponResult?.ok ? couponCode.trim() : null,
         notes: normalizeOrderNote(notes),
         loyaltyPoints: redeemingPoints,
-        idempotencyKey: cart.idempotencyKey,
+        // Cash keeps the cart key: place_order returns the order already placed
+        // under it when a response was lost (see checkoutSessionKey.ts).
+        idempotencyKey: paymentMethod === 'online' ? checkoutKey : cart.idempotencyKey,
         paymentMethod,
       };
       const isOnline = paymentMethod === 'online';
@@ -882,10 +915,22 @@ export function CheckoutScreen() {
         if (session.order_id) {
           cart.clear();
           router.replace(`/receipt/${session.order_id}`);
+        } else if (!sessionTotalMatchesShown(session.total, totals.total)) {
+          // The server priced this order differently from the screen. Never
+          // open a page that charges an amount the customer was not shown
+          // (F-X02-001). The session has no payment attempt yet, so nothing
+          // can be paid on it; it expires on its own.
+          captureMessage('checkout session total differs from the preview', {
+            level: 'warning',
+            subsystem: 'checkout',
+            op: 'session_total_mismatch',
+            extra: { session: Number(session.total), shown: totals.total },
+          });
+          setError(t('checkoutTotalChanged'));
         } else {
           // Keep the cart until payment actually succeeds — a failed/abandoned
           // payment must not wipe it, and there is no order to strand.
-          await runOnlinePayment(session.id, cart.idempotencyKey);
+          await runOnlinePayment(session.id, cart.idempotencyKey, checkoutKey);
         }
       } else {
         // Cash: unchanged. The order is created + synced to the POS now.
@@ -904,9 +949,10 @@ export function CheckoutScreen() {
   // Session-based: the order is created by the backend ONLY after the payment is
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
-  // `cartKey` is passed only when this call BEGAN the checkout; a resume keeps
-  // the key saved with it (savePendingSession), so it stays tied to its order.
-  const runOnlinePayment = async (sessionId: string, cartKey?: string) => {
+  // `cartKey` and `checkoutKey` are passed only when this call BEGAN the
+  // checkout; a resume keeps the keys saved with it (savePendingSession), so it
+  // stays tied to its order.
+  const runOnlinePayment = async (sessionId: string, cartKey?: string, checkoutKey?: string) => {
     // Single-flight: a second concurrent run for the same (or any) session would
     // stack a duplicate payment WebView and fire a redundant verify. Bail if one
     // is already in progress; the ref is reset in the finally below.
@@ -918,7 +964,7 @@ export function CheckoutScreen() {
       // Awaited (not fire-and-forget) so the write is committed before we hand
       // off to the in-app WebView — the exact window this recovery is meant to
       // survive (see pendingSession.ts).
-      await savePendingSession(sessionId, Date.now(), cartKey);
+      await savePendingSession(sessionId, Date.now(), cartKey, checkoutKey);
       setPayFlow({ state: 'opening', sessionId });
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
       if (init.status === 'already_paid' && init.orderId) { reportTimeline('paid'); void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }

@@ -729,6 +729,66 @@ dialog) is in flight. Older builds keep a short window here; see §12.
 
 ---
 
+### A checkout whose order details changed (audit F-X02-001)
+
+Written 2026-11-22, **not yet live**: it needs the migration
+`20261020120000_checkout_session_input_match` applied and an app build carrying
+the client half. The section above covered a changed **cart** only, because the
+cart key stands for the items. A customer who opened a card payment for a pickup
+order, closed the page, and switched to delivery — or changed branch, address,
+coupon, points or notes — kept the same key. Either the app resumed the old
+checkout, or `begin_checkout_session` handed it back, and the customer paid the
+**old total** for the **old order**: `payment-initiate` invoices
+`checkout_sessions.total`, and `finalize_checkout_session` builds the order from
+the session's snapshot.
+
+**Server (`begin_checkout_session`).** Each session now stores
+`input_fingerprint`, a sha256 over every input of the call. The retry lookup
+returns the existing session only when the fingerprint matches. Otherwise:
+
+| Existing session | Answer |
+| --- | --- |
+| settled (has an order) | raise `checkout_session_mismatch: order_placed` (P0001) |
+| `pending_payment`, every attempt dead | retire it to `expired`, price a new session under the same key |
+| `pending_payment`, any attempt not dead | raise `checkout_session_mismatch: payment_open` (P0001) |
+
+An attempt is **dead** only when it is `failed` and either its invoice was
+cancelled (`invoice_canceled`) or it never got an invoice or a charge reference.
+An open attempt, an **expired** invoice (a slow 3-D Secure payment can still
+settle on it), and anything holding money are not dead. The old row is locked
+first, the same lock `begin_session_attempt` takes. It is retired as `expired`,
+never `cancelled`, because `finalize_checkout_session` still accepts an expired
+session: a payment that did settle on it still becomes an order. An unknown
+branch id is now refused before the lookup.
+
+Replacing, rather than always raising, is for builds already installed: they
+send the items-only key and would otherwise be stuck on a generic error. It
+does **not** reach an old build's resume path, which reopens a saved checkout
+without calling `begin_checkout_session` at all; only the app half closes that.
+
+**App.** The card checkout's key is `checkoutSessionKey(cart key, inputs)`
+(`apps/mobile/src/features/checkout/checkoutSessionKey.ts`): the same inputs
+give the same key, any change gives a new one. It is saved with the pending
+checkout as `checkoutKey`, and Place Order offers a checkout begun for other
+details to the same `action: 'abandon'` as a changed cart. Screen entry still
+compares the cart key only, because the details shown there are defaults, not
+the customer's choice. Cash keeps the cart key (`place_order` uses it to return
+the order already placed after a lost response).
+
+Before opening a payment page the app compares the session's server total with
+the total on screen, to the halala, and opens nothing on a difference:
+`checkoutTotalChanged` after a new session, `checkoutEarlierPaymentOpen` when a
+resumed checkout's total differs (its payment may be under way, so it is
+neither abandoned nor opened). A resumed total that cannot be read opens
+nothing either. The two server refusals map to `checkoutEarlierPaymentOpen` and
+`checkoutAlreadyPlaced`.
+
+**Ordering.** Either half may ship first. The migration alone fixes an old
+build's fresh-begin path and leaves its resume path as it is. The app alone
+rotates the key, so the old lookup never sees changed inputs under one key, and
+its total check catches a resumed checkout; against an unmigrated server it
+behaves as today otherwise. No Edge Function changes.
+
 ## 5. The app's payment WebView
 
 One transport. The hosted page always opens in the in-app WebView
@@ -1528,6 +1588,7 @@ Customer-facing:
 - `loyaltyOrderTooSmall` (new 2026-11-14, gap PG-31; shown next to the points switch, not a payment message, listed here because it ships with the same change): «يمكن استخدام النقاط عندما يبلغ الإجمالي قبل خصم النقاط {amount} ريال أو أكثر.» The app fills in `{amount}`, for example 10.00. It names the total before points, not the order, because the minimum is judged after any coupon.
 - payment screen footer: «تُدخل بيانات بطاقتك في صفحة Moyasar الآمنة.»
 - web stand-in: «يمكنك إكمال طلبك عبر الموقع والدفع نقدًا.»
+- `checkoutTotalChanged`, `checkoutEarlierPaymentOpen`, `checkoutAlreadyPlaced` (new 2026-11-22, audit F-X02-001; shown instead of opening a payment page for a different amount or order): «تغيّر إجمالي هذا الطلب. راجع تفاصيل طلبك ثم حاول مرة أخرى.» / «قد تكون عملية دفع بالبطاقة بدأتها سابقاً لتفاصيل طلب مختلفة لا تزال قيد التنفيذ. يرجى المحاولة مرة أخرى بعد بضع دقائق.» / «تم تقديم طلب من عملية الدفع هذه بالفعل. راجع طلباتك قبل الطلب مرة أخرى.»
 
 Staff-facing, added 2026-11-22: the POS payment-line prefix for a TEST payment,
 «اختبار - » (before the card label, for example «اختبار - فيزا»), in

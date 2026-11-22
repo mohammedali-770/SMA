@@ -268,8 +268,11 @@ describe('a refused start no longer locks the device out (old builds and new)', 
     const recovery = place.slice(place.indexOf('const rec = await recoverPendingSession({'));
     const branch = recovery.slice(0, recovery.indexOf('let deliveryAddressId'));
     expect(branch).toContain("if (rec.kind === 'receipt') {");
-    expect(branch).toContain("if (rec.kind === 'resume') { await runOnlinePayment(rec.sessionId); return; }");
-    expect(branch.match(/return;/g)).toHaveLength(2);
+    // Since F-X02-001 the resume branch first checks the resumed session's
+    // total against the screen, and returns whether or not it reopens it.
+    expect(branch).toContain("if (rec.kind === 'resume') {");
+    expect(branch).toContain('await runOnlinePayment(rec.sessionId);\n        return;\n      }');
+    expect(branch.match(/return;/g)).toHaveLength(3);
   });
 });
 
