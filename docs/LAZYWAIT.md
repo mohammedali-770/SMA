@@ -963,6 +963,26 @@ by a printed ticket rather than by the vendor.
     `order_cancelled` and parks the order `blocked` /
     `sync_blocked_reason = 'order_cancelled'` in the same locked statement.
     The worker is unchanged: it treats the answer as "not ready" (below).
+- **No second ticket for an order the branch already has, and no ticket for an
+  order whose money is going back** (`20261022120000`, audit F-X04-001 and
+  F-X03-002; **written 2026-11-22, NOT applied**, `MIGRATIONS.md` §75). Every
+  non-429 4xx is recorded `blocked` and clears the may-have-sent marker, so the
+  order looked resendable even after staff had taken it by hand and moved it to
+  preparing, ready or delivered; and nothing on the Retry, claim or pre-send
+  path read `refund_state`. Once applied:
+  - the customer's Resend answers `unavailable` with reason `order_in_progress`
+    for any status but `received`;
+  - the admin **Retry** refuses with P0001 `refund_in_progress: …` for any
+    refund lifecycle and `order_in_progress: …` for any status but `received`.
+    The panel still shows Retry for such an order (neither the feed nor the
+    client mirror sees `status` or `refund_state`) and shows the refusal as it
+    is;
+  - the pre-send gate answers `refund_started` (any refund lifecycle) or
+    `order_progressed` (ready, out for delivery, delivered) and parks the order
+    `blocked` with that `sync_blocked_reason`, the same way as
+    `order_cancelled`. A `preparing` order is still sent, because an unpaid card
+    order an administrator advanced reaches its first send only when the payment
+    lands.
 - **There are currently TWO of that index, and this line named only one.** The
   2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
   (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition
@@ -1443,6 +1463,11 @@ once-a-minute cron picks the paid order up on its next run
 POST. Two of its outcomes write nothing: the RPC itself failing, and a status
 the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
 send nothing, and leave it 'syncing' for the stale reaper.
+
+**`refund_started` and `order_progressed` take it too** (`20261022120000`,
+written 2026-11-22, not applied): parked in the same statement, one `skipped`
+row each (`refund_started_before_send`, `order_progressed_before_send`), and
+the same test drives the real handler with both.
 
 **`order_cancelled` takes the same branch, and is not left 'syncing'**
 (`20261015120000`, written 2026-11-17, applied 2026-11-18, ledger row 120). The gate answers it for a

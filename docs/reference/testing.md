@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**297 TypeScript test files declaring 4361 test blocks, plus 101 SQL suites.**
+**297 TypeScript test files declaring 4362 test blocks, plus 102 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -121,6 +121,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/place_order_variants_test.sql`
 - `supabase/tests/platform_rollup_suppression_test.sql`
+- `supabase/tests/pos_resend_refund_guards_test.sql`
 - `supabase/tests/product_variants_guest_read_test.sql`
 - `supabase/tests/promo_disclosure_test.sql`
 - `supabase/tests/prune_operational_run_history_test.sql`
@@ -282,7 +283,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-135 files, 1844 declared test blocks.
+135 files, 1845 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -296,7 +297,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
-| `src/components/admin/LazywaitPanel.test.tsx` | 6 | LazywaitPanel |
+| `src/components/admin/LazywaitPanel.test.tsx` | 7 | LazywaitPanel |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
@@ -443,7 +444,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
-| `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | lazywait-sync, told order_cancelled by the gate |
+| `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | the control: the same fixture, answered ready_to_send |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/lazywaitOrderPayments.test.ts` | 8 | a card order certain to be paid |
