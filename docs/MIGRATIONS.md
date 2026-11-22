@@ -66,6 +66,13 @@ to Production.**
 > read was made by this change, so this banner does not restate the outstanding
 > count. `20261021120000` sorts after every other file, and an older unapplied
 > file still sorts ahead of it. **Name the target by version.**
+> **Updated 2026-11-22 (loyalty points reservation) — `20261019120000_loyalty_points_reservation`
+> is written, validated and NOT applied (§72, ledger row 125).** Four high audit
+> findings: points held by an open card checkout could be spent twice, and a
+> cancellation could refund points never debited. **A MONEY-PATH CHANGE:**
+> `place_order` moves to `7078c7dd…`. No live read was made by this change, so
+> it states no outstanding count. No deploy implied. **Name the target by
+> version.**
 
 > **Updated 2026-11-19 (refund on cancel) — `20261018120000_refund_cancelled_paid_orders`
 > is written, validated and NOT applied (§70, ledger row 123).** The owner's
@@ -1787,6 +1794,7 @@ production.
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 124 | 20261021120000 | catalog_delete_open_checkout_guard | `92501c99ac08` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Audit finding F-X03-001 (confirmed, high): hard-deleting a product, size or option while a customer is paying for it made `finalize_checkout_session` fail on an order-line FK after capture, leaving a payment with no order. New objects only: two helpers and one BEFORE DELETE OR UPDATE OF id trigger function, bound on `products`, `product_variants` and `modifiers`, refusing with 55006 while a session that names the row can still be paid. No existing function redefined (`finalize_checkout_session`, `insert_order_from_snapshot`, `compute_order_snapshot` and `place_order` asserted unmoved, against pre-images read by the file itself). No row written, no grant changed on an existing object. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 125 | 20261019120000 | loyalty_points_reservation | `62d2d1c04498` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §72. Audit findings F-DBM-04-002, F-DBM-18-001, F-DBM-27-001, F-DBM-32-001: points held by an open card checkout are reserved (`loyalty_points_reserved`, honoured by `place_order`, `begin_session_attempt` and the zero-total arm of `insert_order_from_snapshot`); a snapshot order records the points actually debited and any shortfall goes to the new append-only `loyalty_redemption_shortfalls`; cancellation refunds from the `redeem` ledger rows, netted. No row written. Re-applies cleanly. No deploy implied. **MONEY-PATH CHANGE:** `place_order` `12b6816d…` → `7078c7dd…`; `compute_order_snapshot` unchanged. Replace this row when the file is applied. |
 | 126 | 20261023120000 | payment_records_retention_and_limits | `2dca585b3a8a` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §73. Three audit findings: F-DBM-04-001 (`payment_records.checkout_session_id` becomes `ON DELETE SET NULL`, a BEFORE DELETE trigger on `checkout_sessions` removes only order-less attempt records, and `anonymize_account_data` detaches and counts the records of retained orders, so a paid card order keeps its payment record through both erasure routes); F-DBM-02-001 (`set_order_number` pads to six digits and no longer truncates past 999 999); F-DBM-17-001 (`trg_checkout_sessions_item_note_length` refuses an item note over 140 characters when the session is created, before payment). Redefines `anonymize_account_data` and `set_order_number` only, each guarded by its pre-image. No existing row changed. No deploy implied. **MONEY PATH UNTOUCHED** (measured on the chain; not hard-coded in the file). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
@@ -10372,6 +10380,194 @@ pre-image hashes.
    helpers, and the paired suite proves the refusal on the local chain.
 4. Rollback, if ever wanted: drop the three triggers and the three functions.
    Nothing else depends on them.
+## 72. Loyalty points held by an open card checkout are reserved — WRITTEN 2026-11-22, NOT APPLIED (ledger row 125)
+
+`20261019120000_loyalty_points_reservation.sql`. **Written 2026-11-22 on
+branch `fix/loyalty-points-reservation-20261122`, validated on a local chain,
+awaiting owner approval.** The owner's instruction of 2026-11-22, "pause the
+audit and fix the high findings first", for four high findings of the
+2026-11-19 audit (`docs/readiness/20261119-full-audit-plan`): F-DBM-04-002,
+F-DBM-18-001, F-DBM-27-001 and F-DBM-32-001. No live read was made by this
+change.
+
+sha256 `62d2d1c04498c69aac13a468462c147e65dde4c6ead659b8e524739596e2bda0`, 1 454 lines / 75 215 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape.
+
+**A MONEY-PATH CHANGE.** It redefines `place_order`, so that function's hash
+moves, which is the intended effect. `compute_order_snapshot`,
+`begin_checkout_session` and `finalize_checkout_session` are not touched.
+
+### What was wrong, reproduced on the chain at `fe53628` first
+
+One customer, 100 points, 0.10 SAR a point, card payments on:
+
+- **Cash during a card checkout (F-DBM-04-002, F-DBM-18-001).** A card session
+  redeeming 100 points opened its attempt; a cash order then redeemed the same
+  100 (`place_order` never looked at checkout sessions); the card payment was
+  finalized. Both orders got a 10.00 SAR discount; one `redeem -100` row.
+  `insert_order_from_snapshot` inserted the order with the snapshot's
+  redemption and only then clamped the debit to the balance.
+- **Card after card (F-DBM-32-001).** `begin_session_attempt`'s guard counted
+  another session only while it was `pending_payment` inside its 30-minute
+  window. With the first session's window over but its attempt (and the Moyasar
+  invoice bounded by it) still live for up to 60 minutes, a second session's
+  attempt opened, and both were paid: two discounts, one debit.
+- **Cancelling mints (F-DBM-27-001).** When the clamp reached 0, the order row
+  kept the snapshot's `loyalty_points_redeemed` (the correcting `update` ran
+  only `if v_redeemed > 0`), no `redeem` row existed, and
+  `admin_set_order_status` refunded the column: cancelling gave the customer
+  100 points that had never been taken.
+- **A fourth path, found while writing this.** A points-covered (zero-total)
+  checkout is settled inside `begin_checkout_session` by
+  `insert_order_from_snapshot` and consulted nothing either: 600 points spent
+  while a card session held 300 of an 800 balance.
+
+### What it changes
+
+- **`public.loyalty_points_reserved(customer, exclude_session)`**, new,
+  `service_role`-only. The points of every checkout session of that customer
+  whose payment can still be captured: unconsumed (`order_id` null), in a
+  status `finalize_checkout_session` accepts (`pending_payment`, `expired`),
+  total above zero, and either `pending_payment` inside its window, or holding
+  an attempt that is `initiated` with `expires_at` in the future (or null), or
+  `initiated` with a stamped `provider_ref` (the confirm path stamps it only on
+  a paid, binding-valid payment, so this is a capture whose finalize has not
+  landed), or `authorized`.
+- **`place_order`** refuses a redemption larger than balance minus reserved:
+  P0001, hint `loyalty_points_reserved`, "Some of your loyalty points are held
+  by a card payment that is still open. Order without points, or try again after
+  that payment finishes." With nothing reserved it is never reached: the
+  redemption was already clamped to the balance.
+- **`begin_session_attempt`**'s guard sums `loyalty_points_reserved` for the
+  customer's OTHER sessions. Its message is unchanged.
+- **`insert_order_from_snapshot`** locks the profile and settles the redemption
+  BEFORE inserting the order, and writes the order with the points actually
+  debited. With nothing charged (the zero-total arm) it refuses as
+  `place_order` does. With a charge it never refuses, because the payment was
+  captured; when the live balance no longer covers the snapshot it debits what
+  is there and records the difference in **`public.loyalty_redemption_shortfalls`**
+  (new: append-only, one row per order, admin-readable under RLS, no client
+  write privilege). The discount and total stay as charged.
+- **`admin_set_order_status`**: a cancellation refunds what the order's
+  `redeem` ledger rows took, net of any earlier
+  `Cancelled order redemption refund:` adjustment for that order, mirroring the
+  earn reversal. `orders.loyalty_points_redeemed` is no longer read.
+
+**Why the shortfall is not an `order_integrity_incidents` row.** The watchdog's
+clean pass resolves every active incident it did not detect itself after two
+scans, so a row written from here would be auto-resolved before its warning
+alert became eligible. A watchdog rule over the new table is the right
+follow-up, and it means redefining `order_integrity_watchdog`, which this
+change does not do.
+
+### What it does not do
+
+- No row written, no backfill, no grant widened. An order cancelled before the
+  apply is unaffected.
+- `begin_payment_attempt` is unchanged: it pays for an existing order whose
+  points `place_order` already debited.
+- Cash-only behaviour, pickup-only, per-item exclusion, multipliers, comp
+  members and the `earn_pending` flow are unchanged; the earn side of every
+  function is untouched, and their suites pass unchanged.
+- **No deploy implied.** Every signature is unchanged. No Edge Function and no
+  provider behaviour is touched (CLAUDE.md §6).
+- **What the customer sees.** A cash order or a points-covered checkout
+  refused for held points shows `errOrderPointsReserved` (EN and AR, new in this
+  branch; the Arabic is engineering-drafted and needs a native read) once the
+  next EAS build ships; until then, the generic "Something went wrong." A second
+  card attempt refused by `begin_session_attempt` reaches the app as
+  payment-initiate's "Could not start the payment. Please try again.", shown as
+  `payFailed`, as it did before this change.
+
+### Pre-images and post-images, measured on the local chain
+
+`md5(pg_get_functiondef(oid))` (the basis this ledger records) and
+`md5(prosrc)` with its length. Every pre-image body was confirmed
+byte-identical to its last migration file before the derivation was trusted.
+
+| Function | Pre-image `pg_get_functiondef` | Pre-image `prosrc` | Post-image `pg_get_functiondef` | Post-image `prosrc` |
+| --- | --- | --- | --- | --- |
+| `place_order` (from `20260924120000`) | `12b6816d256c29b76edf947ae1a7ea77` | `33468a7638e052d37970db54b4b1ec79` (26 288) | **`7078c7ddc36eb5eb0f7b0fc86b26dc8d`** | `ea2b65d4cf47dad464d46b1cd9735c6e` (27 419) |
+| `begin_session_attempt` (from `20261003120000`) | `41e4202996a88afc9e4f194d2316b046` | `49fd86c5433cdda578698b2008f9e378` (4 862) | `b71a3bf65e02393ce46a6320055665c3` | `06f672e44418685fd96c56c6d22fc301` (5 062) |
+| `insert_order_from_snapshot` (from `20260921120000`) | `c53c64b7ab9e6971a9b01d8776936942` | `0a3dcc0c6c6ee61642a439b128d630de` (5 555) | `da9e57fe5da7ed0d5fc9895a4fb118de` | `326aa5848ea7c30ca91a1157661c4920` (8 251) |
+| `admin_set_order_status` (from `20260918120000`) | `cfe7e4d69e00917e90a0e16c114d98da` | `4d8b428ae290f00eb1155b3617f48c81` (8 326) | `262754081c4ce44e765f0ecdce95c517` | `4aafbe86601229cbf41708bb600f11f0` (9 410) |
+| `loyalty_points_reserved` (new) | — | — | `8d4bb5ea4c38c0f832974cd5c2b8cabc` | `ae1379da4a636847c4f2d90c540a233e` (794) |
+| `compute_order_snapshot` (not replaced) | `22e2d42935459e7bf93abb2941b56325` | — | unchanged | — |
+
+**The money-path pair becomes `7078c7dd…` / `22e2d429…`.** Six suites pinned
+`place_order` at `12b6816d…` (`advisor_fixes`, `cancelled_order_followups`,
+`cancelled_orders_guard`, `payment_refund_visibility`,
+`refund_cancelled_paid_orders`, `refund_retry_backoff`); their pins move to the
+new value in this branch. A sibling change that also redefines `place_order`
+moves it again, and the pins with it.
+
+### What the file checks
+
+Cardinality first (one overload of each), then SECURITY DEFINER and
+`search_path` on the four redefined functions, client reach (anon none;
+authenticated only `admin_set_order_status`; service_role all), the new table's
+RLS, single policy and closed client writes, a call of the helper (0 for a
+customer with no sessions), and statement-shaped assertions on the
+comment-stripped bodies: the reservation consulted and refused in `place_order`
+with the channel gate still at four references; the guard reading the helper
+and the window-only sum gone; the profile locked before the order insert, the
+post-insert correction gone, the shortfall recorded and the zero-total arm
+honouring the reservation; the refund read from the ledger and netted, the
+column never read, the `earn_pending` promotion intact. No money-path hash is
+asserted, because a sibling change may move it.
+
+### Validation
+
+- Paired suite `supabase/tests/loyalty_points_reservation_test.sql`, 10 cases:
+  own hold never blocks own attempt or finalize; cash refused during an open
+  session and an open attempt, with the unreserved remainder spendable; a
+  second card attempt and a cash order refused after the first session's window
+  ends while its attempt lives; the hold kept while stamped or authorized and
+  released when expired, failed or cancelled; the zero-total checkout refused
+  while points are held and unchanged when not; a partial and a full shortfall
+  recorded with the charged money unchanged and cancellation refunding exactly
+  the debit (0 for the full case); the shortfall table append-only and
+  admin-only; the refund read from the ledger, netted and idempotent; the plain
+  clamp and the minimum unchanged. **On the base chain it fails at CASE 1** (the
+  helper does not exist); the behavioural before/after is the reproduction above.
+- **It re-applies cleanly, and that was measured, after the first version
+  did not.** The SQL CI replays the whole chain once more before the suites
+  (the report-only idempotence step), so every earlier file puts its own body
+  back: `20260924120000` alone returns `place_order` to `12b6816d…`. The first
+  push of this file stopped on that replay at its `create table`
+  (`relation "loyalty_redemption_shortfalls" already exists`), leaving every
+  earlier body in place, and the six suites pinned to `7078c7dd…` failed on
+  PR #517. The table is now `create table if not exists`, and the policy and
+  both triggers are dropped `if exists` before they are created; the functions
+  were already `create or replace`, and the file carries no pre-image check.
+  Applied twice on a clone, the five functions' `pg_get_functiondef` hashes and
+  ACLs, the table's ACL and RLS flag, its policy, triggers and constraints were
+  identical after each apply. In a private copy of the CI sequence (bootstrap,
+  the chain, the chain replayed, harness, seed) `place_order` ends at
+  `7078c7dd…`, this file is absent from the idempotence report, and the only
+  entries are the six earlier files that refuse a replay on the base chain too.
+- Every suite in `supabase/tests/` against that CI-style build, 2026-11-22:
+  **100 run, 98 passed, 2 quarantined**; the same result on clones of the
+  chain without the replay. The detail of the clone run:
+- Every suite in `supabase/tests/`, each on its own clone of the chain with
+  this file applied, 2026-11-22: **100 run, 98 passed, 2 failed, both
+  quarantined in `known-failing.txt`** (`lazywait_mapping_test`,
+  `lazywait_sync_scheduler_test`). `order_cancellation_integrity_test.sql`
+  needed its fixtures to carry the `redeem` ledger row `place_order` always
+  writes, exactly as 2026-09-14 added the `earn` row for the same reason; its
+  assertions are unchanged. `moyasar_begin_attempt_test.sql` CASE 11 passes
+  unchanged.
+- **Mutation checks**, eleven mutants, each applied with and without the
+  file's own block and run against the paired suite: reservation check dropped
+  from `place_order`; the helper's attempt arm dropped (the F-DBM-32-001
+  shape), its stamped-reference arm, its authorized arm, its window bound
+  moved; the clamp removed; the zero-total arm's reservation dropped; the
+  shortfall not recorded; the refund read from the column again; the earlier
+  refund not netted; `begin_session_attempt` not excluding its own session.
+  **The paired suite killed all eleven.** The file's own block also refused
+  four of them at apply (zero-total arm, column refund, netting, own-session
+  exclusion); the others are behavioural and only a call can see them.
 ## 73. Payment records survive erasure; order numbers grow; item notes bounded before payment — WRITTEN 2026-11-22, NOT APPLIED (ledger row 126)
 
 _Renumbered from §71 / ledger row 124 when #512 merged first and took those numbers. Comments inside this file\'s migration and suite that say "MIGRATIONS.md §71" mean this section._
@@ -10529,6 +10725,32 @@ because calling it draws an order number.
 
 1. Read-only first. Each must hold, or stop:
    ```sql
+   select p.proname, md5(pg_get_functiondef(p.oid))
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('place_order', 'begin_session_attempt',
+                        'insert_order_from_snapshot', 'admin_set_order_status');
+   -- the four pre-images above (a sibling money-path apply moves place_order:
+   -- re-derive this file from that body first, never apply over it)
+   select count(*) from public.orders o
+    where coalesce(o.loyalty_points_redeemed, 0) > 0 and o.status <> 'cancelled'
+      and coalesce((select -sum(t.points) from public.loyalty_transactions t
+                     where t.order_id = o.id and t.type = 'redeem'), 0)
+          <> o.loyalty_points_redeemed;
+   -- orders whose column and ledger disagree: after the apply, cancelling one
+   -- refunds the LEDGER figure. Review any it finds before applying.
+   select count(*) from public.checkout_sessions
+    where order_id is null and status in ('pending_payment', 'expired');
+   -- open sessions whose points become held the moment this lands
+   ```
+2. Apply `20261019120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the post-image hashes above, `compute_order_snapshot`
+   unchanged, `loyalty_redemption_shortfalls` empty, and
+   `select public.loyalty_points_reserved(gen_random_uuid())` returns 0.
+4. Rollback, if ever wanted: re-create the four pre-image bodies from the files
+   named above, then drop `loyalty_points_reserved` and
+   `loyalty_redemption_shortfalls` (read the table first: a row in it is a
+   finding to keep).
    select p.proname, md5(p.prosrc), length(p.prosrc)
      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname in ('anonymize_account_data', 'set_order_number');
