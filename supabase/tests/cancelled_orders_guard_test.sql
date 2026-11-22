@@ -654,7 +654,7 @@ declare
   v_sig text;
 begin
   if (select md5(pg_get_functiondef('public.place_order(uuid, public.order_type, jsonb, uuid, text, text, integer, uuid, text)'::regprocedure)))
-       is distinct from '12b6816d256c29b76edf947ae1a7ea77' then
+       is distinct from '7078c7ddc36eb5eb0f7b0fc86b26dc8d' then
     raise exception 'CASE 14 FAILED: place_order moved';
   end if;
   if (select md5(pg_get_functiondef('public.compute_order_snapshot(uuid, uuid, public.order_type, jsonb, uuid, text, integer)'::regprocedure)))

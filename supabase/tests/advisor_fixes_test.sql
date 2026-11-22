@@ -228,8 +228,8 @@ begin
   select md5(pg_get_functiondef(p.oid)) into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'place_order';
-  if v_txt is distinct from '12b6816d256c29b76edf947ae1a7ea77' then
-    raise exception 'CASE 5 FAILED: place_order hashes %, expected 12b6816d256c29b76edf947ae1a7ea77', coalesce(v_txt, 'NULL');
+  if v_txt is distinct from '7078c7ddc36eb5eb0f7b0fc86b26dc8d' then
+    raise exception 'CASE 5 FAILED: place_order hashes %, expected 7078c7ddc36eb5eb0f7b0fc86b26dc8d', coalesce(v_txt, 'NULL');
   end if;
   select md5(pg_get_functiondef(p.oid)) into v_txt
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace

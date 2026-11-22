@@ -48,6 +48,11 @@ export type FailureKind =
    */
   | 'checkout_session_open'
   | 'checkout_session_placed'
+  /**
+   * Loyalty points held by the customer's own card checkout that is still open
+   * (place_order and the points-covered checkout, 20261019120000).
+   */
+  | 'order_points_reserved'
   /** Anything we have not taught this module to recognise. */
   | 'unknown';
 
@@ -71,6 +76,7 @@ const MESSAGE_KEY: Record<FailureKind, StringKey> = {
   order_quantity_limit: 'errOrderQuantityLimit',
   checkout_session_open: 'checkoutEarlierPaymentOpen',
   checkout_session_placed: 'checkoutAlreadyPlaced',
+  order_points_reserved: 'errOrderPointsReserved',
   unknown: 'somethingWentWrong',
 };
 
@@ -101,30 +107,35 @@ export function describeFailure(err: unknown): Failure {
   // The order refusals come FIRST. They are the server's own sentences, passed
   // through order-intake unchanged, and one of them carries a count that the
   // generic classifiers below could misread.
-  const kind: FailureKind =
-    /verify your phone number before placing an order/.test(s)
-      ? 'order_phone_unverified'
+  const kind: FailureKind = /verify your phone number before placing an order/.test(s)
+    ? 'order_phone_unverified'
     : /orders in progress\. please wait/.test(s)
       ? 'order_open_limit'
-    : /orders in the last hour\. please try again later/.test(s)
-      ? 'order_hourly_limit'
-    : /order_items_quantity_max/.test(s)
-      ? 'order_quantity_limit'
-    : /checkout_session_mismatch: payment_open/.test(s)
-      ? 'checkout_session_open'
-    : /checkout_session_mismatch: order_placed/.test(s)
-      ? 'checkout_session_placed'
-    : /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
-      ? 'network_blocked'
-    : /rate.?limit|too many requests|\b429\b|too many attempts/.test(s)
-      ? 'rate_limited'
-    : /timeout|timed out|\baborted\b|abort ?error/.test(s)
-      ? 'timeout'
-    : /network request failed|failed to fetch|fetch failed|network error|no internet|offline|unable to resolve host|could not connect/.test(s)
-      ? 'offline'
-    : /\b5\d\d\b|internal server error|service unavailable|bad gateway|gateway timeout/.test(s)
-      ? 'server'
-    : 'unknown';
+      : /orders in the last hour\. please try again later/.test(s)
+        ? 'order_hourly_limit'
+        : /order_items_quantity_max/.test(s)
+          ? 'order_quantity_limit'
+          : /checkout_session_mismatch: payment_open/.test(s)
+            ? 'checkout_session_open'
+            : /checkout_session_mismatch: order_placed/.test(s)
+              ? 'checkout_session_placed'
+              : /loyalty points are held by a card payment that is still open/.test(s)
+                ? 'order_points_reserved'
+                : /\btls\b|\bssl\b|certificate|secure connection|sslhandshake|cert_authority/.test(s)
+                  ? 'network_blocked'
+                  : /rate.?limit|too many requests|\b429\b|too many attempts/.test(s)
+                    ? 'rate_limited'
+                    : /timeout|timed out|\baborted\b|abort ?error/.test(s)
+                      ? 'timeout'
+                      : /network request failed|failed to fetch|fetch failed|network error|no internet|offline|unable to resolve host|could not connect/.test(
+                            s,
+                          )
+                        ? 'offline'
+                        : /\b5\d\d\b|internal server error|service unavailable|bad gateway|gateway timeout/.test(
+                              s,
+                            )
+                          ? 'server'
+                          : 'unknown';
 
   return { kind, messageKey: MESSAGE_KEY[kind], technical };
 }

@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **164**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261021120000_catalog_delete_open_checkout_guard.sql`.
+Migration files in the repository: **165**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261021120000_catalog_delete_open_checkout_guard.sql`.
 
 ## Tables
 
@@ -55,6 +55,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `lazywait_sync_requests` | `20260720120000_lazywait_sync_scheduler.sql` | 0 | **none declared** |
 | `legal_documents` | `20260712140000_legal_documents.sql` | 0 | 5 |
 | `loyalty_multipliers` | `20260910120000_loyalty_multipliers.sql` | 0 | 4 |
+| `loyalty_redemption_shortfalls` | `20261019120000_loyalty_points_reservation.sql` | 0 | 1 |
 | `loyalty_transactions` | `20260707120900_loyalty_audit.sql` | 4 | 1 |
 | `modifier_groups` | `20260707120200_catalog.sql` | 1 | 1 |
 | `modifiers` | `20260707120200_catalog.sql` | 1 | 3 |
@@ -121,7 +122,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_push_state` | 1 | `20260927120000_admin_push_subscriptions.sql` |
 | `admin_search_role_candidates` | 2 | `20260827090000_admin_search_phone_normalization.sql` |
 | `admin_set_comp_member` | 2 | `20260827100000_comp_members_by_phone.sql` |
-| `admin_set_order_status` | 3 | `20260918120000_loyalty_earn_on_settlement.sql` |
+| `admin_set_order_status` | 4 | `20261019120000_loyalty_points_reservation.sql` |
 | `admin_set_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `admin_set_user_role` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_update_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
@@ -135,7 +136,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `begin_checkout_session` | 4 | `20261020120000_checkout_session_input_match.sql` |
 | `begin_lazywait_create_attempt` | 2 | `20261015120000_cancelled_order_followups.sql` |
 | `begin_payment_attempt` | 3 | `20261012120000_cancelled_orders_guard.sql` |
-| `begin_session_attempt` | 2 | `20261003120000_moyasar_only_payments.sql` |
+| `begin_session_attempt` | 3 | `20261019120000_loyalty_points_reservation.sql` |
 | `branch_availability_sweep` | 5 | `20260923120000_branch_variant_availability.sql` |
 | `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
@@ -203,7 +204,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `has_active_account_deletion` | 1 | `20260715130000_account_deletion_lock.sql` |
 | `import_lazywait_addon_groups` | 1 | `20260826080000_import_lazywait_addon_groups.sql` |
 | `import_lazywait_catalog` | 3 | `20260826080000_import_lazywait_addon_groups.sql` |
-| `insert_order_from_snapshot` | 6 | `20260921120000_loyalty_earn_snapshot_path.sql` |
+| `insert_order_from_snapshot` | 7 | `20261019120000_loyalty_points_reservation.sql` |
 | `invoke_account_deletion_processor` | 1 | `20260716180000_account_deletion_scheduler_job.sql` |
 | `invoke_admin_push_dispatch` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
 | `invoke_lazywait_sync_processor` | 1 | `20260720120000_lazywait_sync_scheduler.sql` |
@@ -225,6 +226,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `list_pos_confirmation_required` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `loyalty_multiplier_for` | 1 | `20260910120000_loyalty_multipliers.sql` |
 | `loyalty_next_expiry_on` | 1 | `20260909120000_loyalty_expiry.sql` |
+| `loyalty_points_reserved` | 1 | `20261019120000_loyalty_points_reservation.sql` |
 | `loyalty_safe_reason` | 1 | `20260724130000_loyalty_reason_no_order_number.sql` |
 | `mark_phone_verified` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `normalize_branch_availability` | 1 | `20260820110000_branch_availability_snooze.sql` |
@@ -279,7 +281,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `payments_needing_attention_internal` | 1 | `20261013120000_payment_refund_visibility.sql` |
 | `place_customer_order` | 3 | `20261012120000_cancelled_orders_guard.sql` |
-| `place_order` | 18 | `20260924120000_place_order_variant_availability.sql` |
+| `place_order` | 19 | `20261019120000_loyalty_points_reservation.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |

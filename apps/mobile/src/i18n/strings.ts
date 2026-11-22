@@ -23,6 +23,8 @@ export const STRINGS = {
     errOrderOpenLimit: 'You already have several orders in progress. Please wait until one is ready before placing another.',
     errOrderHourlyLimit: 'You have placed several orders in the last hour. Please try again a little later.',
     errOrderQuantityLimit: `You can order up to ${MAX_LINE_QUANTITY} of one item.`,
+    // 20261019120000: points held by an open card checkout cannot be spent again.
+    errOrderPointsReserved: 'Some of your points are held by a card payment that is still open. Turn off points for this order, or try again once that payment is finished.',
     cancel: 'Cancel',
     close: 'Close',
     back: 'Back',
@@ -444,6 +446,8 @@ export const STRINGS = {
     errOrderOpenLimit: 'لديك عدة طلبات قيد التنفيذ. يرجى الانتظار حتى يجهز أحدها قبل تقديم طلب جديد.',
     errOrderHourlyLimit: 'لقد قدّمت عدة طلبات خلال الساعة الماضية. يرجى المحاولة مرة أخرى بعد قليل.',
     errOrderQuantityLimit: `يمكنك طلب ${MAX_LINE_QUANTITY} قطعة كحد أقصى من الصنف الواحد.`,
+    // NEEDS A NATIVE ARABIC READ (engineering-drafted, 20261019120000).
+    errOrderPointsReserved: 'بعض نقاطك محجوزة لعملية دفع بالبطاقة لم تكتمل بعد. أوقف استبدال النقاط في هذا الطلب، أو حاول مرة أخرى بعد انتهاء تلك العملية.',
     cancel: 'إلغاء',
     close: 'إغلاق',
     back: 'رجوع',

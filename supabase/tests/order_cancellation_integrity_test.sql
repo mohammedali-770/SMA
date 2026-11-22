@@ -77,6 +77,16 @@ begin
   values
     (v_customer, v_order, 'earn', 10, 70, 'Earned on order (fixture)', v_customer);
 
+  -- And the matching 'redeem' row, added 2026-11-22 for the same reason. Since
+  -- 20261019120000 the redemption refund also reads the ledger -- what the
+  -- order's 'redeem' rows actually took -- rather than
+  -- orders.loyalty_points_redeemed, a column insert_order_from_snapshot could
+  -- leave at a figure nothing had debited. place_order always writes this row.
+  insert into public.loyalty_transactions
+    (profile_id, order_id, type, points, balance_after, reason, created_by)
+  values
+    (v_customer, v_order, 'redeem', -40, 60, 'Redeemed on order (fixture)', v_customer);
+
   insert into t_cancel_ctx values (v_customer, v_admin, v_branch, v_coupon, v_order);
 end $$;
 
@@ -282,6 +292,11 @@ begin
     (profile_id, order_id, type, points, balance_after, reason, created_by)
   values
     (v_customer, v_order, 'earn', 10, 2, 'Earned on order (fixture)', v_customer);
+  -- The 40 redeemed, as a ledger row (see the CASE 4 fixture, 20261019120000).
+  insert into public.loyalty_transactions
+    (profile_id, order_id, type, points, balance_after, reason, created_by)
+  values
+    (v_customer, v_order, 'redeem', -40, 2, 'Redeemed on order (fixture)', v_customer);
 
   perform set_config('test.auth_uid', v_admin::text, true);
   perform set_config('test.is_admin', 'true', true);
