@@ -10322,8 +10322,7 @@ row. Last, the five pre-images.
    -- live sessions; each will match nothing after the apply (NULL fingerprint)
    select online_payment_enabled from public.app_settings where id = true;
    ```
-2. Apply `20261020120000` by name. Never "the outstanding migrations": the
-   frozen Moyasar file still sorts ahead of everything.
+2. Apply `20261020120000` by name, never "the outstanding migrations".
 3. Afterwards, read-only: the post-image above (untrimmed apply), the column
    present, `has_function_privilege('anon', …)` false, the money-path pair
    unchanged, `checkout_sessions` unchanged in count.
