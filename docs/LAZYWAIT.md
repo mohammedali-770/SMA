@@ -965,7 +965,7 @@ by a printed ticket rather than by the vendor.
     The worker is unchanged: it treats the answer as "not ready" (below).
 - **No second ticket for an order the branch already has, and no ticket for an
   order whose money is going back** (`20261022120000`, audit F-X04-001 and
-  F-X03-002; **written 2026-11-22, NOT applied**, `MIGRATIONS.md` §75). Every
+  F-X03-002; **applied 2026-11-22**, `MIGRATIONS.md` §75). Every
   non-429 4xx is recorded `blocked` and clears the may-have-sent marker, so the
   order looked resendable even after staff had taken it by hand and moved it to
   preparing, ready or delivered; and nothing on the Retry, claim or pre-send
@@ -1465,7 +1465,7 @@ the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
 send nothing, and leave it 'syncing' for the stale reaper.
 
 **`refund_started` and `order_progressed` take it too** (`20261022120000`,
-written 2026-11-22, not applied): parked in the same statement, one `skipped`
+applied 2026-11-22): parked in the same statement, one `skipped`
 row each (`refund_started_before_send`, `order_progressed_before_send`), and
 the same test drives the real handler with both.
 

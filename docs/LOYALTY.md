@@ -287,11 +287,12 @@ It **never blocks an order**: any failure renders nothing, the same rule
 `refreshAvailability` follows. The line is hidden at 0 points, because an item may
 legitimately earn nothing.
 
-## 3b. Points held by an open card checkout — WRITTEN 2026-11-22, NOT APPLIED
+## 3b. Points held by an open card checkout — APPLIED 2026-11-22
 
 `supabase/migrations/20261019120000_loyalty_points_reservation.sql`
-(`docs/MIGRATIONS.md` §72). Until it is applied, everything below describes the
-branch, not Production.
+(`docs/MIGRATIONS.md` §72). **Applied to Production on 2026-11-22** (live
+version `20261122070659`). The message a customer sees for the new refusal ships
+with the next EAS build; until then the generic apology shows.
 
 **The problem.** A card order is priced when its checkout session opens and
 debits its points only when the payment is confirmed, up to an hour later.

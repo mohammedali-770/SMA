@@ -68,7 +68,7 @@ is no app key for it. Until this, a direct API call could create an unpaid
 online order that waits for a payment and blocks its owner's account deletion.
 
 **The card checkout session is refused, too, when its key is reused for other
-details** (written 2026-11-22, not applied: `20261020120000`, audit F-X02-001).
+details** (`20261020120000`, audit F-X02-001; applied 2026-11-22, the app half ships with the next EAS build).
 `begin_checkout_session` used to return the existing session for a key whatever
 the call asked for, so a changed order type, branch, address, coupon, points or
 notes produced the OLD order at the OLD total. It now reuses a session only for
@@ -1416,8 +1416,8 @@ refund enrolled before the order was cancelled is not stopped: it is already a
 refund in progress, and the customer is shown it.
 
 **AMENDED: a cancelled paid card order is enrolled at its cancellation**
-(`20261018120000_refund_cancelled_paid_orders`, written 2026-11-19, NOT
-applied; `MIGRATIONS.md` §70). The owner's decision of 2026-11-19, "do the auto
+(`20261018120000_refund_cancelled_paid_orders`, written 2026-11-19; applied,
+live `20261119051739`, found by a live read on 2026-11-22; `MIGRATIONS.md` §70). The owner's decision of 2026-11-19, "do the auto
 refund" (gap PG-13), retires the hand procedure. Once the file is applied the
 same trigger has a second branch, which enrols a refund when an UPDATE makes an
 order cancelled and paid (the old row was not both), and the order is
@@ -2153,7 +2153,7 @@ kitchen's ability to read the ticket, not the database: ten lines each carrying
 280 characters is not something anybody can work from.
 
 **On the card path the bound is applied when the checkout session is created,
-not only in finalize** (`20261023120000`, written 2026-11-22, not applied;
+not only in finalize** (`20261023120000`, applied 2026-11-22;
 audit finding F-DBM-17-001). The `order_items` trigger runs only when
 `finalize_checkout_session` inserts the lines, which is after Moyasar has
 captured the payment, so a session carrying a 141-character note could be paid
