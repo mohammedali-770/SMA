@@ -1777,6 +1777,7 @@ production.
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 124 | 20261023120000 | payment_records_retention_and_limits | `2dca585b3a8a` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Three audit findings: F-DBM-04-001 (`payment_records.checkout_session_id` becomes `ON DELETE SET NULL`, a BEFORE DELETE trigger on `checkout_sessions` removes only order-less attempt records, and `anonymize_account_data` detaches and counts the records of retained orders, so a paid card order keeps its payment record through both erasure routes); F-DBM-02-001 (`set_order_number` pads to six digits and no longer truncates past 999 999); F-DBM-17-001 (`trg_checkout_sessions_item_note_length` refuses an item note over 140 characters when the session is created, before payment). Redefines `anonymize_account_data` and `set_order_number` only, each guarded by its pre-image. No existing row changed. No deploy implied. **MONEY PATH UNTOUCHED** (measured on the chain; not hard-coded in the file). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -10195,3 +10196,187 @@ UPDATE `orders`, which is what lets an invoker-rights trigger read
    refund already enrolled keeps running.
 
 Steps: `docs/OWNER_ACTIONS.md` §61.
+
+## 71. Payment records survive erasure; order numbers grow; item notes bounded before payment — WRITTEN 2026-11-22, NOT APPLIED (ledger row 124)
+
+`20261023120000_payment_records_retention_and_limits.sql`. **Written
+2026-11-22 on branch `fix/payment-records-retention-limits-20261122`,
+validated on a local chain, awaiting owner approval.** The owner asked on
+2026-11-22: "pause the audit and fix the high findings first". It fixes three
+findings of the 2026-11-19 full audit, each confirmed by an independent
+re-check. Section number 71 and row 124 follow §70 on the default branch at
+`fe53628`; sibling fix branches written the same day may claim the same
+numbers, and whichever merges second renumbers.
+
+sha256 `2dca585b3a8aa1beb3cd57ae5c752b4b8c55f037c5611e0879a56e40715aaf0c`, 666 lines / 36 204 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape. Two redefined bodies carry comment lines (`anonymize_account_data`
+already did); the file's pre-image and post-image checks compare a
+comment-and-whitespace-stripped content hash as well as the exact one, so an
+apply that trims comments for transport still verifies.
+
+### What it changes
+
+1. **F-DBM-04-001 (high): erasure no longer deletes the payment records of
+   card orders.** `finalize_checkout_session` links the paid record to both the
+   order and its session, and `payment_records.checkout_session_id` was
+   `ON DELETE CASCADE`. So `anonymize_account_data` (which deletes the
+   customer's sessions) and deleting the Auth user (`auth.users` → `profiles` →
+   `checkout_sessions` → `payment_records`) both deleted the record while the
+   order stayed paid. Gap PG-06 (`readiness/20261113-card-payments-gaps.md`),
+   and `RECORD_OF_PROCESSING.md` activity 15, which states the intended rule.
+   - The FK becomes `ON DELETE SET NULL`; name, column, referenced key,
+     `ON UPDATE NO ACTION`, `MATCH SIMPLE` and not-deferrable are kept.
+   - `payment_records_owner_ck` (`order_id is not null or checkout_session_id
+     is not null`) is **not** changed. A record with an `order_id` passes with
+     the session link nulled. A record with neither would fail it, so SET NULL
+     alone would make deleting a session with an abandoned attempt RAISE and
+     block both erasure routes. `trg_checkout_sessions_drop_attempt_records`
+     (BEFORE DELETE, row, new SECURITY DEFINER function
+     `checkout_session_drop_attempt_records`) therefore deletes the session's
+     **order-less** records first: exactly the rows the cascade deleted
+     before. Being a trigger on the session table, it covers the cascaded
+     delete as well as the explicit one.
+   - `anonymize_account_data` detaches the records of retained orders before
+     deleting the sessions and reports `payment_records_detached`. Three
+     anchored substitutions on the 20260919120000 body; every existing cleanup
+     kept.
+   - The surviving rows are not rewritten. They hold amount, currency, status,
+     Moyasar ids, card scheme, last four, issuer and the authorisation and
+     reference codes (`sanitizeMoyasarPayment`), no name, number or address,
+     which is what activity 15 says is kept with the order.
+2. **F-DBM-02-001 (high): order numbers no longer wrap.** `lpad(..., 6, '0')`
+   truncated, so 1 000 000 to 1 000 009 all produced `SM-YYYY-100000`, and
+   `place_order`'s unique-violation handler turned the collision into an
+   all-NULL row. The pad is now `greatest(6, length(v))`: every value below
+   1 000 000 gives the same string as before, and the number grows to seven
+   digits and beyond. The Riyadh year expression from `20261006120000` is kept.
+3. **F-DBM-17-001 (medium): an over-long item note is refused before
+   payment.** The 140-character bound existed only on `order_items`, which the
+   card path writes in finalize, after the capture.
+   `trg_checkout_sessions_item_note_length` (BEFORE INSERT OR UPDATE OF
+   `snapshot`) walks `snapshot->'items'` with `order_item_note_is_acceptable`
+   and raises `Item note is too long` (P0001), the `order_items` message. It
+   mirrors `trg_checkout_sessions_note_length` (`20260819120000`). An UPDATE
+   that leaves the snapshot unchanged passes, so no historical session becomes
+   unupdatable.
+
+### What it does not do
+
+- **Records with no order are still deleted with their session**, as before.
+  That includes an `initiated` attempt whose invoice may still be payable
+  (F-DBM-04-003, the deletion processor's blocker check, an Edge Function
+  change) and a payment Moyasar captured that never became an order (a
+  finalize that failed, or a session-only duplicate). What should happen to
+  those is PG-06's second question and needs an owner decision.
+- **`place_order` is not redefined.** Its `exception when unique_violation`
+  handler still catches any unique violation and returns an all-NULL row when
+  no existing order is found. Narrowing it to the idempotency index is a
+  follow-up for the change that owns `place_order`.
+- `compute_order_snapshot`, `begin_checkout_session`,
+  `finalize_checkout_session` and `insert_order_from_snapshot` are not
+  redefined. **MONEY PATH UNTOUCHED**, measured on the chain before and after:
+  `place_order` `12b6816d256c29b76edf947ae1a7ea77`, `compute_order_snapshot`
+  `22e2d42935459e7bf93abb2941b56325` (`md5(pg_get_functiondef(oid))`). The file
+  does not hard-code them, because a sibling change may move them.
+- No existing row is changed. No grant changes (`anonymize_account_data` is
+  re-stated service_role only; `set_order_number`'s ACL is asserted unchanged).
+  **No deploy implied.**
+
+### Pre-images and post-images, measured on the local chain
+
+| Function | Pre-image `md5(prosrc)` | Pre-image content hash | Post-image `md5(prosrc)` | Post-image content hash | Post-image `md5(pg_get_functiondef)` |
+| --- | --- | --- | --- | --- | --- |
+| `anonymize_account_data` | `c44b5c79be74a548bc756d0d9789ce22` (4 504) | `dd05bddec4a66a659cd22ccd9bcdeb0e` | `9f639ec0b09e5936549a29a5ccc58c28` (5 701) | `629070db1d6585eefd8ea1b84c0e6713` | `39a32120f311e837c40f4e0d6c7f365a` |
+| `set_order_number` | `ed203eebfde6c1a5026e39c625e1dc80` (256) | `fde9ae12224a86dacb0f601eb8549179` | `45a4521e26bb8540c93b2bccb6750555` (323) | `0df037abaddf7fcace5951b3650d102e` | `36dc39287a6c265b8a139e6005d1622c` |
+| `checkout_session_drop_attempt_records` (new) | — | — | `1734cb4ec748a4b5bb3f32dc83af9df9` (127) | — | `3d4a4349b7345c8e250518fa13386c1e` |
+| `enforce_checkout_session_item_notes` (new) | — | — | `17c270d0c13bebb9adcae0c5eb5d43c0` (458) | — | `bda1aec0305198f9f3b214da7f907218` |
+
+The content hash is `md5` of the body with `--` comments and all whitespace
+removed. The pre-image guard accepts the exact hash, the content hash, or the
+post-image content hash (a re-apply). The pre-image `anonymize_account_data`
+hash is the one PG-06 read live on 2026-11-13 (`c44b5c79…`).
+
+### What the file checks
+
+The FK (one, SET NULL, other properties kept), `payment_records_owner_ck`
+unchanged, `payment_records_order_id_fkey` unchanged; both triggers bound with
+the right timing and events; both new functions closed to `anon` and
+`authenticated`; comment-stripped statement-shaped checks on all four bodies
+(the detach precedes the session delete, erasure deletes no payment record,
+every earlier cleanup is present, no fixed width of 6 remains); both
+post-image content hashes; `set_order_number`'s ACL and trigger unchanged; the
+detach predicate run read-only against a customer id that cannot exist; and
+both new trigger functions **called** on a temporary table of the shape they
+read (140 accepted, 141 refused P0001 on insert and on update, the delete
+trigger driven through a real DELETE). `set_order_number` is not called,
+because calling it draws an order number.
+
+### Validation
+
+- Applied to a clone of the chain at `fe53628` and re-applied as a no-op. The
+  existing-data stage (`existing-data.sh`, this file only) applied it onto
+  seeded rows: every invariant held, **no existing row changed**.
+- **Before, on the base chain:** two customers each paid one card order; erasing
+  one by `anonymize_account_data` and the other by deleting the Auth user left
+  **0 of 2** paid records while both orders stayed paid. With the sequence at
+  999 998, `place_order` returned `SM-2026-999999`, `SM-2026-100000`, then
+  all-NULL rows. `begin_checkout_session` accepted a 141-character item note and
+  `finalize_checkout_session` then raised `Item note is too long`.
+  **After:** 2 of 2 records kept; `SM-2026-1000000`, `-1000001`, `-1000002`;
+  the session is refused at creation.
+- Paired suite `supabase/tests/payment_records_retention_and_limits_test.sql`,
+  13 cases. Run one case at a time on the base chain, A1, A2, A3, B2, B3, C2 and
+  C4 fail; A5, B1 and C1 (behaviour that must not change) pass on both.
+- All 100 suites against the migrated chain: 98 pass, the 2 quarantined
+  (`lazywait_mapping_test.sql`, `lazywait_sync_scheduler_test.sql`) fail as
+  before. (`server_input_bounds_test.sql` builds its dblink conninfo from
+  `current_user`, so in this sandbox it passes only when run as `postgres`; it
+  passes on both chains that way.)
+- **Mutation checks**, nine mutants, each applied onto the chain and run
+  against the file's own block and, with that block removed, the paired suite:
+
+  | Mutant | Migration's own block | Paired suite |
+  | --- | --- | --- |
+  | FK back to CASCADE | killed | killed (A1; A2, A3 behaviourally) |
+  | attempt-record trigger not created | killed | killed (A1; without A1, A2 raises `payment_records_owner_ck`) |
+  | attempt trigger deletes every record of the session | killed | killed (A3) |
+  | fixed pad of 6 restored | killed | killed (B2) |
+  | pad widened to 7 | killed | killed (B1) |
+  | note predicate inverted | killed | killed (fixture refused) |
+  | note guard skips every UPDATE | killed | killed (C4) |
+  | erasure detach removed | killed | killed (A2) |
+  | note trigger not created | killed | killed (A1; without A1, C2) |
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must hold, or stop:
+   ```sql
+   select p.proname, md5(p.prosrc), length(p.prosrc)
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname in ('anonymize_account_data', 'set_order_number');
+   -- anonymize_account_data c44b5c79… (4 504), set_order_number ed203eeb… (256),
+   -- or the content hashes above for a body stored without comments
+   select pg_get_constraintdef(oid) from pg_constraint
+    where conname in ('payment_records_checkout_session_id_fkey', 'payment_records_owner_ck');
+   select last_value from public.order_number_seq;
+   -- was a paid card order's payment record already lost?
+   select count(*) filter (where o.total > 0) as paid_card_orders_without_record,
+          count(*) filter (where o.total = 0) as zero_total_online_orders
+     from public.orders o
+    where o.payment_status = 'paid' and o.payment_method = 'online'
+      and not exists (select 1 from public.payment_records pr where pr.order_id = o.id);
+   ```
+   A zero-total online order (a comped customer through the card checkout) is
+   created paid with no payment record by design, so only the first count is a
+   lost record. A non-zero first count needs reading row by row (and Moyasar's
+   own record) before anyone concludes a record was lost.
+2. Apply `20261023120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the post-image hashes above; the FK reads
+   `ON DELETE SET NULL`; both triggers on `checkout_sessions`; the money-path
+   pair unchanged; `payment_records` count unchanged.
+4. Rollback, if ever wanted: re-add the FK `ON DELETE CASCADE`, drop the two
+   triggers and their functions, and re-create the two pre-image bodies
+   (section 1 of `20260919120000` and section 3 of `20261006120000`). Nothing
+   is lost by rolling back, but erasure then deletes card payment records
+   again.
