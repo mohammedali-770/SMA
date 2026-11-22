@@ -12,8 +12,10 @@
 --   CASE 1   guard   the gate: a cancelled order a claim left 'syncing' is
 --                    answered order_cancelled and parked blocked/order_cancelled,
 --                    one skipped log row, no notification, no marker
---   CASE 2   honest  the gate: an order in each of the other five statuses is
---                    still answered ready_to_send, with the marker stamped
+--   CASE 2   honest  the gate: a received or preparing order is still
+--                    answered ready_to_send, with the marker stamped (AMENDED
+--                    for 20261022120000: ready, out_for_delivery and delivered
+--                    are now order_progressed, see below)
 --   CASE 3   guard   the gate: a cancelled order past its deadline is
 --                    order_cancelled, not deadline_expired, and so never gets
 --                    a pos_failed event; a received one is still deadline_expired
@@ -29,8 +31,9 @@
 --                    would otherwise re-queue, with order_cancelled: and P0001,
 --                    and changes nothing; one it would refuse anyway is refused
 --                    as cancelled first
---   CASE 7   honest  the admin Retry still re-queues an eligible order in each of
---                    the other five statuses
+--   CASE 7   honest  the admin Retry still re-queues an eligible RECEIVED order
+--                    (AMENDED for 20261022120000: the other four statuses are now
+--                    refused as order_in_progress, see below)
 --   CASE 8   honest  the admin Retry: the admin gate still comes first (42501 for
 --                    a cancelled order), and a missing order is still P0002
 --   CASE 9   guard   the follow-up's own story, end to end: the worker claims an
@@ -156,6 +159,14 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- CASE 2 — honest: every other status is still started
 -- ---------------------------------------------------------------------------
+-- AMENDED for 20261022120000_pos_resend_refund_guards (audit F-X04-001). This
+-- case used to require ready_to_send for all five non-cancelled statuses, which
+-- is the behaviour that finding records as a defect: a ticket for an order the
+-- branch has already made or handed over. It now pins the two statuses that are
+-- still sent (received, and preparing, which an unpaid card order can reach
+-- before its first send) and that the other three are answered
+-- order_progressed. The full behaviour is supabase/tests/
+-- pos_resend_refund_guards_test.sql CASE 5.
 do $$
 declare
   v_s   public.order_status;
@@ -163,7 +174,14 @@ declare
   v_ans text;
   o     public.orders;
 begin
-  foreach v_s in array array['received', 'preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+  foreach v_s in array array['ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_id := pg_temp.new_order(v_s, 'syncing');
+    v_ans := public.begin_lazywait_create_attempt(v_id, 'tok-2');
+    if v_ans is distinct from 'order_progressed' then
+      raise exception 'CASE 2 FAILED: a % order was answered % (expected order_progressed)', v_s, coalesce(v_ans, '<null>');
+    end if;
+  end loop;
+  foreach v_s in array array['received', 'preparing']::public.order_status[] loop
     v_id := pg_temp.new_order(v_s, 'syncing');
     v_ans := public.begin_lazywait_create_attempt(v_id, 'tok-2');
     select * into o from public.orders where id = v_id;
@@ -175,7 +193,7 @@ begin
       raise exception 'CASE 2 FAILED: the gate wrote a sync-log row for a % order', v_s;
     end if;
   end loop;
-  raise notice 'CASE 2 ok: received, preparing, ready, out_for_delivery and delivered are still started';
+  raise notice 'CASE 2 ok: received and preparing are still started; ready, out_for_delivery and delivered are order_progressed';
 end $$;
 
 -- ---------------------------------------------------------------------------
@@ -354,6 +372,12 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- CASE 7 — honest: every other status is still re-queued
 -- ---------------------------------------------------------------------------
+-- AMENDED for 20261022120000_pos_resend_refund_guards (audit F-X04-001). This
+-- case used to require that the Retry re-queue an order in all five
+-- non-cancelled statuses: a second ticket for an order staff have already moved
+-- on, which is the defect. A received order is still re-queued; the other four
+-- are refused as order_in_progress. Full behaviour:
+-- supabase/tests/pos_resend_refund_guards_test.sql CASE 2 and CASE 3.
 do $$
 declare
   v_s   public.order_status;
@@ -361,7 +385,14 @@ declare
   v_res text;
 begin
   perform pg_temp.as_admin();
-  foreach v_s in array array['received', 'preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+  foreach v_s in array array['preparing', 'ready', 'out_for_delivery', 'delivered']::public.order_status[] loop
+    v_id := pg_temp.new_order(v_s, 'failed');
+    v_res := pg_temp.requeue(v_id);
+    if v_res not like 'P0001 order_in_progress:%' or (select lazywait_sync_state from public.orders where id = v_id) <> 'failed' then
+      raise exception 'CASE 7 FAILED: the Retry of a % order answered % (%)', v_s, v_res, pg_temp.shape(v_id);
+    end if;
+  end loop;
+  foreach v_s in array array['received']::public.order_status[] loop
     v_id := pg_temp.new_order(v_s, 'failed');
     v_res := pg_temp.requeue(v_id);
     if v_res is distinct from 'OK' or (select lazywait_sync_state from public.orders where id = v_id) <> 'pending' then
@@ -374,7 +405,7 @@ begin
     raise exception 'CASE 7 FAILED: an expired order is no longer refused as deadline_expired';
   end if;
   perform pg_temp.as_nobody();
-  raise notice 'CASE 7 ok: received, preparing, ready, out_for_delivery and delivered are still re-queued';
+  raise notice 'CASE 7 ok: a received order is still re-queued; the other four statuses are order_in_progress';
 end $$;
 
 -- ---------------------------------------------------------------------------

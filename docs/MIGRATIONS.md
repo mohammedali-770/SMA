@@ -1777,6 +1777,7 @@ production.
 | 121 | 20261016120000 | refund_retry_backoff | `96a17fd96dd7` | 20261118055554 | refund_retry_backoff | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-18 05:55:54 UTC** on explicit owner approval ("Apply 20261016120000", named by version), via MCP `apply_migration`, **one call, target named explicitly**; it returned `{"success":true}`. §68, `OWNER_ACTIONS.md` §58. Gap PG-01, the owner's numbers: refund back-off (5 minutes doubling, capped at 6 hours), failed after 10 attempts with the last reason, and watchdog rule R18 `REFUND_STUCK` (warning over 1 hour, critical over 24 hours). §9-B.7: the merged copy (merged in #481 as `902cd1a`) is sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes. **ONE TRANSPORT DEVIATION, the same kind as row 119:** comment-only lines OUTSIDE dollar-quoted bodies were stripped for transport size, so 125 880 bytes were sent and the applied TEXT is not the repository file. All 8 dollar-quoted bodies were proven byte-identical to the merged file's before sending, so **every stored function body matches the merged file's**, the snapshot in its transport form. **Pre-checks, read live just before sending, all matching §68 step 1:** claim content hash `e20c906d9a4d39cdb585bafe0460b0c3`, finalize content hash `0d64407adc77188b7f4f2767e41df945`, watchdog `fb4fc4e2bdcee6ec46ced01029269cb0`, snapshot `3847b5f3e18713bb0b322cacf9ce46ab`; `refund_retry_delay` and `order_refunds.next_attempt_at` absent; 0 `order_refunds`, 0 incidents, `payment-refund-worker` inactive. **Outcomes, md5(prosrc) / length, all equal to §68's post-image table:** `claim_order_refund(text, uuid[])` `a97954d897596a3c052888e8ef9689d5` / 2 627; `finalize_order_refund` `0605d1dae897c0752b5d47c6f385e97e` / 3 184; `refund_retry_delay` `4d49c1987b096639c57bf76a1bbec900` / 140; `order_integrity_watchdog` `93de2aaacc8d94b8638ada91841bc27b` / 38 612; `operations_health_snapshot_internal` (transport form) `0f8f08f9d128536b61f908f885c66d7c` / 50 778; one overload each. `order_refunds.next_attempt_at` is `timestamp with time zone`. `refund_retry_delay` (1) `00:05:00`, (7) `05:20:00`, (8) `06:00:00`, (12) `06:00:00`. `anon` and `authenticated` execute none of the three refund functions. **The file's rolled-back probe left nothing:** `order_refunds` 0, `order_integrity_incidents` 0, 82 orders, 40 branches, and `order_number_seq` last_value 92, equal to the newest order `SM-2026-000092`, so no order number was burned. **MONEY PATH UNTOUCHED** (`12b6816d…` / `22e2d429…`, re-read). Live history **165 → 166**. **Version NOT aligned** (§9-D). No deploy implied. The `payment-refund-worker` cron job is still **inactive**, so automated refunds remain off. Reconciled by name against the default branch at `902cd1a`: 160 files = 158 applied + 2 superseded (rows 8-9) + **0 unapplied. NOTHING IS OUTSTANDING.** |
 | 122 | 20261017120000 | advisor_fixes | `f7880fc0b55a` | — | — | — | E | **NOT APPLIED** (read live 2026-11-18: no history row; `checkout_sessions_select_own` still bare; none of the 21 index names exists) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-18, UNAPPLIED.** §69. The owner's advisor run of 2026-11-18: `checkout_sessions_select_own` wraps `auth.uid()` and `is_staff()` in scalar SELECTs (0003, 1 → 0), and 21 covering btree indexes, one per unindexed foreign key (0001, 21 → 0). No index dropped, no policy merged, no function redefined, no row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 123 | 20261018120000 | refund_cancelled_paid_orders | `63e2ad30e1b0` | — | — | — | E | **NOT APPLIED** (written 2026-11-19; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-19, UNAPPLIED.** §70. The owner's decision of 2026-11-19, "do the auto refund" (gap PG-13): `set_order_refund_enrollment` gains a branch that enrols a refund when an UPDATE makes an online order cancelled and paid, with a paid `payment_records` row, `total > 0` and `refund_state = 'none'`; `open_order_refund_record` records reason `order_cancelled` for it. Transition-only: no backfill. `order_refund_due` unchanged (asserted). No row written, no grant changed. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 124 | 20261022120000 | pos_resend_refund_guards | `21229514999b` | — | — | — | E | **NOT APPLIED** (written 2026-11-22; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version**, after 20261012120000, 20261015120000, 20261016120000 and 20261018120000 | high if `db push` | **WRITTEN 2026-11-22, UNAPPLIED.** §71. Audit findings F-X04-001, F-X03-002, F-X04-002 (high, confirmed). `begin_lazywait_create_attempt` refuses and parks an order with any refund lifecycle (`refund_started`) or one already ready, out for delivery or delivered (`order_progressed`); `request_customer_pos_resend` refuses an order whose status left `received` (`order_in_progress`); `requeue_lazywait_order` refuses any refund lifecycle and any status but `received`; `claim_order_refund` takes a refund only while its order is `received` or `cancelled`; new BEFORE trigger `set_orders_refund_progress_guard` undoes the POS-failure enrolment on a progressed order and refuses any status change but cancelling while a refund is pending, processing or refunded. No signature, no row written, no grant widened. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -10195,3 +10196,249 @@ UPDATE `orders`, which is what lets an invoker-rights trigger read
    refund already enrolled keeps running.
 
 Steps: `docs/OWNER_ACTIONS.md` §61.
+
+## 71. The POS and refunds stop contradicting each other — WRITTEN 2026-11-22, NOT APPLIED (ledger row 124)
+
+`20261022120000_pos_resend_refund_guards.sql`. **Written 2026-11-22 on branch
+`fix/pos-resend-refund-guards-20261122`, validated on a local chain, awaiting
+owner approval.** The owner's instruction of 2026-11-22, "pause the audit and
+fix the high findings first". It fixes three high findings of the 2026-11-19
+audit, each confirmed by an independent re-check: **F-X04-001** (a Resend or
+admin Retry after a POS 4xx sends a second kitchen ticket for an order staff
+have already moved on), **F-X03-002** (an admin Retry sends an order to the
+kitchen after its refund was enrolled or paid out) and **F-X04-002** (the
+POS-failure refund is enrolled whatever the order's progress, staff can
+deliver an order whose refund is pending, and the worker is then handed it).
+Version `20261022120000` sorts after every file on the default branch at
+`fe53628`. **Section and ledger numbers 71 / 124 are the next free ones at
+`fe53628`; other fixes written the same day may claim them too, so renumber at
+merge if they collide.**
+
+sha256 `21229514999b952483e0b124109f927b6279b9005194816d712adba109bf01bd`, 890 lines / 49 914 bytes.
+**Re-hash the MERGED copy before applying**, per §15. It carries no `\u`
+escape, and none of its five new bodies carries a whole-line comment, so an
+apply that trims comments for transport stores exactly the repository bodies.
+
+**F-X04-002 is reachable today wherever card payment takes real orders:** the
+refund job has been on since 2026-11-19 (`PAYMENTS.md` §6), so a paid card
+order that the branch fulfils by hand during a POS failure is refunded in full
+on the job's next run.
+
+### It depends on four earlier files, and refuses to apply without them
+
+`requeue_lazywait_order` and `begin_lazywait_create_attempt` are derived from
+`20261015120000` (§67), `claim_order_refund` from `20261016120000`,
+`request_customer_pos_resend` from `20261012120000` (§64), and the new
+trigger runs after the enrolment rule of `20261018120000` (§70). **Apply those
+first, each by version.** The precondition block reads each replaced body's
+`md5(prosrc)` and refuses unless it is the body this file was derived from (or
+that body with its whole-line comments removed, or this file's own on a
+re-apply), and it refuses unless `set_order_refund_enrollment` is the
+`20261018120000` body.
+
+### What it changes
+
+- **`begin_lazywait_create_attempt`**, the last check before the Create Order
+  POST, refuses two more shapes at the place and in the way it refuses a
+  cancelled order (§67): parked `blocked` in the same locked statement, one
+  `skipped` sync-log row, no notification, no marker.
+  - any refund lifecycle (`pending`, `processing`, `refunded`, `failed`):
+    answer `refund_started`, reason `refund_started`, last error
+    `refund_started_before_send`;
+  - status `ready`, `out_for_delivery` or `delivered`: answer
+    `order_progressed`, reason `order_progressed`, last error
+    `order_progressed_before_send`.
+
+  `preparing` is still sent, on purpose: an unpaid card order an administrator
+  advanced reaches its first send only when the payment lands, and that first
+  ticket is the one the kitchen and the POS books need. **`lazywait-sync` is
+  unchanged** and treats both answers as "not ready";
+  `_shared/lazywaitCancelledGate.test.ts` now drives the real handler with each.
+- **`request_customer_pos_resend`**: an otherwise eligible order whose status
+  has left `received` gets outcome `unavailable`, reason `order_in_progress`,
+  message "The branch already has this order, so it was not sent again.", one
+  `skipped` log row (`resend_rejected_order_in_progress`) and nothing else. The
+  check sits after the eligibility refusal, so every existing refusal keeps its
+  answer; a refund was already refused there (`refund_in_progress`).
+- **`requeue_lazywait_order`** (the admin Retry), after the eligibility refusal
+  and before the update: P0001 `refund_in_progress: …` for any refund
+  lifecycle, then P0001 `order_in_progress: This order is already <status>. …`
+  for any status but `received`. The console shows a refused Retry's message as
+  it is (`LazywaitPanel.test.tsx` pins both).
+- **`claim_order_refund`** takes a refund only while its order is `received` or
+  `cancelled`, in the candidate scan and again under the lock. Those are the
+  two statuses a refund is opened in, and with the trigger below the only two
+  an order with a live refund can reach, so for every refund this file lets
+  exist the filter changes nothing. It stops a refund **already** open on a
+  fulfilled order from being paid out; such a refund stays `pending`, untouched,
+  for a person to resolve.
+- **New trigger `set_orders_refund_progress_guard`** (BEFORE INSERT OR UPDATE
+  on `orders`, function `guard_order_progress_refund()`, invoker rights,
+  EXECUTE revoked from `public`, `anon` and `authenticated`). Its name sorts
+  after `set_orders_refund_enrollment`, so it sees that trigger's decision. On
+  UPDATE:
+  - when the row arrives `pending` from `none`, its status is neither
+    `received` nor `cancelled`, and `order_refund_due(...)` holds, it puts
+    `refund_state` and `refund_required_at` back. `open_order_refund_record` is
+    an AFTER trigger, so no refund row is written;
+  - any status change other than to `cancelled` while `refund_state` is
+    `pending`, `processing` or `refunded` raises P0001
+    `refund_in_progress: This order's payment is being refunded to the
+    customer, so it cannot be moved to <status>. Cancel the order instead.`
+    `admin_set_order_status` updates the row, so the console's "Save failed"
+    banner shows that sentence and the console rolls the row back
+    (`AppContext.updateOrderStatus`). No console code changed.
+
+### Why these status sets
+
+From the order state machine (audit record X04 §1): `received → preparing |
+cancelled`, `preparing → ready | cancelled`, `ready → out_for_delivery |
+delivered | cancelled`, `out_for_delivery → delivered | cancelled`;
+`delivered` and `cancelled` are terminal. `admin_set_order_status` is the only
+writer of `status`, so every move off `received` other than cancelling is a
+person saying the branch is fulfilling the order.
+
+- **Resend and Retry refuse every status but `received`.** They only ever act
+  after a failure, and a failed order that staff have moved on is one the
+  branch is making by hand.
+- **The POS-failure refund is enrolled only while `received`.** Nothing paid is
+  stranded by that: every progressed status except `delivered` can still be
+  cancelled, and cancelling a paid card order opens the cancellation refund
+  (§70; the paired suite's CASE 6 proves it for a `preparing` order). A
+  delivered order is never refunded automatically: the customer has the food.
+- **A live or completed refund blocks every forward move, not only
+  `delivered`.** With the enrolment rule above, such a refund exists only on a
+  received order, so a forward move would start the kitchen on food whose
+  money is going back. Cancelling stays open, and is the exit. **`failed` does
+  not block:** `finalize_order_refund` writes it only for a refund the worker
+  has stopped (`order_refunds` `failed` is terminal and nothing re-arms it), so
+  no money moves after a delivery, and the claim filter would stop one that was
+  re-armed by hand.
+
+### What it does not do
+
+- It does not redefine `admin_set_order_status` (another change owns it),
+  `set_order_refund_enrollment`, `order_refund_due`, the eligibility helpers,
+  `lazywait_requeue_eligibility` or its console mirror, either claim,
+  `place_order`, `insert_order_from_snapshot` or `open_order_refund_record`.
+  `set_order_refund_enrollment` would be the more direct place for the
+  enrolment rule (`new.status <> 'cancelled'` becoming `= 'received'`); it was
+  outside this change's remit, so the rule sits in a trigger that runs after it.
+- **Cash orders** are unaffected: no refund rule applies to them, and the gate,
+  Resend and Retry act on them exactly as before while `received`.
+- No row written. A refund already pending on a progressed order stays pending
+  (count them before applying with the query below; how many exist depends on
+  whether card payment has taken real orders, which this change did not read).
+- **The customer receipt still offers Resend** on an order refused here: the
+  app derives its state from the POS columns, which do not change. The tap is
+  now answered `unavailable` with reason `order_in_progress`, the screen
+  refreshes and nothing is sent. Telling the customer why is an app change with
+  new EN/AR copy and an EAS build, not part of this file.
+- No deploy implied. **MONEY PATH UNTOUCHED**: neither `place_order` nor
+  `compute_order_snapshot` is redefined, and the file asserts that neither body
+  changed during its run (not against a fixed hash, since another change may
+  move them).
+
+### Pre-images and post-images, measured on the local chain at `fe53628`
+
+| Function | Pre-image `md5(prosrc)` | Same, whole-line comments removed | Post-image `md5(prosrc)` | Post-image `md5(pg_get_functiondef)` |
+| --- | --- | --- | --- | --- |
+| `request_customer_pos_resend` | `c4a21ddb872b79098d369f8d5cb39934` (3 637) | `2051aafdde9384c05b07d0f6d44675ca` (3 405) | `6a1bc2bec2f98c0180d508c36b65f016` (4 212) | `9522304dccaacafba7260eeb8a37eb2b` |
+| `begin_lazywait_create_attempt` | `365fcc1b8d82a95eac196076740bd957` (1 854) | same, no comment lines | `73b44b2c590aedcf546f0bac7af3061e` (3 144) | `b957746d5d9149409e68ac99a6e193b3` |
+| `requeue_lazywait_order` | `5b83a99cb110ec14bb99deb2c839e0fc` (2 062) | same, no comment lines | `3cf675f31f078369b46cc064a41c6e58` (2 627) | `daa087971b0bf0ca30847d25cead423d` |
+| `claim_order_refund` | `a97954d897596a3c052888e8ef9689d5` (2 627) | `df42bb949390fec8aa1a0631dca5071d` (1 409) | `782e584cc08d59ddfd621204d35b507f` (1 731) | `ef8da735db43a2dbe84192437a8d5905` |
+| `guard_order_progress_refund` (new) | — | — | `6f1511e51a489522f060c2401eaec35d` (1 039) | `bfde962b8c4050d7a56b23baf3fab17f` |
+
+### What the file checks
+
+Outcomes first, in a sub-transaction aborted by a final `raise`, with explicit
+order numbers so no `SM-` number is drawn: the gate in each of the five
+non-cancelled statuses and with a refund pending (answers, park shape, one log
+row each, no notification); a paid card order failing at the POS with the
+budget spent while `received` (enrolled, one refund row) and while `ready`
+(not enrolled, no row); a forward move with a refund pending, a delivery with a
+refund pending and a forward move of a refunded order (each P0001
+`refund_in_progress`), and cancelling one (allowed); `claim_order_refund` with
+**every other refund excluded, so no real refund is touched**, handing out the
+received order's refund and not the delivered one's; the Retry and Resend as
+far as their gates (42501, 28000). The rollback is proven. Then the
+comment-stripped text of the Resend, the Retry and the claim (each refusal
+between the eligibility refusal and the update; the claim filter present
+twice), the trigger (enabled, row-level, BEFORE, after the enrolment), grants,
+and the money path.
+
+### Validation
+
+- Local chain at `fe53628` (`sma_chain_template`), each suite on its own clone
+  with this file applied: **100 suites, 97 passed**. The three that did not:
+  `lazywait_mapping_test` and `lazywait_sync_scheduler_test` (quarantined in
+  `known-failing.txt`) and `server_input_bounds_test`, whose dblink case could
+  not authenticate in this environment and fails identically without this file.
+  The file applies, re-applies as a no-op, and applies inside one transaction;
+  with an older `requeue_lazywait_order` its precondition refuses.
+- Paired suite `supabase/tests/pos_resend_refund_guards_test.sql`, 10 cases,
+  driven through `place_customer_order`, the worker's claim, gate and
+  `record_lazywait_sync`, `admin_set_order_status`, the Resend, the Retry and
+  the refund claim and finalize, every trigger on. **On the base chain CASES 1,
+  2, 4, 5, 6, 7, 8 and 10 fail** (the guard cases); CASES 3 and 9 (a failed
+  received cash order is still resent and retried; a cash order end to end)
+  pass on both.
+- **Four existing assertions pinned the behaviour the findings call defects,
+  and were changed deliberately**, each with a comment citing this file:
+  `cancelled_orders_guard_test.sql` CASE 2 (a Resend accepted in every
+  non-cancelled status) and CASE 7's last loop (the POS-failure refund enrolled
+  in every non-cancelled status); `cancelled_order_followups_test.sql` CASE 2
+  (the gate sending in every non-cancelled status) and CASE 7 (the Retry
+  re-queuing in every non-cancelled status). Each now pins the new rule.
+- **Mutation checks**, thirteen mutants, each applied once with the file's own
+  block and once without it (to test the suite alone):
+
+  | Mutant | File's own block | Paired suite |
+  | --- | --- | --- |
+  | gate: `order_progressed` refusal removed | killed | killed (CASE 5) |
+  | gate: `refund_started` refusal removed | killed | killed (CASE 5) |
+  | gate: progressed set narrowed to `delivered` | killed | killed (CASE 5) |
+  | Resend: `order_in_progress` refusal removed | killed (text) | killed (CASE 1) |
+  | Retry: refund check removed | killed (text) | killed (CASE 4) |
+  | Retry: status check inverted | killed (text) | killed (CASE 2) |
+  | claim: status filter removed (scan and lock) | killed | killed (CASE 8) |
+  | claim: `delivered` admitted | killed | killed (CASE 8) |
+  | trigger: enrolment undo removed | killed | killed (CASE 6) |
+  | trigger: undo only for `delivered` | killed | killed (CASE 6) |
+  | trigger: `refunded` no longer blocks | killed | killed (CASE 7) |
+  | trigger: cancelling also blocked | killed | killed (CASE 6) |
+  | claim: scan filter removed, lock re-check kept | killed (text) | **survived** |
+
+  The last mutant survives every outcome test because the re-check under the
+  lock already refuses the candidate and the scan moves on. The scan filter is
+  kept so the 50-candidate window is not filled by refunds that can never be
+  claimed, and is pinned by the text check.
+
+### Applying it (owner, §5, named by version)
+
+1. Read-only first. Each must hold, or stop:
+   ```sql
+   select p.proname, md5(p.prosrc), length(p.prosrc)
+     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('request_customer_pos_resend', 'begin_lazywait_create_attempt',
+                        'requeue_lazywait_order', 'claim_order_refund');
+   -- one of the pre-image values in the table above, for each
+   select count(*) from supabase_migrations.schema_migrations
+    where name in ('cancelled_orders_guard', 'cancelled_order_followups',
+                   'refund_retry_backoff', 'refund_cancelled_paid_orders');
+   -- 4: every dependency applied
+   select o.status, o.refund_state, count(*) from public.orders o
+    where o.status not in ('received', 'cancelled') and o.refund_state <> 'none'
+    group by 1, 2;
+   -- refunds already open on an order the branch went on with; this file
+   -- leaves them pending and the worker stops taking them
+   ```
+2. Apply `20261022120000` by name. Never "the outstanding migrations".
+3. Afterwards, read-only: the post-image hashes above; the trigger
+   `set_orders_refund_progress_guard` present and enabled; the money-path pair
+   unchanged; no `VERIFY-20261022120000-` order or branch survived;
+   `order_refunds` unchanged in count.
+4. Rollback, if ever wanted: drop the trigger and its function, and re-create
+   the four pre-image bodies (sections 1 and 2 of `20261015120000`, section 1
+   of `20261012120000`, section 2 of `20261016120000`). No data is lost.
