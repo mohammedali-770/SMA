@@ -3191,7 +3191,8 @@ customer-facing and two on staff tickets.** Read them in the same pass.
   «تم الاستلام 🎉» ("Collected"), shown to a customer whose order was a pickup.
   The body below it is the existing «بالهناء والشفاء! شكراً لطلبك من سبايسي ميل.»,
   unchanged. A delivery customer keeps «تم التوصيل 🎉». This is live customer
-  messaging, so it ships only with the `push-dispatch` deploy in §64;
+  messaging, so it shipped only with the `push-dispatch` deploy in §64 — **that
+  deploy is DONE (v15, 2026-11-24), so this title is live and its read is now overdue**;
 - **`ملاحظة العميل / CUSTOMER NOTE`**, the label in front of a customer's own
   note on the kitchen ticket (`CUSTOMER_NOTE_LABEL`, `_shared/lazywait.ts`).
   Staff read it, not customers; check it reads as "the customer's note" and not
@@ -6002,7 +6003,9 @@ step and no deploy. After the build, a customer's stored language corrects at
 their next launch (the claim finds the row, the mismatch triggers one
 registration) or the moment they change the language.
 
-## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — one decision, then deploys
+## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — `push-dispatch` DEPLOYED, three deploys still open
+
+**Status, 2026-11-24 (later).** Steps 1 and 2 below are **DONE**. The pull request merged as #535 (`3d00583`) on the owner's instruction "merge 535", which is recorded as approval of the broadcast-audience change; and **`push-dispatch` was deployed as version 15** (10:56 UTC) on the owner's approval ("deploy push-dispatch") from the default branch at `2c5f7bb`: `verify_jwt` false, ezbr `f7bb6770…c0dc`, all 8 bundle files read back byte-identical to the source (compared with `cmp`), an `OPTIONS` probe returned 200, and no POST was sent. The version before it was 14. **Still open: step 3 (`lazywait-sync`), step 4 (`operations-alert-dispatch`, `email-test-config`) and step 5 (the native Arabic read — the pickup title is now live without it).** The text below is the original plan, kept as written.
 
 **Opened 2026-11-24.** Five findings from the full audit (F-X08-002, -003, -004,
 F-X10-001, -003) are fixed in code by one pull request. **Nothing is live until
@@ -6034,9 +6037,9 @@ request is in flight; fixing that needs a migration and is not part of this.
 
 **The steps, each its own approval (CLAUDE.md §5):**
 
-1. **Decide the audience change** above, then merge the pull request. Merging
+1. **DONE 2026-11-24.** **Decide the audience change** above, then merge the pull request. Merging
    deploys nothing.
-2. **Deploy `push-dispatch`** by name. Do it before `lazywait-sync`: the drain
+2. **DONE 2026-11-24 (v15).** **Deploy `push-dispatch`** by name. Do it before `lazywait-sync`: the drain
    change is harmless against the old function, but the stale-event check lives
    in `push-dispatch` and is what makes a flag-off period safe.
 3. **Deploy `lazywait-sync`.** Look at the next kitchen ticket that carries a
