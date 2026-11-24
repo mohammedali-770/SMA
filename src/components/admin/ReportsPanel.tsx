@@ -13,7 +13,7 @@ import {
 } from '../../utils/calculations';
 import { Price } from '../Price';
 import { isMissingFunctionError, orders as ordersApi } from '../../lib/api';
-import { buildCouponUsage, lazywaitRefOf, mapReportOrder, type ReportOrder } from '../../lib/reports';
+import { buildCouponUsage, buildProductSales, lazywaitRefOf, mapReportOrder, type ReportOrder } from '../../lib/reports';
 import { ADMIN_LOCALES } from './adminLocales';
 
 const SELECT = [
@@ -135,22 +135,7 @@ export const ReportsPanel: React.FC = () => {
     };
   });
 
-  const productReport = (() => {
-    const map: { [id: string]: { name: string; category: string; qty: number; rev: number } } = {};
-    deliveredOrders.forEach(o => {
-      o.items.forEach(item => {
-        const pId = item.productId;
-        const pRef = products.find(p => p.id === pId);
-        const catRef = categories.find(c => c.id === pRef?.categoryId);
-        const name = isRTL ? (pRef?.nameAr || item.nameAr) : (pRef?.nameEn || item.nameEn);
-        const catName = isRTL ? (catRef?.nameAr || 'مقبلات وأطباق') : (catRef?.nameEn || 'Sides & Burgers');
-        if (!map[pId]) map[pId] = { name, category: catName, qty: 0, rev: 0 };
-        map[pId].qty += item.quantity;
-        map[pId].rev += item.price * item.quantity;
-      });
-    });
-    return Object.keys(map).map(id => ({ id, ...map[id] })).sort((a, b) => b.rev - a.rev);
-  })();
+  const productReport = buildProductSales(deliveredOrders, products, categories, isRTL);
 
   const couponReport = buildCouponUsage(deliveredOrders);
 

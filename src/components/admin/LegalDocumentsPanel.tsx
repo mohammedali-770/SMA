@@ -288,7 +288,13 @@ export const LegalDocumentsPanel: React.FC = () => {
                       </select>
                     </label>
                     <label className="flex flex-col gap-2">
-                      <span className={LABEL}>{isRTL ? 'يتطلب الموافقة' : 'Requires acceptance'}</span>
+                      {/* Honest about what it does today: nothing reads this column. The
+                          app never selects it, no screen asks for acceptance and no table
+                          records one (F-TAA4-002), so an admin must not read "Yes" as
+                          "customers must accept this version". */}
+                      <span className={LABEL}>
+                        {isRTL ? 'يتطلب الموافقة (غير مُفعّل بعد)' : 'Requires acceptance (not enforced yet)'}
+                      </span>
                       <select
                         value={draft.requires_acceptance ? 'true' : 'false'}
                         onChange={(e) => setDraft({ ...draft, requires_acceptance: e.target.value === 'true' })}
@@ -298,6 +304,11 @@ export const LegalDocumentsPanel: React.FC = () => {
                         <option value="false">{isRTL ? 'لا' : 'No'}</option>
                         <option value="true">{isRTL ? 'نعم' : 'Yes'}</option>
                       </select>
+                      <Text variant="caption" tone="tertiary" as="span">
+                        {isRTL
+                          ? 'التطبيق لا يطلب من العميل الموافقة ولا يسجّلها حالياً، لذلك لا يغيّر هذا الخيار شيئاً.'
+                          : 'The app does not ask customers to accept, or record acceptance, yet — this setting changes nothing.'}
+                      </Text>
                     </label>
                   </div>
 

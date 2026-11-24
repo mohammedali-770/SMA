@@ -174,22 +174,28 @@ export const MenuManagementPanel: React.FC = () => {
       variants: [],
     };
 
+    // Captured now: the form state below is reset before the write settles.
+    const oldImg = persistedImg;
     if (editingProduct) {
-      updateProduct({
+      const saved = updateProduct({
         ...pData,
         id: editingProduct.id
       });
+      // Retire the old object only once the write is KNOWN to have succeeded.
+      // updateProduct resolves false when the row was refused or the network
+      // dropped, and the live product then still points at the old file, so
+      // deleting it would break the photo the customer is looking at - the exact
+      // failure this ordering exists to prevent (F-TAA4-005). An orphaned file
+      // costs a few kilobytes and nothing else. removeByUrl itself ignores a URL
+      // this project's bucket did not produce, and keeps a file another row
+      // still references.
+      if (oldImg && oldImg !== pData.imageUrl) {
+        void Promise.resolve(saved).then((ok) => {
+          if (ok === true) void productImageApi.removeByUrl(oldImg);
+        });
+      }
     } else {
       addProduct(pData);
-    }
-
-    // Only NOW is it safe to retire the old object: the row has been told to
-    // point somewhere else. Ordered this way round because the failure that
-    // matters is a live product referencing a deleted file — an orphaned file
-    // costs a few kilobytes and nothing else. removeByUrl is a no-op for a URL
-    // this bucket did not produce, so a hand-pasted external link is untouched.
-    if (persistedImg && persistedImg !== pData.imageUrl) {
-      void productImageApi.removeByUrl(persistedImg);
     }
 
     setEditingProduct(null);
@@ -301,7 +307,7 @@ export const MenuManagementPanel: React.FC = () => {
       alert(adminLang === 'en' ? 'Please paste CSV lines first' : 'الرجاء لصق خطوط CSV أولاً');
       return;
     }
-    const result = parseCSVMenu(rawCsvText, categories, adminLang);
+    const result = parseCSVMenu(rawCsvText, categories, adminLang, products);
     setCsvResult(result);
     if (result.errors.length > 0) {
       setCsvMsg(adminLang === 'en' ? 'Warnings detected. Inspect list below.' : 'تم كشف تنبيهات بالتنسيق. افحص القائمة أدناه.');
@@ -370,7 +376,7 @@ export const MenuManagementPanel: React.FC = () => {
       const text = event.target?.result as string;
       if (text) {
         setRawCsvText(text);
-        const result = parseCSVMenu(text, categories, adminLang);
+        const result = parseCSVMenu(text, categories, adminLang, products);
         setCsvResult(result);
         if (result.errors.length > 0) {
           setCsvMsg(adminLang === 'en' ? 'Spreadsheet has layout warnings' : 'الجدول يحتوي على تحذيرات بالتنسيق');

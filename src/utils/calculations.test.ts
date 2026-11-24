@@ -202,6 +202,55 @@ describe('parseCSVMenu', () => {
   });
 });
 
+describe('parseCSVMenu — image and duplicates (F-TAA4-007)', () => {
+  const HEADER =
+    'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url';
+  const row = (name: string, image = '', cat = 'Burgers') => `${cat},برجر,${name},اسم,d,و,10,100,${image}`;
+
+  it('leaves an empty image cell empty instead of using a stock burger photo', () => {
+    const { products } = parseCSVMenu(`${HEADER}\n${row('Juice')}\n${row('Short', '').replace(/,$/, '')}`, []);
+    expect(products.map(p => p.imageUrl)).toEqual(['', '']);
+  });
+
+  it('keeps an image the sheet actually supplies', () => {
+    const { products } = parseCSVMenu(`${HEADER}\n${row('A', 'https://cdn.example/a.jpg')}`, []);
+    expect(products[0].imageUrl).toBe('https://cdn.example/a.jpg');
+  });
+
+  it('the shipped template no longer puts a burger photo on the orange juice', () => {
+    const csv = decodeURIComponent(getCSVTemplateData().split(',').slice(1).join(','));
+    const juice = parseCSVMenu(csv, []).products.find(p => p.nameEn === 'Ice Cold Orange Juice');
+    expect(juice?.imageUrl).toBe('');
+  });
+
+  it('skips a row already on the menu in the same category, and says so in both languages', () => {
+    const cats: Category[] = [{ id: 'cat-1', nameEn: 'Burgers', nameAr: 'برجر', sortOrder: 1 }];
+    const existing = [{ categoryId: 'cat-1', nameEn: 'Spicy Volcano' }];
+    const csv = `${HEADER}\n${row('  spicy volcano ')}\n${row('New Item')}`;
+    const en = parseCSVMenu(csv, cats, 'en', existing);
+    expect(en.products.map(p => p.nameEn)).toEqual(['New Item']);
+    expect(en.errors).toEqual([expect.stringMatching(/Row 2 was skipped.*already exists on the menu/)]);
+    const ar = parseCSVMenu(csv, cats, 'ar', existing);
+    expect(ar.errors[0]).toMatch(/^تم تخطي الصف 2/);
+  });
+
+  it('does not treat the same name in a DIFFERENT category as a duplicate', () => {
+    const cats: Category[] = [
+      { id: 'cat-1', nameEn: 'Burgers', nameAr: 'برجر', sortOrder: 1 },
+      { id: 'cat-2', nameEn: 'Sides', nameAr: 'مقبلات', sortOrder: 2 },
+    ];
+    const r = parseCSVMenu(`${HEADER}\n${row('Fries', '', 'Sides')}`, cats, 'en', [{ categoryId: 'cat-1', nameEn: 'Fries' }]);
+    expect(r.errors).toEqual([]);
+    expect(r.products).toHaveLength(1);
+  });
+
+  it('skips a repeat of the same product inside the file, keeping the first', () => {
+    const r = parseCSVMenu(`${HEADER}\n${row('Twin')}\n${row('TWIN')}\n${row('Other')}`, []);
+    expect(r.products.map(p => p.nameEn)).toEqual(['Twin', 'Other']);
+    expect(r.errors).toEqual([expect.stringMatching(/Row 3 was skipped.*appears earlier in this file/)]);
+  });
+});
+
 describe('parseCSVMenu — what spreadsheets actually write', () => {
   const HEADER =
     'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url';

@@ -83,33 +83,52 @@ describe('storage path', () => {
 });
 
 describe('path recovery from a public URL', () => {
-  const base = `https://ref.supabase.co/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/`;
+  const PROJECT = 'https://ref.supabase.co';
+  const base = `${PROJECT}/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/`;
 
   it('recovers the path from a URL this bucket produced', () => {
-    expect(productImagePathFromUrl(`${base}products/u1.jpg`)).toBe('products/u1.jpg');
+    expect(productImagePathFromUrl(`${base}products/u1.jpg`, PROJECT)).toBe('products/u1.jpg');
   });
 
   it('drops a query string or fragment', () => {
-    expect(productImagePathFromUrl(`${base}products/u1.jpg?t=2`)).toBe('products/u1.jpg');
-    expect(productImagePathFromUrl(`${base}products/u1.jpg#x`)).toBe('products/u1.jpg');
+    expect(productImagePathFromUrl(`${base}products/u1.jpg?t=2`, PROJECT)).toBe('products/u1.jpg');
+    expect(productImagePathFromUrl(`${base}products/u1.jpg#x`, PROJECT)).toBe('products/u1.jpg');
   });
 
   it('returns null for a URL we do not own, so cleanup never deletes it', () => {
     // This is the important one: image_url may still hold a hand-pasted
     // external URL, and replacing that image must not try to delete somebody
     // else's object — nor an object in the BANNER bucket.
-    expect(productImagePathFromUrl('https://images.unsplash.com/photo-1568901346375')).toBeNull();
+    expect(productImagePathFromUrl('https://images.unsplash.com/photo-1568901346375', PROJECT)).toBeNull();
     expect(productImagePathFromUrl(
-      'https://ref.supabase.co/storage/v1/object/public/banner-images/banners/u.jpg',
+      'https://ref.supabase.co/storage/v1/object/public/banner-images/banners/u.jpg', PROJECT,
     )).toBeNull();
-    expect(productImagePathFromUrl(null)).toBeNull();
-    expect(productImagePathFromUrl(undefined)).toBeNull();
-    expect(productImagePathFromUrl('')).toBeNull();
+    expect(productImagePathFromUrl(null, PROJECT)).toBeNull();
+    expect(productImagePathFromUrl(undefined, PROJECT)).toBeNull();
+    expect(productImagePathFromUrl('', PROJECT)).toBeNull();
+  });
+
+  it('returns null for another host that merely contains the bucket marker (F-TAA4-005)', () => {
+    expect(productImagePathFromUrl(
+      `https://evil.example/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/products/u1.jpg`, PROJECT,
+    )).toBeNull();
+    expect(productImagePathFromUrl(
+      `https://evil.example/x?next=${base}products/u1.jpg`, PROJECT,
+    )).toBeNull();
+    expect(productImagePathFromUrl(
+      `https://ref.supabase.co.evil.example/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/products/u1.jpg`, PROJECT,
+    )).toBeNull();
+  });
+
+  it('fails closed when the project URL is unknown or malformed', () => {
+    expect(productImagePathFromUrl(`${base}products/u1.jpg`, undefined)).toBeNull();
+    expect(productImagePathFromUrl(`${base}products/u1.jpg`, '')).toBeNull();
+    expect(productImagePathFromUrl(`${base}products/u1.jpg`, 'not a url')).toBeNull();
   });
 
   it('returns null when the prefix is present but the path is empty', () => {
-    expect(productImagePathFromUrl(`${base}products/`)).toBeNull();
-    expect(productImagePathFromUrl(base)).toBeNull();
+    expect(productImagePathFromUrl(`${base}products/`, PROJECT)).toBeNull();
+    expect(productImagePathFromUrl(base, PROJECT)).toBeNull();
   });
 });
 
