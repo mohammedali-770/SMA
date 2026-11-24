@@ -17,6 +17,7 @@ import { getCSVTemplateData, parseCSVMenu } from '../../utils/calculations';
 import { Price } from '../Price';
 import { ADMIN_LOCALES } from './adminLocales';
 import { AdminModal } from './view/shared/AdminModal';
+import { deleteCategoryConfirmMessage, deleteProductConfirmMessage } from '../../lib/confirmCopy';
 
 const TH = 'px-4 py-3 text-start';
 const TD = 'px-4 py-2 align-middle';
@@ -554,7 +555,7 @@ export const MenuManagementPanel: React.FC = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => { if (confirm('Delete product?')) deleteProduct(p.id); }}
+                                onClick={() => { if (confirm(deleteProductConfirmMessage(isRTL))) deleteProduct(p.id); }}
                                 disabled={isAccountant}
                                 aria-label={isRTL ? 'حذف المنتج' : 'Delete product'}
                                 className={ICON_BTN}
@@ -624,7 +625,7 @@ export const MenuManagementPanel: React.FC = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => { if (confirm('Delete Category? All associated products will be disabled.')) deleteCategory(c.id); }}
+                              onClick={() => { if (confirm(deleteCategoryConfirmMessage(isRTL))) deleteCategory(c.id); }}
                               disabled={isAccountant}
                               aria-label={isRTL ? 'حذف الفئة' : 'Delete category'}
                               className={ICON_BTN}
