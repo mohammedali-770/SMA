@@ -3133,6 +3133,11 @@ the product) and the category-delete confirm (a category with products cannot be
 deleted). Check the cancel text reads as a plain statement of an irreversible
 refund, not as a question about whether to refund.
 
+The sign-out failure message (2026-11-24) is on the same list: «تعذّر تسجيل
+الخروج» with «تحقق من اتصالك وحاول مرة أخرى.» (English: "Could not sign out" /
+"Check your connection and try again."), shown by the customer app's Profile and
+delete-account screens and, in both languages at once, by the staff console.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

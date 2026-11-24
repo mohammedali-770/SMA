@@ -17,7 +17,7 @@
  */
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, BackHandler, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   canSubmitDeletion, chooseReverifyMethod, deletionStatusMessageKey, isDeletionLockedPhase,
@@ -50,7 +50,7 @@ const CONSEQUENCE_KEYS = [
 export function DeleteAccountScreen() {
   const styles = useStyles();
   const colors = useThemeColors();
-  const { t, lang, rtlRow } = useI18n();
+  const { t, pick, lang, rtlRow } = useI18n();
   const { signOut } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('checking');
@@ -147,9 +147,17 @@ export function DeleteAccountScreen() {
     // Sign-out ONLY after the request is accepted. Silence this device first so a
     // shared phone never keeps this account's push registration.
     try { await deactivateThisDevice(); } catch { /* best-effort */ }
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // Still signed in (the server call failed): allow Done to be pressed again
+      // instead of leaving for the login screen over a live session.
+      finishedRef.current = false;
+      Alert.alert(pick('Could not sign out', 'تعذّر تسجيل الخروج'), pick('Check your connection and try again.', 'تحقق من اتصالك وحاول مرة أخرى.'));
+      return;
+    }
     router.replace('/(auth)/login');
-  }, [signOut]);
+  }, [signOut, pick]);
 
   // After acceptance, sign out AUTOMATICALLY after a brief readable moment —
   // safety must not depend on the customer pressing Done. The DB-level lock is

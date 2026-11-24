@@ -360,7 +360,18 @@ export const auth = {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
   },
-  async signOut() { await supabase.auth.signOut(); },
+  /**
+   * supabase-js only clears the stored session when the server call succeeds or
+   * answers 401/403/404. On a network failure it returns `{ error }` and KEEPS the
+   * session, so ignoring that result left the AAL2 session stored while the
+   * screen showed the sign-in form, and a reload reopened the console with no
+   * password or code (audit finding F-TA3-001). Throw instead, so the caller can
+   * keep showing the truth: still signed in.
+   */
+  async signOut() {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
+  },
   /**
    * The signed-in user's profile row, or `null` when there is genuinely no row
    * for them.

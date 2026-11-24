@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**301 TypeScript test files declaring 4402 test blocks, plus 104 SQL suites.**
+**303 TypeScript test files declaring 4406 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -288,7 +288,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-136 files, 1850 declared test blocks.
+138 files, 1854 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -356,6 +356,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
 | `src/context/consoleLoadWiring.test.ts` | 9 | Lazywait monitor |
+| `src/context/signOutWiring.test.ts` | 2 | sign-out only resets the screen after the session really ended |
 | `src/context/staffInitialLoad.test.ts` | 5 | runStaffInitialLoad |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
 | `src/design-system/contrastContract.test.ts` | 12 | muted ink clears WCAG AA for normal text |
@@ -371,6 +372,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/adminPushApi.test.ts` | 7 | sendAdminPushConfirmation |
 | `src/lib/api.test.ts` | 8 | admin.deleteBranch |
 | `src/lib/auditGate.test.ts` | 26 | audit gate — the real 2026-11-18 web shape |
+| `src/lib/authSignOut.test.ts` | 2 | auth.signOut |
 | `src/lib/banners.test.ts` | 17 | selectActiveBanners |
 | `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
 | `src/lib/branchImport.test.ts` | 47 | splitRows |

@@ -1,7 +1,7 @@
 /** Profile hub: personal info, loyalty, preferences, social links and support. */
 import { router, useFocusEffect } from 'expo-router';
 import React from 'react';
-import { Linking, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, View } from 'react-native';
 import { AwardIcon, SignOutIcon } from '../../components/Icons';
 import { InstagramIcon, SnapchatIcon, TikTokIcon, WhatsAppIcon } from '../../components/SocialIcons';
 import { Screen } from '../../components/Screen';
@@ -86,7 +86,16 @@ export function ProfileScreen() {
   // It used to replace to /(auth)/login, which became a dead end once login
   // stopped being the only way in.
   const onSignOut = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // The session is still stored when the server call fails, so stay signed in
+      // and say so rather than showing the guest screen over a live session.
+      Alert.alert(
+        pick('Could not sign out', 'تعذّر تسجيل الخروج'),
+        pick('Check your connection and try again.', 'تحقق من اتصالك وحاول مرة أخرى.'),
+      );
+    }
   };
   const signedIn = status === 'signed_in';
   const signedOut = status === 'signed_out';
