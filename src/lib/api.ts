@@ -461,11 +461,53 @@ export interface UpsertIntegrationInput {
   publicConfig: Record<string, unknown>;
   /** Only send when the admin entered a NEW secret; omit/null keeps the stored one. */
   secretConfig?: Record<string, unknown> | null;
+  /**
+   * The `updated_at` of the row the admin's form was built from (`null` when the
+   * form was built with no row). The RPC overwrites `enabled`, `provider_name`
+   * and the whole `public_config`, so a form that is older than the row would
+   * silently undo someone else's change; the save is refused instead (F-X09-004).
+   */
+  expectedUpdatedAt: string | null;
 }
+/**
+ * Thrown by `integrations.upsert` when the row moved since the form was loaded.
+ * `latest` is the row as it is now, so the caller can show it rather than leave
+ * the admin looking at values that are no longer stored.
+ */
+export class IntegrationConflictError extends Error {
+  readonly latest: DbIntegrationSetting | null;
+  constructor(latest: DbIntegrationSetting | null) {
+    super(
+      'These settings were changed by someone else after this form was loaded. Nothing was saved. '
+      + 'The form now shows the current values; review them and save again if you still want your change.',
+    );
+    this.name = 'IntegrationConflictError';
+    this.latest = latest;
+  }
+}
+const sameInstant = (a: string | null, b: string | null): boolean => {
+  if (a === null || b === null) return a === b;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  return Number.isNaN(ta) || Number.isNaN(tb) ? a === b : ta === tb;
+};
 export const integrations = {
   /** Admin-only. Returns the non-secret projection (`has_secret` flag only). */
   list: async () => ok<DbIntegrationSetting[]>(await supabase.rpc('list_integration_settings')),
+  /**
+   * Compare-then-write. `upsert_integration_settings` has no version argument
+   * (and a migration is outside this change), so the check is made here against a
+   * fresh read immediately before the write. That closes the real exposure - a
+   * console tab that has sat open for minutes or hours - and leaves only the
+   * millisecond window between this read and the RPC, which needs a server-side
+   * `p_expected_updated_at` to close completely.
+   */
   async upsert(input: UpsertIntegrationInput): Promise<DbIntegrationSetting> {
+    const fresh = ok<DbIntegrationSetting[]>(await supabase.rpc('list_integration_settings'));
+    const current = fresh.find(r => r.provider_type === input.providerType) ?? null;
+    if (!sameInstant(current?.updated_at ?? null, input.expectedUpdatedAt)) {
+      throw new IntegrationConflictError(current);
+    }
     const rows = ok<DbIntegrationSetting[]>(await supabase.rpc('upsert_integration_settings', {
       p_provider_type: input.providerType,
       p_provider_name: input.providerName,
@@ -1304,9 +1346,22 @@ export const productImages = {
    * strictly better than failing the administrator's save.
    */
   async removeByUrl(url: string | null | undefined): Promise<void> {
-    const path = productImagePathFromUrl(url);
+    const path = productImagePathFromUrl(url, import.meta.env.VITE_SUPABASE_URL);
     if (!path) return;
-    try { await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]); } catch { /* orphan, not a failure */ }
+    try {
+      // Another row may point at the same object: a pasted URL reuses a photo.
+      // Deleting it would break that row's image, so look first, and when the
+      // look itself fails keep the file (an orphan costs kilobytes). The match is
+      // on the path, so a copy with a different query string still counts.
+      const pattern = `%${path}%`;
+      const [prod, banner] = await Promise.all([
+        supabase.from('products').select('id', { count: 'exact', head: true }).like('image_url', pattern),
+        supabase.from('homepage_banners').select('id', { count: 'exact', head: true }).like('image_url', pattern),
+      ]);
+      if (prod.error || banner.error) return;
+      if ((prod.count ?? 0) > 0 || (banner.count ?? 0) > 0) return;
+      await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]);
+    } catch { /* orphan, not a failure */ }
   },
 };
 
