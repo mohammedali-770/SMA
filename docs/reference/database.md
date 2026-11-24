@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **168**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261024120000_cash_order_input_match_expired_session_lookup.sql`.
+Migration files in the repository: **169**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261124130000_catalog_image_url_checks.sql`.
 
 ## Tables
 
@@ -47,7 +47,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `comp_member_audit` | `20260826090000_comp_members.sql` | 1 | 1 |
 | `comp_members` | `20260826090000_comp_members.sql` | 1 | 1 |
 | `coupons` | `20260707120400_coupons.sql` | 0 | 1 |
-| `homepage_banners` | `20260712130000_homepage_banners.sql` | 0 | 5 |
+| `homepage_banners` | `20260712130000_homepage_banners.sql` | 1 | 5 |
 | `integration_settings` | `20260707121000_integration_settings.sql` | 2 | **none declared** |
 | `integration_sync_logs` | `20260707121300_payments_and_sync.sql` | 0 | 1 |
 | `lazywait_catalog_items` | `20260708150000_lazywait_catalog_mapping.sql` | 1 | **none declared** |
@@ -83,7 +83,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `payment_records` | `20260707121300_payments_and_sync.sql` | 4 | 1 |
 | `product_modifier_groups` | `20260707120200_catalog.sql` | 0 | 1 |
 | `product_variants` | `20260824120000_product_variants.sql` | 0 | 4 |
-| `products` | `20260707120200_catalog.sql` | 3 | 3 |
+| `products` | `20260707120200_catalog.sql` | 4 | 3 |
 | `profiles` | `20260707120100_profiles.sql` | 2 | 2 |
 | `push_devices` | `20260714090000_push_notifications.sql` | 0 | 4 |
 | `role_change_audit` | `20260810140000_staff_role_administration.sql` | 0 | 1 |
@@ -208,7 +208,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `handle_new_user` | 4 | `20261005120000_server_input_bounds.sql` |
 | `has_active_account_deletion` | 1 | `20260715130000_account_deletion_lock.sql` |
 | `import_lazywait_addon_groups` | 1 | `20260826080000_import_lazywait_addon_groups.sql` |
-| `import_lazywait_catalog` | 3 | `20260826080000_import_lazywait_addon_groups.sql` |
+| `import_lazywait_catalog` | 4 | `20261124130000_catalog_image_url_checks.sql` |
 | `insert_order_from_snapshot` | 7 | `20261019120000_loyalty_points_reservation.sql` |
 | `invoke_account_deletion_processor` | 1 | `20260716180000_account_deletion_scheduler_job.sql` |
 | `invoke_admin_push_dispatch` | 1 | `20260928120000_admin_push_closure_notifications.sql` |
@@ -218,6 +218,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `is_admin` | 2 | `20260810142000_staff_mfa_aal2.sql` |
 | `is_branch_operator` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `is_call_center` | 1 | `20260820100500_ops_branch_scoping.sql` |
+| `is_https_image_url` | 1 | `20261124130000_catalog_image_url_checks.sql` |
 | `is_ops_operator` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `is_staff` | 2 | `20260810142000_staff_mfa_aal2.sql` |
 | `jwt_has_aal2` | 1 | `20260810142000_staff_mfa_aal2.sql` |

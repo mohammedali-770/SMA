@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**317 TypeScript test files declaring 4560 test blocks, plus 105 SQL suites.**
+**318 TypeScript test files declaring 4565 test blocks, plus 106 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -61,6 +61,7 @@ The same job ends with `.github/sql-ci/existing-data.sh`: the change's migration
 - `supabase/tests/cancelled_orders_guard_test.sql`
 - `supabase/tests/cash_order_input_match_test.sql`
 - `supabase/tests/catalog_delete_open_checkout_guard_test.sql`
+- `supabase/tests/catalog_image_url_checks_test.sql`
 - `supabase/tests/checkout_preview_parity_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/checkout_session_input_match_test.sql`
@@ -170,7 +171,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-113 files, 1503 declared test blocks.
+114 files, 1508 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -214,6 +215,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/view/paymentStatusDialog.test.tsx` | 5 | payment dialog actions |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 19 | decideNavigation — allow (Moyasar hosted page and 3-D Secure) |
 | `apps/mobile/src/features/menu/bannerFetchOwnership.test.ts` | 5 | banner fetch ownership |
+| `apps/mobile/src/features/menu/bannerRoute.test.ts` | 5 | bannerHref |
 | `apps/mobile/src/features/menu/categoryFocus.test.ts` | 17 | categoryFocusReducer |
 | `apps/mobile/src/features/menu/menuSections.test.ts` | 27 | menuItemKey (branch-selection crash regression) |
 | `apps/mobile/src/features/notifications/languageSyncWiring.test.ts` | 15 | syncDeviceLang sends the new language through register_push_device with the stored preferences |
