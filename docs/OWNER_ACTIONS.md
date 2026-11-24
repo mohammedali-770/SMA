@@ -3138,6 +3138,21 @@ The sign-out failure message (2026-11-24) is on the same list: «تعذّر تس
 "Check your connection and try again."), shown by the customer app's Profile and
 delete-account screens and, in both languages at once, by the staff console.
 
+Four more staff-console Arabic strings of the same date are engineering-drafted
+and belong on the same read. The legal-documents editor now labels its
+acceptance control «يتطلب الموافقة (غير مُفعّل بعد)» with the caption «التطبيق لا
+يطلب من العميل الموافقة ولا يسجّلها حالياً، لذلك لا يغيّر هذا الخيار شيئاً.»
+(English: "Requires acceptance (not enforced yet)" / "The app does not ask
+customers to accept, or record acceptance, yet — this setting changes nothing."),
+because nothing reads that column. The product-sales report shows «فئة غير
+معروفة» ("Unknown category") for a line whose product or category no longer
+exists. The CSV menu import reports a skipped duplicate row as «تم تخطي الصف N:
+«…» موجود أصلاً في المنيو ضمن التصنيف «…».» or, for a repeat inside the file,
+«… مكرر في هذا الملف ضمن التصنيف «…».» (English: "Row N was skipped: … already
+exists on the menu / already appears earlier in this file under …"). The
+integration cards' refusal of a stale save is English-only, like the rest of
+that screen.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

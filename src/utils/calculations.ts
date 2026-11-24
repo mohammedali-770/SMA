@@ -308,6 +308,14 @@ const MENU_CSV_TEXT = {
       `عدد الأعمدة في الصف ${row} هو ${count}، بينما في النموذج ${MENU_CSV_COLUMNS} أعمدة. ` +
       'الفاصلة داخل الخلية يجب أن تكون بين علامتي اقتباس، والحفظ من Excel بصيغة «CSV UTF-8» يفعل ذلك تلقائياً.',
   }),
+  duplicate: (row: number, name: string, category: string, inFile: boolean) => ({
+    en: inFile
+      ? `Row ${row} was skipped: "${name}" already appears earlier in this file under "${category}".`
+      : `Row ${row} was skipped: "${name}" already exists on the menu under "${category}".`,
+    ar: inFile
+      ? `تم تخطي الصف ${row}: «${name}» مكرر في هذا الملف ضمن التصنيف «${category}».`
+      : `تم تخطي الصف ${row}: «${name}» موجود أصلاً في المنيو ضمن التصنيف «${category}».`,
+  }),
   badCalories: (row: number, raw: string) => ({
     en:
       `Row ${row} has an invalid calories value: "${raw}". ` +
@@ -333,6 +341,7 @@ export function parseCSVMenu(
   csvText: string,
   existingCategories: Category[],
   lang: 'en' | 'ar' = 'en',
+  existingProducts: readonly Pick<Product, 'categoryId' | 'nameEn'>[] = [],
 ): {
   categories: Category[];
   products: Product[];
@@ -341,6 +350,13 @@ export function parseCSVMenu(
   const products: Product[] = [];
   const newCategories: Category[] = [...existingCategories];
   const errors: string[] = [];
+  // A product is the same product when its English name matches within the same
+  // category, ignoring case and spacing - the rule categories already use.
+  // Nothing was matched before, so re-importing a sheet, or one that overlapped
+  // the Lazywait catalog, put every item on the live menu a second time.
+  const dupKey = (categoryId: string, nameEn: string) => `${categoryId}\u0000${nameEn.trim().toLowerCase()}`;
+  const onMenu = new Set(existingProducts.map(p => dupKey(p.categoryId, p.nameEn)));
+  const inFile = new Set<string>();
   const refuse = (message: string) => {
     errors.push(message);
     return { categories: newCategories, products, errors };
@@ -401,7 +417,12 @@ export function parseCSVMenu(
     const descAr = cells[5];
     const priceRaw = cells[6];
     const caloriesRaw = cells[7] ?? '';
-    const imageUrl = cells[8] || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
+    // An empty image cell stays empty. It used to become a stock BURGER photo,
+    // so the template's own orange-juice row went live with a burger on it. The
+    // menu renders a neutral dish icon for a product with no image, which is
+    // honest; a confidently wrong photo is not (see handleSaveProduct, which
+    // dropped the same default for hand-typed products).
+    const imageUrl = cells[8] ?? '';
 
     if (!catNameEn || !catNameAr || !prodNameEn || !prodNameAr || !priceRaw) {
       errors.push(`Row ${i + 1} contains missing required fields.`);
@@ -441,6 +462,13 @@ export function parseCSVMenu(
       newCategories.push(category);
     }
 
+    const key = dupKey(category.id, prodNameEn);
+    if (onMenu.has(key) || inFile.has(key)) {
+      errors.push(MENU_CSV_TEXT.duplicate(i + 1, prodNameEn, category.nameEn, !onMenu.has(key))[lang]);
+      continue;
+    }
+    inFile.add(key);
+
     const prodId = generateId('prod-csv');
     const newProduct: Product = {
       // CSV import carries a single price per row, so no tiers.
@@ -457,7 +485,7 @@ export function parseCSVMenu(
       descriptionAr: descAr,
       price,
       calories,
-      imageUrl: imageUrl || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
+      imageUrl,
       isActive: true,
       modifierGroupIds: ['mg-heat-level'] // default heat level modifier group assigned
     };

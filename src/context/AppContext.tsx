@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 import {
   auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi,
   admin as adminApi, integrations as integrationsApi,
-  DbIntegrationSetting, UpsertIntegrationInput, ORDERS_POLL_LIMIT,
+  DbIntegrationSetting, UpsertIntegrationInput, IntegrationConflictError, ORDERS_POLL_LIMIT,
 } from '../lib/api';
 import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, mapDeliveryZone, buildAvailabilityMatrix,
@@ -171,7 +171,8 @@ interface AppContextType {
   updateCategory: (id: string, nameEn: string, nameAr: string) => void;
   deleteCategory: (id: string) => void;
   addProduct: (product: Omit<Product, 'id'>) => void;
-  updateProduct: (product: Product) => void;
+  /** Resolves true once the write succeeded, false if it was refused (the error is in `writeError`). */
+  updateProduct: (product: Product) => Promise<boolean>;
   deleteProduct: (id: string) => void;
   /** Earn-side loyalty exclusion. Narrow by design — see adminApi. */
   setProductEarnsPoints: (id: string, earns: boolean) => void;
@@ -466,7 +467,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const saveIntegration = useCallback(async (input: UpsertIntegrationInput): Promise<DbIntegrationSetting> => {
-    const row = await integrationsApi.upsert(input);
+    let row: DbIntegrationSetting;
+    try {
+      row = await integrationsApi.upsert(input);
+    } catch (e) {
+      // A refused stale save: keep the list on the row that is stored now.
+      if (e instanceof IntegrationConflictError && e.latest) {
+        const latest = e.latest;
+        setIntegrationSettings(prev => prev.map(r => (r.provider_type === latest.provider_type ? latest : r)));
+      }
+      throw e;
+    }
     setIntegrationSettings(prev => {
       const exists = prev.some(r => r.provider_type === row.provider_type);
       return exists ? prev.map(r => (r.provider_type === row.provider_type ? row : r)) : [...prev, row];
@@ -1111,13 +1122,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
-  const updateProduct = (p: Product) => {
-    void (async () => {
-      try {
-        await adminApi.updateProduct(p.id, productToDbUpdate(p));
-        await refreshCatalog();
-      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
-    })();
+  const updateProduct = async (p: Product): Promise<boolean> => {
+    try {
+      await adminApi.updateProduct(p.id, productToDbUpdate(p));
+    } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); return false; }
+    // The row is saved; a failed refresh must not read as a failed save.
+    try { await refreshCatalog(); } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
+    return true;
   };
   // Narrow and explicit; see adminApi.setProductEarnsPoints. Refreshes the
   // catalog afterwards so the table shows what the server stored rather than

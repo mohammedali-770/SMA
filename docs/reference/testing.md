@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**305 TypeScript test files declaring 4438 test blocks, plus 105 SQL suites.**
+**309 TypeScript test files declaring 4469 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -289,7 +289,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-138 files, 1854 declared test blocks.
+142 files, 1885 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -300,15 +300,17 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
 | `src/components/admin/CompMembersPanel.test.tsx` | 13 | CompMembersPanel |
 | `src/components/admin/CouponsPanel.test.tsx` | 24 | the standing answer to |
-| `src/components/admin/IntegrationCard.payment.test.tsx` | 5 | payment card |
+| `src/components/admin/IntegrationCard.payment.test.tsx` | 7 | payment card |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LazywaitPanel.test.tsx` | 7 | LazywaitPanel |
+| `src/components/admin/LegalDocumentsPanel.test.tsx` | 1 | requires-acceptance control |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
-| `src/components/admin/MenuManagementPanel.test.tsx` | 20 | product price validation — the money contract |
+| `src/components/admin/MenuManagementPanel.image.test.tsx` | 4 | old product image cleanup |
+| `src/components/admin/MenuManagementPanel.test.tsx` | 21 | product price validation — the money contract |
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 14 | against the payment-test-config deployed before Moyasar |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
@@ -390,6 +392,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/imageUpload.test.ts` | 21 | fitWithin |
 | `src/lib/immutableAssetNames.test.ts` | 3 | findUnhashedAssets |
 | `src/lib/integrationProvider.test.ts` | 4 | initialProviderName |
+| `src/lib/integrationsUpsertStale.test.ts` | 6 | integrations.upsert stale-form guard |
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
@@ -416,12 +419,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/paymentGatewayApi.test.ts` | 5 | paymentGateway.testCheckoutResult |
 | `src/lib/picomatchReachability.test.ts` | 5 | GHSA-fc5q-39xc-vjpf: the bundle scan can see picomatch |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
-| `src/lib/productImages.test.ts` | 19 | product image type gate |
+| `src/lib/productImages.test.ts` | 21 | product image type gate |
+| `src/lib/productImagesRemove.test.ts` | 5 | productImages.removeByUrl |
 | `src/lib/pwa/adminPushState.test.ts` | 9 | resolveAdminPushState |
 | `src/lib/pwa/pushSubscription.test.ts` | 13 | urlBase64ToUint8Array |
 | `src/lib/pwa/pushSupport.test.ts` | 16 | pushReadiness |
 | `src/lib/pwa/serviceWorkerPush.test.ts` | 21 | sw.js — push handler |
-| `src/lib/reports.test.ts` | 8 | buildCouponUsage |
+| `src/lib/reports.test.ts` | 12 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/sessionPersistence.test.ts` | 3 | supabase client session persistence |
 | `src/lib/staleAssetRecovery.test.ts` | 15 | failedAssetUrl |
@@ -429,7 +433,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/vercelConfig.test.ts` | 13 | vercel.json is expressible by this model |
 | `src/lib/webBudget.test.ts` | 8 | startupFontNames |
-| `src/utils/calculations.test.ts` | 64 | getVATBreakdown |
+| `src/utils/calculations.test.ts` | 70 | getVATBreakdown |
 | `src/utils/csvReader.test.ts` | 15 | readCsv — fields and records |
 
 ### `supabase/functions/`

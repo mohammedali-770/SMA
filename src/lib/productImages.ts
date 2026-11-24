@@ -58,19 +58,36 @@ export function planProductImageUpload(input: Size & { bytes: number }): UploadP
 }
 
 /**
- * The storage path for a public URL previously produced by this bucket, or null
- * when the URL did not come from here.
+ * The storage path for a public URL previously produced by THIS project's
+ * bucket, or null when the URL did not come from here.
  *
  * Used to clean up the old object when an image is replaced. It returns null for
  * a hand-pasted external URL (Unsplash, a supplier's CDN), which is the point:
  * `image_url` is still allowed to hold any URL, and we must never attempt to
  * delete something we do not own.
+ *
+ * "From here" means the URL's ORIGIN is the project's own (`projectUrl`, the
+ * Supabase URL the console talks to) and the bucket marker is the start of its
+ * path. The marker used to be matched anywhere in any string, so a pasted URL on
+ * another host that merely contained it resolved to a path in our bucket
+ * (F-TAA4-005). With no `projectUrl` the answer is null: fail closed.
  */
-export function productImagePathFromUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
+export function productImagePathFromUrl(
+  url: string | null | undefined,
+  projectUrl: string | null | undefined,
+): string | null {
+  if (!url || !projectUrl) return null;
+  let parsed: URL;
+  let project: URL;
+  try {
+    parsed = new URL(url);
+    project = new URL(projectUrl);
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== project.origin) return null;
   const marker = `/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/`;
-  const at = url.indexOf(marker);
-  if (at < 0) return null;
-  const path = url.slice(at + marker.length).split(/[?#]/)[0];
+  if (!parsed.pathname.startsWith(marker)) return null;
+  const path = parsed.pathname.slice(marker.length);
   return path.startsWith('products/') && path.length > 'products/'.length ? path : null;
 }
