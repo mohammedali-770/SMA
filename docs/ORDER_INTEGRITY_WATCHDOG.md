@@ -365,6 +365,16 @@ alert-eligible until the suppression expires.
 - `healthy` — cron active, a success within 4 min, zero unresolved critical and
   zero unresolved warning incidents.
 
+**Stranded orders are a `failing` cause with no incident row.** Since
+`20260810113000`, any non-cancelled blocked or dead-letter Lazywait order (other
+than the deliberate `delivery_schema_unconfirmed` gate) makes `overall_state`
+`failing` on its own, so the card can be red over `Open Critical 0`. The summary
+therefore returns `stranded_order_count`, `stranded_dead_letter_count`,
+`stranded_missing_mapping_count` and `oldest_stranded_order_at`, and the Overall
+State tile prints them as a line (`stranded orders N (dead-letter D, missing
+mapping M) · oldest Xh`, danger-toned when N > 0). A payload without the field,
+from a database older than that migration, prints no line rather than a zero.
+
 **Unresolved-active counting (Acknowledge ≠ Fixed).** `open_critical_count` /
 `open_warning_count` count every **non-resolved** incident of that severity —
 `open` + `acknowledged` + `suppressed`. Acknowledging means "seen", and suppress
