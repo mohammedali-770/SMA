@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**313 TypeScript test files declaring 4531 test blocks, plus 105 SQL suites.**
+**313 TypeScript test files declaring 4532 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -438,7 +438,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-58 files, 1155 declared test blocks.
+58 files, 1156 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -486,7 +486,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
-| `supabase/functions/_shared/pushStaleAudienceCopy.test.ts` | 16 | pos_sync: a queued message that has gone stale is closed, not sent |
+| `supabase/functions/_shared/pushStaleAudienceCopy.test.ts` | 17 | pos_sync: a queued message that has gone stale is closed, not sent |
 | `supabase/functions/_shared/rest.test.ts` | 42 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
 | `supabase/functions/_shared/smtpTarget.test.ts` | 27 | parseSmtpTarget |

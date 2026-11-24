@@ -197,16 +197,27 @@ describe('pos_sync: a queued message that has gone stale is closed, not sent', (
 
   it('the cut-off sits just past 30 minutes', async () => {
     const inside = seed(29 * MINUTE);
-    const outside = seed(31 * MINUTE, 'pos_failed');
+    const outside = seed(31 * MINUTE);
     expect(
       (await call({ action: 'pos_sync', orderId: inside.orderId, status: 'pos_confirmed' }, 'service')).body
         .status,
     ).toBe('ok');
     expect(
-      (await call({ action: 'pos_sync', orderId: outside.orderId, status: 'pos_failed' }, 'service')).body
+      (await call({ action: 'pos_sync', orderId: outside.orderId, status: 'pos_confirmed' }, 'service')).body
         .status,
     ).toBe('superseded');
   });
+
+  it.each(['pos_failed', 'pos_confirmation_required', 'pos_retrying'] as const)(
+    'a %s message that waited out an outage is still sent: it is claimed against the order\'s current state, not its age',
+    async (posStatus) => {
+      const { orderId, row } = seed(3 * 24 * 60 * MINUTE, posStatus);
+      const res = await call({ action: 'pos_sync', orderId, status: posStatus }, 'service');
+      expect(res.body).toMatchObject({ status: 'ok', send_status: 'sent', sent: 1 });
+      expect(row.send_status).toBe('sent');
+      expect(expo).toHaveLength(1);
+    },
+  );
 
   it('a row with no readable age is NOT treated as stale (fails open, as before)', async () => {
     const { orderId, row } = seed(null);

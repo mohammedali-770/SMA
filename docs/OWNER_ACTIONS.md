@@ -5886,7 +5886,7 @@ request is in flight; fixing that needs a migration and is not part of this.
 
 | Function | Change | Customer-visible? |
 | --- | --- | --- |
-| `push-dispatch` | A queued POS-outcome message older than 30 minutes is closed as `superseded` instead of sent (F-X08-002); a pickup order's `delivered` push now says «Collected» / «تم الاستلام» (F-X08-004); the broadcast audience change above | Yes: live customer messaging |
+| `push-dispatch` | A queued "Order confirmed" (`pos_confirmed`) older than 30 minutes is closed as `superseded` instead of sent (F-X08-002); the failure and verification messages are still sent however late; a pickup order's `delivered` push now says «Collected» / «تم الاستلام» (F-X08-004); the broadcast audience change above | Yes: live customer messaging |
 | `lazywait-sync` | Its push drain counts a dispatch only when push-dispatch answered `ok`, not every HTTP 200, `disabled` included; the customer's own note on a ticket is labelled (F-X10-001) | Kitchen tickets, staff-facing |
 | `operations-alert-dispatch`, `email-test-config` | The From name, From email and reply-to are refused if they carry a line break, control character or angle bracket (F-EFN-03-012, F-X10-003) | No: alert mail is off |
 
@@ -5906,11 +5906,14 @@ request is in flight; fixing that needs a migration and is not part of this.
 5. **Have the Arabic read** in §35 (the pickup title is customer-facing).
 
 **One behaviour to know about.** Turning the push master flag off for an
-incident now has a bounded cost: queued POS-outcome messages that wait out more
-than 30 minutes are dropped on turning it back on, which is the point (a
-customer is not told "Order confirmed" about yesterday's order). A message that
-mattered and was dropped, say an order that failed during the outage, is one the
-branch will already be handling by hand.
+incident now has a bounded cost: a queued "Order confirmed" that waits out more
+than 30 minutes is dropped on turning it back on, which is the point (a
+customer is not told "Order confirmed" about yesterday's order). Only that one
+is closed by age. "Order not confirmed", "Verifying your order" and "Confirming
+your order" are claimed against the order's CURRENT sync state, so one whose state
+has moved on is superseded by the claim, and one that still holds is sent however
+late: the customers an outage hurt most still hear that their order failed
+(review finding on this PR).
 
 **Done looks like:** `push-dispatch` and `lazywait-sync` redeployed with the
 versions recorded here; a pickup order marked delivered pushes «Collected»; a

@@ -76,7 +76,7 @@ const MAX_SEND_ATTEMPTS = 5;
 // on Expo I/O and double-send (review finding). 10 min > 400s, so an expired
 // lease is provably a dead owner.
 const PROCESSING_LEASE_MS = 10 * 60_000;
-// A queued POS-outcome message is only worth sending while it is still news
+// A queued "Order confirmed" is only worth sending while it is still news
 // (F-X08-002). The producers enqueue the moment something happens and the drain
 // runs every minute, so a healthy row is dispatched within a couple of minutes.
 // A row older than this was held back by something else: the master flag was
@@ -87,6 +87,14 @@ const PROCESSING_LEASE_MS = 10 * 60_000;
 // 'superseded', the terminal no-send state the claim already writes for an event
 // that no longer holds. 30 minutes is three times the 10-minute POS deadline
 // (pos_sync_deadline_at), so no message about a live order is ever this old.
+//
+// ONLY `pos_confirmed` IS CLOSED BY AGE. The other three (`pos_retrying`,
+// `pos_confirmation_required`, `pos_failed`) are claimed against the order's
+// CURRENT sync state, so a row whose state has moved on is superseded by the
+// claim itself, and one whose state still holds is still true and still
+// something the customer needs to read: "Order not confirmed" is exactly the
+// message that must reach them after an outage, however late. Dropping them by
+// age would silence the customers an outage hurt most.
 const POS_SYNC_MAX_AGE_MS = 30 * 60_000;
 // Account-deletion requests that are still in flight, i.e. the customer has
 // asked to be erased and erasure has not finished. Same six values as the
@@ -634,7 +642,7 @@ Deno.serve(async (req: Request) => {
       .select('id, customer_id, status').eq('id', orderId).maybeSingle();
     if (!order) return json({ error: 'order not found' }, 404);
 
-    // A STALE event is closed, not sent (F-X08-002). The claim below decides by
+    // A STALE "Order confirmed" is closed, not sent (F-X08-002). The claim below decides by
     // the order's CURRENT sync state and never looks at how old the event is, so
     // after the master flag had been off for a while every queued row would go out
     // as the flag came back. Read the event's age first; close it under the
@@ -648,7 +656,7 @@ Deno.serve(async (req: Request) => {
       .eq('send_status', 'pending')
       .maybeSingle();
     const queuedAt = queued?.created_at ? Date.parse(String(queued.created_at)) : NaN;
-    if (Number.isFinite(queuedAt) && Date.now() - queuedAt > POS_SYNC_MAX_AGE_MS) {
+    if (status === 'pos_confirmed' && Number.isFinite(queuedAt) && Date.now() - queuedAt > POS_SYNC_MAX_AGE_MS) {
       await admin.from('notification_log')
         .update({ send_status: 'superseded', updated_at: new Date().toISOString() })
         .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
