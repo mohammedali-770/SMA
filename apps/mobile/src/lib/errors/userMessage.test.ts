@@ -166,4 +166,30 @@ describe('card checkout session refusals from begin_checkout_session', () => {
     expect(sql).toContain("raise exception 'checkout_session_mismatch: payment_open'");
     expect(sql).toContain("raise exception 'checkout_session_mismatch: order_placed'");
   });
+
+  // Audit F-D1-001 / F-D1-003 (20261024120000): the cash wrapper and the card
+  // lookup raise the SAME two sentences, so every installed build already
+  // translates them. If either were reworded, a customer would see the generic
+  // apology instead of "an order was already placed" / "a payment is open".
+  it('maps the refusals the 20261024120000 migration adds, without a new sentence', () => {
+    const sql = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../supabase/migrations/20261024120000_cash_order_input_match_expired_session_lookup.sql',
+      ),
+      'utf8',
+    );
+    // place_customer_order (cash) refuses a changed retry as an order already placed.
+    expect(sql).toContain("raise exception 'checkout_session_mismatch: order_placed'");
+    // begin_checkout_session waits for an expired session's open payment, and
+    // still refuses different inputs, with the existing payment_open sentence.
+    const payOpen = sql.match(/raise exception 'checkout_session_mismatch: payment_open'/g) ?? [];
+    expect(payOpen.length).toBeGreaterThanOrEqual(2);
+    expect(describeFailure(new Error('checkout_session_mismatch: order_placed')).kind).toBe(
+      'checkout_session_placed',
+    );
+    expect(describeFailure(new Error('checkout_session_mismatch: payment_open')).kind).toBe(
+      'checkout_session_open',
+    );
+  });
 });

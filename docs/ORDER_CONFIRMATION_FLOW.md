@@ -54,7 +54,13 @@ checkout shows it in the customer's language (`userMessage.ts`):
 | more than 50 of one item on a line | *order_items_quantity_max: at most 50 of one item per order line.* (SQLSTATE 23514) | `errOrderQuantityLimit` |
 
 A retry with the idempotency key of an order that already exists still returns
-that order. The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in
+that order **when it asks for the same thing**. From `20261024120000` (written,
+not applied) `place_customer_order` compares the retry's branch, order type,
+address, coupon, notes, points and items with those the order was placed with
+(a stored sha256, `order_input_fingerprints`) and refuses a different retry with
+`checkout_session_mismatch: order_placed` instead of showing success for the old
+order (audit F-D1-001); orders placed before that file are replayed as before.
+The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in
 `MIGRATIONS.md` §57. These cover cash orders only: the online checkout-session
 path does not go through `place_customer_order`.
 
