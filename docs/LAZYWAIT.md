@@ -289,6 +289,14 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    menu from the cache — one product per item, one `product_variants` row per
    price. "Replace" semantics: anything absent from the latest pull is
    DEACTIVATED, never deleted, so order-history FKs survive.
+   **Images (from `20261124130000`, F-X10-002):** the POS `photo` fills a
+   product's image only while it is EMPTY and only when it is a plain https URL;
+   it never replaces an image already there (an upload to the product-images
+   bucket or a URL an administrator pasted), because nothing records where an
+   image came from. A later change of the photo in the POS therefore does not
+   reach a product that already has one; clear the image in the console to take
+   the POS's. A `photo` that is not https is ignored rather than aborting the
+   import.
 
 ### What the pull actually returns, and the bug it hid
 

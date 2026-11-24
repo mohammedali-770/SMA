@@ -44,6 +44,7 @@ import { mapBanner } from '../../lib/mappers';
 import { color, radius, space } from '../../design-system/generated/tokens';
 import type { HomeBanner } from '../../types/models';
 import { makeStyles } from '../../theme/makeStyles';
+import { bannerHref } from './bannerRoute';
 
 const ROTATE_MS = 4000;
 const RATIO = 6 / 16; // height = width * 6/16 (~2.67:1) — short banner.
@@ -120,7 +121,9 @@ export function BannerCarousel({ banners, inset = true }: {
   const onImgError = (id: string) => setFailed((f) => ({ ...f, [id]: true }));
 
   const onTap = (b: HomeBanner) => {
-    if (b.actionType === 'product' && b.actionValue) router.push(`/product/${b.actionValue}`);
+    // Only a product UUID becomes a route (F-X10-002); see ./bannerRoute.
+    const href = bannerHref(b);
+    if (href) router.push(href);
     // 'category' / 'none' -> no navigation (kept intentionally simple).
   };
 
@@ -167,7 +170,7 @@ function BannerImage({
   banner: HomeBanner; width: number; height: number;
   onError: (id: string) => void; onPress: (b: HomeBanner) => void;
 }) {
-  const tappable = banner.actionType === 'product' && !!banner.actionValue;
+  const tappable = bannerHref(banner) !== null;
   return (
     <Pressable onPress={() => onPress(banner)} disabled={!tappable} style={{ width, height }} accessibilityRole={tappable ? 'button' : 'image'}>
       <Image

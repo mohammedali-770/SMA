@@ -1824,6 +1824,7 @@ production.
 | 127 | 20261020120000 | checkout_session_input_match | `4df49c5593d2` | 20261122071547 | checkout_session_input_match | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-22 07:15:47 UTC** on explicit owner approval ("apply 20261020120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **170 → 171**. §74. Merged in #515 as `a56b3f8`. The SQL sent is the whole merged file (sha256 `4df49c55…`, 477 lines / 25 520 bytes), comments included. **Before, read live:** `begin_checkout_session` exactly the pre-image (`md5(prosrc)` `1cc3338f…` / 6 408, `pg_get_functiondef` `11931d25…`), one overload, the column absent, **0 live pending checkout sessions**. **After, read live:** the stored body equals the post-image pre-computed from the merged file (`bb7292aa…` / 9 228, `5e274a8d…`); `checkout_sessions.input_fingerprint` is `text`, nullable, and no existing row has a value (27 sessions, none fingerprinted); SECURITY DEFINER with `search_path=public`; anon cannot execute it, authenticated can; `begin_session_attempt`, `insert_order_from_snapshot`, `finalize_checkout_session`, `place_order` and `compute_order_snapshot` hash as they did before this file. **The file's header said online payment was off in Production; the live read showed `app_settings.online_payment_enabled` = `true`.** That made no difference here (nothing live to match), and `docs/PAYMENTS.md` §1 is updated with the finding. The app half still ships only with the next EAS build. Text outside the stored body cannot be verified after the fact. Original description follows. **WRITTEN 2026-11-22, UNAPPLIED.** §74. Audit F-X02-001 (high): `begin_checkout_session` reused a live or settled session for the same key whatever the call asked for, so a changed order type, branch, address, coupon, points or notes was invoiced at the OLD total and produced the OLD order. Adds `checkout_sessions.input_fingerprint`; the lookup reuses only on a matching fingerprint, retires a `pending_payment` session whose attempts are all dead to `expired` and prices a new one, and otherwise raises `checkout_session_mismatch: payment_open` / `order_placed` (P0001). An unknown branch is refused before the lookup. Redefines `begin_checkout_session` only. No row written, grants re-stated unchanged. No deploy implied; the app half ships in an EAS build. **MONEY PATH UNTOUCHED** (`place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `finalize_checkout_session`, `begin_session_attempt` asserted unmoved against pre-images read by the file). Replace this row when the file is applied. |
 | 128 | 20261022120000 | pos_resend_refund_guards | `21229514999b` | 20261122064937 | pos_resend_refund_guards | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-22 06:49:37 UTC** on explicit owner approval ("apply 20261022120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **168 → 169**. §75. Merged in #516 as `a7a7e10`. The SQL sent is the whole merged file (sha256 `21229514999b…`, 890 lines / 49 914 bytes), comments included. **Before, read live:** the four prerequisites present by name (`20261114172737`, `20261118045145`, `20261118055554`, `20261119051739`), all five pre-images exact (the four replaced bodies and `set_order_refund_enrollment`'s markers), one `claim_order_refund`, no guard function or trigger, money-path pair `12b6816d…` / `22e2d429…`. **After, read live:** all five stored bodies equal hashes pre-computed from the merged file BEFORE sending (`begin_lazywait_create_attempt` `73b44b2c…` / 3 144, `claim_order_refund` `782e584c…` / 1 731, `guard_order_progress_refund` `6f1511e5…` / 1 039, `request_customer_pos_resend` `6a1bc2be…` / 4 212, `requeue_lazywait_order` `3cf675f3…` / 2 627), one overload each; `set_orders_refund_progress_guard` enabled; anon cannot execute any, authenticated only the two client RPCs; the file's rolled-back probe left 0 orders and 0 branches; money-path pair unchanged. **No refund was pending or processing on any order** at the time, so nothing was held back. Text outside the stored bodies cannot be verified after the fact. Original description follows. **WRITTEN 2026-11-22, UNAPPLIED.** §75. Audit findings F-X04-001, F-X03-002, F-X04-002 (high, confirmed). `begin_lazywait_create_attempt` refuses and parks an order with any refund lifecycle (`refund_started`) or one already ready, out for delivery or delivered (`order_progressed`); `request_customer_pos_resend` refuses an order whose status left `received` (`order_in_progress`); `requeue_lazywait_order` refuses any refund lifecycle and any status but `received`; `claim_order_refund` takes a refund only while its order is `received` or `cancelled`; new BEFORE trigger `set_orders_refund_progress_guard` undoes the POS-failure enrolment on a progressed order and refuses any status change but cancelling while a refund is pending, processing or refunded. No signature, no row written, no grant widened. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
 | 129 | 20261024120000 | cash_order_input_match_expired_session_lookup | `27b7e98e878b` | 20261124061110 | cash_order_input_match_expired_session_lookup | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-24 06:11:10 UTC** on explicit owner approval ("apply 20261024120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **173 → 174**. §76. Merged in #528 as `860418f`, tree identical to the reviewed head `f123f1b`. The SQL sent is the whole merged file (sha256 `27b7e98e…`, 1 097 lines / 62 268 bytes), comments included. **Before, read live:** history 173, latest `20261122072301`, no row of this name; one overload each of `begin_checkout_session` (`5e274a8d…`) and `place_customer_order` (`971aa034…`), both EXACTLY the pre-images the file expects, which settles the live `place_customer_order` pre-image the PR could not read; no `checkout_input_fingerprint`, no `order_input_fingerprints`; money-path `place_order` `7078c7dd…` / `compute_order_snapshot` `22e2d429…`. **After, read live:** `begin_checkout_session` `6bbcfb65…`, `place_customer_order` `4a0a4acc…` and `checkout_input_fingerprint` `f3639416…`, each equal to the value measured on the local chain and recorded in the PR; `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot` (`da9e57fe…`) unchanged; one overload each; the helper executable by `service_role` only; `anon` cannot execute either replaced function and `authenticated` can; `order_input_fingerprints` has RLS on, no policy, no `anon`/`authenticated` privilege, and 0 rows; 104 orders, unchanged; the payment row is still `moyasar`, enabled. The file's own verification block (reverse-edit hashes, 25 statement clauses, both functions called through to their refusals, the six unmoved hashes) ran in the same call and passed. Text outside the stored bodies (the header comments) cannot be verified after the fact. Nothing is left to deliver: no function, app or deploy change goes with it, and every installed build already maps both refusal sentences. Original description follows. **WRITTEN 2026-11-24, UNAPPLIED.** §76. Audit F-D1-001 and F-D1-003 (both medium). F-D1-001: a cash retry under the same idempotency key with DIFFERENT inputs was answered with the old order; `place_customer_order` now compares a stored fingerprint (`order_input_fingerprints`, new, closed to clients) and refuses with `checkout_session_mismatch: order_placed`, replaying only an identical retry or an order that has no fingerprint. F-D1-003: `begin_checkout_session` skipped an EXPIRED session whose attempt could still be paid, so the same inputs opened a second invoice; its lookup now finds such a session and raises `checkout_session_mismatch: payment_open`. New function `checkout_input_fingerprint` (the 20261020 expression, shared by cash and card). Redefines `begin_checkout_session` and `place_customer_order` only; **MONEY PATH UNTOUCHED** (`place_order` `7078c7dd…`, `compute_order_snapshot` `22e2d429…`, `insert_order_from_snapshot`, `finalize_checkout_session`, `begin_session_attempt` asserted unmoved). No row written, no deploy implied. |
+| 130 | 20261124130000 | catalog_image_url_checks | `eee2bdf06fae` | — | — | — | B | UNAPPLIED | CONFIRMED | none | high if `db push` | **WRITTEN 2026-11-24, UNAPPLIED.** §77. Audit finding F-X10-002 (low). Adds `public.is_https_image_url(text)` and validated CHECKs on `products.image_url` (NULL, `''` or https), `homepage_banners.image_url` (https) and `homepage_banners.action_value` (at most 200 characters; a UUID when `action_type = 'product'`), and redefines `import_lazywait_catalog` so a POS `photo` fills an EMPTY image only and a non-https photo is ignored. **The apply refuses (counts only, nothing changed) if any existing row would fail the constraints.** No row written, no grant widened. No deploy implied; the app half (`bannerRoute.ts`) ships in an EAS build and degrades safely before it. **MONEY PATH UNTOUCHED** (asserted by the file). Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -11393,3 +11394,92 @@ changed comparison in each function) only by the reverse-edit hash.
 3. Read back: both stored bodies, the helper, the table (RLS on, no policy), the
    six unmoved hashes, and that the Moyasar objects and the payment row
    (provider `moyasar`) are unchanged.
+
+## 77. Image and banner-action values are checked at the database; the POS import never replaces an image — WRITTEN 2026-11-24, UNAPPLIED (ledger row 130)
+
+`20261124130000_catalog_image_url_checks.sql`. **Written 2026-11-24 on branch
+`fix/catalog-image-url-checks-20261124`, validated on a local chain, awaiting
+owner approval.** Audit finding F-X10-002 (low), from the cross-cutting input
+handling review.
+
+sha256 `eee2bdf06faeca50334d48bd34565cf7187801c25d6d7d3ebe44e75ed5b185fd`, 658 lines / 34,340 bytes.
+**Re-hash the MERGED copy before applying**, per §15.
+
+### What the finding said, and what the current code showed
+
+- *`products` and `categories` `image_url`:* **`categories` has no image column**
+  (not in `20260707120200_catalog.sql`, and no later migration adds one). Only
+  `products.image_url` and `homepage_banners.image_url` exist, so only those are
+  constrained.
+- *The POS import overwrites an administrator's upload:* **confirmed**, and still
+  live in the newest definition (`20260826080000`): `image_url =
+  coalesce(nullif(raw->>'photo',''), image_url)` prefers the POS value.
+- *The banner tap builds a route from the stored string:* **confirmed**
+  (`BannerCarousel.tsx`); fixed in the app, not here.
+
+### What it changes
+
+- **`public.is_https_image_url(text)`**, new, IMMUTABLE, `search_path` pinned
+  empty: an https URL of 9 to 2048 characters with a non-empty host, no userinfo,
+  no whitespace or control character, no backslash in the host. NULL and `''` are
+  false.
+- **Three CHECK constraints**, added validated: `products_image_url_safe`
+  (NULL, `''` or the helper; the console writes `''` for "no image"),
+  `homepage_banners_image_url_safe` (the helper), and
+  `homepage_banners_action_value_safe` (NULL, or at most 200 characters, and a
+  UUID when `action_type = 'product'`). Hosts are NOT allow-listed: a pasted
+  external URL stays legal.
+- **`import_lazywait_catalog`** (derived from the `20260826080000` body, two
+  statement edits asserted to match once): the POS `photo` fills an image only
+  while it is empty (NULL or `''`) and only when the helper accepts it; a new
+  product takes a valid photo or none. **Trade-off:** nothing records where an
+  image came from, so the rule that is always safe is "never replace"; a later
+  photo change in the POS does not reach a product that already has an image.
+  Measured 2026-08-27, every cached `photo` was null, so no live row changes.
+
+### Why the constraints are validated, and the apply counts first
+
+The author had no Production read. A NOT VALID constraint is enforced on every
+later INSERT and UPDATE of a row (any column) without having looked at the rows
+already there, so a legacy row holding a rejected value would make EVERY update
+of it fail, including the importer's own deactivation pass, which would abort the
+whole import. So section 2 of the file counts the offending rows first and
+**raises if there are any**, naming a COUNT per table and no value; the apply is
+transactional, so nothing changes. Only then are the constraints added, as a scan
+of two small tables. If the owner prefers NOT VALID plus a later `validate
+constraint`, add `not valid` to the three statements; the guard stays.
+
+### What does not change
+
+No row is written. No money-path function is touched (the file asserts neither
+`place_order` nor `compute_order_snapshot` mentions its objects). Signature,
+grants and admin gate of `import_lazywait_catalog` are unchanged. A local
+Supabase stack's `http://127.0.0.1` storage URLs are refused by design.
+
+### Delivery
+
+No function deploy. The mobile half, `features/menu/bannerRoute.ts`, makes a
+banner tappable only when `action_type = 'product'` and `action_value` is a UUID,
+and ships in the next EAS build; before it, behaviour is unchanged and the
+database check already stops a bad value being stored.
+
+### Validated
+
+Local chain of 169 migration files (this one included): applies cleanly and
+re-applies cleanly; the existing-data stage reports no NOT VALID constraint and no
+row changed. Paired suite `supabase/tests/catalog_image_url_checks_test.sql`;
+eight mutants (importer prefers the POS photo again, importer insert stores the
+raw photo, importer update skips the https test, helper accepts `http`, helper
+drops the length cap, the UUID rule dropped from `action_value`, the products
+check made `true`, the banner image check weakened), all killed. The file's own
+verification (section 5) calls the helper on 18 refused and 6 accepted values and
+reads the constraints, the importer body and the grants back.
+
+### To apply
+
+1. Re-hash the merged file.
+2. Apply `20261124130000` **by name**, one call. Never "the outstanding
+   migrations": name the target by version (CLAUDE.md §8). If the guard refuses,
+   read the named table read-only, fix the rows, and apply again.
+3. Read back: the three constraints (`convalidated`), the importer body, the
+   money-path hashes unchanged, and the Moyasar objects and payment row unchanged.
