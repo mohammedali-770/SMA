@@ -5948,6 +5948,29 @@ with a date; the in-app and policy wording chosen and, where it changes,
 entered by you in the database row and in a build; the two smaller decisions
 answered; this section closed with the date.
 
+## 63. Push language follows the app language — an app build, nothing to apply
+
+Audit F-X08-001. `push_devices.lang` was written only by `register_push_device`,
+at first-run consent, at a sign-in claim for a token with no row, and when a
+Profile notification toggle changed. Switching the app language later only
+changed the app, so every push, POS message and broadcast stayed in the language
+the device registered under. The app now sends the new language through the
+**existing** `register_push_device` whenever the stored language differs from
+the app's (`usePushDeviceSync`, `syncDeviceLang`, `deviceLangSyncPrefs`).
+
+**Preferences are not touched, and that is the property to hold.** The RPC has
+no language-only form (it upserts both preferences and sets `is_active`), so the
+app re-reads the row and passes `order_updates_enabled` and `promos_enabled`
+back exactly as stored. It never uses `DEFAULT_DEVICE_PREFS`, and it skips an
+inactive row, which a registration would reactivate. Who a broadcast reaches
+(CLAUDE.md §7) is unchanged, and **no migration is needed**.
+
+**It reaches customers only in the next EAS build** (§47.17 lists the build).
+Until a customer has it, their language stays as registered. There is no server
+step and no deploy. After the build, a customer's stored language corrects at
+their next launch (the claim finds the row, the mismatch triggers one
+registration) or the moment they change the language.
+
 ## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — one decision, then deploys
 
 **Opened 2026-11-24.** Five findings from the full audit (F-X08-002, -003, -004,

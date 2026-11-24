@@ -21,7 +21,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import { pushDevices } from '../../services/api';
-import { DEFAULT_DEVICE_PREFS, type DevicePrefs } from './notificationPolicy';
+import { DEFAULT_DEVICE_PREFS, deviceLangSyncPrefs, type DevicePrefs } from './notificationPolicy';
 import type { DbPushDevice } from '../../types/db';
 
 /**
@@ -121,9 +121,36 @@ export async function findThisDevice(): Promise<DbPushDevice | null> {
  * reassigns the token's row when the device changed accounts, so a shared
  * phone never keeps the previous owner's targeting.
  */
-export async function registerThisDevice(
+export function registerThisDevice(
   lang: 'en' | 'ar',
   prefs: DevicePrefs = DEFAULT_DEVICE_PREFS,
+): Promise<DbPushDevice | null> {
+  return serialiseDeviceWrite(() => registerUnserialised(lang, prefs));
+}
+
+/**
+ * Every write to THIS device's row runs one at a time, in the order it was
+ * asked for. `register_push_device` rewrites both preferences and forces
+ * `is_active = true`, so two writes that overlap can undo each other: the
+ * language sync reads the stored preferences and registers them back, and a
+ * Profile toggle that lands between that read and that write would be restored
+ * to its old value, leaving an opt-out switched off on screen and on in the
+ * database (review finding on F-X08-001). One queue covers the sync, the
+ * registrations and the deactivation; the sync's read and write sit inside ONE
+ * queue entry, so the preferences it passes back are always the latest.
+ *
+ * A failed write rejects its own caller and never blocks the next one.
+ */
+let deviceWriteTail: Promise<unknown> = Promise.resolve();
+function serialiseDeviceWrite<T>(run: () => Promise<T>): Promise<T> {
+  const result = deviceWriteTail.then(run);
+  deviceWriteTail = result.catch(() => undefined);
+  return result;
+}
+
+async function registerUnserialised(
+  lang: 'en' | 'ar',
+  prefs: DevicePrefs,
 ): Promise<DbPushDevice | null> {
   const token = await getExpoPushToken();
   if (!token) return null;
@@ -137,16 +164,40 @@ export async function registerThisDevice(
 }
 
 /**
+ * Make the server's language for THIS device follow the app (audit F-X08-001).
+ *
+ * Re-reads the row first, INSIDE the device-write queue, so the preferences it
+ * passes back are the ones stored when this entry runs: a Profile toggle that
+ * was queued earlier has already landed, and one asked for later runs after it
+ * and wins (the queue is described above `registerUnserialised`). The
+ * decision, including never re-defaulting a preference and never reactivating a
+ * silenced device, is `deviceLangSyncPrefs`. Returns the updated row, or null
+ * when nothing was written. Throws on a failed write so the caller can leave it
+ * for the next opportunity; a failed or indeterminate LOOKUP writes nothing.
+ */
+export function syncDeviceLang(lang: 'en' | 'ar'): Promise<DbPushDevice | null> {
+  return serialiseDeviceWrite(async () => {
+    const lookup = await lookupThisDevice();
+    if (lookup.status !== 'found') return null;
+    const prefs = deviceLangSyncPrefs({ lang, device: lookup.device });
+    if (!prefs) return null;
+    return registerUnserialised(lang, prefs);
+  });
+}
+
+/**
  * Silence THIS device — STRICT variant: throws on token/RPC failure so the
  * caller can surface the error and revert optimistic UI (the Profile opt-out
  * toggles must never show "off" while the server row is still active —
  * review finding).
  */
-export async function deactivateThisDeviceStrict(): Promise<void> {
-  if (!Device.isDevice) return;
-  const token = await getExpoPushToken();
-  if (!token) throw new Error('push token unavailable');
-  await pushDevices.deactivateToken(token);
+export function deactivateThisDeviceStrict(): Promise<void> {
+  return serialiseDeviceWrite(async () => {
+    if (!Device.isDevice) return;
+    const token = await getExpoPushToken();
+    if (!token) throw new Error('push token unavailable');
+    await pushDevices.deactivateToken(token);
+  });
 }
 
 /**
