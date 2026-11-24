@@ -1568,6 +1568,30 @@ deploys with every merge (CLAUDE.md §13).
 (`{status:'disabled', reason:'test_mode'}`), shown as "Online payment is
 unavailable right now." A TEST-mode attempt can never confirm an order.
 
+### The saved checkout pointer: who may set it, and when it is dropped (2026-11-24)
+
+The app keeps ONE pointer to the checkout it is waiting on
+(`sm.pendingCheckoutSession`, `features/checkout/pendingSession.ts`), and every
+later checkout, cash included, resolves it first. Two rules keep it from being
+steered (audit findings F-TA5-001 and F-TA5-002):
+
+- **The payment return link may not replace it.** `spicymeal://payment/return?session=<id>`
+  can be opened by any web page or app with any well-formed id. The route now
+  records the link's session only when no session is pending or it is the one
+  already pending. A different id is ignored and the existing pointer is resolved.
+- **A session the signed-in customer cannot see is dropped.** `payment-verify`
+  answers 404 with the sentence `Checkout session not found` for a session that
+  never existed or belongs to someone else (row level security hides it). The
+  recovery now clears the pointer on exactly that sentence and reports `cleared`.
+  Any other failure (network, a server fault, a platform "function not found")
+  still keeps the pointer for a later retry, because a payment under way must
+  never be abandoned. This also frees the next account on a shared phone.
+
+What is not changed: a payment still under way is never abandoned, and a real
+session of the customer's own is resumed exactly as before. If the link lands
+while another session is pending, that other session's payment is settled by
+the webhook and the next verify, not by the link.
+
 ## 7. Channels without a branch step
 
 **Superseded 2026-08-27 — delivery is now a full branch channel, and this
