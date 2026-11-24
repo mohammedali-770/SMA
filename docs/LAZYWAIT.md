@@ -406,8 +406,10 @@ instead of the live config row.) Field-by-field state:
   follows modifier choices the system wrote (`Volcano — … CUSTOMER NOTE: No
   onions`); a note alone there has nothing to be mistaken for and is unchanged.
   The label is `CUSTOMER_NOTE_LABEL` in `_shared/lazywait.ts`; its Arabic is
-  engineering-drafted (`OWNER_ACTIONS.md` §35). Takes effect when
-  `lazywait-sync` is redeployed (`OWNER_ACTIONS.md` §64).
+  engineering-drafted (`OWNER_ACTIONS.md` §35). **LIVE since 2026-11-24 11:12 UTC**
+  (`lazywait-sync` v27, `OWNER_ACTIONS.md` §64). **No printed ticket has been
+  checked yet**, and whether the POS prints `order_details` verbatim is not
+  verifiable from the repository.
 
   It is prefixed rather than appended so it survives a POS display that
   truncates a long note.
@@ -1184,6 +1186,16 @@ is not part of this change.
 `docs/PAYMENTS.md`, #526), so the sweeps and the connect-failure classification
 above are live. One comment in `_shared/lazywait.ts` (lines 496-499) differs from
 the repository in its line wrapping; the code is identical.
+
+**Redeployed 2026-11-24 11:12 UTC as `lazywait-sync` v27** (the #535 changes: the
+labelled customer note above, and the push drain counting a dispatch only when
+`push-dispatch` answered `ok`), from the default branch at `70b72d5`. Seven of
+the eight bundle files read back byte-identical. The same comment in
+`_shared/lazywait.ts` differs again, now at **lines 496-497** (the line break after
+"`is_paid`" sits one word later in the live copy); size and line count are
+unchanged and the code is identical once comments are removed. It was not
+redeployed for a comment. This supersedes the line numbers in the v26 paragraph
+above.
 
 ## Online payment (prepared, not live)
 *Changed 2026-11-12: this said "the Geidea webhook". The provider is Moyasar
