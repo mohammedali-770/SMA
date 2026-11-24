@@ -113,8 +113,8 @@
 -- That is the check that "unrelated behaviour is preserved" - every statement
 -- that is not one of the listed edits is byte-identical to what ran before.
 --
--- Apply by version, never as "the outstanding migrations": 20260824100000
--- (Moyasar, frozen under CLAUDE.md section 6) sorts ahead of everything.
+-- Apply by version, never as "the outstanding migrations": name this file's
+-- target explicitly (CLAUDE.md section 8). Moyasar is live; nothing here touches it.
 
 -- ---------------------------------------------------------------------------
 -- 0. Preconditions and pre-images
