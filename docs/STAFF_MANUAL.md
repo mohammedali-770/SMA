@@ -466,6 +466,16 @@ like it was "redirecting to /app" and there was no way back from inside it.
   المحاولة**، وإن تكرّر فسجّل الخروج ثم ادخل من جديد وأبلغ عن ذلك: هذا خطأ وليس
   دليلاً على فقدان صلاحيتك.
 
+### A held account deletion — طلب حذف حساب معلّق
+
+**English**
+
+Operations Health → Account deletion shows a "Manual review" count. Administrators (signed in with the second factor) see the requests behind it just below, in "Held account deletions": each has a short id, the reason code and how long it has been held. A held request locks that account: it cannot place unpaid orders or save addresses until the request is resolved. **Close as failed** releases the lock and erases nothing; the person must verify again to ask for deletion. **Retry** puts the request back in the queue to be re-checked. A staff account that asked to be deleted is held on purpose and is never erased by this queue, so for it use **Close as failed**. Add a note if useful; only administrators can read it.
+
+**العربية**
+
+تعرض شاشة **صحة العمليات** عدد «مراجعة يدوية» لطلبات حذف الحسابات. يرى المدراء (بعد التحقق بخطوتين) الطلبات خلفه في «طلبات حذف الحسابات المعلّقة»: لكل طلب رقم قصير ورمز السبب ومدة التعليق. الطلب المعلّق يقفل الحساب: لا طلبات غير مدفوعة ولا حفظ عناوين حتى يُحسم. **إغلاق كفاشل** يرفع القفل ولا يحذف شيئاً، وعلى صاحب الحساب التحقق من هويته مجدداً ليطلب الحذف. **إعادة المحاولة** تعيد الطلب إلى قائمة المعالجة ليُفحص من جديد. حساب الموظف الذي طلب الحذف يُحجز عمداً ولا يُحذف عبر هذه القائمة، فاستخدم له **إغلاق كفاشل**. يمكنك إضافة ملاحظة، ولا يقرؤها إلا المدراء.
+
 ## 8. Things staff must not do — ممنوعات مهمة
 
 **English**
