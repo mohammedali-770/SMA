@@ -1407,6 +1407,17 @@ search for.
   refund the payment by hand. The incident ends when a later verify confirms the
   payment.
 
+  **Retried, not abandoned (2026-11-24, audit F-D2-002).** The row is written
+  whenever the confirming call fails, but the ANSWER now depends on why. Only a
+  refusal the database raised on purpose (SQLSTATE `P0001`: "session not
+  payable", "amount does not match") is a terminal `failed`. A timeout, a
+  deadlock, a dropped connection or an empty answer is `pending`
+  (`finalize_unknown` / `confirm_unknown`): `payment-webhook` answers 503 so
+  Moyasar redelivers, `payment-verify` answers `pending`, and the app keeps its
+  saved checkout. Until then a captured payment could end with no order, no
+  redelivery and no resumable checkout on the device. The R17 incident still
+  opens on the row, and ends when the retry confirms the payment.
+
 **Finding them.** Until the apply, the console has no list of them. The order
 receipt shows only the **newest** payment row for an order, so it may show the
 duplicate or hide it, and a duplicate with no order id appears on no receipt.

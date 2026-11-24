@@ -2,7 +2,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import {
-  HANDLED_WEBHOOK_TYPES, NOT_A_DUPLICATE_FILTER, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice,
+  HANDLED_WEBHOOK_TYPES, NOT_A_DUPLICATE_FILTER, isRetryableConfirmReason, WEBHOOK_VERIFICATION_TYPE, isAdminTestInvoice,
   mapMoyasarPaymentStatus, matchesAnyWebhookSecret, parseWebhookEnvelope, resolveMoyasarConfig,
   verifyWebhookSecretToken, webhookVerificationLogRow, type MoyasarWebhookEnvelope,
 } from '../_shared/moyasar.ts';
@@ -246,7 +246,7 @@ async function handleMoyasarWebhook(
   const result = await validateAndConfirmMoyasarPayment(admin, rec, retrieved.body, { liveMode: evt.live });
   // Our own write or read failed before the outcome was known. Ask Moyasar to
   // send it again rather than acknowledge a payment nothing has confirmed.
-  if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') {
+  if (isRetryableConfirmReason(result.reason)) {
     return json({ status: 'retry', reason: result.reason }, 503);
   }
   // A duplicate is acknowledged: it is recorded for a refund, and a retry would

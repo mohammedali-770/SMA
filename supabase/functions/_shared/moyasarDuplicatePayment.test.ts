@@ -576,6 +576,82 @@ describe('an unknown outcome is never reported paid or failed', () => {
     const verify = await call('payment-verify', { checkoutSessionId: session.id });
     expect(verify.body).toEqual({ status: 'paid', orderId: db.rows('checkout_sessions')[0].order_id });
   });
+
+  // F-D2-002 (first F-EFP-04-001): the confirming RPC failing AFTER Moyasar captured the
+  // money used to be a terminal answer that the webhook acknowledged, so nothing retried.
+  it('finalize failing for a reason that is not a refusal answers pending and the webhook is redelivered', async () => {
+    const { session, invoiceId } = await openSession();
+    const p1 = moyasar.pay(invoiceId, 'pay_1', 'paid');
+    db.failNext('rpc.finalize_checkout_session', { message: 'canceling statement due to statement timeout', code: '57014' });
+    expect(await webhook(p1)).toEqual({ status: 503, body: { status: 'retry', reason: 'finalize_unknown' } });
+    expect(db.rows('checkout_sessions')[0]).toMatchObject({ status: 'pending_payment' });
+    expect(db.rows('orders')).toHaveLength(0);
+    // The watchdog still sees it: the sync-log row is unchanged.
+    expect(db.rows('integration_sync_logs').filter((r) => r.error === 'finalize_failed')).toHaveLength(1);
+    // payment-verify does not let the app drop the checkout either.
+    db.failNext('rpc.finalize_checkout_session', { message: 'connection reset', code: '08006' });
+    const verifying = await call('payment-verify', { checkoutSessionId: session.id });
+    expect(verifying.body.status).toBe('pending');
+    // Moyasar's redelivery confirms it, once.
+    expect((await webhook(p1)).body.status).toBe('paid');
+    expect(db.rows('orders')).toHaveLength(1);
+  });
+
+  it('finalize raising a deliberate refusal is still terminal and acknowledged', async () => {
+    const { invoiceId } = await openSession();
+    const p1 = moyasar.pay(invoiceId, 'pay_1', 'paid');
+    db.failNext('rpc.finalize_checkout_session', { message: 'Checkout session is not payable (status=cancelled)', code: 'P0001' });
+    const res = await webhook(p1);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'acknowledged', outcome: 'failed' });
+  });
+
+  it('order flow: confirm failing for a reason that is not a refusal answers pending, not failed', async () => {
+    const order = db.order({ total: 64 });
+    const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    const p1 = moyasar.pay(String(init.body.invoiceId), 'pay_1', 'paid');
+    db.failNext('rpc.confirm_order_payment', { message: 'deadlock detected', code: '40P01' });
+    expect((await webhook(p1)).status).toBe(503);
+    db.failNext('rpc.confirm_order_payment', { message: 'fetch failed', code: '' });
+    expect((await call('payment-verify', { orderId: order.id })).body.status).toBe('pending');
+    expect((await webhook(p1)).body.status).toBe('paid');
+    expect(paidRowsOf(order.id)).toHaveLength(1);
+  });
+
+  it('order flow: a deliberate refusal from confirm stays terminal', async () => {
+    const order = db.order({ total: 64 });
+    const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
+    const p1 = moyasar.pay(String(init.body.invoiceId), 'pay_1', 'paid');
+    db.failNext('rpc.confirm_order_payment', { message: 'Payment amount 1 does not match order total 64', code: 'P0001' });
+    const res = await webhook(p1);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ outcome: 'failed' });
+  });
+});
+
+describe('which confirm failures are retried', () => {
+  it('only a plpgsql RAISE (SQLSTATE P0001) is a deliberate refusal', async () => {
+    const { isDeliberateRefusal } = await import('./moyasar.ts');
+    expect(isDeliberateRefusal({ code: 'P0001' })).toBe(true);
+    for (const code of ['57014', '40001', '40P01', '08006', 'PGRST301', '', undefined, 'P0002']) {
+      expect(isDeliberateRefusal({ code })).toBe(false);
+    }
+    expect(isDeliberateRefusal(null)).toBe(false);
+    expect(isDeliberateRefusal(undefined)).toBe(false);
+  });
+
+  it('every "our own step did not complete" reason is retryable, and no terminal reason is', async () => {
+    const { isRetryableConfirmReason, olderInvoiceVerdict } = await import('./moyasar.ts');
+    for (const r of ['stamp_failed', 'readback_failed', 'finalize_unknown', 'confirm_unknown']) {
+      expect(isRetryableConfirmReason(r)).toBe(true);
+      for (const live of [true, false]) {
+        expect(olderInvoiceVerdict({ outcome: 'pending', paid: false, reason: r }, live)).toBe('pending');
+      }
+    }
+    for (const r of ['finalize_failed', 'confirm_failed', 'no_payment', undefined]) {
+      expect(isRetryableConfirmReason(r)).toBe(false);
+    }
+  });
 });
 
 /**
@@ -590,7 +666,9 @@ describe('a stamped payment beaten after its confirm failed is still recorded (C
     const order = db.order({ total: 64 });
     const init = await call('payment-initiate', { orderId: order.id, language: 'en' });
     const inv1 = String(init.body.invoiceId);
-    db.failNext('rpc.confirm_order_payment');
+    // A deliberate refusal (P0001): the terminal case. A transient error is retried instead
+    // (F-D2-002), so it would not leave the stamped, unconfirmed attempt this scenario needs.
+    db.failNext('rpc.confirm_order_payment', { message: 'Payment amount 1 does not match order total 64', code: 'P0001' });
     const first = await webhook(moyasar.pay(inv1, 'pay_ONE', 'paid'));
     expect(first.body).toEqual({ status: 'acknowledged', outcome: 'failed' });
     const [a1] = db.attempts({ provider_checkout_ref: inv1 });

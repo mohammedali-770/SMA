@@ -1031,6 +1031,32 @@ export function isOrderAlreadyPaidByAnother(error: { message?: unknown; code?: u
 }
 
 /**
+ * Is this RPC error a refusal the function RAISED ON PURPOSE (a plpgsql RAISE, SQLSTATE
+ * P0001: "session not payable", "amount does not match")? Anything else (a statement
+ * timeout, a deadlock, a dropped connection, a PostgREST or HTTP fault, an empty answer)
+ * says nothing about the payment, so it must never be read as "this payment failed".
+ * Audit finding F-D2-002 (first F-EFP-04-001): the confirming RPC failing after Moyasar
+ * captured the money was answered as a terminal failure and acknowledged, so Moyasar
+ * stopped redelivering and the app dropped the saved checkout.
+ */
+export function isDeliberateRefusal(error: { code?: unknown } | null | undefined): boolean {
+  return !!error && String(error.code ?? '') === 'P0001';
+}
+
+/**
+ * Reasons that mean "our own write, read or confirmation did not complete, the payment
+ * may be genuine". Each is answered `pending` (never `failed`), the webhook answers 503 so
+ * Moyasar redelivers, and the app keeps its saved checkout.
+ */
+export const RETRYABLE_CONFIRM_REASONS: ReadonlySet<string> = new Set([
+  'stamp_failed', 'readback_failed', 'finalize_unknown', 'confirm_unknown',
+]);
+
+export function isRetryableConfirmReason(reason: unknown): boolean {
+  return RETRYABLE_CONFIRM_REASONS.has(String(reason ?? ''));
+}
+
+/**
  * PostgREST filter that leaves recorded duplicates out of an "attempts" lookup.
  * A duplicate row is a record of money to give back, not an attempt: a lookup
  * that took the newest row as THE attempt would otherwise read a duplicate,
@@ -1174,7 +1200,7 @@ export function olderInvoiceVerdict(
   // read failed (the stamp read-back, or the post-finalize "did it pay" read,
   // which runs after finalize may already have created the order). That is
   // never a reason to let the app drop the session, live or not.
-  if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') return 'pending';
+  if (isRetryableConfirmReason(result.reason)) return 'pending';
   if ((result.outcome === 'pending' || result.outcome === 'unknown') && sessionLive) return 'pending';
   return 'ignore';
 }

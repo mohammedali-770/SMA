@@ -33,6 +33,7 @@ import {
   confirmMessageKey,
   fromMinorUnits,
   isAdminTestInvoice,
+  isDeliberateRefusal,
   isGenuineConfirmation,
   isMoyasarIpNotAllowed,
   isOrderAlreadyPaidByAnother,
@@ -432,7 +433,12 @@ export async function validateAndConfirmMoyasarPayment(
           },
           error: 'finalize_failed',
         }).then(() => {}, () => {});
-        return { outcome: 'failed', paid: false, reason: 'finalize_failed' };
+        // Only a refusal the function raised on purpose is a verdict. A timeout, a
+        // dropped connection or an empty answer says nothing about the payment, which
+        // Moyasar has captured: answer pending so the webhook is redelivered and the
+        // app keeps its saved checkout (F-D2-002). The row above still feeds the watchdog.
+        if (error && isDeliberateRefusal(error)) return { outcome: 'failed', paid: false, reason: 'finalize_failed' };
+        return { outcome: 'pending', paid: false, reason: 'finalize_unknown' };
       }
       confirmedOrder = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
       orderId = String(confirmedOrder?.id ?? '');
@@ -512,7 +518,9 @@ export async function validateAndConfirmMoyasarPayment(
           provider: 'moyasar', order_id: attempt.order_id, direction: 'webhook', status: 'failed',
           request: { payment_id: paymentId.slice(0, 64) }, error: 'confirm_failed',
         }).then(() => {}, () => {});
-        return { outcome: 'failed', paid: false, reason: 'confirm_failed' };
+        // As for finalize above: only a deliberate refusal is terminal (F-D2-002).
+        if (isDeliberateRefusal(error)) return { outcome: 'failed', paid: false, reason: 'confirm_failed' };
+        return { outcome: 'pending', paid: false, reason: 'confirm_unknown' };
       }
       orderId = String(attempt.order_id ?? '');
       // Store safe card display fields (the session path does this inside finalize).

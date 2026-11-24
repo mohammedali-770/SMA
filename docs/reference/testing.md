@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**303 TypeScript test files declaring 4406 test blocks, plus 104 SQL suites.**
+**303 TypeScript test files declaring 4412 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -433,7 +433,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-52 files, 1062 declared test blocks.
+52 files, 1068 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -458,7 +458,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitOrderPayments.test.ts` | 8 | a card order certain to be paid |
 | `supabase/functions/_shared/legacyKeyGuard.test.ts` | 6 | the legacy Supabase API keys stay out of the tree |
 | `supabase/functions/_shared/moyasar.test.ts` | 123 | minor units (halalas) |
-| `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 24 | a declined payment no longer closes its attempt (C1 part 1) |
+| `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 30 | a declined payment no longer closes its attempt (C1 part 1) |
 | `supabase/functions/_shared/moyasarHttp.test.ts` | 10 | parseMoyasarProxyUrl |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 42 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
