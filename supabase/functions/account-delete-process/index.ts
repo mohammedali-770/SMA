@@ -14,7 +14,9 @@ import {
   classifyBlockers,
   decideAfterFailure,
   interpretTransition,
+  isCustomerRoleForDeletion,
   safeFailureCode,
+  STAFF_DELETION_HOLD_REASON,
   statusForBlocker,
   WAITING_RECHECK_MS,
   type FailureStage,
@@ -105,6 +107,25 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<T
   }
 
   try {
+    // ---- Stage: staff hold (F-X05-001) ----
+    // A staff account is never erased by this queue. The request function
+    // refuses them up front; this covers a request queued before that refusal
+    // shipped and an account promoted after it was queued. Held for a human
+    // (resolve_account_deletion_request) rather than failed, so nothing is
+    // dropped silently, and nothing is anonymized or deleted. This is also what
+    // keeps the last administrator from being removed: every administrator is
+    // held. A failed read throws and retries; it never proceeds.
+    const { data: profileRow, error: profileErr } = await admin
+      .from('profiles').select('role').eq('id', userId).maybeSingle();
+    if (profileErr) throw profileErr;
+    if (!isCustomerRoleForDeletion(profileRow?.role)) {
+      const ok = await transition(admin, id, token, {
+        status: 'manual_review',
+        manual_review_reason: STAFF_DELETION_HOLD_REASON,
+      });
+      return interpretTransition(ok, 'manual_review');
+    }
+
     // ---- Stage: blocker checks (real states only) ----
     const [activeOrders, pendingOnlineOrders, pendingCheckoutSessions] = await Promise.all([
       countOrThrow(admin.from('orders').select('id', { count: 'exact', head: true })

@@ -914,7 +914,9 @@ export function createLazywaitApiClient(cfg: LazywaitConfig, opts: LazywaitApiCl
       const res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown> }>(baseCfg, {
         method: built.spec.method, path: built.spec.path, body: built.spec.body, timeoutMs: built.spec.timeoutMs ?? defTimeout,
       });
-      const outcome = classifyCreateOrderResult({ status: res.status, data: res.data, error: res.error });
+      const outcome = classifyCreateOrderResult({
+        status: res.status, data: res.data, error: res.error, neverConnected: res.neverConnected,
+      });
       return {
         sent: true, blockedReason: null, outcome, status: res.status,
         error: res.error ? redactSecretsInString(res.error) : null,

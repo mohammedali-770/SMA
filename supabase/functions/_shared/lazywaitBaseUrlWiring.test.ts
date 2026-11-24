@@ -78,11 +78,19 @@ describe('lazywait-sync guards before it claims any order', () => {
     expect(guard).toBeLessThan(claim);
   });
 
-  it('the guard also precedes the stale reaper — nothing runs on an unconfigured worker', () => {
+  // CHANGED 2026-11-24 (F-X09-002). This used to assert the reverse — that the
+  // guard came BEFORE the reaper — and that pinned the very defect: a blank or
+  // switched-off integration froze every queued order past its deadline. The
+  // reaper is time-driven bookkeeping that never touches the POS and needs no
+  // base URL, so it now runs first; what must stay behind the guard is everything
+  // that claims an order or talks to the POS (pinned above and below).
+  it('the guard follows the time-driven sweeps and precedes everything that touches the POS', () => {
     const guard = src.indexOf('resolveLazywaitBaseUrl(');
     const reap = src.indexOf('reap_stale_lazywait_syncs');
+    const send = src.search(/lazywaitFetch\s*[<(]/);
     expect(reap).toBeGreaterThan(-1);
-    expect(guard).toBeLessThan(reap);
+    expect(reap).toBeLessThan(guard);
+    expect(guard).toBeLessThan(send);
   });
 
   it('the config fault is NOT written as an order-level sync outcome', () => {

@@ -5,12 +5,15 @@ import {
   classifyBlockers,
   computeBackoffMs,
   decideAfterFailure,
+  decideDeletionAccountGuard,
   interpretTransition,
+  isCustomerRoleForDeletion,
   isTerminal,
   MAX_AUTO_ATTEMPTS,
   passwordReauthUserMatches,
   RETRY_CAP_MS,
   safeFailureCode,
+  STAFF_DELETION_HOLD_REASON,
   statusForBlocker,
   type BlockerCounts,
 } from './accountDeletion';
@@ -139,5 +142,50 @@ describe('safeFailureCode / isTerminal', () => {
     expect(isTerminal('failed')).toBe(true);
     expect(isTerminal('manual_review')).toBe(false);
     expect(isTerminal('processing')).toBe(false);
+  });
+});
+
+describe('staff accounts never use the customer deletion path (F-X05-001)', () => {
+  const STAFF_ROLES = ['admin', 'accountant', 'branch_staff', 'call_center'];
+
+  it('refuses every staff role with 403 staff_account', () => {
+    for (const role of STAFF_ROLES) {
+      const g = decideDeletionAccountGuard({ role, error: null });
+      expect(g).toMatchObject({ allowed: false, status: 403, code: 'staff_account' });
+    }
+  });
+
+  it('is an allow-list: an unknown or future role is refused, not admitted', () => {
+    for (const role of ['owner', 'ADMIN', '', 'customer ', 7, {}, true]) {
+      expect(decideDeletionAccountGuard({ role, error: null }).allowed).toBe(false);
+    }
+  });
+
+  it('leaves customers unchanged, including a user with no profile row', () => {
+    expect(decideDeletionAccountGuard({ role: 'customer', error: null })).toEqual({ allowed: true });
+    expect(decideDeletionAccountGuard({ role: null, error: null })).toEqual({ allowed: true });
+    expect(decideDeletionAccountGuard({ role: undefined, error: null })).toEqual({ allowed: true });
+  });
+
+  it('fails CLOSED when the role read failed, whatever the role says', () => {
+    for (const role of ['customer', 'admin', null, undefined]) {
+      const g = decideDeletionAccountGuard({ role, error: { message: 'boom' } });
+      expect(g).toMatchObject({ allowed: false, status: 500, code: 'role_check_failed' });
+    }
+  });
+
+  it('never puts a raw error or role into the response message', () => {
+    const g = decideDeletionAccountGuard({ role: 'admin', error: null });
+    if (g.allowed) throw new Error('expected a refusal');
+    expect(g.message).not.toMatch(/\b(admin|accountant|branch_staff|call_center)\b/i);
+  });
+
+  it('the processor predicate agrees with the request guard', () => {
+    for (const role of STAFF_ROLES) expect(isCustomerRoleForDeletion(role)).toBe(false);
+    for (const role of ['customer', null, undefined]) expect(isCustomerRoleForDeletion(role)).toBe(true);
+  });
+
+  it('holds with a safe, PII-free reason', () => {
+    expect(STAFF_DELETION_HOLD_REASON).toBe('staff_account_requires_admin');
   });
 });

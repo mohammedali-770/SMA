@@ -50,6 +50,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/__fixtures__/paymentRuntime.ts`
 - `_shared/accountDeletion.test.ts`
 - `_shared/accountDeletion.ts`
+- `_shared/accountDeletionStaffWiring.test.ts`
 - `_shared/adminAuth.test.ts`
 - `_shared/adminAuth.ts`
 - `_shared/adminAuthWiring.test.ts`
@@ -75,9 +76,11 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/lazywaitCancelledGate.test.ts`
 - `_shared/lazywaitCatalog.test.ts`
 - `_shared/lazywaitCatalog.ts`
+- `_shared/lazywaitConnectFailure.test.ts`
 - `_shared/lazywaitGateLogWiring.test.ts`
 - `_shared/lazywaitOrderPayments.test.ts`
 - `_shared/lazywaitPaidLookupDeferral.test.ts`
+- `_shared/lazywaitSweepsWiring.test.ts`
 - `_shared/legacyKeyGuard.test.ts`
 - `_shared/moyasar.test.ts`
 - `_shared/moyasar.ts`
