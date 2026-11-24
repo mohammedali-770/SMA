@@ -533,9 +533,18 @@ instead of the live config row.) Field-by-field state:
   `true` only when the claimed order row is `payment_method = 'online'` and
   `payment_status = 'paid'` **and** a `payment_records` row for it has status
   `paid`. Only the server writes that row, after fetching the payment from
-  Moyasar itself. A cash order, an unpaid or comped order, or a failed lookup
-  sends no flag, so the failure direction is "shown unpaid", never "shown
-  paid". Why it was needed: read live 2026-11-19, the separate
+  Moyasar itself. A cash order or an unpaid or comped order sends no flag, so
+  the failure direction is "shown unpaid", never "shown paid". **A failed
+  lookup is the exception (2026-11-24, audit F-D2-001):** for an online order
+  the row calls paid, an error reading `payment_records` no longer sends the
+  ticket unpaid, because Create Order has no idempotency key and nothing
+  corrects the ticket afterwards. The worker releases the claim before the
+  fenced gate (`posPaidLookupMustDefer`): state back to `pending`, due 30
+  seconds later, no attempt counted, no customer message, one `skipped` sync-log
+  row `payment_lookup_deferred`. The minute cron claims it again inside the
+  10-minute deadline; if the read keeps failing, the deadline sweep dead-letters
+  it as for any order and R1 raises it for a paid one. A lookup that succeeds
+  and finds no paid record is not an error and still sends unpaid, as before. Why it was needed: read live 2026-11-19, the separate
   `update-online-payment` call had been refused with HTTP 400 on all 9 card
   orders since 2026-11-18 13:23 UTC, so every card order showed **unpaid** at
   the branch (confirmed by the owner on the POS). That call ran after payment

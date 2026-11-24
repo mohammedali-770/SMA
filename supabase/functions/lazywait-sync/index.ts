@@ -9,7 +9,7 @@ import {
   timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
-import { posIsPaidFlag, posOrderPayments, posWarnings } from '../_shared/posPaidFlag.ts';
+import { posIsPaidFlag, posOrderPayments, posPaidLookupMustDefer, posWarnings } from '../_shared/posPaidFlag.ts';
 
 /**
  * lazywait-sync — server-side POS sync worker (invoked by a schedule/cron, NOT
@@ -279,6 +279,42 @@ Deno.serve(async (req: Request) => {
             .order('confirmed_at', { ascending: false }).limit(1)
           : Promise.resolve({ data: [] as unknown[], error: null }),
       ]);
+      // A FAILED payment lookup for a card order the row says is paid does not
+      // go out as "unpaid" (audit F-D2-001). Create Order has no idempotency key
+      // and the update-online-payment call is gone, so a ticket sent without the
+      // flag stays unpaid on the branch's screen for a customer who has paid.
+      // The send has not started (no gate, no marker), so the claim is simply
+      // released: back to 'pending', due in PAYMENT_LOOKUP_RETRY_MS, no attempt
+      // counted, no customer message. The minute cron claims it again inside the
+      // same 10-minute deadline; if the read keeps failing, the deadline sweep
+      // dead-letters it with the usual pos_failed message, and R1 raises it for a
+      // paid order. If this release itself fails the row stays 'syncing' and the
+      // stale reaper requeues it (the marker is null), as for the gate errors below.
+      if (posPaidLookupMustDefer(
+        order as { payment_method?: unknown; payment_status?: unknown },
+        Boolean(capturedPaymentRead.error),
+      )) {
+        summary.skipped++;
+        const { error: deferErr } = await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: 'pending',
+            sync_next_attempt_at: new Date(Date.now() + PAYMENT_LOOKUP_RETRY_MS).toISOString(),
+            sync_last_error: 'payment_lookup_failed',
+          },
+          p_log_status: 'skipped',
+          p_error: 'payment_lookup_deferred',
+        });
+        console.error(JSON.stringify({
+          at: 'lazywait-sync.payment_lookup',
+          order_id: orderId,
+          outcome: 'deferred',
+          sent: false,
+          error: safeErr(capturedPaymentRead.error?.message),
+          release_failed: Boolean(deferErr),
+        }));
+        continue;
+      }
       const posIsPaid = posIsPaidFlag(order as { payment_method?: unknown; payment_status?: unknown }, {
         rows: Array.isArray(capturedPaymentRead.data) ? capturedPaymentRead.data.length : 0,
         lookupFailed: Boolean(capturedPaymentRead.error),
@@ -790,6 +826,14 @@ Deno.serve(async (req: Request) => {
  * takes the rest.
  */
 const POS_NOTIFY_DRAIN_LIMIT = 20;
+
+/**
+ * How long an order whose paid-payment lookup failed waits before it can be
+ * claimed again (audit F-D2-001). The cron driver ticks once a minute, so this
+ * is "the next tick"; it is far inside the 10-minute POS deadline, which still
+ * bounds the retries.
+ */
+const PAYMENT_LOOKUP_RETRY_MS = 30_000;
 
 /**
  * Send the queued customer messages about what happened at the POS.

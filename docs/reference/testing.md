@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**306 TypeScript test files declaring 4449 test blocks, plus 104 SQL suites.**
+**308 TypeScript test files declaring 4474 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -433,7 +433,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-55 files, 1105 declared test blocks.
+57 files, 1130 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -458,6 +458,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitConnectFailure.test.ts` | 15 | classifyConnectFailure — only a PROVEN never-connected failure is reported |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/lazywaitOrderPayments.test.ts` | 8 | a card order certain to be paid |
+| `supabase/functions/_shared/lazywaitPaidLookupDeferral.test.ts` | 7 | a card-paid order whose payment lookup fails is deferred, never sent unpaid |
 | `supabase/functions/_shared/lazywaitSweepsWiring.test.ts` | 9 | lazywait-sync sweeps run when the integration is off or misconfigured |
 | `supabase/functions/_shared/legacyKeyGuard.test.ts` | 6 | the legacy Supabase API keys stay out of the tree |
 | `supabase/functions/_shared/moyasar.test.ts` | 123 | minor units (halalas) |
@@ -474,8 +475,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/paymentSyncKick.test.ts` | 4 | triggerLazywaitSyncOnce — the post-payment POS kick |
 | `supabase/functions/_shared/paymentTestCheckout.test.ts` | 20 | allowTestModeCheckout() |
 | `supabase/functions/_shared/paymentVerifyTerminal.test.ts` | 26 | a session with nothing payable is answered terminal, without a key |
+| `supabase/functions/_shared/paymentWebhookDeferral.test.ts` | 15 | a switched-off provider asks for the event to come back |
 | `supabase/functions/_shared/paymentWiring.test.ts` | 80 | payment functions talk to Moyasar only |
-| `supabase/functions/_shared/posPaidFlag.test.ts` | 29 | posIsPaidFlag: a ticket is created paid only when the payment is certain |
+| `supabase/functions/_shared/posPaidFlag.test.ts` | 32 | posIsPaidFlag: a ticket is created paid only when the payment is certain |
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |

@@ -40,10 +40,18 @@ export function maskedCardNumber(lastFour: unknown): string {
  *     it paid (payment-verify / payment-webhook); nothing the app reports can
  *     create it.
  *
- * Anything else -- a cash order, an unpaid order, a comped order with no
- * captured payment, or a payment lookup that failed -- returns undefined, so
- * the ticket goes out exactly as before, without the flag. The failure
- * direction is "shown unpaid", never "shown paid".
+ * Anything else -- a cash order, an unpaid order, or a comped order with no
+ * captured payment -- returns undefined, so the ticket goes out exactly as
+ * before, without the flag. The failure direction is "shown unpaid", never
+ * "shown paid".
+ *
+ * A payment LOOKUP THAT FAILED is not in that list any more (audit F-D2-001,
+ * 2026-11-24). For a card order the row says is paid, "shown unpaid" is the
+ * wrong direction: the customer has been charged, the ticket would print the
+ * full total, Create Order has no idempotency key so nothing resends it, and the
+ * separate update-online-payment call that could have corrected it is gone. The
+ * worker therefore asks posPaidLookupMustDefer() first and does not send at all
+ * on an error. `lookupFailed` still answers undefined here, as a last guard.
  */
 export function posIsPaidFlag(
   order: { payment_method?: unknown; payment_status?: unknown },
@@ -52,6 +60,23 @@ export function posIsPaidFlag(
   if (order.payment_method !== 'online' || order.payment_status !== 'paid') return undefined;
   if (capturedPayment.lookupFailed || !(capturedPayment.rows > 0)) return undefined;
   return true;
+}
+
+/**
+ * True when the POS handoff for this order must be DEFERRED rather than sent:
+ * an online order the row says is paid, whose captured-payment lookup returned
+ * an error. Sending it would put a card-paid order on the branch's screen as
+ * unpaid with nothing to correct it afterwards (audit F-D2-001).
+ *
+ * Deliberately narrow. Only a lookup ERROR defers. A lookup that succeeded and
+ * found no paid record is not an error, and cash, unpaid and comped orders have
+ * no lookup to fail, so none of those can be held back by this.
+ */
+export function posPaidLookupMustDefer(
+  order: { payment_method?: unknown; payment_status?: unknown },
+  lookupFailed: boolean,
+): boolean {
+  return lookupFailed && order.payment_method === 'online' && order.payment_status === 'paid';
 }
 
 /**
