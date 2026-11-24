@@ -743,9 +743,9 @@ refusals and the test button reports with a sentence. `reply_to` is now carried
 on the parsed target, and `email-test-config` reads it from there. Same trust
 boundary as the host guard: the settings are written under `is_admin()` (role
 and AAL2) or with the service key, so this is containment, not a defence against
-an anonymous caller. It takes effect when `operations-alert-dispatch` and
-`email-test-config` are redeployed (`OWNER_ACTIONS.md` §64); nothing is sent
-today, because external dispatch is still off, so there is no urgency.
+an anonymous caller. It has taken effect since 2026-11-24, when `operations-alert-dispatch` (v9) and
+`email-test-config` (v10) were redeployed (`OWNER_ACTIONS.md` §64); nothing is sent
+today, because external dispatch is still off.
 
 **THE CONTROL-CHARACTER CLASS IS WRITTEN WITH PROPERTY ESCAPES, since 2026-11-24, because the first
 deploy of this guard was refused at bundling.** The class was spelled with a backslash-u escape

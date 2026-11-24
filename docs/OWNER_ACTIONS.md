@@ -6003,9 +6003,9 @@ step and no deploy. After the build, a customer's stored language corrects at
 their next launch (the claim finds the row, the mismatch triggers one
 registration) or the moment they change the language.
 
-## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — `push-dispatch` and `lazywait-sync` DEPLOYED, mail deploys blocked on a one-line fix
+## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — all four functions DEPLOYED
 
-**Status, 2026-11-24 (later).** Steps 1 and 2 below are **DONE**. The pull request merged as #535 (`3d00583`) on the owner's instruction "merge 535", which is recorded as approval of the broadcast-audience change; and **`push-dispatch` was deployed as version 15** (10:56 UTC) on the owner's approval ("deploy push-dispatch") from the default branch at `2c5f7bb`: `verify_jwt` false, ezbr `f7bb6770…c0dc`, all 8 bundle files read back byte-identical to the source (compared with `cmp`), an `OPTIONS` probe returned 200, and no POST was sent. The version before it was 14. **`lazywait-sync` was then deployed as version 27** (11:12 UTC, step 3), `verify_jwt` false, ezbr `fbde0a65…3b5c`, seven of eight bundle files read back byte-identical and one comment in `_shared/lazywait.ts` (lines 496-497) re-wrapped, code identical, not redeployed for a comment. **Still open: the printed-ticket check from step 3, step 4 (`operations-alert-dispatch`, `email-test-config`) and step 5 (the native Arabic read — the pickup title is now live without it).** The text below is the original plan, kept as written.
+**Status, 2026-11-24 (later).** Steps 1 and 2 below are **DONE**. The pull request merged as #535 (`3d00583`) on the owner's instruction "merge 535", which is recorded as approval of the broadcast-audience change; and **`push-dispatch` was deployed as version 15** (10:56 UTC) on the owner's approval ("deploy push-dispatch") from the default branch at `2c5f7bb`: `verify_jwt` false, ezbr `f7bb6770…c0dc`, all 8 bundle files read back byte-identical to the source (compared with `cmp`), an `OPTIONS` probe returned 200, and no POST was sent. The version before it was 14. **`lazywait-sync` was then deployed as version 27** (11:12 UTC, step 3), `verify_jwt` false, ezbr `fbde0a65…3b5c`, seven of eight bundle files read back byte-identical and one comment in `_shared/lazywait.ts` (lines 496-497) re-wrapped, code identical, not redeployed for a comment. **The mail pair was then deployed too (step 4, below).** **Still open: the printed-ticket check from step 3 and step 5 (the native Arabic read — the pickup title is now live without it).** The text below is the original plan, kept as written.
 
 **Opened 2026-11-24.** Five findings from the full audit (F-X08-002, -003, -004,
 F-X10-001, -003) are fixed in code by one pull request. **Nothing is live until
@@ -6044,17 +6044,30 @@ request is in flight; fixing that needs a migration and is not part of this.
    in `push-dispatch` and is what makes a flag-off period safe.
 3. **DEPLOYED 2026-11-24 (v27); the ticket check below is still to do.** **Deploy `lazywait-sync`.** Look at the next kitchen ticket that carries a
    note: it should read `ملاحظة العميل / CUSTOMER NOTE: …`.
-4. **NOT DEPLOYED YET (2026-11-24).** The first attempt to deploy
+4. **DEPLOYED 2026-11-24, both.** The first attempt to deploy
    `operations-alert-dispatch` was **refused at bundling** (`_shared/smtpTarget.ts:109
    Unterminated regexp literal`), because the deploy tool decodes a backslash-u
-   escape in the text it is sent into a real line separator. Nothing was changed: it is
-   still v8, and `email-test-config` (same import) is still v9. The class is now written
-   with property escapes (`OPERATIONS_ALERTS_DIGEST.md`), the same 67 characters. **Once
-   that fix is merged, each function needs its own approval again, by name.**
-   **Deploy `operations-alert-dispatch` and `email-test-config`** whenever you
-   next redeploy mail; there is no urgency while external dispatch is off. With the
-   live sender (`from_name` «Spicy Meal», a plain `from_email`) nothing changes;
-   a sender with a line break would be refused with `smtp_sender_invalid`.
+   escape in the text it is sent into a real line separator. Nothing was changed
+   by it. The class is now written with property escapes (#540, `73f5392`;
+   `OPERATIONS_ALERTS_DIGEST.md`), the same 67 characters, and each function was
+   then deployed on its own approval, by name, from the default branch at `73f5392`:
+   - **`operations-alert-dispatch` v9** (11:36 UTC, v8 before), `verify_jwt` false,
+     ezbr `becbd97b…fe8e`; all 8 bundle files read back byte-identical.
+   - **`email-test-config` v10** (v9 before), `verify_jwt` true, ezbr
+     `ebd2c3a5…fe67` (was `78fc3844…`); all 8 bundle files read back byte-identical
+     (`cmp`, and no extra file). The read-back was re-run by me from the saved
+     `after.json`, and the live version, `verify_jwt` and ezbr were re-read from
+     the function list.
+   - **What was not done:** no POST of any kind was sent to either function (a POST
+     can run the drain or send mail), only an `OPTIONS` probe, which returned 200
+     for `email-test-config`. No flag, setting or secret was read or changed.
+     `external_dispatch_enabled` is untouched and is still the owner's to flip.
+   - **What this changes in behaviour:** a sender with a line break, control
+     character or angle bracket in the From name, From email or reply-to is refused
+     (`smtp_sender_invalid`). With the live sender (`from_name` «Spicy Meal», a plain
+     `from_email`) nothing changes. Alert mail is still off.
+   - **Not claimed:** that the live sender passes the guard end to end. That needs the
+     admin's *Send test email* button, which sends a real email and is yours to press.
 5. **Have the Arabic read** in §35 (the pickup title is customer-facing).
 
 **One behaviour to know about.** Turning the push master flag off for an
@@ -6067,7 +6080,7 @@ has moved on is superseded by the claim, and one that still holds is sent howeve
 late: the customers an outage hurt most still hear that their order failed
 (review finding on this PR).
 
-**Done looks like:** `push-dispatch` and `lazywait-sync` redeployed with the
+**Done looks like:** all four functions redeployed with the
 versions recorded here; a pickup order marked delivered pushes «Collected»; a
 broadcast sent while a test account has an open deletion request reports one
 fewer targeted device than the opt-in count.
