@@ -67,6 +67,7 @@ The admin console is panel-based rather than routed: one component per operation
 
 | Panel | Purpose |
 | --- | --- |
+| AccountDeletionReviewPanel | Account deletions held for review — the way out of `manual_review` |
 | BannerManagementPanel | Admin-only Banner Management. Admins add/enable/order/delete homepage banners shown in the mobile app (above the search bar). Accountants are… |
 | BranchDataImportPanel | @license SPDX-License-Identifier: Apache-2.0 |
 | BranchPoliciesPanel | Lazy so mapbox-gl loads only when an admin opens the zone editor |

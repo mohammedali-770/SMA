@@ -125,7 +125,14 @@ then call `auth.admin.deleteUser`. It is now closed in two places:
   deletes anything. That covers a request queued before the refusal shipped and an
   account promoted after it was queued, and it is what keeps the last
   administrator from being removed: every administrator is held, not only the last.
-  An administrator resolves it with `resolve_account_deletion_request`.
+  An administrator resolves it from the console: Operations Health, "Held account
+  deletions" (`AccountDeletionReviewPanel`), which lists every `manual_review`
+  request with its safe reason code and age and calls
+  `resolve_account_deletion_request` after a confirmation. *Close as failed*
+  releases the account lock (erases nothing); *Retry* re-queues the request, and
+  for a staff hold it only holds it again, so *Close as failed* is the exit there.
+  The RPC needs an administrator at AAL2; the panel is not shown to other roles.
+  Until 2026-11-24 nothing in the tree called the RPC (audit F-X11-001).
 
 Staff leave through `staff-accounts` (branch and call centre, which asks
 `is_admin()`: role and AAL2) or an administrator's own process. There is
