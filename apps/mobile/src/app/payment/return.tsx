@@ -62,7 +62,15 @@ export default function PaymentReturnRoute() {
       // Persist it so the shared recovery resolves exactly this charge (and so a
       // subsequent cold checkout entry resumes the same one).
       const sid = uuidParam(params.session);
-      if (sid) await savePendingSession(sid, Date.now());
+      // A link may only (re)record the checkout this device already has pending,
+      // or the first one. It must never REPLACE a different pending session: any
+      // web page or app can open this custom-scheme link with any well-formed
+      // id, and that would otherwise displace a real in-flight payment's pointer
+      // (audit finding F-TA5-001).
+      if (sid) {
+        const existing = await loadPendingSession();
+        if (!existing || existing.sessionId === sid) await savePendingSession(sid, Date.now());
+      }
 
       const rec = await recoverPendingSession({
         read: loadPendingSession,

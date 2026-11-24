@@ -4,6 +4,8 @@ import {
   cartChangedSince,
   checkoutChangedSince,
   decidePendingAction,
+  isSessionGoneError,
+  SESSION_NOT_FOUND_MESSAGE,
   describeVerifyResult,
   parsePendingSession,
   recoverPendingSession,
@@ -77,6 +79,32 @@ describe('decidePendingAction', () => {
 
 describe('recoverPendingSession', () => {
   const pending: PendingSession = { sessionId: 'sess-live', at: 100 };
+
+  it('a session this customer cannot see (server: not found) is dropped, so it cannot wedge checkout', async () => {
+    const clear = vi.fn(async () => {});
+    const verify = vi.fn(async () => { throw new Error(SESSION_NOT_FOUND_MESSAGE); });
+    const res = await recoverPendingSession({ read: async () => pending, verify, clear });
+    expect(res).toEqual({ kind: 'cleared' });
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['a network failure', new Error('Network request failed')],
+    ['a platform "function not found" (function down or not deployed)', new Error('Requested function was not found')],
+    ['a server fault', new Error('Internal error')],
+  ])('%s keeps the pointer for a later retry', async (_name, err) => {
+    const clear = vi.fn(async () => {});
+    const res = await recoverPendingSession({ read: async () => pending, verify: async () => { throw err; }, clear });
+    expect(res).toEqual({ kind: 'resume', sessionId: 'sess-live' });
+    expect(clear).not.toHaveBeenCalled();
+  });
+
+  it('isSessionGoneError matches only the server sentence, on a real Error', () => {
+    expect(isSessionGoneError(new Error(SESSION_NOT_FOUND_MESSAGE))).toBe(true);
+    expect(isSessionGoneError(new Error('Checkout session not found.'))).toBe(false);
+    expect(isSessionGoneError(SESSION_NOT_FOUND_MESSAGE)).toBe(false);
+    expect(isSessionGoneError(null)).toBe(false);
+  });
 
   it('no pending session -> none (safe to begin a new checkout)', async () => {
     const clear = vi.fn(async () => {});

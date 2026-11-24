@@ -289,7 +289,7 @@ documented by Moyasar; a page that ignores it is unharmed.
 | Every request to Moyasar (proxy) | `supabase/functions/_shared/moyasarHttp.ts` |
 | App: payment WebView screen | `apps/mobile/src/app/payment/checkout.tsx` |
 | App: WebView navigation policy | `apps/mobile/src/features/checkout/webviewPolicy.ts` |
-| App: interrupted-payment recovery | `apps/mobile/src/features/checkout/pendingSession.ts` |
+| App: interrupted-payment recovery (saved checkout pointer: set only by checkout or by a link that matches it; dropped when verify says the session is not the caller's, see `ORDER_CONFIRMATION_FLOW.md` §6a) | `apps/mobile/src/features/checkout/pendingSession.ts`, `apps/mobile/src/app/payment/return.tsx` |
 | Console: payment card, panel, receipt | `src/components/admin/IntegrationCard.tsx`, `MoyasarPaymentPanel.tsx`, `view/orders/PaymentDetails.tsx` |
 | Console: Online Payment switch guard | `src/lib/onlinePaymentGate.ts` |
 | Post-payment POS handoff (kick + online-payment attach) | `supabase/functions/_shared/paymentSync.ts` |

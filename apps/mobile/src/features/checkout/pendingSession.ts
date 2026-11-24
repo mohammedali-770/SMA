@@ -198,6 +198,23 @@ export function refusalDropsSession(init: { status?: string | null; reason?: str
   return init.status === 'disabled' && init.reason === 'amount_below_minimum';
 }
 
+/**
+ * What payment-verify answers (HTTP 404) when the signed-in customer cannot see
+ * the checkout session: it never existed, or it belongs to somebody else (row
+ * level security hides it). Either way THIS customer can never resume it, so a
+ * saved pointer to it is dead weight rather than something to retry. Pinned
+ * against the server's string in pendingSessionPointerWiring.test.ts.
+ *
+ * Only this exact server sentence counts. A platform "function not found" (a
+ * function that is down or not deployed) carries no such sentence, so an outage
+ * still keeps the pointer.
+ */
+export const SESSION_NOT_FOUND_MESSAGE = 'Checkout session not found';
+
+export function isSessionGoneError(err: unknown): boolean {
+  return err instanceof Error && err.message === SESSION_NOT_FOUND_MESSAGE;
+}
+
 export type RecoverResult =
   | { kind: 'none' }                        // nothing pending → safe to begin a new checkout
   | { kind: 'receipt'; orderId: string }    // the pending payment succeeded → go to the receipt
@@ -234,7 +251,16 @@ export async function recoverPendingSession(deps: {
   let res: VerifyOutcome | null = null;
   try {
     res = await deps.verify(pending.sessionId);
-  } catch {
+  } catch (e) {
+    // A session this customer cannot see can never be resumed by them: drop the
+    // pointer instead of retrying for ever. Without this, a stale pointer (a
+    // forged return link, or the previous account on a shared phone) sent every
+    // later checkout, cash included, into resuming a checkout that was not
+    // theirs (audit findings F-TA5-001 and F-TA5-002).
+    if (isSessionGoneError(e)) {
+      await deps.clear();
+      return { kind: 'cleared' };
+    }
     res = null; // transient — keep the session for a later retry
   }
 
