@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**299 TypeScript test files declaring 4391 test blocks, plus 104 SQL suites.**
+**300 TypeScript test files declaring 4397 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -169,7 +169,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-111 files, 1475 declared test blocks.
+112 files, 1481 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -204,7 +204,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/loyaltySettingsReread.test.ts` | 25 | mapLoyaltyRedemption — a bad row is never looser than no row |
 | `apps/mobile/src/features/checkout/paymentUxWiring.test.ts` | 12 | the customer never reads raw server text after a payment error |
 | `apps/mobile/src/features/checkout/paymentWebViewWiring.test.ts` | 14 | CheckoutScreen opens the hosted page only in the in-app WebView |
-| `apps/mobile/src/features/checkout/pendingSession.test.ts` | 44 | parsePendingSession |
+| `apps/mobile/src/features/checkout/pendingSession.test.ts` | 47 | parsePendingSession |
+| `apps/mobile/src/features/checkout/pendingSessionPointerWiring.test.ts` | 3 | the client constant is the sentence the server really sends |
 | `apps/mobile/src/features/checkout/pendingSessionStore.test.ts` | 5 | savePendingSession keeps a checkout tied to the cart it was begun for |
 | `apps/mobile/src/features/checkout/previewParity.test.ts` | 8 | checkout preview matches compute_order_snapshot (PG-31) |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 51 | lineTotal |
