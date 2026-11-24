@@ -513,8 +513,8 @@ instead of the live config row.) Field-by-field state:
     / «Apple Pay - مدى»; an unknown brand keeps ONLINE CREDIT CARD
     (`posPaymentNames`). Measured the same day: 12 of 13 paid card payments
     were Apple Pay on mada, 1 a Visa card.
-  - **A TEST payment says so (2026-11-22, audit finding F-EFP-05-001; on
-    the branch, not yet deployed):** when the paid record's `mode` is `test`
+  - **A TEST payment says so (2026-11-22, audit finding F-EFP-05-001; deployed
+    2026-11-22 with `lazywait-sync` v25):** when the paid record's `mode` is `test`
     (a Moyasar test card, admitted only by the testing-phase switch for a
     listed customer, `docs/PAYMENTS.md` §3), the label is prefixed
     `TEST - ` / «اختبار - », for example `TEST - VISA` / «اختبار - فيزا». The
@@ -1155,6 +1155,11 @@ error kinds, not observed on this project's Edge runtime** — if its messages
 differ, the failure simply stays ambiguous (the previous behaviour). A health
 probe or breaker, so a known-down POS holds orders instead of burning each one,
 is not part of this change.
+
+**Deployed 2026-11-24 as `lazywait-sync` v26** (with the paid-lookup deferral of
+`docs/PAYMENTS.md`, #526), so the sweeps and the connect-failure classification
+above are live. One comment in `_shared/lazywait.ts` (lines 496-499) differs from
+the repository in its line wrapping; the code is identical.
 
 ## Online payment (prepared, not live)
 *Changed 2026-11-12: this said "the Geidea webhook". The provider is Moyasar
