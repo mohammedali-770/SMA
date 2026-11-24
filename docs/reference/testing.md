@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**312 TypeScript test files declaring 4506 test blocks, plus 105 SQL suites.**
+**314 TypeScript test files declaring 4522 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -289,11 +289,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-142 files, 1885 declared test blocks.
+144 files, 1901 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `src/App.test.tsx` | 12 | console shell — unknown identity (#415 P1) |
+| `src/components/admin/AccountDeletionReviewPanel.test.tsx` | 9 | AccountDeletionReviewPanel |
 | `src/components/admin/BranchDataImportPanel.test.tsx` | 12 | BranchDataImportPanel — working hours |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
 | `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
@@ -372,6 +373,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/design-system/ui/typographyLanguage.test.tsx` | 10 | console typography follows the active language |
 | `src/legal/legalPage.test.ts` | 26 | slugForType |
 | `src/legal/prerender.test.ts` | 17 | escapeHtml — the whole reason this module can use string concatenation |
+| `src/lib/accountDeletionReviewApi.test.ts` | 7 | accountDeletionReview.list |
 | `src/lib/adminPushApi.test.ts` | 7 | sendAdminPushConfirmation |
 | `src/lib/api.test.ts` | 8 | admin.deleteBranch |
 | `src/lib/auditGate.test.ts` | 26 | audit gate — the real 2026-11-18 web shape |

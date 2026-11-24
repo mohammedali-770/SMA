@@ -28,6 +28,7 @@ import { OperationsAlertsCapability, operationsAlertsTabVisible } from '../lib/o
 import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
+import { AccountDeletionReviewPanel } from './admin/AccountDeletionReviewPanel';
 import { CompMembersPanel } from './admin/CompMembersPanel';
 import { CouponsPanel } from './admin/CouponsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
@@ -350,7 +351,14 @@ export const AdminDashboard: React.FC = () => {
           {/* TAB: OPERATIONS HEALTH CENTER (staff read-only observability).
               Mounted only when the capability probe does not confirm a missing RPC. */}
           {activeTab === 'health' && healthVisible && (
-            <OperationsHealthPanel lang={adminLang} onNavigate={(tab) => setActiveTab(tab)} />
+            <div className="space-y-8">
+              <OperationsHealthPanel lang={adminLang} onNavigate={(tab) => setActiveTab(tab)} />
+              {/* The way out of the "Manual review" count above (F-X11-001).
+                  Admin only: the RPC is is_admin()-gated (role AND AAL2), so an
+                  accountant who can see the count is not offered a button the
+                  server would refuse. */}
+              {canTriage && <AccountDeletionReviewPanel lang={adminLang} />}
+            </div>
           )}
 
           {/* TAB: OPERATIONS ALERTS + DAILY DIGEST (inbox/digest; admin-only settings).
