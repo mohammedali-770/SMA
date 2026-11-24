@@ -5,6 +5,7 @@ import {
   posCardType,
   posIsPaidFlag,
   posOrderPayments,
+  posPaidLookupMustDefer,
   posPaymentNames,
   posWarnings,
 } from './posPaidFlag.ts';
@@ -37,6 +38,23 @@ describe('posIsPaidFlag: a ticket is created paid only when the payment is certa
   it('cash is never marked paid at creation', () => {
     expect(posIsPaidFlag({ payment_method: 'cash', payment_status: 'paid' }, captured)).toBeUndefined();
     expect(posIsPaidFlag({ payment_method: 'cash', payment_status: 'pending' }, captured)).toBeUndefined();
+  });
+});
+
+describe('posPaidLookupMustDefer: a failed lookup holds back a card-paid order and nothing else (F-D2-001)', () => {
+  it('an online order the row calls paid, with a failed lookup, is deferred', () => {
+    expect(posPaidLookupMustDefer({ payment_method: 'online', payment_status: 'paid' }, true)).toBe(true);
+  });
+
+  it('a lookup that did not fail never defers', () => {
+    expect(posPaidLookupMustDefer({ payment_method: 'online', payment_status: 'paid' }, false)).toBe(false);
+  });
+
+  it('cash, and online orders the row does not call paid, are never deferred, whatever the lookup did', () => {
+    expect(posPaidLookupMustDefer({ payment_method: 'cash', payment_status: 'paid' }, true)).toBe(false);
+    for (const status of ['pending', 'failed', 'refunded', null, undefined]) {
+      expect(posPaidLookupMustDefer({ payment_method: 'online', payment_status: status }, true)).toBe(false);
+    }
   });
 });
 

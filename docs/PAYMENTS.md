@@ -169,6 +169,51 @@ stored invoice id, the amount matches in halalas, the currency matches, and the
 webhook's `live` flag (when present) matches the attempt's mode. The secret key
 is chosen by the **attempt's** stored mode. Detail: API reference §7.
 
+### What the webhook answers (2026-11-24, audit F-X09-001)
+
+Moyasar redelivers a non-2xx webhook on a fixed ladder (immediate, +1m, +10m,
++30m, +1h, +2h; API reference §6.2) and then **drops** it. A 200 therefore ends
+that safety net at once. Before this change `payment-webhook` answered 200 in
+five situations where a retry could still have confirmed a captured payment, and
+the three of them the owner can correct now answer 503 and leave one log row.
+The deciding question for each is: *could the same event succeed if it came
+back later, and is it ours?*
+
+| Situation | Answer | Why |
+| --- | --- | --- |
+| Body is not JSON | 400 | Unchanged. |
+| `webhook_verification` event | 200, code stored | Unchanged. Sent once, never retried (§8.2), so it is recorded before every other gate. |
+| No `payment` row in `integration_settings` | 200 `ignored` | No row means card payment was never set up, so no attempt can exist to confirm. Nothing to wait for. |
+| Provider is not Moyasar | 200 `ignored` | A deliberate provider change, not a temporary state; `payment-initiate` opens no invoice under it. |
+| **Row disabled** (`enabled = false`) | **503 `retry`** and a log row, *if* the token matches a configured Moyasar token, the type is handled, and the event is for the mode the gateway runs; otherwise 200 `ignored` | A switch the owner can undo. A payment captured while it was off is confirmed by the redelivery after it is back on. Needing a matching token keeps an unauthenticated caller from filling the log. |
+| **No webhook secret for the event's mode** | **503 `retry`** and a log row, if the type is handled and the mode is the one the gateway runs; otherwise 200 `ignored` | A configuration gap the owner can close. The token cannot be checked, so this is the one 503 any caller can trigger; it is bounded by Moyasar's six deliveries per event and by the row being one small insert. |
+| Secret token does not match | 401, log row `secret token mismatch` | Unchanged. |
+| Event type outside `HANDLED_WEBHOOK_TYPES` | 200 `acknowledged` | Redelivery cannot help. Never a retry, in any state above. |
+| Event for the mode the gateway does **not** run (a TEST event on a LIVE gateway, or the reverse) | 200 in every case above | A sandbox account can send these for ever, and its secret and attempts are not ours to configure. Never an endless retry. |
+| Admin sandbox invoice | 200 `admin_test` | Unchanged. |
+| Payment matches no attempt (`unknown payment`) | 200, log row `unknown payment`, loud log line | Unchanged on purpose. Admin sandbox invoices and other systems on the same Moyasar account end here by design, so a 503 would retry them all. The gap this leaves is the sweep below. |
+| Payment found, **no secret key for the attempt's mode** | **503 `retry`** and a log row, if the attempt's mode is the one the gateway runs; otherwise 200 `cannot verify` | We cannot re-fetch the payment without the key, and the owner can add it. |
+| Payment found, **body carries no payment id** | 200 `cannot verify`, log row `webhook without a payment id` (status `skipped`) | The same body would come back; redelivery cannot help. |
+| Re-fetch from Moyasar fails | 503 | Unchanged. |
+| Stamp, read-back or confirm RPC could not complete | 503 | Unchanged (F-D2-002, §6 "Retried, not abandoned"). |
+| Paid and confirmed, a duplicate, a decline | 200 | Unchanged. |
+
+The log rows the new 503 answers write are `integration_sync_logs`, provider
+`moyasar`, direction `webhook`, status `failed`, error `webhook_deferred_provider_disabled`,
+`webhook_deferred_webhook_secret_missing` or `webhook_deferred_secret_key_missing`.
+The request column holds the event id, the type, the payment id (each cut to 64
+characters or fewer), and the mode. It never holds the token, the key or the
+body. These errors are none of `finalize_failed` and `confirm_failed`, which is
+all watchdog rule R17 and its partial index read, so **a deferral raises no
+alert**: a console reader finds it by searching the log, and it ends when the
+redelivery confirms the payment. At most six rows per event, then Moyasar
+stops.
+
+What this does not do: a disabled provider or missing secret that lasts longer
+than the ladder (about 3.7 hours) still loses the event. `payment-verify` and
+the console's Re-verify still confirm the payment when the customer returns or
+an administrator asks; only the sweep below would catch the rest.
+
 ### Amounts
 
 - Moyasar takes **minor units**: 1.00 SAR is `100`. The conversion lives in one
@@ -1568,7 +1613,10 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   checkouts too and does not move the state. **Open, not built:** a sweep that
   asks Moyasar about each attempt still open after its invoice expired, and
   confirms or flags the ones that were paid. That is a new scheduled job and a
-  deploy, so it is its own change.
+  deploy, so it is its own change; the design is under "Reconciliation sweep
+  (designed, not built)" below. Since 2026-11-24 the webhook asks Moyasar to
+  redeliver when it cannot process an event for a reason the owner can fix (§2,
+  "What the webhook answers"), which narrows this gap without closing it.
 - **The Online Payment guard is console-only** (§3).
 - **The webhook verification code is accepted while the row is disabled**, by
   design, because it is sent once. Anyone holding a configured token can make the
@@ -1620,6 +1668,81 @@ applied 2026-11-14):
   applied on 2026-11-18** (ledger row 120). The check then parks the order instead
   of sending it. It touches no payment or refund: a paid order parked this way
   is still a hand refund, as for any cancelled paid order (above).
+
+### Reconciliation sweep (designed, not built)
+
+Written for the owner to decide on (audit F-X09-001). **Nothing here exists.** No
+function, no migration, no cron job. Building it is a code change through a pull
+request; turning it on is a sequence of owner approvals under CLAUDE.md §5.
+
+**The gap.** Confirming a captured payment needs an outside trigger: Moyasar's
+webhook, the customer's app calling `payment-verify`, or an administrator's
+Re-verify. If the customer pays and closes the app, and the webhook is not
+delivered (or its ladder, about 3.7 hours, runs out during an outage), the
+attempt stays `initiated` with no `provider_ref`. It reads exactly like an
+abandoned checkout, no watchdog rule sees it, and nobody is told that money was
+taken with no order.
+
+**What it would query.** Attempts that could hold a payment nobody confirmed:
+
+- `payment_records` with `provider = 'moyasar'`, `status = 'initiated'`,
+  `provider_checkout_ref` not null (an invoice exists), `failure_code` null, and
+  not a recorded duplicate (`NOT_A_DUPLICATE_FILTER`);
+- created more than 5 minutes ago, so a payment in flight is left to the normal
+  paths, and still inside a lookback window (24 hours would match the figure
+  `open_unverified_24h` already shows);
+- not looked at in the last 5 minutes (`last_verified_at`), oldest first, at most
+  20 per run.
+
+**Which function and schedule.** A new Edge Function, `payment-reconcile`,
+following the refund worker's shape: `verify_jwt = false`, a trigger secret in
+the `x-reconcile-secret` header compared timing-safe against a value held in the
+payment settings row, a bounded batch, and a fail-closed preflight (Moyasar is
+the configured, enabled provider; the key for the attempt's mode exists). For
+each attempt it would call the **existing** `verifyMoyasarAttempt()`, which
+fetches the invoice, closes it when Moyasar has expired or cancelled it, and
+otherwise runs the same `validateAndConfirmMoyasarPayment` every other path runs.
+No new confirmation logic. It would be driven by a `pg_cron` job every 5
+minutes through an `invoke_payment_reconcile_processor()` function modelled on
+`invoke_payment_refund_processor()` (`20260729090000`), created **inactive**.
+
+**What it would write.** Only what the existing path writes: `payment_records`
+(`last_verified_at`, `raw`, and `status` / `failure_code` when an invoice closes
+or a payment settles), the order or checkout-session RPCs' own effects on a
+confirmed payment, and the existing `finalize_failed` / `confirm_failed` log rows
+when a confirmation fails, which R17 already turns into an incident. It adds no
+table. It would add one summary log line per run (counts only, no ids). A paid
+payment it finds is confirmed exactly as the webhook would have confirmed it.
+
+**What it would not do.** It does not refund anything. A payment on an invoice
+nobody stored (the sibling-invoice case, §2) is outside its query; the
+webhook's own sibling lookup is the only path for that. It does not touch
+TEST attempts when the gateway runs LIVE, and the confirmation guard still
+refuses a TEST attempt that is not on the tester allowlist.
+
+**Cost.** At most 20 invoice reads per run, serial, through the same proxy and
+Allowed-IPs path as every Moyasar call (§8.1), so it adds nothing to the
+IP-allowlist work and fails closed with the same `moyasar_proxy_unsupported`
+message if the proxy is unavailable.
+
+**Live steps it would need, each a separate owner approval.**
+
+1. Merge the pull request that adds the function, its tests and the migration.
+2. Apply the migration (the `invoke_payment_reconcile_processor()` function, the
+   inactive cron job, and a partial index on the query above), named by version,
+   one call, verified afterwards; the money-path hashes are unaffected.
+3. Deploy `payment-reconcile` (`verify_jwt = false`) and set its trigger secret
+   without it crossing the wire (generated inside Postgres, as the refund and
+   alert-dispatch secrets were).
+4. Run it once by hand and read the result before the cron is activated.
+5. Activate the cron job.
+
+**Decisions the owner would make first.** The lookback window; whether an
+attempt still `initiated` after the sweep has confirmed nothing should open a
+watchdog incident of its own (a `PAYMENT_UNVERIFIED` rule, which would be a
+second migration); and whether a payment found after its invoice expired should
+be confirmed automatically or left for an administrator (§11 Q6 is the open
+question about late 3-D Secure completions).
 
 ---
 
