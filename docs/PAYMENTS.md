@@ -731,6 +731,37 @@ dialog) is in flight. Older builds keep a short window here; see §12.
 
 ---
 
+### A cash retry with other details, and a retry while an expired checkout can still be paid (audit F-D1-001, F-D1-003)
+
+Written 2026-11-24, **not applied**: `20261024120000_cash_order_input_match_expired_session_lookup`
+(`MIGRATIONS.md` §76). Two gaps the F-X02-001 fix left.
+
+**Cash (F-D1-001).** `place_order` returns the order that holds (customer, key)
+without comparing anything, and the app's cash key is the cart key, which stands
+for the items only. A customer whose order was written but whose response was
+lost, who then changed pickup to delivery (or the branch, address, coupon, notes
+or points) and tapped Confirm, was shown success for the first order.
+`place_customer_order` now compares: the same sha256 the card path stores
+(`checkout_input_fingerprint`, one function for both) is kept per order in
+`order_input_fingerprints`, and a retry under the same key with different inputs
+raises `checkout_session_mismatch: order_placed` (P0001), which every installed
+build already maps to `checkoutAlreadyPlaced`. A retry with the same inputs
+replays the order as before: no second ticket, no second redemption. An order
+placed before the migration has no fingerprint and is replayed as it always was.
+`place_order` itself is not redefined.
+
+**Card (F-D1-003).** A checkout session lives 30 minutes; the payment attempt
+opened inside it lives up to 60 more, and `finalize_checkout_session` accepts an
+`expired` session. The retry lookup skipped an expired session, so the same key
+and inputs opened a second session and a second payable invoice. It now finds an
+expired, unconsumed session that has an `initiated` attempt inside its own
+`expires_at`, or an `authorized` one, and raises `checkout_session_mismatch:
+payment_open` instead of opening another; different inputs hit the same refusal.
+A failed, cancelled or lapsed attempt holds nothing, and the 24-hour
+late-settlement grace of `checkout_session_may_still_capture` is deliberately not
+applied to a customer's retry. Note: `checkoutEarlierPaymentOpen` still says
+"for different order details", which is slightly off for the same-inputs case.
+
 ### A checkout whose order details changed (audit F-X02-001)
 
 Written 2026-11-22. The migration
@@ -775,7 +806,8 @@ checkout as `checkoutKey`, and Place Order offers a checkout begun for other
 details to the same `action: 'abandon'` as a changed cart. Screen entry still
 compares the cart key only, because the details shown there are defaults, not
 the customer's choice. Cash keeps the cart key (`place_order` uses it to return
-the order already placed after a lost response).
+the order already placed after a lost response); since `20261024120000` the
+server compares that retry's inputs too, see the next section.
 
 Before opening a payment page the app compares the session's server total with
 the total on screen, to the halala, and opens nothing on a difference:

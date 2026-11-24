@@ -1821,6 +1821,7 @@ production.
 | 126 | 20261023120000 | payment_records_retention_and_limits | `2dca585b3a8a` | 20261122072301 | payment_records_retention_and_limits | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-22 07:23:01 UTC** on explicit owner approval ("apply 20261023120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **172 → 173**. §73. Merged in #514 as `ec44ea6`. The SQL sent is the whole merged file (sha256 `2dca585b…`, 666 lines / 36 204 bytes), comments included. **Before, read live:** `anonymize_account_data` (`c44b5c79…` / 4 504) and `set_order_number` (`ed203eeb…` / 256) exactly the pre-images, one overload each; `payment_records_checkout_session_id_fkey` was `ON DELETE CASCADE`; `payment_records_owner_ck` as expected; 0 paid card orders without a payment record (3 zero-total online orders, by design); 27 payment records, 27 sessions, 0 sessions with an over-long item note, `order_number_seq` at 114. **After, read live:** all four stored bodies equal hashes pre-computed from the merged file (`anonymize_account_data` `9f639ec0…` / 5 701, `set_order_number` `45a4521e…` / 323, `checkout_session_drop_attempt_records` `1734cb4e…` / 127, `enforce_checkout_session_item_notes` `17c270d0…` / 458), one overload each; the FK is `ON DELETE SET NULL`, validated, with `payment_records_owner_ck` and `payment_records_order_id_fkey` unchanged; both new triggers enabled on `checkout_sessions` beside the three it already had; no client role can execute the new functions or `anonymize_account_data`; 27 / 27 / 104 rows and `order_number_seq` 114 unchanged (the apply drew no order number); `set_orders_number` still enabled on `orders`; the money-path pair and the other checkout functions unchanged. 8 payment records have no order (abandoned attempts): they are still deleted with their session, as before. Text outside the stored bodies cannot be verified after the fact. Original description follows. **WRITTEN 2026-11-22, UNAPPLIED.** §73. Three audit findings: F-DBM-04-001 (`payment_records.checkout_session_id` becomes `ON DELETE SET NULL`, a BEFORE DELETE trigger on `checkout_sessions` removes only order-less attempt records, and `anonymize_account_data` detaches and counts the records of retained orders, so a paid card order keeps its payment record through both erasure routes); F-DBM-02-001 (`set_order_number` pads to six digits and no longer truncates past 999 999); F-DBM-17-001 (`trg_checkout_sessions_item_note_length` refuses an item note over 140 characters when the session is created, before payment). Redefines `anonymize_account_data` and `set_order_number` only, each guarded by its pre-image. No existing row changed. No deploy implied. **MONEY PATH UNTOUCHED** (measured on the chain; not hard-coded in the file). Replace this row when the file is applied. |
 | 127 | 20261020120000 | checkout_session_input_match | `4df49c5593d2` | 20261122071547 | checkout_session_input_match | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-22 07:15:47 UTC** on explicit owner approval ("apply 20261020120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **170 → 171**. §74. Merged in #515 as `a56b3f8`. The SQL sent is the whole merged file (sha256 `4df49c55…`, 477 lines / 25 520 bytes), comments included. **Before, read live:** `begin_checkout_session` exactly the pre-image (`md5(prosrc)` `1cc3338f…` / 6 408, `pg_get_functiondef` `11931d25…`), one overload, the column absent, **0 live pending checkout sessions**. **After, read live:** the stored body equals the post-image pre-computed from the merged file (`bb7292aa…` / 9 228, `5e274a8d…`); `checkout_sessions.input_fingerprint` is `text`, nullable, and no existing row has a value (27 sessions, none fingerprinted); SECURITY DEFINER with `search_path=public`; anon cannot execute it, authenticated can; `begin_session_attempt`, `insert_order_from_snapshot`, `finalize_checkout_session`, `place_order` and `compute_order_snapshot` hash as they did before this file. **The file's header said online payment was off in Production; the live read showed `app_settings.online_payment_enabled` = `true`.** That made no difference here (nothing live to match), and `docs/PAYMENTS.md` §1 is updated with the finding. The app half still ships only with the next EAS build. Text outside the stored body cannot be verified after the fact. Original description follows. **WRITTEN 2026-11-22, UNAPPLIED.** §74. Audit F-X02-001 (high): `begin_checkout_session` reused a live or settled session for the same key whatever the call asked for, so a changed order type, branch, address, coupon, points or notes was invoiced at the OLD total and produced the OLD order. Adds `checkout_sessions.input_fingerprint`; the lookup reuses only on a matching fingerprint, retires a `pending_payment` session whose attempts are all dead to `expired` and prices a new one, and otherwise raises `checkout_session_mismatch: payment_open` / `order_placed` (P0001). An unknown branch is refused before the lookup. Redefines `begin_checkout_session` only. No row written, grants re-stated unchanged. No deploy implied; the app half ships in an EAS build. **MONEY PATH UNTOUCHED** (`place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `finalize_checkout_session`, `begin_session_attempt` asserted unmoved against pre-images read by the file). Replace this row when the file is applied. |
 | 128 | 20261022120000 | pos_resend_refund_guards | `21229514999b` | 20261122064937 | pos_resend_refund_guards | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-11-22 06:49:37 UTC** on explicit owner approval ("apply 20261022120000", named by version), via MCP `apply_migration`, **one call**; it returned `{"success":true}`. History **168 → 169**. §75. Merged in #516 as `a7a7e10`. The SQL sent is the whole merged file (sha256 `21229514999b…`, 890 lines / 49 914 bytes), comments included. **Before, read live:** the four prerequisites present by name (`20261114172737`, `20261118045145`, `20261118055554`, `20261119051739`), all five pre-images exact (the four replaced bodies and `set_order_refund_enrollment`'s markers), one `claim_order_refund`, no guard function or trigger, money-path pair `12b6816d…` / `22e2d429…`. **After, read live:** all five stored bodies equal hashes pre-computed from the merged file BEFORE sending (`begin_lazywait_create_attempt` `73b44b2c…` / 3 144, `claim_order_refund` `782e584c…` / 1 731, `guard_order_progress_refund` `6f1511e5…` / 1 039, `request_customer_pos_resend` `6a1bc2be…` / 4 212, `requeue_lazywait_order` `3cf675f3…` / 2 627), one overload each; `set_orders_refund_progress_guard` enabled; anon cannot execute any, authenticated only the two client RPCs; the file's rolled-back probe left 0 orders and 0 branches; money-path pair unchanged. **No refund was pending or processing on any order** at the time, so nothing was held back. Text outside the stored bodies cannot be verified after the fact. Original description follows. **WRITTEN 2026-11-22, UNAPPLIED.** §75. Audit findings F-X04-001, F-X03-002, F-X04-002 (high, confirmed). `begin_lazywait_create_attempt` refuses and parks an order with any refund lifecycle (`refund_started`) or one already ready, out for delivery or delivered (`order_progressed`); `request_customer_pos_resend` refuses an order whose status left `received` (`order_in_progress`); `requeue_lazywait_order` refuses any refund lifecycle and any status but `received`; `claim_order_refund` takes a refund only while its order is `received` or `cancelled`; new BEFORE trigger `set_orders_refund_progress_guard` undoes the POS-failure enrolment on a progressed order and refuses any status change but cancelling while a refund is pending, processing or refunded. No signature, no row written, no grant widened. No deploy implied. **MONEY PATH UNTOUCHED** (asserted). Replace this row when the file is applied. |
+| 129 | 20261024120000 | cash_order_input_match_expired_session_lookup | `9af0fe9cf0bd` | — | — | — | E | **NOT APPLIED** (written 2026-11-24; no live read made by this change) | CONFIRMED | apply on explicit owner approval, **named by version** | high if `db push` | **WRITTEN 2026-11-24, UNAPPLIED.** §76. Audit F-D1-001 and F-D1-003 (both medium). F-D1-001: a cash retry under the same idempotency key with DIFFERENT inputs was answered with the old order; `place_customer_order` now compares a stored fingerprint (`order_input_fingerprints`, new, closed to clients) and refuses with `checkout_session_mismatch: order_placed`, replaying only an identical retry or an order that has no fingerprint. F-D1-003: `begin_checkout_session` skipped an EXPIRED session whose attempt could still be paid, so the same inputs opened a second invoice; its lookup now finds such a session and raises `checkout_session_mismatch: payment_open`. New function `checkout_input_fingerprint` (the 20261020 expression, shared by cash and card). Redefines `begin_checkout_session` and `place_customer_order` only; **MONEY PATH UNTOUCHED** (`place_order` `7078c7dd…`, `compute_order_snapshot` `22e2d429…`, `insert_order_from_snapshot`, `finalize_checkout_session`, `begin_session_attempt` asserted unmoved). No row written, no deploy implied. Replace this row when the file is applied. |
 
 Reconciliation check: the rows above detail **122 repository rows, 119 of which
 carry a live version** (recomputed 2026-11-18 when row 122 was added unapplied;
@@ -11275,3 +11276,115 @@ and the money path.
 4. Rollback, if ever wanted: drop the trigger and its function, and re-create
    the four pre-image bodies (sections 1 and 2 of `20261015120000`, section 1
    of `20261012120000`, section 2 of `20261016120000`). No data is lost.
+
+## 76. A cash retry is answered only for its own inputs; a card retry waits for an open payment — WRITTEN 2026-11-24 (ledger row 129)
+
+`20261024120000_cash_order_input_match_expired_session_lookup.sql`. **Written
+2026-11-24 on branch `fix/checkout-idempotency-and-expired-session-20261124`,
+validated on a local chain, awaiting owner approval.** Audit findings F-D1-001
+(cash) and F-D1-003 (card), both medium, from the 2026-11-19 audit's tier B
+slice D1. Section 76 and row 129 follow §75 / row 128 on the default branch at
+`c1de1f9`; sibling fix branches were written the same day and may need these
+numbers moved at merge.
+
+sha256 `9af0fe9cf0bda20afb91fd64661ecfc5e7648377fedfb5e421c6b39c572f3c34`, 1 097 lines / 62 254 bytes.
+**Re-hash the MERGED copy before applying**, per §15.
+
+### What it changes
+
+- **`checkout_input_fingerprint(...)`**, new, STABLE, executable by
+  `service_role` only. The expression 20261020 wrote inline in
+  `begin_checkout_session`, moved into one function; the file asserts it equals
+  that expression on two probes, so every stored session fingerprint still
+  matches, and that each of the seven inputs moves it.
+- **`order_input_fingerprints(order_id, fingerprint, created_at)`**, new. One row
+  per order `place_customer_order` creates under a key. A side table rather than
+  an `orders` column, so no UPDATE fires `orders`' twelve triggers. RLS on, no
+  policy, every client privilege revoked, `ON DELETE CASCADE`.
+- **`place_customer_order`** (cash). After the per-customer advisory lock it
+  already takes, it reads the order holding the key. Same fingerprint: falls
+  through and `place_order` replays it (no second ticket, no second redemption).
+  Different fingerprint: `checkout_session_mismatch: order_placed` (P0001) with
+  the card path's DETAIL and HINT, a sentence every installed build already
+  translates (`checkoutAlreadyPlaced`). No fingerprint row (an order placed
+  before this file): replayed as before. A new order is stamped in the same
+  transaction; a replayed order never is. `place_order` is not redefined: the
+  only caller is this wrapper (`place_order` is `service_role`-only, and
+  `order-intake` calls the wrapper as the customer).
+- **`begin_checkout_session`** (card). Fingerprint via the shared function. The
+  lookup now also finds an `expired`, unconsumed session that has an `initiated`
+  attempt inside its own `expires_at`, or an `authorized` one. For the SAME
+  inputs it raises `checkout_session_mismatch: payment_open` (an expired session
+  is never handed back: `begin_session_attempt` would refuse it); for DIFFERENT
+  inputs the existing payment_open rule applies. The scenario is real in code: a
+  session lives 30 minutes, an attempt opened inside it up to 60 more, and
+  `finalize_checkout_session` accepts `expired`; online payment is on in
+  Production (ledger row 127). A failed, cancelled or lapsed attempt holds
+  nothing, and the 24-hour grace of `checkout_session_may_still_capture` is NOT
+  extended to a customer's retry, so the longest a retry waits is the attempt's
+  own window, and abandoning the payment ends it at once.
+
+### What it does not do
+
+- `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`,
+  `finalize_checkout_session`, `begin_session_attempt` and
+  `checkout_session_may_still_capture` are read into a session setting at the
+  top and asserted unmoved at the end (`md5(pg_get_functiondef)`; on the local
+  chain `place_order` `7078c7ddc36eb5eb0f7b0fc86b26dc8d`, `compute_order_snapshot`
+  `22e2d42935459e7bf93abb2941b56325`, `insert_order_from_snapshot`
+  `da9e57fe5da7ed0d5fc9895a4fb118de`).
+- **THE TWO HASHES THAT MOVE:** `begin_checkout_session`
+  `5e274a8d2e8be25af9343f41b80df177` -> `6bbcfb658a8573c9bc59e4258738f412`;
+  `place_customer_order` `971aa034eaffae72a38c030134aa4615` ->
+  `4a0a4acce1357f59b0490acd39b7247e`. Record the live values at apply time.
+- Late settlement after an attempt's window, and orders placed before the file
+  (no fingerprint), behave as before. No Edge Function, no app code, no deploy.
+  `checkoutEarlierPaymentOpen` still says "for different order details", slightly
+  off for the same-inputs case.
+
+### Pre-image and post-image, measured on the local chain
+
+| | `md5(prosrc)` | `md5(pg_get_functiondef)` |
+| --- | --- | --- |
+| `begin_checkout_session` pre (`20261020120000`) | `bb7292aa64d8ac6d7c3a11b30a477b30` | `5e274a8d2e8be25af9343f41b80df177` |
+| `begin_checkout_session` post | `ea2b09b6ae8596608b1361171615819b` | `6bbcfb658a8573c9bc59e4258738f412` |
+| `place_customer_order` pre (`20261012120000`) | `dc7d0f140c6d987ed46cb6cf0c9fdc59` | `971aa034eaffae72a38c030134aa4615` |
+| `place_customer_order` post | `df9738542b901dd4438529019136012e` | `4a0a4acce1357f59b0490acd39b7247e` |
+| `checkout_input_fingerprint` | `457454b2b8d2b21314658197e83bda75` | `f3639416f00cad0a518d258fd58537c2` |
+
+The live `begin_checkout_session` pre-image (`bb7292aa…`, `5e274a8d…`) is the one
+ledger row 127 recorded live; the live `place_customer_order` must be read before
+the apply and compared with the row above. The file refuses to apply over any
+other body.
+
+### What the file checks
+
+Cardinality, SECURITY DEFINER, `search_path` and grants of both functions; the
+helper's parity with the 20261020 expression and its sensitivity to each input;
+the table (RLS on, no policy, no client privilege, cascade); 25 statement-shaped
+clauses read from the comment-stripped bodies, including the order of the
+compare (after the lock, before the limits) and of the stamp (after
+`place_order`, before the projection); and, for each replaced body, that
+**reversing this file's edits and normalising comments and whitespace gives the
+pre-image's normalised hash** — which is the proof that every other statement is
+byte-identical to what ran before. Then both functions are CALLED (unknown
+branch; a fresh key through the widened lookup; the wrapper through its new
+read as far as the phone rule), and the six unmoved hashes are compared.
+
+### Validated
+
+Local chain of 168 migration files (this one included): applies cleanly and re-applies cleanly. Paired suite
+`supabase/tests/cash_order_input_match_test.sql`, 11 cases; against the pre-fix
+bodies cases 1, 2, 3, 7, 8 and 9 fail and 4, 10 and 11 (preservation) pass. Eight
+mutants of the installed functions, all killed by the suite; four mutants of the
+file, all killed by the file's own verification, two of them (an unrelated
+changed comparison in each function) only by the reverse-edit hash.
+
+### To apply
+
+1. Re-hash the merged file; read live `place_customer_order` and
+   `begin_checkout_session` and compare with the table above.
+2. Apply `20261024120000` **by name**, one call. Never "the outstanding
+   migrations": `20260824100000` (Moyasar, frozen) sorts ahead of it.
+3. Read back: both stored bodies, the helper, the table (RLS on, no policy), the
+   six unmoved hashes, and that Moyasar is still absent.

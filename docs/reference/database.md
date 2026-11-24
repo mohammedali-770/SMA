@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **167**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261023120000_payment_records_retention_and_limits.sql`.
+Migration files in the repository: **168**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20261024120000_cash_order_input_match_expired_session_lookup.sql`.
 
 ## Tables
 
@@ -68,6 +68,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `operations_digest_runs` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
 | `ops_change_events` | `20260820130000_ops_change_events.sql` | 1 | 1 |
 | `order_change_events` | `20260724200000_order_read_contracts.sql` | 0 | 1 |
+| `order_input_fingerprints` | `20261024120000_cash_order_input_match_expired_session_lookup.sql` | 0 | **none declared** |
 | `order_integrity_alert_outbox` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
 | `order_integrity_config` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
 | `order_integrity_incidents` | `20260721170000_order_integrity_watchdog.sql` | 0 | **none declared** |
@@ -133,7 +134,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `audit_admin_table_change` | 1 | `20261007120000_audit_trail.sql` |
 | `audit_order_status_change` | 1 | `20261007120000_audit_trail.sql` |
 | `audit_rows_are_append_only` | 1 | `20261007120000_audit_trail.sql` |
-| `begin_checkout_session` | 4 | `20261020120000_checkout_session_input_match.sql` |
+| `begin_checkout_session` | 5 | `20261024120000_cash_order_input_match_expired_session_lookup.sql` |
 | `begin_lazywait_create_attempt` | 3 | `20261022120000_pos_resend_refund_guards.sql` |
 | `begin_payment_attempt` | 3 | `20261012120000_cancelled_orders_guard.sql` |
 | `begin_session_attempt` | 3 | `20261019120000_loyalty_points_reservation.sql` |
@@ -141,6 +142,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `branch_reference_reveal` | 1 | `20260917120000_branch_reference_entries.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `cancel_branch_delivery_request` | 1 | `20260916120000_branch_delivery_requests.sql` |
+| `checkout_input_fingerprint` | 1 | `20261024120000_cash_order_input_match_expired_session_lookup.sql` |
 | `checkout_session_drop_attempt_records` | 1 | `20261023120000_payment_records_retention_and_limits.sql` |
 | `checkout_session_may_still_capture` | 1 | `20261021120000_catalog_delete_open_checkout_guard.sql` |
 | `checkout_snapshot_references_catalog` | 1 | `20261021120000_catalog_delete_open_checkout_guard.sql` |
@@ -283,7 +285,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `payments_needing_attention_internal` | 1 | `20261013120000_payment_refund_visibility.sql` |
-| `place_customer_order` | 3 | `20261012120000_cancelled_orders_guard.sql` |
+| `pg_temp` | 1 | `20261024120000_cash_order_input_match_expired_session_lookup.sql` |
+| `place_customer_order` | 4 | `20261024120000_cash_order_input_match_expired_session_lookup.sql` |
 | `place_order` | 19 | `20261019120000_loyalty_points_reservation.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
