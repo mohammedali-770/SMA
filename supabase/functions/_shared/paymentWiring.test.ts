@@ -968,7 +968,7 @@ describe('duplicates: detected on both flows, and never taken for an attempt', (
 
   it('the webhook asks Moyasar to retry an outcome it could not establish', () => {
     expect(fnBody(code('payment-webhook'), 'async function handleMoyasarWebhook(')).toContain(
-      "if (result.reason === 'stamp_failed' || result.reason === 'readback_failed') {",
+      "if (isRetryableConfirmReason(result.reason)) {",
     );
   });
 });
