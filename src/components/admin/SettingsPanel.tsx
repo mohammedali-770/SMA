@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, LifeBuoy, MapPin, ShieldCheck, Sliders, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
+import { Text } from '../../design-system/ui/Text';
 import { NumericCommitField } from './view/NumericCommitField';
 import { Price } from '../Price';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
@@ -217,18 +218,32 @@ export const SettingsPanel: React.FC = () => {
                         <span className="font-black text-con-text text-xs uppercase">{isRTL ? 'تخصيص الهوية وشروط الاستخدام والضريبة' : 'Brand Corporate Design & VAT Rules'}</span>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'رابط شعار العلامة التجارية' : 'Logo Image URL'}</label>
-                          <input 
-                            type="text"
-                            value={brandSettings.logoUrl}
-                            onChange={(e) => updateBrandSettings({ logoUrl: e.target.value })}
-                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant}
-                          />
-                        </div>
+                      {/*
+                        F-X20-001: this tab used to carry eight more fields (logo
+                        URL, "Prices Include VAT", support phone, WhatsApp
+                        hotline, and the privacy policy and terms in both
+                        languages). `brandPatchToDb` has no column for any of
+                        them, so every edit lived in React state until the next
+                        load and then reverted to bundled placeholder text,
+                        with nothing on screen saying so. They are removed, not
+                        disabled: a disabled field still shows a value that is
+                        not the live one. The real homes are the Support &
+                        Contact sub-tab (`app_settings.support_*`) and the Legal
+                        Documents screen (`legal_documents`).
+                      */}
+                      <div role="note" className="rounded-[var(--radius-ds-md)] border border-info-line bg-info-tint px-3 py-2.5 space-y-1">
+                        <Text variant="label" tone="info" as="p">{t.brand_scope_title}</Text>
+                        <Text variant="caption" tone="secondary" as="p">{t.brand_scope_body}</Text>
+                        <button
+                          type="button"
+                          onClick={() => setSettingsSubTab('support')}
+                          className="ds-motion min-h-11 text-[12px] font-bold text-ember underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2"
+                        >
+                          {t.brand_open_support}
+                        </button>
+                      </div>
 
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'اللون الأساسي للعلامة (HEX)' : 'Primary Color Theme'}</label>
                           <div className="flex gap-2">
@@ -270,11 +285,10 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="p-3 bg-con-surface-2 rounded-xl space-y-3">
-                          <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">{isRTL ? 'إعدادات ضريبة القيمة المضافة بالمملكة' : 'Saudi Arabia VAT Regulatory Config'}</span>
-                          
-                          <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 bg-con-surface-2 rounded-xl space-y-3">
+                        <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">{isRTL ? 'إعدادات ضريبة القيمة المضافة بالمملكة' : 'Saudi Arabia VAT Regulatory Config'}</span>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {/*
                               VAT is the tax rate applied to every order total.
                               It commits on blur/Enter and refuses a blank or
@@ -298,103 +312,14 @@ export const SettingsPanel: React.FC = () => {
                                 suffix="%"
                               />
                             </div>
-
-                            <div>
-                              <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'الأسعار تشمل الضريبة' : 'Prices Include VAT'}</label>
-                              <select
-                                value={brandSettings.vatIncluded ? 'true' : 'false'}
-                                onChange={(e) => updateBrandSettings({ vatIncluded: e.target.value === 'true' })}
-                                className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                                disabled={isAccountant}
-                              >
-                                <option value="true">{isRTL ? 'نعم (شاملة ١٥٪)' : 'Yes (Inclusive)'}</option>
-                                <option value="false">{isRTL ? 'لا (مضافة عند الفاتورة)' : 'No (Exclusive)'}</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-3 bg-con-surface-2 rounded-xl space-y-3">
-                          <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">{isRTL ? 'قنوات الدعم والتواصل' : 'Customer Support Desks'}</span>
-                          
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'هاتف خدمة العملاء' : 'Support Phone'}</label>
-                              <input 
-                                type="text"
-                                value={brandSettings.supportPhone}
-                                onChange={(e) => updateBrandSettings({ supportPhone: e.target.value })}
-                                className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                                disabled={isAccountant}
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'رقم الواتساب التجاري' : 'WhatsApp Hotline'}</label>
-                              <input 
-                                type="text"
-                                value={brandSettings.whatsappNumber}
-                                onChange={(e) => updateBrandSettings({ whatsappNumber: e.target.value })}
-                                className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                                disabled={isAccountant}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'سياسة الخصوصية بالإنجليزية' : 'Privacy Policy (EN)'}</label>
-                          <textarea 
-                            value={brandSettings.privacyPolicyEn}
-                            onChange={(e) => updateBrandSettings({ privacyPolicyEn: e.target.value })}
-                            rows={3}
-                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'سياسة الخصوصية بالعربية' : 'سياسة الخصوصية (AR)'}</label>
-                          <textarea 
-                            value={brandSettings.privacyPolicyAr}
-                            onChange={(e) => updateBrandSettings({ privacyPolicyAr: e.target.value })}
-                            rows={3}
-                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'شروط وأحكام الخدمة بالإنجليزية' : 'Terms & Conditions (EN)'}</label>
-                          <textarea 
-                            value={brandSettings.termsEn}
-                            onChange={(e) => updateBrandSettings({ termsEn: e.target.value })}
-                            rows={3}
-                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'شروط وأحكام الخدمة بالعربية' : 'الشروط والأحكام (AR)'}</label>
-                          <textarea 
-                            value={brandSettings.termsAr}
-                            onChange={(e) => updateBrandSettings({ termsAr: e.target.value })}
-                            rows={3}
-                            className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
-                            disabled={isAccountant}
-                          />
+                          <Text variant="caption" tone="secondary" as="p">{t.brand_vat_inclusive}</Text>
                         </div>
                       </div>
 
                       <div className="flex justify-end gap-2 border-t border-con-line pt-3">
-                        <span className="text-[10px] text-mint font-bold flex items-center gap-1">
-                          <Check className="w-3.5 h-3.5" />
-                          {isRTL ? 'تم حفظ الهوية التجارية وتحديثها تلقائياً!' : 'Brand preferences updated automatically!'}
+                        <span className="text-[10px] text-mint-ink font-bold flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                          {t.brand_saved_note}
                         </span>
                       </div>
                     </div>
@@ -423,10 +348,10 @@ export const SettingsPanel: React.FC = () => {
                       {/* Current live availability (from the server, not the draft) */}
                       <div className="p-3 bg-con-surface-2 border border-con-line rounded-xl flex flex-wrap items-center gap-2 text-[10px] font-bold">
                         <span className="text-con-text-2 uppercase tracking-wide">{isRTL ? 'الوضع الحالي:' : 'Live now:'}</span>
-                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.onlineEnabled ? 'bg-mint-tint text-mint' : 'bg-con-surface-2 text-con-text-2'}`}>
+                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.onlineEnabled ? 'bg-mint-tint text-mint-ink' : 'bg-con-surface-2 text-con-text-2'}`}>
                           {isRTL ? 'إلكتروني' : 'Online'} {paymentSettings.onlineEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.cashEnabled ? 'bg-mint-tint text-mint' : 'bg-con-surface-2 text-con-text-2'}`}>
+                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.cashEnabled ? 'bg-mint-tint text-mint-ink' : 'bg-con-surface-2 text-con-text-2'}`}>
                           {isRTL ? 'نقدي' : 'Cash'} {paymentSettings.cashEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </span>
                         {paymentSettings.outageMode && (
@@ -524,13 +449,13 @@ export const SettingsPanel: React.FC = () => {
 
                       {/* Contextual warnings mirroring what the customer will see */}
                       {payBothDisabled && (
-                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ds text-[11px] font-bold flex items-center gap-2">
+                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ink text-[11px] font-bold flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-danger-ds flex-shrink-0" />
                           {isRTL ? 'لا توجد طريقة دفع مفعّلة — لن يتمكّن العملاء من إتمام الطلب. فعّل النقدي أو الإلكتروني.' : 'No payment method is enabled — customers cannot check out. Enable cash or online.'}
                         </div>
                       )}
                       {payOnlineOffCashOn && !payBothDisabled && (
-                        <div className="p-3 bg-info-tint border border-info-line rounded-xl text-sky text-[11px] font-bold flex items-center gap-2">
+                        <div className="p-3 bg-info-tint border border-info-line rounded-xl text-sky-ink text-[11px] font-bold flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-sky flex-shrink-0" />
                           {isRTL ? 'الدفع الإلكتروني معطّل والنقدي مفعّل — تستمر العمليات نقداً، وتُرسل الطلبات للكاشير كغير مدفوعة.' : 'Online is off and cash is on — operations continue on cash; orders go to POS as unpaid.'}
                         </div>
@@ -549,14 +474,14 @@ export const SettingsPanel: React.FC = () => {
                       )}
 
                       {payError && (
-                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ds text-[11px] font-bold flex items-center gap-2">
+                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ink text-[11px] font-bold flex items-center gap-2">
                           <AlertCircle className="w-4 h-4 text-danger-ds flex-shrink-0" /> {payError}
                         </div>
                       )}
 
                       <div className="flex justify-end items-center gap-3 border-t border-con-line pt-3">
                         {paySaved && !payDirty && (
-                          <span className="text-[10px] text-mint font-bold flex items-center gap-1">
+                          <span className="text-[10px] text-mint-ink font-bold flex items-center gap-1">
                             <Check className="w-3.5 h-3.5" /> {isRTL ? 'تم الحفظ' : 'Saved'}
                           </span>
                         )}
@@ -591,7 +516,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                         <div className="p-3 bg-con-surface border border-con-line rounded-2xl">
                           <span className="text-[9px] font-black text-con-text-3 uppercase block">{isRTL ? 'الرمز العام مُهيّأ' : 'Public token configured'}</span>
-                          <p className={`text-sm font-black mt-1 ${mapConfig.isConfigured ? 'text-mint' : 'text-danger-ds'}`}>
+                          <p className={`text-sm font-black mt-1 ${mapConfig.isConfigured ? 'text-mint-ink' : 'text-danger-ink'}`}>
                             {mapConfig.isConfigured ? (isRTL ? 'نعم' : 'Yes') : (isRTL ? 'لا' : 'No')}
                           </p>
                         </div>
@@ -602,7 +527,7 @@ export const SettingsPanel: React.FC = () => {
                       </div>
 
                       {mapConfig.tokenPresentButInvalid ? (
-                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ds text-[11px] font-bold flex items-start gap-2">
+                        <div className="p-3 bg-danger-tint border border-danger-line rounded-xl text-danger-ink text-[11px] font-bold flex items-start gap-2">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                           <span>
                             {isRTL
@@ -637,7 +562,7 @@ export const SettingsPanel: React.FC = () => {
                         <span className="font-black text-con-text text-xs uppercase">{isRTL ? 'برنامج المكافآت والنقاط الموحد' : 'Brand Customer Loyalty & Rewards System'}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] text-con-text-3 font-bold">{isRTL ? 'برنامج النقاط:' : 'Loyalty State:'}</span>
-                          <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${loyaltySettings.isEnabled ? 'bg-mint-tint text-mint' : 'bg-con-surface-2 text-con-text-2'}`}>
+                          <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${loyaltySettings.isEnabled ? 'bg-mint-tint text-mint-ink' : 'bg-con-surface-2 text-con-text-2'}`}>
                             {loyaltySettings.isEnabled ? (isRTL ? 'مفعل' : 'ENABLED') : (isRTL ? 'معطل' : 'DISABLED')}
                           </span>
                         </div>
@@ -1013,7 +938,7 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
                 className="w-full border border-con-line rounded-lg px-2 py-1.5 text-xs font-bold"
               />
               {w ? <p className="text-[9px] font-bold text-amber-ink flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {w}</p>
-                 : <p className="text-[9px] font-bold text-mint flex items-center gap-1"><Check className="w-3 h-3" /> {isRTL ? 'ستظهر للعملاء' : 'Visible to customers'}</p>}
+                 : <p className="text-[9px] font-bold text-mint-ink flex items-center gap-1"><Check className="w-3 h-3" /> {isRTL ? 'ستظهر للعملاء' : 'Visible to customers'}</p>}
             </div>
           );
         })}
@@ -1054,8 +979,8 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
         >
           {saving ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'حفظ' : 'Save')}
         </button>
-        {saved ? <span className="text-[10px] font-black text-mint flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {isRTL ? 'تم الحفظ' : 'Saved'}</span> : null}
-        {error ? <span className="text-[10px] font-black text-danger-ds flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {error}</span> : null}
+        {saved ? <span className="text-[10px] font-black text-mint-ink flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {isRTL ? 'تم الحفظ' : 'Saved'}</span> : null}
+        {error ? <span className="text-[10px] font-black text-danger-ink flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {error}</span> : null}
         {readOnly ? <span className="text-[9px] font-bold text-con-text-3">{isRTL ? 'عرض فقط (محاسب)' : 'View-only (accountant)'}</span> : null}
       </div>
     </div>

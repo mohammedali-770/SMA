@@ -337,6 +337,11 @@ controlled pickup orders, then plan widening) or **halt** (flip Enabled OFF).
 - Local order state, pricing, VAT, coupon, or loyalty is altered by anything
   Lazywait-related (Supabase must remain the source of truth).
 
+**Superseded 2026-11-24 for three of these:** delivery orders (since 2026-08-27),
+add-ons and `price_id` are now sent, and the mapping screen's caption was
+corrected to say so. `docs/LAZYWAIT.md` ("Still intentionally NOT sent") is the
+current list. What follows is the pilot-era statement, kept as written.
+
 **Still intentionally NOT sent in Create Order (unchanged):** delivery, addons/
 modifiers, `price_id`, `customer_id`/`customer_cell`, online-payment update
 (unless a real online payment — Moyasar since 2026-11-11 — is verified server-side, which the pilot excludes).

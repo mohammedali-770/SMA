@@ -431,8 +431,10 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       <Text variant="caption" tone="tertiary" as="p">
         <b>Import to App</b> makes Lazywait the menu source: it creates/updates your categories &amp; products from
         the latest pull (prices from Lazywait), hides local items not in Lazywait, and keeps branch delivery settings.
-        Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). price_id,
-        addons/modifiers and delivery are mapped for reference but intentionally NOT sent in Create Order yet.
+        Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). A confirmed
+        mapping is used when an order is sent to the POS: the mapped price tier (price_id) and add-ons go in
+        Create Order, and delivery orders go with their address. An add-on with no mapping is not dropped; it is
+        written into the item&apos;s kitchen note instead.
       </Text>
     </div>
   );

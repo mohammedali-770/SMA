@@ -67,7 +67,7 @@ export function Field({
       <label htmlFor={fieldId} className="text-start text-[13px] font-semibold text-con-text-2">
         <span id={state.labelId}>{label}</span>
         {required ? (
-          <span className="text-danger-ds" aria-hidden="true">
+          <span className="text-danger-ink" aria-hidden="true">
             {' *'}
           </span>
         ) : null}
@@ -116,7 +116,7 @@ export function Field({
           role={state.messageIsError ? 'alert' : undefined}
           aria-live={state.accessibility.liveRegion === 'polite' ? 'polite' : undefined}
           className={`text-start text-[11.5px] ${
-            state.messageIsError ? 'text-danger-ds' : 'text-con-text-3'
+            state.messageIsError ? 'text-danger-ink' : 'text-con-text-3'
           }`}
         >
           {state.message}

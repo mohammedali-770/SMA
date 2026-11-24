@@ -26,6 +26,12 @@ vi.mock('./context/AppContext', () => ({
   useApp: () => useApp(),
 }));
 
+// The MFA gate asks Supabase for an assurance level; the shell tests only need
+// to see what renders around it.
+vi.mock('./components/StaffMfaGate', () => ({
+  StaffMfaGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 // Imported after the mock so AppContent binds to it.
 const { AppContent } = await import('./App');
 
@@ -181,6 +187,104 @@ describe('console shell — known identities', () => {
     useApp.mockReturnValue(ctx({ isAuthenticated: false }));
     render(<AppContent />);
     expect(screen.getByText('Sign in to your account')).toBeTruthy();
+  });
+});
+
+/*
+ * F-X14-001 / F-X14-002. The frame around the consoles (header, loaders, load
+ * and save errors) used to be English-only although the operations consoles are
+ * Arabic by default, and its Sign out button had no accessible name under 640px
+ * because its only text was `hidden sm:inline`.
+ */
+describe('console shell — language follows the console it wraps (F-X14-001)', () => {
+  const cashier = { ...GUEST, id: 'u1', fullName: 'Test Cashier', role: 'branch_staff' };
+  const admin = { ...GUEST, id: 'u2', fullName: 'Test Admin', role: 'admin' };
+
+  it('is Arabic around the branch console by default: loader, role, sign out', () => {
+    useApp.mockReturnValue(ctx({ currentUser: cashier, dataLoading: true }));
+    render(<AppContent />);
+
+    expect(screen.getByText('جارٍ تحميل بيانات الفرع…')).toBeTruthy();
+    expect(screen.getByText('موظف فرع')).toBeTruthy();
+    expect(screen.queryByText('Branch_staff')).toBeNull();
+    expect(screen.queryByText('Loading branch data…')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'تسجيل الخروج' }).length).toBeGreaterThan(0);
+  });
+
+  it('gives the load error and its Retry in Arabic, and Retry still retries', () => {
+    const c = ctx({ currentUser: cashier, dataError: 'catalog failed' });
+    useApp.mockReturnValue(c);
+    render(<AppContent />);
+
+    expect(screen.getByText('تعذّر تحميل بياناتك')).toBeTruthy();
+    expect(screen.queryByText("Couldn't load your data")).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة المحاولة' }));
+    expect(c.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives the save-error banner and its dismiss in Arabic', () => {
+    const c = ctx({ currentUser: cashier, writeError: 'permission denied' });
+    useApp.mockReturnValue(c);
+    render(<AppContent />);
+
+    expect(screen.getByText('تعذّر الحفظ')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'إغلاق' }));
+    expect(c.dismissWriteError).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours a stored English choice, and sets the direction from the language', () => {
+    window.localStorage.setItem('sm-ops-lang-v2', 'en');
+    useApp.mockReturnValue(ctx({ currentUser: cashier, dataLoading: true }));
+    const { container } = render(<AppContent />);
+
+    expect(screen.getByText('Loading branch data…')).toBeTruthy();
+    expect(screen.getByText('Branch operator')).toBeTruthy();
+    expect(container.querySelector('header')?.getAttribute('dir')).toBe('ltr');
+  });
+
+  it('sets rtl on the header in Arabic', () => {
+    useApp.mockReturnValue(ctx({ currentUser: cashier, dataLoading: true }));
+    const { container } = render(<AppContent />);
+    expect(container.querySelector('header')?.getAttribute('dir')).toBe('rtl');
+  });
+
+  it('follows the admin dashboard language for administrators', () => {
+    useApp.mockReturnValue(ctx({ currentUser: admin, dataLoading: true, adminLang: 'ar' }));
+    render(<AppContent />);
+    expect(screen.getByText('جارٍ تحميل بيانات الفريق…')).toBeTruthy();
+    expect(screen.getByText('مسؤول')).toBeTruthy();
+  });
+
+  it('stays English for administrators until they switch, and ignores the ops language', () => {
+    window.localStorage.setItem('sm-ops-lang-v2', 'ar');
+    useApp.mockReturnValue(ctx({ currentUser: admin, dataLoading: true, adminLang: 'en' }));
+    render(<AppContent />);
+    expect(screen.getByText('Loading staff data…')).toBeTruthy();
+    expect(screen.getByText('Admin')).toBeTruthy();
+  });
+
+  it('keeps the sign-in states English by default, as the screens they sit on are', () => {
+    useApp.mockReturnValue(ctx({ dataLoading: true }));
+    render(<AppContent />);
+    expect(screen.getByText('Loading your account…')).toBeTruthy();
+  });
+
+  it('shows an unrecognised role id rather than nothing', () => {
+    useApp.mockReturnValue(ctx({ currentUser: { ...cashier, role: 'courier' }, dataLoading: true }));
+    render(<AppContent />);
+    expect(screen.getByText('Courier')).toBeTruthy();
+  });
+});
+
+describe('console shell — Sign out is a named, full-size target (F-X14-002)', () => {
+  it('carries its name on the button itself, not on a span hidden below 640px', () => {
+    useApp.mockReturnValue(ctx({ dataLoading: true }));
+    render(<AppContent />);
+    const button = screen.getAllByRole('button', { name: 'Sign out' })[0];
+    // `hidden sm:inline` removes the visible text from the accessibility tree
+    // at phone width; the name has to be on the button.
+    expect(button.getAttribute('aria-label')).toBe('Sign out');
+    expect(button.className).toMatch(/\bmin-h-11\b/);
   });
 });
 

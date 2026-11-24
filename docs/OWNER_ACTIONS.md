@@ -3200,6 +3200,43 @@ customer-facing and two on staff tickets.** Read them in the same pass.
 - **the `smtp_sender_invalid` sentence** the test-email button shows (English
   only, so nothing to read in Arabic).
 
+**Widened 2026-11-24 — the console shell and the Brand tab (F-X14-001/002,
+F-X20-001).** Staff-console copy, engineering-drafted, on the same read. The
+frame around the branch and call-centre consoles (header, loaders, load and save
+errors) used to be English-only; it now follows the console's language, so these
+are what a cashier reads when the network drops
+(`src/components/ops/opsStrings.ts`, the `shell*`, `role*` and `appearance*`
+keys):
+
+- the loaders «جارٍ التشغيل…» ("Starting…"), «جارٍ تحميل بيانات الفريق…»
+  ("Loading staff data…"), «جارٍ تحميل بيانات الفرع…» ("Loading branch data…")
+  and «جارٍ تحميل حسابك…» ("Loading your account…");
+- the load-error title «تعذّر تحميل بياناتك» ("Couldn't load your data"), the
+  save-error title «تعذّر الحفظ» ("Save failed") and the banner's close button
+  «إغلاق» ("Dismiss"); the Retry and Sign out buttons reuse the existing
+  «إعادة المحاولة» and «تسجيل الخروج»;
+- the role badge, which used to print the raw role id: «مسؤول» (admin), «محاسب»
+  (accountant), «موظف فرع» (branch operator), «مركز اتصال» (call centre), «عميل»
+  (customer);
+- the appearance toggle's name «المظهر» ("Appearance"), the hint «اضغط للتغيير.»
+  ("Activate to change.") and the three modes «تلقائي» (System), «فاتح» (Light),
+  «داكن» (Dark). The one to check is «تلقائي», chosen because the mode follows
+  the device setting.
+
+The Settings > Brand tab (`src/components/admin/adminLocales.ts`, keys
+`brand_*`) now says that only the two colours and the VAT rate are saved, and
+where the removed fields went: «يُحفظ في هذا التبويب اللونان ونسبة الضريبة فقط»
+("Only the two colours and the VAT rate are saved on this tab"); the body «كانت
+هنا حقول للشعار ووضع الضريبة وأرقام الدعم ونص الخصوصية والشروط لا تحفظ أي شيء،
+فأُزيلت. أرقام الدعم في تبويب «التواصل والدعم»، وسياسة الخصوصية والشروط في شاشة
+«المستندات القانونية».»; the button «فتح التواصل والدعم» ("Open Support &
+Contact"); «جميع الأسعار شاملة الضريبة، وتُحسب ضريبة الإيصال من الإجمالي. لا
+يمكن تغيير ذلك من هنا.» ("All prices include VAT. The VAT on a receipt is worked
+out from the total, and that cannot be changed here."); and «يُحفظ اللونان ونسبة
+الضريبة تلقائياً.» ("Colours and the VAT rate are saved automatically."). Check
+that the first reads as "these two things are saved here, nothing else", not as
+"these two are the only brand settings that exist".
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

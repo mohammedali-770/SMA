@@ -194,6 +194,18 @@ describe('settings mappers', () => {
     expect(b.secondaryColor).toBe('#222222');
     expect(b.vatPercentage).toBe(15);
   });
+  it('models only what app_settings backs (F-X20-001)', () => {
+    // The logo, VAT mode, support numbers and legal text used to be on this
+    // type with no column behind them, so the console showed editable fields
+    // that saved nothing. They are gone from the type; if one comes back, the
+    // console can offer it again, so it must come back WITH a column and a patch.
+    expect(Object.keys(mapBrandSettings(s)).sort()).toEqual(
+      ['instagram', 'primaryColor', 'secondaryColor', 'twitter', 'vatPercentage'],
+    );
+    for (const gone of ['logoUrl', 'vatIncluded', 'supportPhone', 'whatsappNumber', 'privacyPolicyEn', 'privacyPolicyAr', 'termsEn', 'termsAr']) {
+      expect(mapBrandSettings(s)).not.toHaveProperty(gone);
+    }
+  });
   it('maps loyalty config from app_settings', () => {
     expect(mapLoyaltySettings(s)).toEqual({
       isEnabled: true, pointsPerRiyal: 1, minPointsToRedeem: 100, discountPerPoint: 0.1,
@@ -247,7 +259,7 @@ describe('reverse patch mappers (app -> DB)', () => {
   it('only includes provided brand fields', () => {
     expect(brandPatchToDb({ primaryColor: '#abc' })).toEqual({ primary_color: '#abc' });
     expect(brandPatchToDb({ vatPercentage: 15, secondaryColor: '#def' })).toEqual({ vat_percentage: 15, secondary_color: '#def' });
-    expect(brandPatchToDb({ logoUrl: 'x' })).toEqual({}); // not backed
+    expect(brandPatchToDb({ instagram: 'x' })).toEqual({}); // not backed
   });
   it('maps loyalty patches', () => {
     expect(loyaltyPatchToDb({ pointsPerRiyal: 2, isEnabled: false })).toEqual({ points_per_riyal: 2, loyalty_enabled: false });

@@ -70,6 +70,16 @@
   --color-sky: #1E7FE0;
   --color-warn: #DE7C00;
   --color-danger-ds: #D92D20;
+  /* Status INKS: the colour of status TEXT. The hues above are for bars, dots
+     and icons; as 11.5px pill labels on their own tints they measured 3.01
+     (mint), 3.63 (sky) and 4.23 (danger) -- all under WCAG AA 4.5:1 (audit
+     F-X14-004). Light values mirror `mintInk` / `skyInk` / `dangerInk` in
+     design-system/tokens.ts (4.85 / 5.02 / 5.52 on their tints, 4.86+ on every
+     cream and white ground); contrastContract.test.ts asserts the mirror. The
+     dark theme re-points them in theme-dark.css. */
+  --color-mint-ink: #0E7A3E;
+  --color-sky-ink: #1767BF;
+  --color-danger-ink: #B8261B;
   --color-amber-ink: #8A5600;
   --color-on-ember: #FFFFFF;
 

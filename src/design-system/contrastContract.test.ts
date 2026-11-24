@@ -177,6 +177,9 @@ describe('the hand-maintained CSS mirror matches the canonical token', () => {
     ['danger-tint', 'dangerTint'],
     ['info-tint', 'infoTint'],
     ['mint-tint', 'mintTint'],
+    ['mint-ink', 'mintInk'],
+    ['sky-ink', 'skyInk'],
+    ['danger-ink', 'dangerInk'],
     ['disabled-bg', 'disabledBg'],
     ['disabled-fg', 'disabledFg'],
   ] as const)('--color-%s equals tokens.%s', (varName, tokenKey) => {

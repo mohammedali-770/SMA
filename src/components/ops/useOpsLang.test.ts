@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, cleanup, renderHook } from '@testing-library/react';
 
-import { useOpsLang } from './useOpsLang';
+import { useOpsLang, useOpsLangFollower } from './useOpsLang';
 
 const KEY = 'sm-ops-lang-v2';
 
@@ -69,5 +69,52 @@ describe('useOpsLang', () => {
     const english = result.current.t('branchConsole');
     act(() => result.current.toggle());
     expect(result.current.t('branchConsole')).not.toBe(english);
+  });
+});
+
+describe('useOpsLangFollower (the console shell)', () => {
+  it('reads the audience fallback on every render, so it needs no remount', () => {
+    const { result, rerender } = renderHook(({ fb }: { fb: 'ar' | 'en' }) => useOpsLangFollower(fb), {
+      initialProps: { fb: 'en' as 'ar' | 'en' },
+    });
+    expect(result.current.lang).toBe('en');
+    rerender({ fb: 'ar' });
+    expect(result.current.lang).toBe('ar');
+    expect(result.current.dir).toBe('rtl');
+  });
+
+  it('follows a toggle made by the console it wraps', () => {
+    const shell = renderHook(() => useOpsLangFollower('ar'));
+    const console_ = renderHook(() => useOpsLang('ar'));
+    expect(shell.result.current.lang).toBe('ar');
+
+    act(() => console_.result.current.toggle());
+    expect(shell.result.current.lang).toBe('en');
+    expect(shell.result.current.t('signOut')).toBe('Sign out');
+
+    act(() => console_.result.current.toggle());
+    expect(shell.result.current.lang).toBe('ar');
+  });
+
+  it('follows a toggle even when storage is unavailable', () => {
+    const real = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new Error('private mode');
+    };
+    try {
+      const shell = renderHook(() => useOpsLangFollower('ar'));
+      const console_ = renderHook(() => useOpsLang('ar'));
+      act(() => console_.result.current.toggle());
+      expect(shell.result.current.lang).toBe('en');
+    } finally {
+      Storage.prototype.setItem = real;
+    }
+  });
+
+  it('never writes storage or changes the document by itself', () => {
+    document.documentElement.lang = 'fr';
+    renderHook(() => useOpsLangFollower('ar'));
+    expect(window.localStorage.getItem(KEY)).toBeNull();
+    expect(document.documentElement.lang).toBe('fr');
   });
 });

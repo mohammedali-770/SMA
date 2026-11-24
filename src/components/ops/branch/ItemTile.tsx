@@ -138,7 +138,7 @@ export const ItemTile: React.FC<{
             : `${price.toFixed(2)} ${t('currency')}`}
         </Text>
         {tiers.length > 1 ? (
-          <Text variant="caption" as="span" className="font-semibold text-sky">
+          <Text variant="caption" as="span" className="font-semibold text-sky-ink">
             {`${tiers.length} ${t(tiers.length === 1 ? 'sizesCountOne' : 'sizesCount')} ›`}
           </Text>
         ) : null}

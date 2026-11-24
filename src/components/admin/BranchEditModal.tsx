@@ -196,7 +196,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
       </div>
 
       {hoursError ? (
-        <p className="text-xs font-bold text-danger-ds">
+        <p className="text-xs font-bold text-danger-ink">
           {label(
             'Working hours could not be loaded. They are shown blank and will NOT be saved — reopen this branch to edit them.',
             'تعذّر تحميل ساعات العمل. تظهر فارغة ولن يتم حفظها — أعد فتح الفرع لتعديلها.',

@@ -1434,6 +1434,15 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   was answered by a printed ticket. **Q8 is answered too, and negatively** — the
   POS does NOT render `delivery_address`, which is why the duplicate line in
   `order_details` is permanent.
+  **Corrected 2026-11-24 (F-X20-003):** the console's catalog-mapping screen
+  still told operators that `price_id`, add-ons and delivery are "intentionally
+  NOT sent in Create Order yet", which had been false since 2026-08-26/27 and
+  could lead an operator to "fix" an add-on the POS already has. Its caption now
+  says a confirmed mapping is used when an order is sent (the mapped price tier
+  and add-ons go in Create Order, delivery orders go with their address) and that
+  an add-on with no mapping is written into the item's kitchen note rather than
+  dropped. The builder's own code comments (`_shared/lazywait.ts`) are a
+  separate, no-runtime-effect cleanup and were not touched here.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
 - **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line
