@@ -3124,6 +3124,20 @@ Check that the first reads as a plain, reassuring statement rather than an
 apology for something the customer did, and that «نعيد إليك» does not promise
 that the money has already arrived (the refund's `status` says that).
 
+**Added 2026-11-24 (console confirmations, staff-facing).** Three Arabic
+confirmations in the staff console are engineering-drafted and need the same
+read, in `src/lib/confirmCopy.ts`: the cancel-order confirm (which for a paid
+card order now states the automatic full refund and the customer notification),
+the product-delete confirm (states that delete is permanent and what goes with
+the product) and the category-delete confirm (a category with products cannot be
+deleted). Check the cancel text reads as a plain statement of an irreversible
+refund, not as a question about whether to refund.
+
+The sign-out failure message (2026-11-24) is on the same list: «تعذّر تسجيل
+الخروج» with «تحقق من اتصالك وحاول مرة أخرى.» (English: "Could not sign out" /
+"Check your connection and try again."), shown by the customer app's Profile and
+delete-account screens and, in both languages at once, by the staff console.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

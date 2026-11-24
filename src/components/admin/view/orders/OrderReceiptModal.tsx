@@ -33,6 +33,7 @@ import { ModalShell } from '../shared/ModalShell';
 import { DetailRow } from './DetailRow';
 import { PaymentDetails } from './PaymentDetails';
 import { paymentTone, syncStateOf, syncTone } from './ordersView';
+import { cancelOrderConfirmMessage } from '../../../../lib/confirmCopy';
 
 // Cancellation is deliberately NOT one of the normal select choices. It has
 // financial side effects (loyalty/coupon compensation) and deserves a distinct,
@@ -89,11 +90,7 @@ export function OrderReceiptModal({
 
   const cancelOrder = () => {
     if (isAccountant || !canTransitionOrder(order.status, 'cancelled')) return;
-    const confirmed = window.confirm(
-      isRTL
-        ? 'سيتم إلغاء الطلب وعكس حركة نقاط الولاء واستخدام الكوبون المرتبط به. هل أنت متأكد؟'
-        : 'Cancel this order? Loyalty movements and any consumed coupon usage will be compensated by the server.'
-    );
+    const confirmed = window.confirm(cancelOrderConfirmMessage(order, isRTL));
     if (confirmed) onStatusChange(order.id, 'cancelled');
   };
 

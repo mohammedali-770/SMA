@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**302 TypeScript test files declaring 4401 test blocks, plus 104 SQL suites.**
+**303 TypeScript test files declaring 4406 test blocks, plus 104 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -288,7 +288,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-137 files, 1849 declared test blocks.
+138 files, 1854 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -378,6 +378,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/branchImport.test.ts` | 47 | splitRows |
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
+| `src/lib/confirmCopy.test.ts` | 5 | cancel-order confirmation |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/consoleLoadApi.test.ts` | 15 | orders.lazywaitMonitor |
 | `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
