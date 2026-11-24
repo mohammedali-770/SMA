@@ -23,11 +23,16 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * conclude. Confirmation is the idempotent confirm_order_payment /
  * finalize_checkout_session RPCs.
  *
- * Moyasar is the only payment provider. A payment row that is missing,
- * disabled or names any other provider acknowledges the event with 200 and
- * changes nothing; the app's own call to payment-verify still confirms a
- * genuine payment. The one event a disabled Moyasar row still records is a
- * `webhook_verification`; see recordWebhookVerification().
+ * Moyasar is the only payment provider. A payment row that is missing or names
+ * any other provider acknowledges the event with 200 and changes nothing; the
+ * app's own call to payment-verify still confirms a genuine payment. A row that
+ * is DISABLED, a missing webhook secret and a missing secret key are different:
+ * each is a state the owner can correct, so for an event that is ours and
+ * actionable they answer 503 and leave a log row, and Moyasar redelivers on its
+ * ladder (answerUnprocessable()). The decision table is in docs/PAYMENTS.md
+ * ("What the webhook answers", audit F-X09-001). The one event a disabled
+ * Moyasar row still records is a `webhook_verification`; see
+ * recordWebhookVerification().
  */
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -49,10 +54,72 @@ Deno.serve(async (req: Request) => {
   const evt = parseWebhookEnvelope(parsed);
   if (evt.type === WEBHOOK_VERIFICATION_TYPE) return await recordWebhookVerification(admin, cfg, evt);
 
-  if (!cfg.enabled) return json({ status: 'ignored', reason: 'payment provider not configured' }, 200);
+  // A switched-off row is temporary and the owner's to undo, so an event we can
+  // prove is ours (its token matches a configured one) is asked to come back.
+  if (!cfg.enabled) return await answerUnprocessable(admin, cfg, evt, 'provider_disabled', evt.live ? 'live' : 'test');
 
   return await handleMoyasarWebhook(admin, cfg, rawBody);
 });
+
+// ---------------------------------------------------------------------------
+// An event we cannot process NOW (audit F-X09-001)
+//
+// Moyasar stops retrying on any 2xx, and drops the event after its ladder of
+// six redeliveries (immediate, +1m, +10m, +30m, +1h, +2h). Answering 200 for a
+// state the owner can fix therefore throws away the one nudge that would have
+// confirmed a captured payment. Three states are like that: the payment row is
+// switched off, there is no webhook secret for the mode, and there is no secret
+// key to re-fetch the payment with. Each answers 503 and writes ONE
+// integration_sync_logs row, so the gap is visible instead of silent.
+//
+// What must NOT become a retry, because redelivery cannot help and a loop is
+// only noise:
+//   - an event type we ignore (anything outside HANDLED_WEBHOOK_TYPES);
+//   - an event for the mode this gateway does NOT run (a TEST event reaching a
+//     LIVE gateway, or the reverse): its secret and attempts are not ours to
+//     configure, and a sandbox account can send these for ever;
+//   - while the row is disabled, an event whose token matches nothing we hold
+//     (not provably ours);
+//   - an unknown payment, a payment id that is missing, a foreign provider:
+//     those stay 200 where they were (see docs/PAYMENTS.md).
+//
+// The log row is status 'failed' with its own error strings, none of which is
+// 'finalize_failed' or 'confirm_failed', so the R17 watchdog rule and its
+// partial index (which select exactly those two) never see it. It carries the
+// event id, the type and the payment id, each sliced as everywhere else here,
+// and never the token or the body.
+// ---------------------------------------------------------------------------
+type UnprocessableReason = 'provider_disabled' | 'webhook_secret_missing' | 'secret_key_missing';
+
+const UNPROCESSABLE_IGNORED_TEXT: Record<UnprocessableReason, string> = {
+  provider_disabled: 'payment provider not configured',
+  webhook_secret_missing: 'webhook secret for mode not configured',
+  secret_key_missing: 'cannot verify',
+};
+
+async function answerUnprocessable(
+  admin: SupabaseClient, cfg: ProviderConfig, evt: MoyasarWebhookEnvelope,
+  reason: UnprocessableReason, forMode: 'test' | 'live',
+): Promise<Response> {
+  const ignored = json({ status: 'ignored', reason: UNPROCESSABLE_IGNORED_TEXT[reason] }, 200);
+  const operating = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig).mode;
+  if (!HANDLED_WEBHOOK_TYPES.has(evt.type) || forMode !== operating) return ignored;
+  // A disabled row still holds the tokens, so an event can be proven ours. A
+  // missing token cannot be checked at all, and the key case is reached only
+  // after the payment was matched to an attempt.
+  if (reason === 'provider_disabled' && !matchesAnyWebhookSecret(evt.secretToken, cfg.secretConfig)) return ignored;
+
+  const { error } = await admin.from('integration_sync_logs').insert({
+    provider: 'moyasar', order_id: null, direction: 'webhook', status: 'failed',
+    request: {
+      event: evt.id.slice(0, 64), type: evt.type.slice(0, 40),
+      payment_id: String(evt.data.id ?? '').slice(0, 64), mode: forMode,
+    },
+    error: `webhook_deferred_${reason}`,
+  });
+  if (error) console.error(JSON.stringify({ event: 'moyasar_webhook_defer_log_failed', reason }));
+  return json({ status: 'retry', reason }, 503);
+}
 
 // ---------------------------------------------------------------------------
 // Webhook verification
@@ -108,10 +175,10 @@ async function handleMoyasarWebhook(
   const m = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, mode);
 
   // Without the secret for this mode we cannot authenticate anything, so we
-  // change no state at all rather than acting on an unverified body.
-  if (!m.webhookSecret) {
-    return json({ status: 'ignored', reason: 'webhook secret for mode not configured' }, 200);
-  }
+  // change no state at all rather than acting on an unverified body. For the
+  // mode this gateway runs that is a configuration gap the owner can close, so
+  // the event is asked to come back; for the other mode it is simply ignored.
+  if (!m.webhookSecret) return await answerUnprocessable(admin, cfg, evt, 'webhook_secret_missing', mode);
   if (!verifyWebhookSecretToken(evt.secretToken, m.webhookSecret)) {
     await admin.from('integration_sync_logs').insert({
       provider: 'moyasar', order_id: null, direction: 'webhook', status: 'failed',
@@ -221,8 +288,17 @@ async function handleMoyasarWebhook(
     cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig,
     (rec.mode as 'test' | 'live' | null) ?? mode,
   );
-  if (!mAttempt.secretKey || !paymentId) {
+  if (!paymentId) {
+    // The body names no payment, so a redelivery of the same body cannot help.
+    await admin.from('integration_sync_logs').insert({
+      provider: 'moyasar', order_id: null, direction: 'webhook', status: 'skipped',
+      request: { event: evt.id.slice(0, 64), type: evt.type.slice(0, 40), invoice_id: invoiceId.slice(0, 64) },
+      error: 'webhook without a payment id',
+    }).then(() => {}, () => {});
     return json({ status: 'acknowledged', reason: 'cannot verify' }, 200);
+  }
+  if (!mAttempt.secretKey) {
+    return await answerUnprocessable(admin, cfg, evt, 'secret_key_missing', (rec.mode as 'test' | 'live' | null) ?? mode);
   }
   const retrieved = await retrieveMoyasarPayment(mAttempt.secretKey, paymentId);
   if (!retrieved.ok) {
