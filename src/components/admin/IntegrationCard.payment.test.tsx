@@ -91,3 +91,35 @@ describe('payment card', () => {
     expect(onSave.mock.calls[0][0]).toMatchObject({ publicConfig: { mode: 'live' } });
   });
 });
+
+describe('stale form (F-X09-004)', () => {
+  it('sends the updated_at the form was built from', async () => {
+    const { onSave } = renderCard();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toMatchObject({ expectedUpdatedAt: staleTapRow.updated_at });
+  });
+
+  it('after a refused save shows the current values and sends the new updated_at next time', async () => {
+    const { IntegrationConflictError } = await import('../../lib/api');
+    const latest: DbIntegrationSetting = {
+      ...staleTapRow,
+      provider_name: 'moyasar',
+      enabled: true,
+      public_config: { mode: 'test', currency: 'SAR' },
+      updated_at: '2026-11-24T12:00:00.000Z',
+    };
+    const onSave = vi
+      .fn<(i: UpsertIntegrationInput) => Promise<DbIntegrationSetting>>()
+      .mockRejectedValueOnce(new IntegrationConflictError(latest))
+      .mockResolvedValueOnce(latest);
+    render(<IntegrationCard providerType="payment" row={staleTapRow} disabled={false} onSave={onSave} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText(/changed by someone else/);
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText('Currency') as HTMLInputElement).value).toBe('SAR');
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2));
+    expect(onSave.mock.calls[1][0]).toMatchObject({ expectedUpdatedAt: latest.updated_at, enabled: true });
+  });
+});

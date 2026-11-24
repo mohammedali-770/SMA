@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildCouponUsage, lazywaitRefOf } from './reports';
+import { buildCouponUsage, buildProductSales, lazywaitRefOf, UNKNOWN_CATEGORY_LABEL } from './reports';
 import type { Order } from '../types';
 
 /** Minimal Order factory — only the fields these pure aggregations read. */
@@ -60,5 +60,50 @@ describe('lazywaitRefOf', () => {
   it('is empty (never fabricated) when the order has not synced', () => {
     expect(lazywaitRefOf({ lazywaitOrderNumber: undefined, lazywaitRef: undefined })).toBe('');
     expect(lazywaitRefOf({ lazywaitOrderNumber: '  ', lazywaitRef: '  ' })).toBe('');
+  });
+});
+
+describe('buildProductSales (F-TAA4-006)', () => {
+  const products = [{ id: 'p1', categoryId: 'c1', nameEn: 'Fries', nameAr: 'بطاطس' }];
+  const categories = [{ id: 'c1', nameEn: 'Sides', nameAr: 'مقبلات' }];
+  const line = (productId: string | null, nameEn: string, price: number, quantity: number) => ({
+    productId, nameEn, nameAr: `${nameEn}-ar`, price, quantity,
+  });
+
+  it('keeps two deleted products as two rows, named from the order-item snapshot', () => {
+    const rows = buildProductSales(
+      [{ items: [line(null, 'Old Burger', 20, 2), line(null, 'Old Wrap', 15, 1), line(null, 'Old Burger', 20, 1)] }],
+      products, categories, false,
+    );
+    expect(rows).toHaveLength(2);
+    const burger = rows.find(r => r.name === 'Old Burger');
+    const wrap = rows.find(r => r.name === 'Old Wrap');
+    expect(burger).toMatchObject({ qty: 3, rev: 60 });
+    expect(wrap).toMatchObject({ qty: 1, rev: 15 });
+  });
+
+  it('does not borrow a hard-coded category for a deleted product', () => {
+    const [row] = buildProductSales([{ items: [line(null, 'Old Burger', 20, 1)] }], products, categories, false);
+    expect(row.category).toBe(UNKNOWN_CATEGORY_LABEL.en);
+    expect(row.category).not.toMatch(/Burgers/);
+    const [ar] = buildProductSales([{ items: [line(null, 'Old Burger', 20, 1)] }], products, categories, true);
+    expect(ar.category).toBe(UNKNOWN_CATEGORY_LABEL.ar);
+  });
+
+  it('still groups a live product by id and uses its current name and category', () => {
+    const [row] = buildProductSales(
+      [{ items: [line('p1', 'Fries (old name)', 5, 2)] }, { items: [line('p1', 'Fries', 5, 1)] }],
+      products, categories, false,
+    );
+    expect(row).toMatchObject({ name: 'Fries', category: 'Sides', qty: 3, rev: 15 });
+  });
+
+  it('keeps the grand totals identical to the sum of the lines', () => {
+    const rows = buildProductSales(
+      [{ items: [line(null, 'A', 10, 1), line(null, 'B', 7, 3), line('p1', 'Fries', 5, 2)] }],
+      products, categories, false,
+    );
+    expect(rows.reduce((t, r) => t + r.rev, 0)).toBe(10 + 21 + 10);
+    expect(rows.reduce((t, r) => t + r.qty, 0)).toBe(6);
   });
 });

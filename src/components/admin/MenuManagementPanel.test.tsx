@@ -237,6 +237,19 @@ describe('CSV bulk upload', () => {
     fireEvent.click(tab('Validate and Parse Spreadsheet'));
   }
 
+  it('warns about, and does not stage, a row that duplicates a product already on the menu', () => {
+    // `product` ("Fries") lives in category c1 ("Sides"). Re-importing it must not
+    // put a second live copy on the menu (F-TAA4-007).
+    render(<MenuManagementPanel />);
+    fireEvent.click(tab('Excel/CSV Bulk Import'));
+    const csv = `${HEADER}\nSides,مقبلات,Fries,بطاطس,d,و,5,300,\nSides,مقبلات,Onion Rings,حلقات,d,و,7,200,`;
+    fireEvent.change(screen.getByPlaceholderText(/category_name_en/i), { target: { value: csv } });
+    fireEvent.click(tab('Validate and Parse Spreadsheet'));
+    expect(screen.getByText(/Row 2 was skipped.*already exists on the menu/)).toBeTruthy();
+    expect(screen.getByText('Onion Rings')).toBeTruthy();
+    expect(screen.queryByText('Fries')).toBeNull();
+  });
+
   it('reports the count the server actually wrote, not the parsed count', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     // Two rows parsed, but the server reports one written and one skipped.

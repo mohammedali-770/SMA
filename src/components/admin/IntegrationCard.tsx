@@ -7,7 +7,7 @@ import { Field } from '../../design-system/ui/Field';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
-import { DbIntegrationSetting, UpsertIntegrationInput } from '../../lib/api';
+import { DbIntegrationSetting, IntegrationConflictError, UpsertIntegrationInput } from '../../lib/api';
 import { initialProviderName } from '../../lib/integrationProvider';
 
 const SELECT = [
@@ -154,6 +154,10 @@ interface Props {
 
 export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, onSave }) => {
   const spec = PROVIDER_SPECS[providerType];
+  // The stored row this form was last built from. Its `updated_at` is sent with
+  // every save so a form that has fallen behind the row is refused (F-X09-004),
+  // and the LIVE-mode confirmation compares against it rather than the prop.
+  const [base, setBase] = useState<DbIntegrationSetting | undefined>(row);
   const [enabled, setEnabled] = useState<boolean>(row?.enabled ?? false);
   // Coerce a stale stored provider (e.g. seeded 'sandbox') to a currently-offered
   // option, so a Save persists a usable provider rather than the stale value.
@@ -169,7 +173,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
     // Explicit confirmation before switching the payment gateway to LIVE (real payments).
     if (providerType === 'payment') {
       const newMode = String((pub.mode as string) ?? '').toLowerCase();
-      const oldMode = String(((row?.public_config as Record<string, unknown>)?.mode as string) ?? 'test').toLowerCase();
+      const oldMode = String(((base?.public_config as Record<string, unknown>)?.mode as string) ?? 'test').toLowerCase();
       if (newMode === 'live' && oldMode !== 'live') {
         const okLive = window.confirm(
           'Switch Moyasar to LIVE mode? Real customer payments will be processed. Make sure the LIVE secret key and the LIVE webhook secret token are configured.',
@@ -186,11 +190,24 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
         if (v.trim() !== '') typed[k] = v;
       }
       const secretConfig = Object.keys(typed).length ? typed : null;
-      const saved = await onSave({ providerType, providerName, enabled, publicConfig: pub, secretConfig });
+      const saved = await onSave({
+        providerType, providerName, enabled, publicConfig: pub, secretConfig,
+        expectedUpdatedAt: base?.updated_at ?? null,
+      });
+      setBase(saved);
       setHasSecret(saved.has_secret);
       setSecrets({}); // clear inputs so secrets stay masked
       setMsg({ ok: true, text: 'Saved securely' });
     } catch (e) {
+      if (e instanceof IntegrationConflictError && e.latest) {
+        // Show what is stored now instead of leaving values that are not.
+        const latest = e.latest;
+        setBase(latest);
+        setEnabled(latest.enabled);
+        setProviderName(initialProviderName(latest.provider_name, spec.providerOptions));
+        setPub({ ...(latest.public_config ?? {}) });
+        setHasSecret(latest.has_secret);
+      }
       setMsg({ ok: false, text: e instanceof Error ? e.message : 'Save failed' });
     } finally {
       setSaving(false);

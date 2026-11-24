@@ -129,3 +129,56 @@ export function buildCouponUsage(
 export function lazywaitRefOf(o: Pick<Order, 'lazywaitOrderNumber' | 'lazywaitRef'>): string {
   return (o.lazywaitOrderNumber ?? o.lazywaitRef ?? '').trim();
 }
+
+export interface ProductSalesRow {
+  id: string;
+  name: string;
+  category: string;
+  qty: number;
+  rev: number;
+}
+
+/** Shown when a line's product, or its category, no longer exists. */
+export const UNKNOWN_CATEGORY_LABEL = { en: 'Unknown category', ar: 'فئة غير معروفة' } as const;
+
+/**
+ * Product sales, one row per product.
+ *
+ * `order_items.product_id` becomes NULL when its product is deleted, so keying on
+ * it alone put every deleted product into a single "null" bucket named after the
+ * first line seen (F-TAA4-006). A line with no live product is keyed by the name
+ * snapshot the order item keeps instead, so two deleted products stay two rows.
+ * Quantity and revenue are unchanged; only the attribution moves.
+ */
+export function buildProductSales(
+  orders: readonly Pick<ReportOrder, 'items'>[],
+  products: readonly { id: string; categoryId: string; nameEn: string; nameAr: string }[],
+  categories: readonly { id: string; nameEn: string; nameAr: string }[],
+  isRTL: boolean,
+): ProductSalesRow[] {
+  const map = new Map<string, ProductSalesRow>();
+  for (const o of orders) {
+    for (const item of o.items) {
+      const pRef = item.productId ? products.find(p => p.id === item.productId) : undefined;
+      const snapshot = (item.nameEn || item.nameAr || '').trim().toLowerCase();
+      const key = item.productId ? `id:${item.productId}` : `deleted:${snapshot}`;
+      let row = map.get(key);
+      if (!row) {
+        const catRef = pRef ? categories.find(c => c.id === pRef.categoryId) : undefined;
+        row = {
+          id: key,
+          name: isRTL ? (pRef?.nameAr || item.nameAr) : (pRef?.nameEn || item.nameEn),
+          category: isRTL
+            ? (catRef?.nameAr || UNKNOWN_CATEGORY_LABEL.ar)
+            : (catRef?.nameEn || UNKNOWN_CATEGORY_LABEL.en),
+          qty: 0,
+          rev: 0,
+        };
+        map.set(key, row);
+      }
+      row.qty += item.quantity;
+      row.rev += item.price * item.quantity;
+    }
+  }
+  return [...map.values()].sort((a, b) => b.rev - a.rev);
+}
