@@ -744,7 +744,7 @@ on the parsed target, and `email-test-config` reads it from there. Same trust
 boundary as the host guard: the settings are written under `is_admin()` (role
 and AAL2) or with the service key, so this is containment, not a defence against
 an anonymous caller. It takes effect when `operations-alert-dispatch` and
-`email-test-config` are redeployed (`OWNER_ACTIONS.md` §62); nothing is sent
+`email-test-config` are redeployed (`OWNER_ACTIONS.md` §64); nothing is sent
 today, because external dispatch is still off, so there is no urgency.
 
 **THE HOST RULES MOVED TO `_shared/publicHost.ts` ON 2026-09-19, and this

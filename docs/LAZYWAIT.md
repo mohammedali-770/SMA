@@ -399,7 +399,7 @@ instead of the live config row.) Field-by-field state:
   onions`); a note alone there has nothing to be mistaken for and is unchanged.
   The label is `CUSTOMER_NOTE_LABEL` in `_shared/lazywait.ts`; its Arabic is
   engineering-drafted (`OWNER_ACTIONS.md` §35). Takes effect when
-  `lazywait-sync` is redeployed (`OWNER_ACTIONS.md` §62).
+  `lazywait-sync` is redeployed (`OWNER_ACTIONS.md` §64).
 
   It is prefixed rather than appended so it survives a POS display that
   truncates a long note.
