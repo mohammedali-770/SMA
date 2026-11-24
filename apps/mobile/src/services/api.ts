@@ -90,8 +90,14 @@ export const auth = {
     if (error) throw new Error(error.message);
     return data.session;
   },
+  /**
+   * Throws when the server call fails: supabase-js then KEEPS the stored session,
+   * so reporting "signed out" would show the guest screen over a live session
+   * (audit finding F-TA3-001).
+   */
   async signOut() {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
   },
   async myProfile(): Promise<DbProfile | null> {
     const { data: { user } } = await supabase.auth.getUser();

@@ -782,7 +782,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Persist any debounced settings edit BEFORE the session ends — after sign-out
     // the queued write would run as a guest and RLS would reject it (losing the edit).
     await flushSettings();
-    await auth.signOut();
+    try {
+      await auth.signOut();
+    } catch {
+      // The session is still stored (supabase-js keeps it when the server call
+      // fails), so do NOT show the guest screen: tell the truth and let the staff
+      // member try again with a connection. F-TA3-001.
+      window.alert(
+        'Could not sign out. Check your connection and try again.\nتعذّر تسجيل الخروج. تحقق من اتصالك وحاول مرة أخرى.',
+      );
+      return;
+    }
     resetToGuest();
   }, [resetToGuest, flushSettings]);
 

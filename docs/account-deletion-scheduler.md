@@ -93,3 +93,14 @@ and content type relayed, and 502 when the processor is unreachable. The
 ```bash
 deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts
 ```
+
+## The app's sign-out after a deletion request (2026-11-24)
+
+After the deletion request is accepted, the confirmation screen signs the
+customer out and then leaves for the login screen. `auth.signOut` now throws when
+supabase-js reports a failed server call (it keeps the stored session in that
+case, audit finding F-TA3-001). The screen therefore stays put, lets Done be
+pressed again and says "Could not sign out" instead of leaving for the login
+screen over a live session. The deletion request itself is already accepted and
+is unaffected. The Arabic of that message is engineering-drafted and joins the
+native-read list in `docs/OWNER_ACTIONS.md` section 35.
