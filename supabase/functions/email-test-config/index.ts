@@ -76,7 +76,6 @@ Deno.serve(async (req: Request) => {
     const to = str(payload.to).trim();
     if (!EMAIL_RE.test(to)) return json({ ok: false, message: 'Enter a valid recipient email address.' }, 200);
     const password = str(sec.password);
-    const replyTo = str(pub.reply_to).trim();
 
     let client: SMTPClient | null = null;
     try {
@@ -91,7 +90,7 @@ Deno.serve(async (req: Request) => {
       await client.send({
         from: `${target.fromName} <${target.fromEmail}>`,
         to,
-        replyTo: replyTo || undefined,
+        replyTo: target.replyTo || undefined,
         subject: 'Spicy Meal — SMTP test email',
         content: 'This is a test email from your Spicy Meal admin dashboard. If you received it, your SMTP settings are working.',
         html: '<p>This is a test email from your <b>Spicy Meal</b> admin dashboard.</p><p>If you received it, your SMTP settings are working. ✅</p>',

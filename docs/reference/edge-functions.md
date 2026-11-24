@@ -110,6 +110,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/pushDispatchTimeoutWiring.test.ts`
 - `_shared/pushPosSyncCancelled.test.ts`
 - `_shared/pushReadyCopyWiring.test.ts`
+- `_shared/pushStaleAudienceCopy.test.ts`
 - `_shared/rest.test.ts`
 - `_shared/rest.ts`
 - `_shared/restNoSupabaseJs.test.ts`

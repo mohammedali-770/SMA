@@ -578,6 +578,26 @@ export const COMP_TICKET_LABEL = '*** COMPLIMENTARY / ضيافة ***';
 export const DELIVERY_TICKET_PREFIX = 'التوصيل إلى / DELIVER TO';
 
 /**
+ * The label in front of the CUSTOMER'S OWN note on the ticket (F-X10-001).
+ *
+ * `order_details` is one string made of up to three parts joined by an em dash:
+ * the system's comp label, the system's delivery line, and the customer's note.
+ * Until the note carried its own label, a note of `*** COMPLIMENTARY / ضيافة ***`
+ * or `التوصيل إلى / DELIVER TO: <somewhere else>` printed exactly like the
+ * system's own line, and only the customer's own order is affected, but the cost
+ * lands on a branch collecting cash on delivery. A label does not stop a customer
+ * typing those words; it makes the line say who wrote them, which is what the
+ * cashier reading quickly needs. The per-item `details` gets the same label
+ * whenever the note follows modifier choices the system wrote.
+ */
+export const CUSTOMER_NOTE_LABEL = 'ملاحظة العميل / CUSTOMER NOTE';
+
+/** `<label>: <note>`, or null for no note. */
+function labelCustomerNote(note: string | null): string | null {
+  return note ? `${CUSTOMER_NOTE_LABEL}: ${note}` : null;
+}
+
+/**
  * One human-readable destination line from the address snapshot.
  *
  * Returns null when nothing usable is present, which is what makes
@@ -680,7 +700,9 @@ export function composeItemDetails(
     .filter((s): s is string => s !== null)
     .join(', ');
   const trimmedNote = trimToNull(note);
-  if (choices && trimmedNote) return `${choices} — ${trimmedNote}`;
+  // Labelled only where something the SYSTEM wrote precedes it: a note alone has
+  // nothing to be mistaken for (F-X10-001).
+  if (choices && trimmedNote) return `${choices} — ${labelCustomerNote(trimmedNote)}`;
   return choices || trimmedNote;
 }
 
@@ -957,7 +979,9 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
     input.isComped ? COMP_TICKET_LABEL : null,
     // Duplicated from `delivery_address` on purpose — see DELIVERY_TICKET_PREFIX.
     deliveryAddress ? `${DELIVERY_TICKET_PREFIX}: ${deliveryAddress}` : null,
-    orderNote,
+    // Always labelled, even alone: a note that reads `*** COMPLIMENTARY ***` must
+    // not look like the system's own line on a pickup ticket either (F-X10-001).
+    labelCustomerNote(orderNote),
   ].filter(Boolean).join(' — ');
   if (orderDetails) payload.order_details = orderDetails;
 

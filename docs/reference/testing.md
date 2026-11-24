@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**318 TypeScript test files declaring 4565 test blocks, plus 106 SQL suites.**
+**319 TypeScript test files declaring 4591 test blocks, plus 106 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -445,7 +445,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-57 files, 1130 declared test blocks.
+58 files, 1156 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -457,12 +457,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/adminPushWiring.test.ts` | 29 | the admin channel is separate from the customer channel |
 | `supabase/functions/_shared/alertDispatchWiring.test.ts` | 18 | operations-alert-dispatch is inert until deliberately enabled |
 | `supabase/functions/_shared/apiKeys.test.ts` | 16 | key selection |
-| `supabase/functions/_shared/auditTrailWiring.test.ts` | 10 | push-dispatch broadcast: targeting and send unchanged |
+| `supabase/functions/_shared/auditTrailWiring.test.ts` | 11 | push-dispatch broadcast: targeting and send unchanged |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/deployFunctionsWiring.test.ts` | 9 | deploy-functions.yml |
 | `supabase/functions/_shared/emailTestConfigWiring.test.ts` | 7 | email-test-config validates the SMTP endpoint before connecting |
 | `supabase/functions/_shared/functionRegion.test.ts` | 3 | internalFunctionUrl |
-| `supabase/functions/_shared/lazywait.test.ts` | 102 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
+| `supabase/functions/_shared/lazywait.test.ts` | 107 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 50 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | the control: the same fixture, answered ready_to_send |
@@ -493,9 +493,10 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/pushDispatchTimeoutWiring.test.ts` | 7 | push-dispatch: the Expo send is bounded |
 | `supabase/functions/_shared/pushPosSyncCancelled.test.ts` | 6 | push-dispatch pos_sync: a cancelled order is told nothing about the POS |
 | `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
+| `supabase/functions/_shared/pushStaleAudienceCopy.test.ts` | 17 | pos_sync: a queued message that has gone stale is closed, not sent |
 | `supabase/functions/_shared/rest.test.ts` | 42 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
-| `supabase/functions/_shared/smtpTarget.test.ts` | 24 | parseSmtpTarget |
+| `supabase/functions/_shared/smtpTarget.test.ts` | 27 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
 | `supabase/functions/_shared/webhookReliabilityWiring.test.ts` | 11 | lazywait-webhook |
 | `supabase/functions/_shared/webPush.test.ts` | 29 | base64url |

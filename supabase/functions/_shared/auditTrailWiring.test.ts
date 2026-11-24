@@ -59,16 +59,27 @@ describe('push-dispatch broadcast: targeting and send unchanged', () => {
   it('still targets active, opted-in devices and nothing wider', () => {
     const arm = broadcastArm();
     const select = between(arm, "admin.from('push_devices')", ';');
+    // `customer_id` was added to the select on purpose (F-X08-003), only so the
+    // arm can drop a customer with an in-flight deletion request. The two
+    // filters are unchanged; the next test pins that the audience can only shrink.
     expect(select.replace(/\s+/g, ' ')).toBe(
-      "admin.from('push_devices') .select('id, expo_push_token, lang') .eq('is_active', true) .eq('promos_enabled', true)",
+      "admin.from('push_devices') .select('id, expo_push_token, lang, customer_id') .eq('is_active', true) .eq('promos_enabled', true)",
     );
+  });
+
+  it('drops a customer with an in-flight deletion request, and never widens the audience', () => {
+    const arm = broadcastArm().replace(/\s+/g, ' ');
+    expect(arm).toContain(
+      "admin.from('account_deletion_requests') .select('user_id') .in('status', DELETION_IN_FLIGHT)",
+    );
+    expect(arm).toContain('.filter((d) => !d.customer_id || !leavingIds.has(d.customer_id))');
   });
 
   it('still sends the admin copy as a promo, once', () => {
     const arm = broadcastArm();
     expect(arm.match(/sendToDevices\(/g)).toHaveLength(1);
     expect(arm.replace(/\s+/g, ' ')).toContain(
-      "const result = await sendToDevices(admin, (devices ?? []) as DeviceRow[], { en: { title: titleEn, body: bodyEn }, ar: { title: titleAr, body: bodyAr }, }, { type: 'promo' });",
+      "const result = await sendToDevices(admin, audience, { en: { title: titleEn, body: bodyEn }, ar: { title: titleAr, body: bodyAr }, }, { type: 'promo' });",
     );
   });
 });

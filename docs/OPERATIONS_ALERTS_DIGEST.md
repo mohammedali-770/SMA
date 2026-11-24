@@ -731,6 +731,22 @@ means "any public hostname", and setting it only ever narrows. **It must be set
 before external dispatch is turned on.** "What the SMTP guard cannot see",
 below, says why.
 
+**THE SENDER FIELDS ARE VALIDATED TOO, since 2026-11-24 (F-EFN-03-012,
+F-X10-003).** denomailer writes `From: <name> <<address>>` and `Reply-To:` into
+the message header block unencoded and does not refuse a line break in any of
+them, so a `from_name`, `from_email` or `reply_to` containing CR or LF started a
+new header line (a `Bcc:`, for example) on every alert mail. `parseSmtpTarget`
+now refuses any control character in all three, `<` or `>` in the name, and an
+address that is not a single plain address in the two emails; the refusal is
+`smtp_sender_invalid`, which the dispatcher reports as `disabled` like the host
+refusals and the test button reports with a sentence. `reply_to` is now carried
+on the parsed target, and `email-test-config` reads it from there. Same trust
+boundary as the host guard: the settings are written under `is_admin()` (role
+and AAL2) or with the service key, so this is containment, not a defence against
+an anonymous caller. It takes effect when `operations-alert-dispatch` and
+`email-test-config` are redeployed (`OWNER_ACTIONS.md` §64); nothing is sent
+today, because external dispatch is still off, so there is no urgency.
+
 **THE HOST RULES MOVED TO `_shared/publicHost.ts` ON 2026-09-19, and this
 paragraph would otherwise send a reader to a file that no longer holds them.**
 The admin push sender needed the same question answered about a push endpoint an

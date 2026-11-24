@@ -82,6 +82,8 @@ describe('email-test-config validates the SMTP endpoint before connecting', () =
     expect(branch).toContain('hostname: target.host');
     expect(branch).toContain('port: target.port');
     expect(branch).toContain('tls: target.tls');
+    // The reply-to rides the same guard as the From fields (F-X10-003).
+    expect(branch).toContain('replyTo: target.replyTo');
     for (const raw of [
       'pub.host',
       'pub.port',
@@ -89,6 +91,7 @@ describe('email-test-config validates the SMTP endpoint before connecting', () =
       'pub.username',
       'pub.from_email',
       'pub.from_name',
+      'pub.reply_to',
     ]) {
       expect(branch).not.toContain(raw);
     }

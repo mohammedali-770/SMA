@@ -19,6 +19,7 @@ import {
   SMTP_PORT_NOT_ALLOWED,
   SMTP_PORTS,
   SMTP_REJECTED,
+  SMTP_SENDER_INVALID,
   SMTP_SEND_FAILED,
   SMTP_TLS_FAILED,
 } from './smtpTarget';
@@ -114,6 +115,65 @@ describe('parseSmtpTarget', () => {
     expect(parseSmtpTarget(LIVE, 'example.net').reason).toBe(SMTP_HOST_NOT_ALLOWED);
     expect(parseSmtpTarget(LIVE, '').reason).toBeNull();
     expect(parseSmtpTarget(LIVE, null).reason).toBeNull();
+  });
+
+  /*
+   * THE SENDER FIELDS GO INTO THE HEADER BLOCK UNENCODED (F-EFN-03-012,
+   * F-X10-003). denomailer writes `From: <name> <<address>>` and `Reply-To:`
+   * verbatim, and a CR or LF in any of the three starts a new header line.
+   */
+  describe('sender fields cannot carry a header', () => {
+    const bad: Array<[string, Record<string, unknown>]> = [
+      ['from_name with CRLF and a Bcc header', { from_name: 'Spicy\r\nBcc: x@y.example' }],
+      ['from_name with a bare LF', { from_name: 'Spicy\nMeal' }],
+      ['from_name with a bare CR', { from_name: 'Spicy\rMeal' }],
+      ['from_name with an angle bracket', { from_name: 'Spicy <x@y.example' }],
+      ['from_name with a NUL', { from_name: 'Spicy\u0000Meal' }],
+      ['from_name with a Unicode line separator', { from_name: 'Spicy\u2028Meal' }],
+      ['from_email with CRLF and a Bcc header', { from_email: 'a@b.example\r\nBcc: x@y.example' }],
+      ['from_email with a space', { from_email: 'a b@c.example' }],
+      ['from_email with an angle bracket', { from_email: 'a@b.example>' }],
+      [
+        'from_email with a control character the address pattern would let through',
+        { from_email: 'a@b.example\u0007' },
+      ],
+      ['from_email that is not an address', { from_email: 'not-an-address' }],
+      ['reply_to with CRLF and a Bcc header', { reply_to: 'a@b.example\r\nBcc: x@y.example' }],
+      ['reply_to with a bare LF', { reply_to: 'a@b.example\nBcc: x@y.example' }],
+      [
+        'reply_to with a control character the address pattern would let through',
+        { reply_to: 'a@b.example\u0000' },
+      ],
+      ['reply_to that is not an address', { reply_to: 'not-an-address' }],
+    ];
+
+    it.each(bad)('refuses %s', (_name, patch) => {
+      const t = parseSmtpTarget({ ...LIVE, ...patch });
+      expect(t.reason).toBe(SMTP_SENDER_INVALID);
+      // A refusal carries no usable field.
+      expect(t.host).toBe('');
+      expect(t.fromEmail).toBe('');
+      expect(t.fromName).toBe('');
+      expect(t.replyTo).toBe('');
+    });
+
+    it('still accepts the live sender, an Arabic name and an optional reply-to', () => {
+      expect(parseSmtpTarget(LIVE).reason).toBeNull();
+      expect(parseSmtpTarget({ ...LIVE, from_name: 'سبايسي ميل' })).toMatchObject({
+        reason: null,
+        fromName: 'سبايسي ميل',
+      });
+      expect(parseSmtpTarget({ ...LIVE, reply_to: ' support@spicymeal.com.sa ' })).toMatchObject({
+        reason: null,
+        replyTo: 'support@spicymeal.com.sa',
+      });
+      expect(parseSmtpTarget({ ...LIVE, reply_to: '   ' })).toMatchObject({ reason: null, replyTo: '' });
+      expect(parseSmtpTarget(LIVE).replyTo).toBe('');
+    });
+
+    it('has an admin-facing sentence for the refusal', () => {
+      expect(describeSmtpRefusal(SMTP_SENDER_INVALID)).toMatch(/single line/);
+    });
   });
 
   /*
