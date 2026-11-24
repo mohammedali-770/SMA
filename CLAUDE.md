@@ -303,6 +303,8 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would have swept the then-frozen Moyasar file in**, because `20260824100000` sorted ahead of everything applied on 2026-08-25. It was applied by name on 2026-11-13 (ledger row 114). Any future `supabase migration` operation must still name its target explicitly.
 
+**Current position 2026-11-24, read live AFTER the cash-retry apply: 168 repository files on the default branch / 174 live history rows / 165 applied by exact name, 1 applied under a longer name (row 15), 2 superseded (rows 8-9), 0 unapplied — NOTHING IS OUTSTANDING.** Latest live version `20261124061110` (`20261024120000_cash_order_input_match_expired_session_lookup`, applied 06:11:10 UTC on the owner's approval naming it by version, one call; ledger row 129, `docs/MIGRATIONS.md` §76). Live history **173 → 174**. It redefined `begin_checkout_session` (`6bbcfb65…`) and `place_customer_order` (`4a0a4acc…`) and added `checkout_input_fingerprint` and the closed table `order_input_fingerprints`; **the money-path pair did not move** (`place_order` `7078c7dd…`, `compute_order_snapshot` `22e2d429…`), so the baseline recorded below stands. No deploy follows from it. The next file written is the next referent: **name the target by version.** This supersedes the counts in the paragraph below, which is kept for its record of the five 2026-11-22 applies.
+
 **Current position 2026-11-22, read live AFTER the five audit-fix applies: 167
 repository files on the default branch / 173 live history rows / 164 applied by
 exact name, 1 applied under a longer name (row 15), 2 superseded (rows 8-9), 0
