@@ -170,3 +170,56 @@ export type TransitionOutcome =
 export function interpretTransition(matchedRow: boolean, intended: TransitionOutcome): TransitionOutcome {
   return matchedRow ? intended : 'lost_lease';
 }
+
+// ---------------------------------------------------------------------------
+// Staff accounts never leave through the customer deletion path (F-X05-001).
+// ---------------------------------------------------------------------------
+
+/**
+ * The customer deletion path is re-verified by a code to the account's own phone
+ * or by its own password, and a password sign-in is an AAL1 session. Staff
+ * authority everywhere else needs AAL2 (`is_admin()` = role AND AAL2), and the
+ * last-administrator rule lives in `admin_set_user_role`, so a staff account that
+ * could erase itself through THIS path would skip both. This is an ALLOW-LIST on
+ * purpose: a role added to the enum later is refused until someone decides
+ * otherwise, instead of being admitted by a deny-list that forgot it.
+ *
+ * A profile with no row (null role) holds no staff authority anywhere in the
+ * schema (`current_app_role()` is null, so every predicate is false) and is
+ * treated as a customer, which keeps the path unchanged for them.
+ */
+export function isCustomerRoleForDeletion(role: unknown): boolean {
+  return role === null || role === undefined || role === 'customer';
+}
+
+/** Safe, customer-readable reason stored when the processor holds a staff request. */
+export const STAFF_DELETION_HOLD_REASON = 'staff_account_requires_admin';
+
+export type DeletionAccountGuard =
+  | { allowed: true }
+  | { allowed: false; status: number; code: string; message: string };
+
+/**
+ * Decide whether the caller's account may use the customer deletion path, from
+ * the result of reading its own `profiles.role` (the id comes from the verified
+ * JWT, never the body). Fails CLOSED: a failed read is a refusal, never a pass.
+ */
+export function decideDeletionAccountGuard(lookup: { role: unknown; error: unknown }): DeletionAccountGuard {
+  if (lookup.error !== null && lookup.error !== undefined) {
+    return {
+      allowed: false,
+      status: 500,
+      code: 'role_check_failed',
+      message: 'We could not verify your account. Please try again.',
+    };
+  }
+  if (!isCustomerRoleForDeletion(lookup.role)) {
+    return {
+      allowed: false,
+      status: 403,
+      code: 'staff_account',
+      message: 'Staff accounts cannot be deleted from the app. Ask an administrator.',
+    };
+  }
+  return { allowed: true };
+}

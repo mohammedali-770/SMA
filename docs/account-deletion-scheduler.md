@@ -104,3 +104,34 @@ pressed again and says "Could not sign out" instead of leaving for the login
 screen over a live session. The deletion request itself is already accepted and
 is unaffected. The Arabic of that message is engineering-drafted and joins the
 native-read list in `docs/OWNER_ACTIONS.md` section 35.
+
+## Staff accounts never leave through this queue (F-X05-001, 2026-11-24)
+
+`account-delete-request` re-verifies with a code to the account's own phone or its
+own password, which is an AAL1 session, and `create_account_deletion_request`
+takes only a user id. For an administrator, accountant, branch or call-centre
+account that path skipped both the AAL2 requirement every staff gate carries and
+the last-administrator rule in `admin_set_user_role`, and the processor would
+then call `auth.admin.deleteUser`. It is now closed in two places:
+
+- **`account-delete-request`** reads the caller's `profiles.role` (the id comes
+  from the verified JWT, never the body) before either action, and answers 403
+  `staff_account` for any role other than `customer`. A failed read answers 500
+  `role_check_failed` — it never falls through. A user with no profile row is
+  treated as a customer, since no staff predicate is true for them. It is an
+  allow-list, so a role added to the enum later is refused until someone decides.
+- **`account-delete-process`** holds a staff account in `manual_review` with the
+  reason `staff_account_requires_admin` before it checks blockers, anonymises or
+  deletes anything. That covers a request queued before the refusal shipped and an
+  account promoted after it was queued, and it is what keeps the last
+  administrator from being removed: every administrator is held, not only the last.
+  An administrator resolves it with `resolve_account_deletion_request`.
+
+Staff leave through `staff-accounts` (branch and call centre, which asks
+`is_admin()`: role and AAL2) or an administrator's own process. There is
+deliberately no "administrator at AAL2 may delete themselves" exception here; if
+one is wanted it needs its own decision, including how the last administrator is
+protected. Customers are unchanged. Deploying both functions is a separate owner
+action. The decision is `decideDeletionAccountGuard` in
+`supabase/functions/_shared/accountDeletion.ts`; the handlers are pinned by
+`accountDeletionStaffWiring.test.ts`.

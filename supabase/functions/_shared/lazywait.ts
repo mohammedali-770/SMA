@@ -281,6 +281,10 @@ export function classifyLazywaitError(status: number, code?: string | null): {
  *   ok         2xx + success:true + a usable order_ref  -> synced.
  *   safe_retry HTTP 429 (rate limited): the gateway rejected us before the POS
  *              saw it, so a retry cannot duplicate.       -> retry within budget.
+ *              ALSO a connection that was provably never established
+ *              (`neverConnected`: DNS failure, connection refused, TLS
+ *              handshake rejected). No request byte was written, so the POS
+ *              cannot hold the order. See `classifyConnectFailure`.
  *   ambiguous  timeout / dropped connection (status 0), 5xx, 2xx-without-ref,
  *              success:true-without-ref, malformed body   -> confirmation_required.
  *   terminal   401 / 403 / other 4xx: the request reached the POS and was
@@ -295,6 +299,12 @@ export interface CreateOrderResultInput {
   status: number;                 // 0 = network/timeout (see lazywaitFetch)
   data?: unknown;                 // parsed provider body (may be malformed)
   error?: string | null;         // e.g. 'timeout' on AbortError
+  /**
+   * True only when `lazywaitFetch` PROVED the connection was never established
+   * (see `classifyConnectFailure`). Absent/false for everything else, including
+   * every failure it could not classify, which stays ambiguous.
+   */
+  neverConnected?: boolean;
 }
 export interface CreateOrderOutcome {
   kind: CreateOrderOutcomeKind;
@@ -332,8 +342,15 @@ export function classifyCreateOrderResult(res: CreateOrderResultInput): CreateOr
   }
   if (status === 429) return { kind: 'safe_retry', reason: 'rate_limited', orderRef: null };
   if (status === 0) {
-    // Network failure: the request may have reached the POS before we lost the
-    // reply. Ambiguous — verify, never auto-resend.
+    // A connection that was never established wrote nothing, so the POS cannot
+    // hold this order: it is safe to retry, exactly like a 429. The timeout
+    // check stays first — an abort can land after the request left, whatever
+    // stage the connection reached, so it is never read as "never connected".
+    if (res.neverConnected === true && res.error !== 'timeout') {
+      return { kind: 'safe_retry', reason: 'connect_failed', orderRef: null };
+    }
+    // Any other network failure: the request may have reached the POS before we
+    // lost the reply. Ambiguous — verify, never auto-resend.
     const isTimeout = res.error === 'timeout';
     return {
       kind: 'ambiguous',
@@ -1117,6 +1134,87 @@ export interface LazywaitResponse<T = unknown> {
    * `data:{raw}` fallback.
    */
   text?: string | null;
+  /**
+   * Set (to true) ONLY when the thrown error proves the connection was never
+   * established, so no request byte can have reached the POS. Absent on every
+   * success and on every failure that is not provably of that kind. Feeds
+   * `classifyCreateOrderResult`; `error` then carries a stable
+   * `connect_failed:<kind>` code instead of the runtime's message (which embeds
+   * the request URL).
+   */
+  neverConnected?: boolean;
+}
+
+export type ConnectFailureKind = 'dns' | 'refused' | 'tls' | 'connect';
+
+// Node/undici put the OS or TLS code on `error.cause.code`. Each of these can
+// only be raised before the request is written: DNS resolution, `connect(2)`
+// being refused, and certificate verification during the handshake. Codes that
+// can also fire on an ESTABLISHED connection are deliberately absent —
+// ECONNRESET, EPIPE, ETIMEDOUT, ECONNABORTED, ENETUNREACH, EHOSTUNREACH
+// (unreachable can be reported mid-stream) and every UND_ERR_* socket code.
+const DNS_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN']);
+const REFUSED_CODES = new Set(['ECONNREFUSED']);
+const TLS_CODES = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN', 'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+// Deno's fetch (hyper) wraps a failure of the CONNECTOR — DNS, TCP connect and
+// the TLS handshake — as `client error (Connect)` (older runtimes: `error
+// trying to connect`). hyper raises that kind only before a connection exists,
+// so the request has not been written. A write or read on an established
+// connection is a different kind (`client error (SendRequest)`, `connection
+// error`, `error reading a body from connection`, ...).
+const CONNECT_MARKER = /client error \(connect\)|error trying to connect/i;
+// Anything that says bytes may have moved, or that a clock ran out, vetoes the
+// proof even when a connect marker is also present.
+const MAY_HAVE_SENT = /sendrequest|send request|connection reset|broken pipe|connection closed|closed before|incomplete message|unexpected eof|unexpected end|error reading|body error|connection error|timed out|timeout|aborted|cancel/i;
+
+/**
+ * Decide, from a thrown fetch error, whether the connection was PROVABLY never
+ * established. Returns the kind, or `null` for everything else — and `null` is
+ * the answer whenever there is any doubt, because the cost is asymmetric: a
+ * wrong "never connected" resends an order the POS may already hold, a duplicate
+ * kitchen ticket; a wrong `null` only sends one more order to manual
+ * verification, which is where every failure went before this existed.
+ *
+ * Pure and runtime-agnostic: it reads `message`, `code`, `cause` and
+ * `AggregateError.errors` (depth-bounded), so it covers the Deno and Node error
+ * shapes without importing either. A timeout (`AbortError`) never reaches it —
+ * `lazywaitFetch` handles that first — and a message naming a timeout vetoes it.
+ */
+export function classifyConnectFailure(e: unknown): ConnectFailureKind | null {
+  const nodes: Array<{ message: string; code: string }> = [];
+  const seen = new Set<unknown>();
+  const walk = (x: unknown, depth: number) => {
+    if (x == null || typeof x !== 'object' || seen.has(x) || depth > 6) return;
+    seen.add(x);
+    const o = x as { message?: unknown; code?: unknown; cause?: unknown; errors?: unknown };
+    nodes.push({
+      message: typeof o.message === 'string' ? o.message : '',
+      code: typeof o.code === 'string' ? o.code : '',
+    });
+    walk(o.cause, depth + 1);
+    if (Array.isArray(o.errors)) for (const sub of o.errors) walk(sub, depth + 1);
+  };
+  walk(e, 0);
+  if (nodes.length === 0) return null;
+
+  // Every coded node must be a pre-connect code: one ECONNRESET or ETIMEDOUT
+  // anywhere in the chain (a dual-stack attempt, say) means we cannot say.
+  const codes = nodes.map((n) => n.code).filter((c) => c !== '');
+  const allPreConnect = codes.every((c) => DNS_CODES.has(c) || REFUSED_CODES.has(c) || TLS_CODES.has(c));
+  if (!allPreConnect) return null;
+  if (nodes.some((n) => MAY_HAVE_SENT.test(n.message))) return null;
+
+  const hasCode = codes.length > 0;
+  const hasMarker = nodes.some((n) => CONNECT_MARKER.test(n.message));
+  if (!hasCode && !hasMarker) return null;
+
+  if (codes.some((c) => DNS_CODES.has(c)) || nodes.some((n) => /dns error|failed to lookup address|name or service not known|getaddrinfo/i.test(n.message))) return 'dns';
+  if (codes.some((c) => REFUSED_CODES.has(c)) || nodes.some((n) => /connection refused/i.test(n.message))) return 'refused';
+  if (codes.some((c) => TLS_CODES.has(c)) || nodes.some((n) => /invalid peer certificate|certificate verify failed|unknownissuer|invalid certificate/i.test(n.message))) return 'tls';
+  return 'connect';
 }
 
 /**
@@ -1200,6 +1298,13 @@ export async function lazywaitFetch<T = unknown>(
     };
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError';
+    // An abort is never "never connected": the timer can fire after the request
+    // left. Everything else is classified only when it can be PROVEN.
+    const connectFailure = aborted ? null : classifyConnectFailure(e);
+    if (connectFailure) {
+      return { ok: false, status: 0, data: null, code: null, retryAfterMs: null,
+        error: `connect_failed:${connectFailure}`, text: null, neverConnected: true };
+    }
     return { ok: false, status: 0, data: null, code: null, retryAfterMs: null,
       error: aborted ? 'timeout' : (e instanceof Error ? e.message : 'network_error'), text: null };
   } finally {

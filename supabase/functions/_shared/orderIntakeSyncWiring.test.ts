@@ -85,10 +85,14 @@ describe('lazywait-sync — dispatches the POS lifecycle messages', () => {
     // order-intake invokes this worker synchronously on checkout, so the
     // confirmation push must ride that invocation rather than wait for a tick.
     // Positional: the drain call has to come after the order loop's recording.
+    // Since 2026-11-24 (F-X09-002) the drain lives in the `drainNotifications`
+    // helper, which the early exits also call, so the property is that the LAST
+    // call — the one on the normal path — follows the loop's final recording.
     const record = CODE.lastIndexOf('record_lazywait_sync');
-    const drain = CODE.indexOf('await dispatchPendingPosSync');
+    const drain = CODE.lastIndexOf('await drainNotifications(');
     expect(record).toBeGreaterThan(-1);
     expect(drain).toBeGreaterThan(record);
+    expect(CODE).toContain('await dispatchPendingPosSync(admin)');
   });
 
   it('bounds the drain so a backlog cannot fan out without limit', () => {

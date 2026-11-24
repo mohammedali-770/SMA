@@ -32,7 +32,9 @@ Deno.serve(async (req: Request) => {
 
   const admin = adminClient();
   const cfg = await getProviderConfig(admin, 'lazywait');
-  if (!cfg || !cfg.enabled) return json({ status: 'disabled', reason: 'lazywait not enabled' }, 200);
+  // No integration row at all: there is no trigger secret to authenticate the
+  // caller with, so there is nothing safe to sweep on its behalf.
+  if (!cfg) return json({ status: 'disabled', reason: 'lazywait not enabled' }, 200);
 
   // Shared-secret gate for the scheduled/server trigger — fail CLOSED. Because
   // verify_jwt=false makes this function internet-reachable, we REQUIRE a
@@ -41,6 +43,10 @@ Deno.serve(async (req: Request) => {
   // and send it as the x-sync-secret header (see docs/LAZYWAIT_PILOT.md).
   const triggerSecret = String((cfg.secretConfig as Record<string, unknown>).sync_trigger_secret ?? '');
   if (!triggerSecret) {
+    // A disabled integration with no secret answers exactly as it always did.
+    // The sweeps below run only for an AUTHENTICATED caller, so with no secret
+    // there is no one to authenticate and nothing runs.
+    if (!cfg.enabled) return json({ status: 'disabled', reason: 'lazywait not enabled' }, 200);
     return json({ error: 'sync trigger secret not configured' }, 503);
   }
   // Constant-time compare so the shared-secret check is not a timing oracle
@@ -49,31 +55,6 @@ Deno.serve(async (req: Request) => {
   const providedSyncSecret = req.headers.get('x-sync-secret') ?? '';
   if (!timingSafeEqual(providedSyncSecret, triggerSecret)) {
     return json({ error: 'unauthorized' }, 401);
-  }
-
-  // ---- Base URL: FAIL CLOSED, before anything is claimed or sent -----------
-  // A missing/blank base_url used to fall back to DEFAULT_BASE_URL — the
-  // PRODUCTION POS — which would have started POSTing live customer orders to a
-  // host nobody is watching. There is no fallback now. This runs BEFORE the
-  // reaper and BEFORE claim_lazywait_sync_batch, so on a blank config no order
-  // is claimed, no order changes state, and no HTTP request is attempted; the
-  // queue simply waits for the config to be fixed. It is deliberately NOT
-  // routed through lazywaitFetch: `status: 0` would be classified as a
-  // retryable/ambiguous NETWORK error and would either retry forever or mark
-  // real orders confirmation_required over a config typo.
-  const resolvedBase = resolveLazywaitBaseUrl((cfg.publicConfig as Record<string, unknown>).base_url);
-  if (!resolvedBase.ok) {
-    console.error('lazywait-sync refusing to run:', resolvedBase.reason);
-    return json({ status: 'blocked', error: resolvedBase.reason }, 500);
-  }
-
-  const lw: LazywaitConfig = {
-    baseUrl: resolvedBase.baseUrl,
-    clientId: String((cfg.publicConfig as Record<string, unknown>).client_id ?? ''),
-    apiToken: String((cfg.secretConfig as Record<string, unknown>).api_token ?? ''),
-  };
-  if (!lw.clientId || !lw.apiToken) {
-    return json({ error: 'lazywait config missing client_id or api_token' }, 500);
   }
 
   // TARGETED mode: order-intake passes the id of the order the customer is
@@ -160,6 +141,60 @@ Deno.serve(async (req: Request) => {
       if (n > 0) console.log('reaped stale lazywait syncing rows:', JSON.stringify(reaped));
     }
   });
+
+  // The customer-message drain (see dispatchPendingPosSync). Declared here so the
+  // early exits below can run it too: the reaper just queued 'pos_failed' rows
+  // for whatever it dead-lettered, and a customer should hear that now rather
+  // than whenever the integration is next switched on. It forwards committed
+  // rows to push-dispatch and never contacts the POS.
+  let notified: unknown = { found: 0, dispatched: 0 };
+  const drainNotifications = (after?: () => Promise<void>) => runOffPath(async () => {
+    notified = await dispatchPendingPosSync(admin);
+    if (after) await after();
+  });
+
+  // ---- Disabled: sweeps have run, nothing is claimed or sent ----------------
+  // F-X09-002. This used to be the FIRST thing the worker did after loading the
+  // config, so a switched-off integration returned before the reaper and the
+  // deadline sweep and froze every queued order on "sending to the branch" until
+  // someone switched it back on — and then dead-lettered the lot in one burst.
+  // The reaper and the customer-message drain above are TIME-driven bookkeeping
+  // over rows that are already in the queue; they never touch the POS, need no
+  // base URL and no credentials, so neither the switch nor a config fault is a
+  // reason to skip them. Everything that talks to the POS stays below this line.
+  if (!cfg.enabled) {
+    await drainNotifications();
+    return json({ status: 'disabled', reason: 'lazywait not enabled', reaped, notified }, 200);
+  }
+
+  // ---- Base URL: FAIL CLOSED, before anything is claimed or sent -----------
+  // A missing/blank base_url used to fall back to DEFAULT_BASE_URL — the
+  // PRODUCTION POS — which would have started POSTing live customer orders to a
+  // host nobody is watching. There is no fallback now. This runs BEFORE
+  // claim_lazywait_sync_batch and before anything is sent, so on a blank config
+  // no order is claimed and no HTTP request is attempted. Only the time-driven
+  // sweeps above have run (they never touch the POS, and a config typo is no
+  // reason to leave an order past its deadline on "sending to the branch");
+  // until the config is fixed the queue is not worked. It is deliberately NOT
+  // routed through lazywaitFetch: `status: 0` would be classified as a
+  // retryable/ambiguous NETWORK error and would either retry forever or mark
+  // real orders confirmation_required over a config typo.
+  const resolvedBase = resolveLazywaitBaseUrl((cfg.publicConfig as Record<string, unknown>).base_url);
+  if (!resolvedBase.ok) {
+    console.error('lazywait-sync refusing to run:', resolvedBase.reason);
+    await drainNotifications();
+    return json({ status: 'blocked', error: resolvedBase.reason, reaped, notified }, 500);
+  }
+
+  const lw: LazywaitConfig = {
+    baseUrl: resolvedBase.baseUrl,
+    clientId: String((cfg.publicConfig as Record<string, unknown>).client_id ?? ''),
+    apiToken: String((cfg.secretConfig as Record<string, unknown>).api_token ?? ''),
+  };
+  if (!lw.clientId || !lw.apiToken) {
+    await drainNotifications();
+    return json({ error: 'lazywait config missing client_id or api_token', reaped, notified }, 500);
+  }
 
   // Claim (flips to 'syncing').
   //
@@ -550,7 +585,15 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const outcome = classifyCreateOrderResult({ status: res.status, data: res.data, error: res.error });
+      // `neverConnected` is set only when the transport PROVED no connection was
+      // established (DNS / refused / TLS handshake), so nothing was written to the
+      // POS. That is a safe_retry, handled by the same branch as a 429 below: the
+      // order goes to `failed` and the database's known-failure normalizer clears
+      // the phase marker, which is what makes it resendable and refundable. Every
+      // failure that cannot be proven stays ambiguous -> confirmation_required.
+      const outcome = classifyCreateOrderResult({
+        status: res.status, data: res.data, error: res.error, neverConnected: res.neverConnected,
+      });
       const attempt = Number(order.sync_attempt_count ?? 0) + 1;
       const nowIso = new Date().toISOString();
       const priorFailureAt = (order.first_pos_sync_failure_at as string | null) ?? null;
@@ -732,9 +775,7 @@ Deno.serve(async (req: Request) => {
   // claim, so a deferred drain racing the cron's cannot double-send. And if the
   // isolate is torn down before the claim commits, the row is still 'pending'
   // and the next cron tick takes it — delayed, never dropped.
-  let notified: unknown = { found: 0, dispatched: 0 };
-  await runOffPath(async () => {
-    notified = await dispatchPendingPosSync(admin);
+  await drainNotifications(async () => {
     // After the push, because a customer waiting to hear their order reached
     // the kitchen matters more than a CRM link nobody sees.
     for (const backfill of crmBackfills) await backfill();

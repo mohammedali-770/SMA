@@ -15,7 +15,7 @@
 //  - Raw errors are never returned; only safe codes/generic messages.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
-import { authOwnedFactors, passwordReauthUserMatches } from '../_shared/accountDeletion.ts';
+import { authOwnedFactors, decideDeletionAccountGuard, passwordReauthUserMatches } from '../_shared/accountDeletion.ts';
 import { normalizePhoneE164, hashOtp, timingSafeEqual } from '../_shared/whatsapp.ts';
 import { getOtpPepper, sendOtpViaWhatsApp, type Language } from '../_shared/whatsappSend.ts';
 import { secretKey, serviceCallHeaders } from '../_shared/apiKeys.ts';
@@ -80,6 +80,18 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return json({ error: 'Invalid request' }, 400); }
 
   const admin = adminClient();
+
+  // STAFF ACCOUNTS DO NOT USE THIS PATH (F-X05-001). Re-verification here is a
+  // code to the account's own phone or its own password, which is an AAL1
+  // session; it carries neither the AAL2 that every staff gate requires nor the
+  // last-administrator rule. The role is read for the id in the verified JWT,
+  // never from the body, and a failed read refuses rather than passes. Staff
+  // leave through staff-accounts (branch / call centre) or an administrator.
+  // Customers (and a user with no profile row) are unchanged.
+  const { data: roleRow, error: roleErr } = await admin
+    .from('profiles').select('role').eq('id', user.id).maybeSingle();
+  const guard = decideDeletionAccountGuard({ role: roleRow?.role, error: roleErr });
+  if (!guard.allowed) return json({ error: guard.message, code: guard.code }, guard.status);
 
   // Re-verification binds ONLY to AUTH-OWNED credentials (auth.getUser().phone /
   // .email) — NEVER to customer-editable profile fields. Editing a profile row
