@@ -506,6 +506,13 @@ what an order **costs**, and it can never reduce earning — the CHECK is
 
 Set from **Admin → Settings → Loyalty Program → Points Campaigns**.
 
+**A campaign goes with what it is scoped to.** `product_id`, `category_id` and
+`branch_id` are all `on delete cascade`, so deleting a product, a category or a
+branch deletes the campaigns scoped to it, with no history. The console's
+product-delete confirmation says so (it names "any points campaign for it",
+`src/lib/confirmCopy.ts`); the panel has no way to switch a product off, so
+delete is the only way to take one off the menu (audit finding F-TAA4-004).
+
 ### Why a separate table from `campaigns`
 
 `campaigns` is discount-shaped: its `type` CHECK admits only
