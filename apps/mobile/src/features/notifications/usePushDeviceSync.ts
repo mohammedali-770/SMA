@@ -37,6 +37,14 @@
  * registration has offers off (opt-IN since 2026-11-18), so that is now only a
  * row that already carried them. The claim itself is unchanged by that.
  *
+ * LANGUAGE FOLLOWS THE APP (audit F-X08-001). The claim above never rewrites a
+ * row it finds, so the language stored at registration used to be permanent and
+ * every push stayed in it after the customer switched. A second effect now
+ * brings the stored language in line whenever it differs from the app's, using
+ * `syncDeviceLang`: the stored preferences go back untouched and an inactive
+ * row is left alone (`deviceLangSyncPrefs`). It runs once the claim has settled
+ * on a row, so it never races the claim, and it never registers a device.
+ *
  * An attempt that finishes after its sign-in has ended (sign-out, or a language
  * change re-running the effect) records nothing: marking it complete then would
  * block the claim at the NEXT sign-in, which may be a different customer.
@@ -44,8 +52,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { DbPushDevice } from '../../types/db';
-import { PUSH_CLIENT_ENABLED, shouldRegisterOnSignIn } from './notificationPolicy';
-import { hasNotificationPermission, lookupThisDevice, registerThisDevice } from './pushRegistration';
+import { deviceLangSyncPrefs, PUSH_CLIENT_ENABLED, shouldRegisterOnSignIn } from './notificationPolicy';
+import {
+  hasNotificationPermission, lookupThisDevice, registerThisDevice, syncDeviceLang,
+} from './pushRegistration';
 
 /** Bounded: a few quick tries, then wait for the next sign-in. */
 const RETRY_DELAYS_MS = [2_000, 6_000];
@@ -137,6 +147,39 @@ export function usePushDeviceSync(signedIn: boolean, lang: 'en' | 'ar'): DbPushD
 
     return () => { cancelled = true; };
   }, [signedIn, lang]);
+
+  // Language sync. `wantLang` is read when a write runs, not when it was
+  // queued, and only one write is in flight, so a quick en -> ar -> en cannot
+  // land out of order and leave the server on the wrong language.
+  const wantLang = useRef(lang);
+  const signedInRef = useRef(signedIn);
+  const syncing = useRef(false);
+  wantLang.current = lang;
+  signedInRef.current = signedIn;
+
+  useEffect(() => {
+    if (!PUSH_CLIENT_ENABLED || !signedIn || syncing.current) return;
+    if (!deviceLangSyncPrefs({ lang, device: settled })) return;
+
+    syncing.current = true;
+    void (async () => {
+      try {
+        // A failed write is not retried here: the next language change, or the
+        // next launch (the claim finds the row again), tries again.
+        for (;;) {
+          const target = wantLang.current;
+          const row = await syncDeviceLang(target);
+          if (!signedInRef.current) return;
+          if (row) setSettled(row);
+          if (wantLang.current === target) return;
+        }
+      } catch {
+        /* leave it for the next opportunity */
+      } finally {
+        syncing.current = false;
+      }
+    })();
+  }, [signedIn, lang, settled]);
 
   return settled;
 }
