@@ -47,6 +47,10 @@ export async function registerThisDevice(
   return null;
 }
 
+export async function syncDeviceLang(_lang: 'en' | 'ar'): Promise<DbPushDevice | null> {
+  return null;
+}
+
 export async function deactivateThisDeviceStrict(): Promise<void> { /* no device row on web */ }
 
 export async function deactivateThisDevice(): Promise<void> { /* no device row on web */ }

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**312 TypeScript test files declaring 4506 test blocks, plus 105 SQL suites.**
+**313 TypeScript test files declaring 4523 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -170,7 +170,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-112 files, 1482 declared test blocks.
+113 files, 1499 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -216,7 +216,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/menu/bannerFetchOwnership.test.ts` | 5 | banner fetch ownership |
 | `apps/mobile/src/features/menu/categoryFocus.test.ts` | 17 | categoryFocusReducer |
 | `apps/mobile/src/features/menu/menuSections.test.ts` | 27 | menuItemKey (branch-selection crash regression) |
-| `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 31 | resolveNotificationRoute (allow-listed internal routes ONLY) |
+| `apps/mobile/src/features/notifications/languageSyncWiring.test.ts` | 11 | syncDeviceLang sends the new language through register_push_device with the stored preferences |
+| `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 37 | resolveNotificationRoute (allow-listed internal routes ONLY) |
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 19 | shouldRequestFirstRunPermissions |

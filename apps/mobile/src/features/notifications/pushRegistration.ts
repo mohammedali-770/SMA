@@ -21,7 +21,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
 import { pushDevices } from '../../services/api';
-import { DEFAULT_DEVICE_PREFS, type DevicePrefs } from './notificationPolicy';
+import { DEFAULT_DEVICE_PREFS, deviceLangSyncPrefs, type DevicePrefs } from './notificationPolicy';
 import type { DbPushDevice } from '../../types/db';
 
 /**
@@ -134,6 +134,24 @@ export async function registerThisDevice(
     orderUpdatesEnabled: prefs.orderUpdatesEnabled,
     promosEnabled: prefs.promosEnabled,
   });
+}
+
+/**
+ * Make the server's language for THIS device follow the app (audit F-X08-001).
+ *
+ * Re-reads the row first, so the preferences it passes back are the ones stored
+ * NOW rather than a copy that a Profile toggle may have changed since. The
+ * decision, including never re-defaulting a preference and never reactivating a
+ * silenced device, is `deviceLangSyncPrefs`. Returns the updated row, or null
+ * when nothing was written. Throws on a failed write so the caller can leave it
+ * for the next opportunity; a failed or indeterminate LOOKUP writes nothing.
+ */
+export async function syncDeviceLang(lang: 'en' | 'ar'): Promise<DbPushDevice | null> {
+  const lookup = await lookupThisDevice();
+  if (lookup.status !== 'found') return null;
+  const prefs = deviceLangSyncPrefs({ lang, device: lookup.device });
+  if (!prefs) return null;
+  return registerThisDevice(lang, prefs);
 }
 
 /**

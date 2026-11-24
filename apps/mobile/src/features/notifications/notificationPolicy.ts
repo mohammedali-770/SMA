@@ -173,6 +173,48 @@ export function shouldRegisterOnSignIn(input: {
 }
 
 /**
+ * Whether the language the server holds for THIS device must follow the app.
+ *
+ * `push_devices.lang` is written only by `register_push_device`, and the
+ * server picks every push's copy from it, so a customer who switches the app
+ * language after registering would otherwise keep receiving pushes in the old
+ * one (audit F-X08-001). Returns the preferences to PASS THROUGH to that RPC —
+ * exactly as stored — or `null` when nothing should be written.
+ *
+ * The RPC has no language-only form: it upserts the preferences with the
+ * language and sets `is_active = true`. Two consequences are decided here, so
+ * that a language change can never rewrite a consent choice (CLAUDE.md §7,
+ * "existing rows are never silently rewritten"):
+ *
+ *  - the stored preferences go back UNCHANGED. Never `DEFAULT_DEVICE_PREFS`:
+ *    that would turn a customer's offers switch off, or on, as a side effect
+ *    of tapping a language button;
+ *  - an INACTIVE row is left alone (`null`). Registering would reactivate a
+ *    device the customer deliberately silenced. Its language is refreshed by
+ *    the registration made when they turn notifications back on, which always
+ *    passes the current language.
+ *
+ * `device` must be a row the CALLER owns for THIS token (the RLS-scoped lookup
+ * guarantees ownership), so this never reassigns a token.
+ */
+export function deviceLangSyncPrefs(input: {
+  lang: 'en' | 'ar';
+  device: {
+    lang: 'en' | 'ar';
+    is_active: boolean;
+    order_updates_enabled: boolean;
+    promos_enabled: boolean;
+  } | null | undefined;
+}): DevicePrefs | null {
+  const { lang, device } = input;
+  if (!device || !device.is_active || device.lang === lang) return null;
+  return {
+    orderUpdatesEnabled: device.order_updates_enabled,
+    promosEnabled: device.promos_enabled,
+  };
+}
+
+/**
  * Whether to show the one-time consent NOTICE: so that offers never reach a
  * customer who was not told about them.
  *
