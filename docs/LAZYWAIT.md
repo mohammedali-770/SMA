@@ -379,11 +379,27 @@ instead of the live config row.) Field-by-field state:
   "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
 - `order_details` carries the customer's own kitchen note, and — for a **comped**
-  order — a label in front of it:
+  order — a label in front of it. **Since 2026-11-24 the customer's note is
+  itself labelled** (F-X10-001), so it cannot pass for a system marker:
 
   ```
-  *** COMPLIMENTARY / ضيافة *** — No onions
+  *** COMPLIMENTARY / ضيافة *** — ملاحظة العميل / CUSTOMER NOTE: No onions
   ```
+
+  The line is up to three parts joined by an em dash — the comp label, the
+  `DELIVER TO` line (delivery only) and the note — and until then the note was
+  last with nothing saying whose words it was, so a note typed as
+  `*** COMPLIMENTARY / ضيافة ***` or `التوصيل إلى / DELIVER TO: …` printed exactly
+  like the system's own text. The label does not stop a customer typing it; it
+  says who wrote it. It applies on **every** order that has a note (a forged
+  comp label on a pickup ticket is the main case), so a note-only ticket now
+  reads `ملاحظة العميل / CUSTOMER NOTE: Extra napkins` where it used to read
+  `Extra napkins`. A line's `details` gets the same label only when the note
+  follows modifier choices the system wrote (`Volcano — … CUSTOMER NOTE: No
+  onions`); a note alone there has nothing to be mistaken for and is unchanged.
+  The label is `CUSTOMER_NOTE_LABEL` in `_shared/lazywait.ts`; its Arabic is
+  engineering-drafted (`OWNER_ACTIONS.md` §35). Takes effect when
+  `lazywait-sync` is redeployed (`OWNER_ACTIONS.md` §62).
 
   It is prefixed rather than appended so it survives a POS display that
   truncates a long note.

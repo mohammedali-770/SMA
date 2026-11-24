@@ -897,7 +897,16 @@ async function dispatchPendingPosSync(
           body: JSON.stringify({ action: 'pos_sync', orderId: row.order_id, status: row.status }),
           signal: AbortSignal.timeout(8000),
         });
-        if (res.ok) out.dispatched++;
+        // push-dispatch answers 200 for "I did not send this" too: `disabled`
+        // when the push master flag is off, and `superseded`, `duplicate` or
+        // `in_progress` for an event it declined (F-X08-002). Only an `ok`
+        // answer is a dispatch. The row itself is untouched here: a disabled
+        // answer leaves it 'pending', and push-dispatch closes it as too old if
+        // the flag comes back after it has gone stale.
+        if (res.ok) {
+          const answer = await res.json().catch(() => null) as { status?: string } | null;
+          if (answer?.status === 'ok') out.dispatched++;
+        }
       } catch { /* transient; the row stays 'pending' for the next tick */ }
     }
   } catch (e) {

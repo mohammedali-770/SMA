@@ -3,7 +3,7 @@ import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails,
+  buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails, CUSTOMER_NOTE_LABEL,
   computeBackoffMs, computePosNextAttempt, DEFAULT_BASE_URL, extractOrderRef, hmacSha256Hex,
   LAZYWAIT_BASE_URL_HOST_NOT_ALLOWED,
   LAZYWAIT_BASE_URL_INVALID, LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
@@ -70,7 +70,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
       }],
       customer_name: 'Ahmed',
       source: 'LWAPI',
-      order_details: 'Ring the bell twice',
+      order_details: 'ملاحظة العميل / CUSTOMER NOTE: Ring the bell twice',
       customer_id: 'CRM_42',
       customer_cell: '541234567',
       country_code: '+966',
@@ -143,13 +143,13 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(composeItemDetails('No onions', [
       { addonId: null, nameEn: 'Volcano' },
       { addonId: null, nameEn: 'Extra Hot', quantity: 2 },
-    ])).toBe('Volcano, Extra Hot ×2 — No onions');
+    ])).toBe('Volcano, Extra Hot ×2 — ملاحظة العميل / CUSTOMER NOTE: No onions');
   });
 
   it('sends the order-level note as `order_details` and omits it when there is none', () => {
     const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
     const withNote = buildCreateOrderPayload({ ...base, orderDetails: 'Extra napkins' });
-    expect(withNote.ok && withNote.payload.order_details).toBe('Extra napkins');
+    expect(withNote.ok && withNote.payload.order_details).toBe('ملاحظة العميل / CUSTOMER NOTE: Extra napkins');
     const without = buildCreateOrderPayload({ ...base, orderDetails: '  ' });
     expect(without.ok && 'order_details' in without.payload).toBe(false);
   });
@@ -162,10 +162,66 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     if (!comped.ok) throw new Error('expected a payload');
     // Prefixed, so it survives a POS display that truncates a long note.
     expect(String(comped.payload.order_details)).toBe(
-      '*** COMPLIMENTARY / \u0636\u064a\u0627\u0641\u0629 *** \u2014 Extra napkins',
+      '*** COMPLIMENTARY / \u0636\u064a\u0627\u0641\u0629 *** \u2014 ملاحظة العميل / CUSTOMER NOTE: Extra napkins',
     );
     // A label, never the financial flag.
     expect(comped.payload.is_paid).toBeUndefined();
+  });
+
+  /*
+   * F-X10-001. The ticket line is system markers and the customer's note joined
+   * by an em dash. A note that spells a marker must come out AFTER the label that
+   * says whose words they are, on every order type.
+   */
+  describe('a customer note cannot pass for the system marker', () => {
+    const base = { clientId: 'C', branchId: 'B', customerName: 'A', items } as const;
+    const FORGED_COMP = '*** COMPLIMENTARY / \u0636\u064a\u0627\u0641\u0629 ***';
+    const FORGED_DELIVERY = '\u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0625\u0644\u0649 / DELIVER TO: Somewhere Else';
+
+    it('a forged comp label on a paid pickup order is preceded by the note label', () => {
+      const r = buildCreateOrderPayload({ ...base, orderType: 'pickup', orderDetails: FORGED_COMP, isComped: false });
+      if (!r.ok) throw new Error('expected a payload');
+      const line = String(r.payload.order_details);
+      expect(line).toBe(`${CUSTOMER_NOTE_LABEL}: ${FORGED_COMP}`);
+      // The first thing on the line is who wrote it, never the marker itself.
+      expect(line.startsWith(CUSTOMER_NOTE_LABEL)).toBe(true);
+    });
+
+    it('a forged destination follows the real one, and only after the label', () => {
+      const r = buildCreateOrderPayload({
+        ...base, orderType: 'delivery', deliveryAddress: addr, orderDetails: FORGED_DELIVERY,
+      });
+      if (!r.ok) throw new Error('expected a payload');
+      const line = String(r.payload.order_details);
+      const real = line.indexOf('DELIVER TO: Home');
+      const label = line.indexOf(CUSTOMER_NOTE_LABEL);
+      const forged = line.indexOf('DELIVER TO: Somewhere Else');
+      expect(real).toBeGreaterThan(-1);
+      expect(label).toBeGreaterThan(real);
+      expect(forged).toBeGreaterThan(label);
+    });
+
+    it('the real comp label still comes first and is never inside the note', () => {
+      const r = buildCreateOrderPayload({
+        ...base, orderType: 'pickup', orderDetails: 'napkins', isComped: true,
+      });
+      if (!r.ok) throw new Error('expected a payload');
+      const line = String(r.payload.order_details);
+      expect(line.startsWith('*** COMPLIMENTARY')).toBe(true);
+      expect(line.indexOf('COMPLIMENTARY')).toBeLessThan(line.indexOf(CUSTOMER_NOTE_LABEL));
+    });
+
+    it('an item note that follows modifier choices is labelled; a note alone is left as it was', () => {
+      expect(composeItemDetails('Extra Hot', [{ addonId: null, nameEn: 'Volcano' }]))
+        .toBe(`Volcano \u2014 ${CUSTOMER_NOTE_LABEL}: Extra Hot`);
+      expect(composeItemDetails('No onions', [])).toBe('No onions');
+      expect(composeItemDetails(null, [{ addonId: null, nameEn: 'Volcano' }])).toBe('Volcano');
+    });
+
+    it('an empty or blank note adds no label', () => {
+      const r = buildCreateOrderPayload({ ...base, orderType: 'pickup', orderDetails: '   ' });
+      expect(r.ok && 'order_details' in r.payload).toBe(false);
+    });
   });
 
   it('labels a comped ticket that carries no customer note', () => {
@@ -181,7 +237,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
     const plain = buildCreateOrderPayload({ ...base, orderDetails: 'Extra napkins' });
     if (!plain.ok) throw new Error('expected a payload');
-    expect(String(plain.payload.order_details)).toBe('Extra napkins');
+    expect(String(plain.payload.order_details)).toBe('ملاحظة العميل / CUSTOMER NOTE: Extra napkins');
     expect(String(plain.payload.order_details)).not.toContain('COMPLIMENTARY');
   });
 
@@ -356,7 +412,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     if (!r.ok) return;
     expect(r.payload.order_type).toBe('pickup');
     expect(r.payload.delivery_address).toBeUndefined();
-    expect(String(r.payload.order_details)).toBe('Ring the bell');
+    expect(String(r.payload.order_details)).toBe('ملاحظة العميل / CUSTOMER NOTE: Ring the bell');
   });
 
   it('sends order money VERBATIM — the numbers on the ticket are the ones charged', () => {
@@ -558,7 +614,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const item = (r.payload.order_items as Record<string, unknown>[])[0];
-    expect(item.details).toBe('Volcano ×2, حار — No onions');
+    expect(item.details).toBe('Volcano ×2, حار — ملاحظة العميل / CUSTOMER NOTE: No onions');
   });
 
   it('skips an unmapped modifier with NO usable name rather than emitting an empty fragment', () => {
@@ -669,7 +725,7 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
     if (!built.ok) return;
     const item = (built.payload.order_items as Record<string, unknown>[])[0];
     expect('addons' in item).toBe(false);
-    expect(item.details).toBe('Extra Cheese — No onions');
+    expect(item.details).toBe('Extra Cheese — ملاحظة العميل / CUSTOMER NOTE: No onions');
     // 35 is the stored unit_price; nothing is subtracted, so the ticket implies
     // exactly what place_order charged.
     expect(item.price).toBe(35);
@@ -684,7 +740,7 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
     if (!builtOrphan.ok) return;
     const orphanItem = (builtOrphan.payload.order_items as Record<string, unknown>[])[0];
     expect('addons' in orphanItem).toBe(false);
-    expect(orphanItem.details).toBe('X — No onions');
+    expect(orphanItem.details).toBe('X — ملاحظة العميل / CUSTOMER NOTE: No onions');
     expect(orphanItem.price).toBe(35);
   });
 

@@ -50,6 +50,7 @@ export const SMTP_HOST_NOT_ROUTABLE = 'smtp_host_not_routable';
 export const SMTP_HOST_NOT_ALLOWED = 'smtp_host_not_allowed';
 export const SMTP_PORT_INVALID = 'smtp_port_invalid';
 export const SMTP_PORT_NOT_ALLOWED = 'smtp_port_not_allowed';
+export const SMTP_SENDER_INVALID = 'smtp_sender_invalid';
 
 /**
  * The ports a mail relay listens on: 25 (relay), 465 (submission over TLS),
@@ -71,6 +72,8 @@ export interface SmtpTarget {
   username: string;
   fromEmail: string;
   fromName: string;
+  /** The `reply_to` setting, or '' when none is set. Validated like the From fields. */
+  replyTo: string;
   /**
    * Non-null means REFUSED, and every other field is meaningless.
    *
@@ -83,7 +86,34 @@ export interface SmtpTarget {
 }
 
 function refuse(reason: string): SmtpTarget {
-  return { host: '', port: 0, tls: false, username: '', fromEmail: '', fromName: '', reason };
+  return { host: '', port: 0, tls: false, username: '', fromEmail: '', fromName: '', replyTo: '', reason };
+}
+
+/**
+ * The three sender settings are written, unencoded, into the message's header
+ * block: `From: <name> <<address>>` and `Reply-To: <address>`. denomailer 1.6.0
+ * does not refuse a line break in any of them (`isSingleMail` accepts `[^<>]+`
+ * for the name, and ASCII CR and LF are never encoded), so a value with a line
+ * break writes a new header line, for example `Bcc:`, into every alert mail.
+ * That was F-EFN-03-012 for the display name, and F-X10-003 found `from_email`
+ * and `reply_to` on the same route with no check at all.
+ *
+ * Settings are written under `is_admin()` (role and AAL2) or by a holder of the
+ * service key, so this is containment, the same trust boundary as the host
+ * guard above, not a defence against an anonymous caller.
+ *
+ * REFUSED: any control character (CR and LF included), and for the name also
+ * `<` and `>`, which close or open the address part. The addresses must look
+ * like one address: no whitespace, no angle brackets, no quote.
+ */
+const CONTROL_CHARS = /[\u0000-\u001f\u007f\u0080-\u009f\u2028\u2029]/;
+const SENDER_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
+function senderFieldsValid(fromName: string, fromEmail: string, replyTo: string): boolean {
+  if (CONTROL_CHARS.test(fromName) || /[<>]/.test(fromName)) return false;
+  if (CONTROL_CHARS.test(fromEmail) || !SENDER_ADDRESS.test(fromEmail)) return false;
+  if (replyTo !== '' && (CONTROL_CHARS.test(replyTo) || !SENDER_ADDRESS.test(replyTo))) return false;
+  return true;
 }
 
 /**
@@ -105,10 +135,12 @@ export function parseSmtpTarget(
   const host = normalizeHost(String(publicConfig.host ?? ''));
   const fromEmail = String(publicConfig.from_email ?? '').trim();
   const fromName = String(publicConfig.from_name ?? '').trim() || 'Spicy Meal';
+  const replyTo = String(publicConfig.reply_to ?? '').trim();
   const username = String(publicConfig.username ?? '').trim();
   const tls = publicConfig.secure === true;
 
   if (!host || !fromEmail) return refuse(SMTP_NOT_CONFIGURED);
+  if (!senderFieldsValid(fromName, fromEmail, replyTo)) return refuse(SMTP_SENDER_INVALID);
 
   const portRaw = String(publicConfig.port ?? '').trim() || '587';
   const port = Number(portRaw);
@@ -119,7 +151,7 @@ export function parseSmtpTarget(
   if (!isValidHostname(host)) return refuse(SMTP_HOST_INVALID);
   if (!isAllowedSmtpHost(host, allowlist)) return refuse(SMTP_HOST_NOT_ALLOWED);
 
-  return { host, port, tls, username, fromEmail, fromName, reason: null };
+  return { host, port, tls, username, fromEmail, fromName, replyTo, reason: null };
 }
 
 function listPorts(ports: readonly number[]): string {
@@ -139,6 +171,10 @@ const REFUSAL_SENTENCES = new Map<string, string>([
   [SMTP_HOST_INVALID, 'The SMTP host is not a valid hostname.'],
   [SMTP_HOST_NOT_ROUTABLE, 'The SMTP host must be a public hostname, not an IP address or an internal name.'],
   [SMTP_HOST_NOT_ALLOWED, 'The SMTP host is not on this deployment’s SMTP_ALLOWED_HOSTS list.'],
+  [
+    SMTP_SENDER_INVALID,
+    'The from name, from email or reply-to is not valid: each must be a single line, and the emails must be plain addresses.',
+  ],
 ]);
 
 export function describeSmtpRefusal(reason: string): string {

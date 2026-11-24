@@ -24,7 +24,8 @@ import { expoPushHeaders } from './expoHeaders.ts';
  *       with the same account first).
  *   broadcast     { titleEn, titleAr, bodyEn, bodyAr }
  *       Caller: authenticated ADMIN. Immediate promotional broadcast to
- *       OPTED-IN devices only (is_active AND promos_enabled). Returns
+ *       OPTED-IN devices only (is_active AND promos_enabled), and never a
+ *       customer with an in-flight account-deletion request. Returns
  *       delivery counts. No scheduling / segmentation / topics / sounds.
  *       Its notification_log row also records the sending admin and the four
  *       strings (sent_by, content; 20261007120000, see broadcastLog.ts).
@@ -75,6 +76,26 @@ const MAX_SEND_ATTEMPTS = 5;
 // on Expo I/O and double-send (review finding). 10 min > 400s, so an expired
 // lease is provably a dead owner.
 const PROCESSING_LEASE_MS = 10 * 60_000;
+// A queued POS-outcome message is only worth sending while it is still news
+// (F-X08-002). The producers enqueue the moment something happens and the drain
+// runs every minute, so a healthy row is dispatched within a couple of minutes.
+// A row older than this was held back by something else: the master flag was
+// switched off for an incident, or this function was failing. Sending it when
+// the flag comes back would tell a customer "Order confirmed" about an order that
+// may be days old and already eaten, and `pos_confirmed` always passes the
+// claim's state check because the order stays 'synced'. Such a row is closed as
+// 'superseded', the terminal no-send state the claim already writes for an event
+// that no longer holds. 30 minutes is three times the 10-minute POS deadline
+// (pos_sync_deadline_at), so no message about a live order is ever this old.
+const POS_SYNC_MAX_AGE_MS = 30 * 60_000;
+// Account-deletion requests that are still in flight, i.e. the customer has
+// asked to be erased and erasure has not finished. Same six values as the
+// partial unique index `account_deletion_requests_one_active`; `completed` and
+// `failed` are terminal and are not in it.
+const DELETION_IN_FLIGHT = [
+  'queued', 'waiting_for_active_order', 'waiting_for_financial_process',
+  'processing', 'retry_scheduled', 'manual_review',
+];
 
 type OrderStatus = 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -134,6 +155,26 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
 const READY_DELIVERY_COPY = {
   en: { title: 'Order ready ✅', body: 'Your order is ready and will be on its way shortly.' },
   ar: { title: 'طلبك جاهز ✅', body: 'طلبك جاهز وسيكون في الطريق إليك قريباً.' },
+};
+
+/**
+ * `delivered` for a PICKUP order (F-X08-004).
+ *
+ * A pickup order is completed by `ready` -> `delivered` (`admin_set_order_status`),
+ * so the one `delivered` entry in STATUS_COPY told a customer who walked in and
+ * collected their food that it had been "Delivered" / «تم التوصيل». It is the
+ * same defect as `ready`, found one status later, and is fixed the same way:
+ * selected from `orders.order_type` on the row this function already reads.
+ *
+ * ONLY THE TITLE CHANGES. The bodies are byte-identical to STATUS_COPY.delivered,
+ * which is the copy delivery customers keep receiving unchanged — the English
+ * thanks and the Arabic «بالهناء والشفاء!» are not about the handover. The new
+ * Arabic is the two words «تم الاستلام» ("collected"), engineering-drafted and
+ * not yet read by a native speaker (docs/OWNER_ACTIONS.md §35).
+ */
+const DELIVERED_PICKUP_COPY = {
+  en: { title: 'Collected 🎉', body: STATUS_COPY.delivered.en.body },
+  ar: { title: 'تم الاستلام 🎉', body: STATUS_COPY.delivered.ar.body },
 };
 
 // POS confirmation-lifecycle copy (EN/AR). Body strings are the EXACT approved
@@ -455,11 +496,16 @@ Deno.serve(async (req: Request) => {
       return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
     }
 
-    // Only `ready` differs by fulfilment; every other status reads the same to a
-    // pickup and a delivery customer, so the table stays the default.
+    // Only `ready` and `delivered` differ by fulfilment; every other status reads
+    // the same to a pickup and a delivery customer, so the table stays the default.
+    // `delivered` is the other one (F-X08-004): a pickup customer collected it.
+    // Keyed on 'pickup' rather than "not delivery" so an unexpected order type
+    // keeps the copy it has always had.
     const copy = status === 'ready' && order.order_type === 'delivery'
       ? READY_DELIVERY_COPY
-      : STATUS_COPY[status];
+      : status === 'delivered' && order.order_type === 'pickup'
+        ? DELIVERED_PICKUP_COPY
+        : STATUS_COPY[status];
     const result = await sendToDevices(admin, targets, copy, { type: 'order', orderId });
     // Outcome: any successful delivery → terminal 'sent' (partial failures
     // recorded but NOT retryable — already-delivered devices stay protected);
@@ -517,12 +563,28 @@ Deno.serve(async (req: Request) => {
 
     // OPT-IN ONLY: active devices whose owner opted into promotions.
     const { data: devices, error: devicesError } = await admin.from('push_devices')
-      .select('id, expo_push_token, lang')
+      .select('id, expo_push_token, lang, customer_id')
       .eq('is_active', true)
       .eq('promos_enabled', true);
     if (devicesError) return json({ status: 'error', reason: 'device lookup failed (transient)' }, 500);
 
-    const result = await sendToDevices(admin, (devices ?? []) as DeviceRow[], {
+    // ... AND NOT SOMEONE WHO HAS ASKED TO BE ERASED (F-X08-003). Accepting a
+    // deletion request writes only `account_deletion_requests`; the device rows go
+    // at the very end of erasure, and while the request waits on an open order, a
+    // financial process or manual review they stay active with the offers switch
+    // as it was. Order-status pushes during that wait are still right; marketing
+    // is not. This can only SHRINK the audience. A failed lookup refuses the send
+    // rather than falling back to everyone, because the broadcast cannot be
+    // recalled.
+    const { data: leaving, error: leavingError } = await admin.from('account_deletion_requests')
+      .select('user_id')
+      .in('status', DELETION_IN_FLIGHT);
+    if (leavingError) return json({ status: 'error', reason: 'deletion lookup failed (transient)' }, 500);
+    const leavingIds = new Set((leaving ?? []).map((r: { user_id: string | null }) => r.user_id).filter(Boolean));
+    const audience = ((devices ?? []) as (DeviceRow & { customer_id: string | null })[])
+      .filter((d) => !d.customer_id || !leavingIds.has(d.customer_id));
+
+    const result = await sendToDevices(admin, audience, {
       en: { title: titleEn, body: bodyEn },
       ar: { title: titleAr, body: bodyAr },
     }, { type: 'promo' });
@@ -571,6 +633,28 @@ Deno.serve(async (req: Request) => {
     const { data: order } = await admin.from('orders')
       .select('id, customer_id, status').eq('id', orderId).maybeSingle();
     if (!order) return json({ error: 'order not found' }, 404);
+
+    // A STALE event is closed, not sent (F-X08-002). The claim below decides by
+    // the order's CURRENT sync state and never looks at how old the event is, so
+    // after the master flag had been off for a while every queued row would go out
+    // as the flag came back. Read the event's age first; close it under the
+    // 'pending' guard so a concurrent dispatcher that claimed it in between wins
+    // and this write matches nothing. A row whose age cannot be read is not
+    // treated as stale: failing open here keeps today's behaviour, and the column
+    // is `not null default now()`.
+    const { data: queued } = await admin.from('notification_log')
+      .select('created_at')
+      .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
+      .eq('send_status', 'pending')
+      .maybeSingle();
+    const queuedAt = queued?.created_at ? Date.parse(String(queued.created_at)) : NaN;
+    if (Number.isFinite(queuedAt) && Date.now() - queuedAt > POS_SYNC_MAX_AGE_MS) {
+      await admin.from('notification_log')
+        .update({ send_status: 'superseded', updated_at: new Date().toISOString() })
+        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
+        .eq('send_status', 'pending');
+      return json({ status: 'superseded', reason: 'event too old to send' }, 200);
+    }
 
     // FENCED CLAIM (Finding 3): an atomic RPC flips the deduped 'pending' event
     // row to 'processing' with a per-dispatch lease token. Exactly ONE concurrent

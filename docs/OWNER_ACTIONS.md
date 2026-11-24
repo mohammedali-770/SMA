@@ -3153,6 +3153,21 @@ exists on the menu / already appears earlier in this file under …"). The
 integration cards' refusal of a stale save is English-only, like the rest of
 that screen.
 
+**Widened 2026-11-24 — three more engineering-drafted Arabic strings, one
+customer-facing and two on staff tickets.** Read them in the same pass.
+
+- **The pickup `delivered` push title** (`push-dispatch`, `DELIVERED_PICKUP_COPY`):
+  «تم الاستلام 🎉» ("Collected"), shown to a customer whose order was a pickup.
+  The body below it is the existing «بالهناء والشفاء! شكراً لطلبك من سبايسي ميل.»,
+  unchanged. A delivery customer keeps «تم التوصيل 🎉». This is live customer
+  messaging, so it ships only with the `push-dispatch` deploy in §62;
+- **`ملاحظة العميل / CUSTOMER NOTE`**, the label in front of a customer's own
+  note on the kitchen ticket (`CUSTOMER_NOTE_LABEL`, `_shared/lazywait.ts`).
+  Staff read it, not customers; check it reads as "the customer's note" and not
+  as an instruction;
+- **the `smtp_sender_invalid` sentence** the test-email button shows (English
+  only, so nothing to read in Arabic).
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
@@ -5844,6 +5859,63 @@ refund in progress reads "we could not send your order because the ordering
 service is unavailable. Your payment will be refunded automatically", which is
 not true of a cancelled order the branch received. That is an app change and a
 build (§47.17).
+
+## 62. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — one decision, then deploys
+
+**Opened 2026-11-24.** Five findings from the full audit (F-X08-002, -003, -004,
+F-X10-001, -003) are fixed in code by one pull request. **Nothing is live until
+you approve each step**, and none of it needs a migration.
+
+**The decision that is yours first: the broadcast audience (F-X08-003).** Today
+a broadcast reaches every device with `promos_enabled` that is active. A customer
+who has asked for their account to be deleted keeps that device row, switch and
+all, until erasure finishes, and erasure can wait on an open order, a financial
+process or manual review. The change drops from a broadcast any customer with an
+**in-flight** deletion request (`queued`, `waiting_for_active_order`,
+`waiting_for_financial_process`, `processing`, `retry_scheduled`,
+`manual_review`). **It can only shrink the audience, never widen it**, and it
+refuses the send if the lookup fails rather than falling back to everyone,
+because a broadcast cannot be recalled. It is still a change to who a broadcast
+reaches, which CLAUDE.md §7 keeps for you: approve it, or ask for it to be taken
+out before the merge. Order-status pushes are untouched, so a customer with an
+open order still hears about it. The admin console's opt-in count comes from a
+database function and may read slightly higher than the real audience while a
+request is in flight; fixing that needs a migration and is not part of this.
+
+**What else changes, and when:**
+
+| Function | Change | Customer-visible? |
+| --- | --- | --- |
+| `push-dispatch` | A queued POS-outcome message older than 30 minutes is closed as `superseded` instead of sent (F-X08-002); a pickup order's `delivered` push now says «Collected» / «تم الاستلام» (F-X08-004); the broadcast audience change above | Yes: live customer messaging |
+| `lazywait-sync` | Its push drain counts a dispatch only when push-dispatch answered `ok`, not every HTTP 200, `disabled` included; the customer's own note on a ticket is labelled (F-X10-001) | Kitchen tickets, staff-facing |
+| `operations-alert-dispatch`, `email-test-config` | The From name, From email and reply-to are refused if they carry a line break, control character or angle bracket (F-EFN-03-012, F-X10-003) | No: alert mail is off |
+
+**The steps, each its own approval (CLAUDE.md §5):**
+
+1. **Decide the audience change** above, then merge the pull request. Merging
+   deploys nothing.
+2. **Deploy `push-dispatch`** by name. Do it before `lazywait-sync`: the drain
+   change is harmless against the old function, but the stale-event check lives
+   in `push-dispatch` and is what makes a flag-off period safe.
+3. **Deploy `lazywait-sync`.** Look at the next kitchen ticket that carries a
+   note: it should read `ملاحظة العميل / CUSTOMER NOTE: …`.
+4. **Deploy `operations-alert-dispatch` and `email-test-config`** whenever you
+   next redeploy mail; there is no urgency while external dispatch is off. With the
+   live sender (`from_name` «Spicy Meal», a plain `from_email`) nothing changes;
+   a sender with a line break would be refused with `smtp_sender_invalid`.
+5. **Have the Arabic read** in §35 (the pickup title is customer-facing).
+
+**One behaviour to know about.** Turning the push master flag off for an
+incident now has a bounded cost: queued POS-outcome messages that wait out more
+than 30 minutes are dropped on turning it back on, which is the point (a
+customer is not told "Order confirmed" about yesterday's order). A message that
+mattered and was dropped, say an order that failed during the outage, is one the
+branch will already be handling by hand.
+
+**Done looks like:** `push-dispatch` and `lazywait-sync` redeployed with the
+versions recorded here; a pickup order marked delivered pushes «Collected»; a
+broadcast sent while a test account has an open deletion request reports one
+fewer targeted device than the opt-in count.
 
 ## Owner-action closeout rule
 
