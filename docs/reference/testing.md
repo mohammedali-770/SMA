@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**309 TypeScript test files declaring 4469 test blocks, plus 105 SQL suites.**
+**312 TypeScript test files declaring 4506 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -438,11 +438,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-54 files, 1093 declared test blocks.
+57 files, 1130 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
-| `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
+| `supabase/functions/_shared/accountDeletion.test.ts` | 28 | classifyBlockers — only real, prioritized states |
+| `supabase/functions/_shared/accountDeletionStaffWiring.test.ts` | 6 | account-delete-request refuses staff before any verification or enqueue |
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 19 | staff-accounts privileged actions |
 | `supabase/functions/_shared/adminPush.test.ts` | 50 | scopeFor |
@@ -459,9 +460,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCancelledGate.test.ts` | 2 | the control: the same fixture, answered ready_to_send |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
+| `supabase/functions/_shared/lazywaitConnectFailure.test.ts` | 15 | classifyConnectFailure — only a PROVEN never-connected failure is reported |
 | `supabase/functions/_shared/lazywaitGateLogWiring.test.ts` | 6 | lazywait-sync: a gate refusal that writes no row logs the order id |
 | `supabase/functions/_shared/lazywaitOrderPayments.test.ts` | 8 | a card order certain to be paid |
 | `supabase/functions/_shared/lazywaitPaidLookupDeferral.test.ts` | 7 | a card-paid order whose payment lookup fails is deferred, never sent unpaid |
+| `supabase/functions/_shared/lazywaitSweepsWiring.test.ts` | 9 | lazywait-sync sweeps run when the integration is off or misconfigured |
 | `supabase/functions/_shared/legacyKeyGuard.test.ts` | 6 | the legacy Supabase API keys stay out of the tree |
 | `supabase/functions/_shared/moyasar.test.ts` | 123 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarDuplicatePayment.test.ts` | 30 | a declined payment no longer closes its attempt (C1 part 1) |

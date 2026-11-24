@@ -1117,6 +1117,45 @@ Deferring is safe because everything the reaper decides is time-thresholded
 stale during the invocation that deferred it. Both deferrals degrade to
 *awaiting* — never to skipping — on a runtime without `EdgeRuntime.waitUntil`.
 
+**The sweeps run when the integration is off or misconfigured (F-X09-002, 2026-11-24).**
+Orders keep entering `pending` whatever the integration switch says (`place_order`
+and the insert trigger do not read it), and the reaper is also the deadline sweep —
+branch (d) dead-letters a `pending` or `failed` order past
+`pos_sync_deadline_at` and queues its `pos_failed` message. The worker used to
+answer `disabled` / 503 / 401 / 500 before reaching it, so a switched-off
+integration left every queued order on "sending to the branch" with no deadline,
+then dead-lettered the whole backlog in one burst when it was switched back on.
+The order is now: authenticate the caller (`x-sync-secret`, unchanged), run the
+reaper, then the exits — `disabled`, base URL unresolvable, `client_id` / token
+missing — and each of those drains the queued customer messages before it
+returns. **Nothing that claims an order or calls the POS sits above those exits**
+(`lazywaitSweepsWiring.test.ts` pins that), so a disabled integration still sends
+nothing. Two consequences to know: a disabled integration with no trigger secret
+still answers 200 `disabled` and sweeps nothing (there is no one to
+authenticate), and an order left `pending` past its 10-minute deadline during an
+outage now becomes `dead_letter` on time, with the customer told, instead of at
+re-enable.
+
+**A connection that was never established is a safe retry (F-X09-003, 2026-11-24).**
+`lazywaitFetch` turned every thrown fetch error into `status: 0`, which
+`classifyCreateOrderResult` reads as ambiguous, so a POS outage sent every order
+to `confirmation_required` — never resendable, never refunded. It now reports
+`neverConnected` when the error PROVES nothing was written
+(`classifyConnectFailure`): DNS failure, connection refused, or a TLS handshake
+rejected, recognised from Node codes (`ENOTFOUND`, `EAI_AGAIN`, `ECONNREFUSED`,
+certificate codes) or from Deno/hyper's `client error (Connect)`, which that
+runtime raises only before a connection exists. Such an order is `safe_retry`
+(reason `connect_failed`) and takes the 429 branch: `failed`, the known-failure
+normalizer clears the phase marker, and it becomes resendable and, once the
+budget is spent, refundable. Anything not provable stays ambiguous: timeouts and
+aborts, `ECONNRESET`, `EPIPE`, `ETIMEDOUT`, `EHOSTUNREACH`, `client error
+(SendRequest)`, body-read failures, and any chain mixing a connect marker with a
+send-side or timeout signal. **The Deno wording is taken from hyper's documented
+error kinds, not observed on this project's Edge runtime** — if its messages
+differ, the failure simply stays ambiguous (the previous behaviour). A health
+probe or breaker, so a known-down POS holds orders instead of burning each one,
+is not part of this change.
+
 ## Online payment (prepared, not live)
 *Changed 2026-11-12: this said "the Geidea webhook". The provider is Moyasar
 (owner decision, 2026-11-11), and online payment was off on that date.*
