@@ -460,7 +460,13 @@ slow work.
 Our handler returns `503` when the server-to-server payment fetch fails (a
 network error included), and when our own stamp or read-back fails before the
 outcome is known, so the event comes back rather than being acknowledged after
-we changed nothing. A duplicate payment is acknowledged with 200: it is
+we changed nothing. Since 2026-11-24 it also answers `503` for an authenticated,
+handled event it cannot process because a switch or setting the owner can fix is
+missing (provider row disabled, no webhook secret for the gateway's mode, no
+secret key for the attempt's mode), and writes one `webhook_deferred_*` sync-log
+row; events of an ignored type or for the mode the gateway does not run stay
+`200` so the ladder is not spent on noise (`docs/PAYMENTS.md` §2, "What the
+webhook answers"). A duplicate payment is acknowledged with 200: it is
 recorded, and a retry would only record it again. Every settled decision returns 200. Because delivery
 can be dropped entirely after six attempts, the webhook is **never** the only
 confirmation path — `payment-verify` is.

@@ -591,7 +591,7 @@ describe('payment-webhook', () => {
       'if (evt.type === WEBHOOK_VERIFICATION_TYPE) return await recordWebhookVerification(admin, cfg, evt);',
     );
     expect(verification).toBeGreaterThan(handler.indexOf("if (providerName !== 'moyasar')"));
-    expect(verification).toBeLessThan(handler.indexOf("if (!cfg.enabled) return json({ status: 'ignored'"));
+    expect(verification).toBeLessThan(handler.indexOf('if (!cfg.enabled) return await answerUnprocessable('));
     expect(count(handler, 'cfg.enabled')).toBe(1);
     expect(verification).toBeLessThan(
       handler.indexOf('return await handleMoyasarWebhook(admin, cfg, rawBody);'),
