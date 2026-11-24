@@ -9,7 +9,12 @@
  * "View" opens the same read-only receipt.
  *
  * Data comes from the `is_admin()`-gated `list_pos_confirmation_required` RPC.
- * The card self-hides once the queue is empty — a busy live board should not
+ * That RPC refuses everyone who is not an administrator, so `canRead` is false
+ * for them: the card then sends NO request (it used to call the refused RPC
+ * every 60 seconds for as long as an accountant's tab was open, and hide
+ * itself on the failure) and says plainly that the queue is administrators'
+ * only, instead of vanishing as if there were nothing to verify.
+ * For an administrator the card self-hides once the queue is empty — a busy live board should not
  * carry a permanent empty box — and refreshes on mount and every 60s. The
  * `alive` flag is what stops a late response writing into an unmounted card.
  */
@@ -27,15 +32,19 @@ import { POS_VERIFY_LIMIT, POS_VERIFY_REFRESH_MS, verifyReasonKey } from './orde
 export function OrdersRequiringVerificationCard({
   adminLang,
   onView,
+  canRead,
 }: {
   adminLang: 'en' | 'ar';
   onView: (id: string) => void;
+  /** Whether the caller may read the queue (administrators only). */
+  canRead: boolean;
 }) {
   const t = ADMIN_LOCALES[adminLang];
   const [data, setData] = useState<PosConfirmationRequired | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!canRead) return undefined;
     let alive = true;
     const load = async () => {
       try { const d = await ordersApi.posConfirmationRequired(POS_VERIFY_LIMIT); if (alive) setData(d); }
@@ -45,12 +54,21 @@ export function OrdersRequiringVerificationCard({
     void load();
     const id = setInterval(() => void load(), POS_VERIFY_REFRESH_MS);
     return () => { alive = false; clearInterval(id); };
-  }, []);
+  }, [canRead]);
 
   // Riyadh time with Latin digits in both languages, like the receipts and
   // reports: the device's own zone and an Arabic-Indic clock were what this
   // showed before 2026-11-12.
   const whenText = (iso: string | null): string => (iso ? formatRiyadhDateTime(iso) : '—');
+
+  if (!canRead) {
+    return (
+      <Card className="flex items-center gap-2">
+        <ShieldAlert className="size-4 shrink-0 text-con-text-3" aria-hidden="true" />
+        <Text variant="caption" tone="secondary" as="p">{t.verify_admin_only}</Text>
+      </Card>
+    );
+  }
 
   const total = data?.total ?? 0;
   // Hidden entirely once nothing needs verification.

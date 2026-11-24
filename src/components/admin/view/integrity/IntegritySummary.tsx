@@ -29,6 +29,10 @@ export interface IntegrityHealthLike {
   latest_successful_run_at?: string | null;
   incidents_opened_last_24h?: number | null;
   incidents_resolved_last_24h?: number | null;
+  stranded_order_count?: number | null;
+  stranded_dead_letter_count?: number | null;
+  stranded_missing_mapping_count?: number | null;
+  oldest_stranded_order_at?: string | null;
 }
 
 function Tile({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
@@ -42,6 +46,12 @@ function Tile({ label, children }: { label: React.ReactNode; children: React.Rea
 
 export function IntegritySummary({ health }: { health: IntegrityHealthLike | null }) {
   const state = health?.overall_state ?? 'healthy';
+  // Stranded orders alone turn the state to 'failing' with no incident row
+  // beside them, so the cause has to be on the card (F-X11-004).
+  // A payload without the field (a database older than 20260810113000) shows
+  // no line at all rather than a reassuring zero.
+  const strandedKnown = health?.stranded_order_count != null;
+  const stranded = health?.stranded_order_count ?? 0;
 
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -50,6 +60,15 @@ export function IntegritySummary({ health }: { health: IntegrityHealthLike | nul
         <Text variant="caption" tone="tertiary" as="p">
           cron {health?.watchdog_cron_active ? 'active' : 'inactive'}
         </Text>
+        {strandedKnown && (
+          <Text variant="caption" tone={stranded > 0 ? 'danger' : 'tertiary'} as="p">
+            {stranded > 0
+              ? `stranded orders ${stranded} (dead-letter ${health?.stranded_dead_letter_count ?? 0}, `
+                + `missing mapping ${health?.stranded_missing_mapping_count ?? 0}) · `
+                + `oldest ${ageLabel(health?.oldest_stranded_order_at ?? null)}`
+              : 'stranded orders 0'}
+          </Text>
+        )}
       </Tile>
 
       <Tile label="Open Critical">

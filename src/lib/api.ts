@@ -1474,6 +1474,16 @@ export interface OrderIntegrityHealth {
   latest_incident: Record<string, unknown> | null;
   incidents_opened_last_24h: number;
   incidents_resolved_last_24h: number;
+  /**
+   * Orders stuck blocked / dead-letter in the POS queue. Any of them makes
+   * `overall_state` 'failing' even with no open incident row, so the card has
+   * to show them. Optional because a database that predates
+   * 20260810113000 does not return them.
+   */
+  stranded_order_count?: number;
+  stranded_dead_letter_count?: number;
+  stranded_missing_mapping_count?: number;
+  oldest_stranded_order_at?: string | null;
 }
 export interface OrderIntegrityIncident {
   id: string;
