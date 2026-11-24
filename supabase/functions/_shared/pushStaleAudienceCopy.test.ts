@@ -209,7 +209,7 @@ describe('pos_sync: a queued message that has gone stale is closed, not sent', (
   });
 
   it.each(['pos_failed', 'pos_confirmation_required', 'pos_retrying'] as const)(
-    'a %s message that waited out an outage is still sent: it is claimed against the order\'s current state, not its age',
+    "a %s message that waited out an outage is still sent: it is claimed against the order's current state, not its age",
     async (posStatus) => {
       const { orderId, row } = seed(3 * 24 * 60 * MINUTE, posStatus);
       const res = await call({ action: 'pos_sync', orderId, status: posStatus }, 'service');
