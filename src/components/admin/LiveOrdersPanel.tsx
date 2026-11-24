@@ -147,8 +147,14 @@ export const LiveOrdersPanel: React.FC = () => {
           <PaymentsNeedingAttentionCard adminLang={adminLang} onView={viewById} />
         )}
 
-        {/* Read-only ambiguous-POS feed. Self-hides when the queue is empty. */}
-        <OrdersRequiringVerificationCard adminLang={adminLang} onView={viewById} />
+        {/* Read-only ambiguous-POS feed. Self-hides when the queue is empty.
+            Only an administrator may read it: for every other role the card
+            sends no request and says so (F-X11-006). */}
+        <OrdersRequiringVerificationCard
+          adminLang={adminLang}
+          onView={viewById}
+          canRead={currentUser.role === 'admin'}
+        />
 
         <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <Text variant="heading" as="h3">{t.live_alerts}</Text>

@@ -131,7 +131,7 @@ describe('the POS-verification card says when an order started waiting, in Riyad
         },
       ],
     });
-    render(<OrdersRequiringVerificationCard adminLang="ar" onView={() => {}} />);
+    render(<OrdersRequiringVerificationCard adminLang="ar" onView={() => {}} canRead />);
     // It read 9:30 PM on 11 November — London's clock — in Arabic-Indic digits.
     const line = await screen.findByText(/بالانتظار منذ/);
     expect(line.textContent).toContain('بالانتظار منذ 2026-11-12 00:30');

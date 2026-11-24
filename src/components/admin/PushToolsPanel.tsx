@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Megaphone, Send } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
@@ -26,8 +26,18 @@ import { pushAdmin, type PushSendResult } from '../../lib/api';
  *
  * The broadcast keeps its two-step confirm, and the confirm line still names
  * the live opt-in count: this send is immediate and cannot be recalled, so the
- * number of phones it will reach belongs in the sentence you click.
+ * number of phones it will reach belongs in the sentence you click. So that
+ * number is read AGAIN when the confirm opens (the mount read can be hours old
+ * on a panel left open), the send stays disabled while it is loading or failed
+ * to load, and a successful send clears the form so a second click cannot
+ * re-send the same text (the server has no idempotency).
  */
+
+type ConfirmCount =
+  | { state: 'loading' }
+  | { state: 'ready'; promoOptIns: number }
+  | { state: 'failed' };
+
 export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
   const { adminLang } = useApp();
   const isRTL = adminLang === 'ar';
@@ -38,10 +48,37 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ titleEn: '', titleAr: '', bodyEn: '', bodyAr: '' });
   const [confirmBroadcast, setConfirmBroadcast] = useState(false);
+  const [confirmCount, setConfirmCount] = useState<ConfirmCount>({ state: 'loading' });
+  // Identifies the latest confirm-time read, so a slow answer to an earlier
+  // open (or one that returns after Cancel) cannot fill a later confirm.
+  const countRead = useRef(0);
 
+  // An accountant's panel is read-only and the RPC refuses them, so ask nobody.
   useEffect(() => {
+    if (disabled) return;
     void pushAdmin.deviceCounts().then(setCounts).catch(() => setCounts(null));
-  }, []);
+  }, [disabled]);
+
+  const openConfirm = () => {
+    const mine = ++countRead.current;
+    setConfirmBroadcast(true);
+    setConfirmCount({ state: 'loading' });
+    void pushAdmin.deviceCounts()
+      .then((c) => {
+        if (countRead.current !== mine) return;
+        setCounts(c);
+        setConfirmCount({ state: 'ready', promoOptIns: c.promoOptIns });
+      })
+      .catch(() => {
+        if (countRead.current !== mine) return;
+        setConfirmCount({ state: 'failed' });
+      });
+  };
+
+  const closeConfirm = () => {
+    countRead.current += 1;
+    setConfirmBroadcast(false);
+  };
 
   const runTest = () => {
     setBusy('test'); setError(null); setResult(null);
@@ -52,10 +89,16 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
   };
 
   const runBroadcast = () => {
-    setConfirmBroadcast(false);
+    // Unrecallable: never send while the audience size is unknown.
+    if (confirmCount.state !== 'ready') return;
+    closeConfirm();
     setBusy('broadcast'); setError(null); setResult(null);
     void pushAdmin.broadcast(form)
-      .then(setResult)
+      .then((r) => {
+        setResult(r);
+        // Only a send that went out empties the form; a refusal keeps the text.
+        if (r.status === 'ok') setForm({ titleEn: '', titleAr: '', bodyEn: '', bodyAr: '' });
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(null));
   };
@@ -142,7 +185,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
       {!confirmBroadcast ? (
         <Button
           label={isRTL ? 'بثّ ترويجي فوري…' : 'Broadcast promotion…'}
-          onClick={() => setConfirmBroadcast(true)}
+          onClick={openConfirm}
           disabled={disabled || busy !== null || !formComplete}
           variant="secondary"
           leading={<Megaphone className="size-3.5" aria-hidden="true" />}
@@ -150,22 +193,35 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
       ) : (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-ds-md)] border border-warn-line bg-warn-tint p-2.5">
           <Text variant="label" tone="warning" as="span">
-            {isRTL
-              ? `إرسال الآن إلى ${counts?.promoOptIns ?? '؟'} جهازًا مفعّلًا للعروض؟`
-              : `Send now to ${counts?.promoOptIns ?? '?'} device(s) with promotions on?`}
+            {confirmCount.state === 'ready'
+              ? (isRTL
+                ? `إرسال الآن إلى ${confirmCount.promoOptIns} جهازًا مفعّلًا للعروض؟`
+                : `Send now to ${confirmCount.promoOptIns} device(s) with promotions on?`)
+              : confirmCount.state === 'loading'
+                ? (isRTL ? 'جارٍ التحقق من عدد الأجهزة…' : 'Checking how many devices this will reach…')
+                : (isRTL
+                  ? 'تعذّر قراءة عدد الأجهزة المستهدفة، لذلك الإرسال متوقف.'
+                  : 'Could not read how many devices this will reach, so sending is blocked.')}
           </Text>
+          {confirmCount.state === 'failed' && (
+            <Button
+              label={isRTL ? 'إعادة المحاولة' : 'Try again'}
+              onClick={openConfirm}
+              variant="secondary"
+            />
+          )}
           <Button
             label={busy === 'broadcast'
               ? (isRTL ? 'جارٍ البث…' : 'Broadcasting…')
               : (isRTL ? 'تأكيد الإرسال' : 'Confirm send')}
             onClick={runBroadcast}
-            disabled={busy !== null}
+            disabled={busy !== null || confirmCount.state !== 'ready'}
             loading={busy === 'broadcast'}
             variant="danger"
           />
           <Button
             label={isRTL ? 'إلغاء' : 'Cancel'}
-            onClick={() => setConfirmBroadcast(false)}
+            onClick={closeConfirm}
             variant="ghost"
           />
         </div>

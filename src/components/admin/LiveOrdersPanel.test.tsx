@@ -222,6 +222,24 @@ describe('the verification queue', () => {
     expect(dialog.textContent).toContain('0551234567');
   });
 
+  it.each(['accountant', 'call_center', 'branch_staff'])(
+    'sends no request for %s and says the queue is administrators only (F-X11-006)',
+    async (role) => {
+      mockContext({ currentUser: { role } });
+      render(<LiveOrdersPanel />);
+      await screen.findByText('SM-1042');
+      expect(posConfirmationRequired).not.toHaveBeenCalled();
+      expect(screen.getByText(/visible to administrators only/)).toBeTruthy();
+    },
+  );
+
+  it('an administrator is asked, and sees no administrators-only notice', async () => {
+    render(<LiveOrdersPanel />);
+    await screen.findByText('SM-1042');
+    await waitFor(() => expect(posConfirmationRequired).toHaveBeenCalled());
+    expect(screen.queryByText(/visible to administrators only/)).toBeNull();
+  });
+
   it('a failed queue read hides the card rather than showing a broken one', async () => {
     posConfirmationRequired.mockRejectedValue(new Error('42501'));
     render(<LiveOrdersPanel />);
