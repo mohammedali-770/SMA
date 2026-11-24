@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**319 TypeScript test files declaring 4591 test blocks, plus 106 SQL suites.**
+**319 TypeScript test files declaring 4597 test blocks, plus 106 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -445,7 +445,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-58 files, 1156 declared test blocks.
+58 files, 1162 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -496,7 +496,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/pushStaleAudienceCopy.test.ts` | 17 | pos_sync: a queued message that has gone stale is closed, not sent |
 | `supabase/functions/_shared/rest.test.ts` | 42 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
-| `supabase/functions/_shared/smtpTarget.test.ts` | 27 | parseSmtpTarget |
+| `supabase/functions/_shared/smtpTarget.test.ts` | 33 | parseSmtpTarget |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
 | `supabase/functions/_shared/webhookReliabilityWiring.test.ts` | 11 | lazywait-webhook |
 | `supabase/functions/_shared/webPush.test.ts` | 29 | base64url |

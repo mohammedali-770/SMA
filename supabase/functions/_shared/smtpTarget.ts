@@ -105,8 +105,19 @@ function refuse(reason: string): SmtpTarget {
  * REFUSED: any control character (CR and LF included), and for the name also
  * `<` and `>`, which close or open the address part. The addresses must look
  * like one address: no whitespace, no angle brackets, no quote.
+ *
+ * HOW THE CLASS IS WRITTEN, and why. `\p{Cc}` is the C0 and C1 control
+ * characters (U+0000 to U+001F, U+007F to U+009F), `\p{Zl}` is the Unicode line
+ * separator (U+2028) and `\p{Zp}` the paragraph separator (U+2029): the same 67
+ * characters this guard has always refused, checked over every code point.
+ * It is spelled with property escapes rather than with a backslash-u escape for
+ * each code point because the deploy tool decodes a backslash-u escape in the
+ * text it is sent into the real character, and a real U+2028 inside a regular
+ * expression literal ends the line, so the bundler refused this file with
+ * "Unterminated regexp literal" (2026-11-24). `smtpTarget.test.ts` fails if a
+ * backslash-u escape returns to this file.
  */
-const CONTROL_CHARS = /[\u0000-\u001f\u007f\u0080-\u009f\u2028\u2029]/;
+const CONTROL_CHARS = /[\p{Cc}\p{Zl}\p{Zp}]/u;
 const SENDER_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
 function senderFieldsValid(fromName: string, fromEmail: string, replyTo: string): boolean {

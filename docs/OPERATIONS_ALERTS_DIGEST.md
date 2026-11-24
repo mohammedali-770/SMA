@@ -747,6 +747,19 @@ an anonymous caller. It takes effect when `operations-alert-dispatch` and
 `email-test-config` are redeployed (`OWNER_ACTIONS.md` §64); nothing is sent
 today, because external dispatch is still off, so there is no urgency.
 
+**THE CONTROL-CHARACTER CLASS IS WRITTEN WITH PROPERTY ESCAPES, since 2026-11-24, because the first
+deploy of this guard was refused at bundling.** The class was spelled with a backslash-u escape
+for each code point. The tool that deploys Edge Functions decodes such an escape in the text
+it is sent, so U+2028 reached the bundler as a real line separator inside a regular
+expression literal, which ends the line: `_shared/smtpTarget.ts:109 Unterminated regexp
+literal`. Both functions import that file, so neither `operations-alert-dispatch` nor
+`email-test-config` could be deployed, and live stayed at v8 and v9. The class is now
+`[\p{Cc}\p{Zl}\p{Zp}]` with the `u` flag: the same 67 characters (the C0 and C1 controls, the line
+separator and the paragraph separator), compared with the old class over every code point
+with no disagreement. `smtpTarget.test.ts` pins the set, and fails if any deployable
+source file under `supabase/functions` carries a backslash-u escape again. Nothing about
+what is refused changed.
+
 **THE HOST RULES MOVED TO `_shared/publicHost.ts` ON 2026-09-19, and this
 paragraph would otherwise send a reader to a file that no longer holds them.**
 The admin push sender needed the same question answered about a push endpoint an

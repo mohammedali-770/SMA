@@ -6003,7 +6003,7 @@ step and no deploy. After the build, a customer's stored language corrects at
 their next launch (the claim finds the row, the mismatch triggers one
 registration) or the moment they change the language.
 
-## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — `push-dispatch` and `lazywait-sync` DEPLOYED, mail deploys still open
+## 64. Push, kitchen-ticket and mail-header fixes of 2026-11-24 — `push-dispatch` and `lazywait-sync` DEPLOYED, mail deploys blocked on a one-line fix
 
 **Status, 2026-11-24 (later).** Steps 1 and 2 below are **DONE**. The pull request merged as #535 (`3d00583`) on the owner's instruction "merge 535", which is recorded as approval of the broadcast-audience change; and **`push-dispatch` was deployed as version 15** (10:56 UTC) on the owner's approval ("deploy push-dispatch") from the default branch at `2c5f7bb`: `verify_jwt` false, ezbr `f7bb6770…c0dc`, all 8 bundle files read back byte-identical to the source (compared with `cmp`), an `OPTIONS` probe returned 200, and no POST was sent. The version before it was 14. **`lazywait-sync` was then deployed as version 27** (11:12 UTC, step 3), `verify_jwt` false, ezbr `fbde0a65…3b5c`, seven of eight bundle files read back byte-identical and one comment in `_shared/lazywait.ts` (lines 496-497) re-wrapped, code identical, not redeployed for a comment. **Still open: the printed-ticket check from step 3, step 4 (`operations-alert-dispatch`, `email-test-config`) and step 5 (the native Arabic read — the pickup title is now live without it).** The text below is the original plan, kept as written.
 
@@ -6044,7 +6044,14 @@ request is in flight; fixing that needs a migration and is not part of this.
    in `push-dispatch` and is what makes a flag-off period safe.
 3. **DEPLOYED 2026-11-24 (v27); the ticket check below is still to do.** **Deploy `lazywait-sync`.** Look at the next kitchen ticket that carries a
    note: it should read `ملاحظة العميل / CUSTOMER NOTE: …`.
-4. **Deploy `operations-alert-dispatch` and `email-test-config`** whenever you
+4. **NOT DEPLOYED YET (2026-11-24).** The first attempt to deploy
+   `operations-alert-dispatch` was **refused at bundling** (`_shared/smtpTarget.ts:109
+   Unterminated regexp literal`), because the deploy tool decodes a backslash-u
+   escape in the text it is sent into a real line separator. Nothing was changed: it is
+   still v8, and `email-test-config` (same import) is still v9. The class is now written
+   with property escapes (`OPERATIONS_ALERTS_DIGEST.md`), the same 67 characters. **Once
+   that fix is merged, each function needs its own approval again, by name.**
+   **Deploy `operations-alert-dispatch` and `email-test-config`** whenever you
    next redeploy mail; there is no urgency while external dispatch is off. With the
    live sender (`from_name` «Spicy Meal», a plain `from_email`) nothing changes;
    a sender with a line break would be refused with `smtp_sender_invalid`.
