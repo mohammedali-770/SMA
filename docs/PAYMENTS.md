@@ -198,6 +198,10 @@ back later, and is it ours?*
 | Stamp, read-back or confirm RPC could not complete | 503 | Unchanged (F-D2-002, §6 "Retried, not abandoned"). |
 | Paid and confirmed, a duplicate, a decline | 200 | Unchanged. |
 
+**Live since 2026-11-24** as `payment-webhook` v20 (and `lazywait-sync` v26 for
+the paid-lookup deferral). One comment in `_shared/moyasarVerify.ts` (lines
+446-447) differs from the repository in its line wrapping; the code is identical.
+
 The log rows the new 503 answers write are `integration_sync_logs`, provider
 `moyasar`, direction `webhook`, status `failed`, error `webhook_deferred_provider_disabled`,
 `webhook_deferred_webhook_secret_missing` or `webhook_deferred_secret_key_missing`.
@@ -258,7 +262,7 @@ cold start of the checkout while the first create is in flight is enough
 (`CheckoutScreen` recovery answers `resume`); the window is the create's
 in-transit time, up to its 15 s timeout.
 
-Since 2026-11-22, on this branch (not yet deployed):
+Since 2026-11-22 (deployed 2026-11-22 and again 2026-11-24):
 
 - **The first stored invoice wins.** `payment-initiate` stores an invoice id
   only on an attempt that has none (`.is('provider_checkout_ref', null)`), and
@@ -527,7 +531,7 @@ request by `allowTestModeCheckout()` in `_shared/paymentTestCheckout.ts`.
 
 **It admits only the customers named in a second secret,
 `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`** (since 2026-11-22, audit finding
-F-EFP-05-001; on this branch, not yet deployed). Until then the switch admitted
+F-EFP-05-001; deployed 2026-11-22). Until then the switch admitted
 every signed-in customer of the public app, so while it was on anyone holding
 Moyasar's published test cards could have real food sent to a kitchen for no
 money. The value is a comma-separated list of customer profile ids (UUIDs),

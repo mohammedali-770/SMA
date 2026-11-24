@@ -131,7 +131,9 @@ Staff leave through `staff-accounts` (branch and call centre, which asks
 `is_admin()`: role and AAL2) or an administrator's own process. There is
 deliberately no "administrator at AAL2 may delete themselves" exception here; if
 one is wanted it needs its own decision, including how the last administrator is
-protected. Customers are unchanged. Deploying both functions is a separate owner
-action. The decision is `decideDeletionAccountGuard` in
+protected. Customers are unchanged. **Both functions were deployed 2026-11-24**
+(`account-delete-request` v9, byte-identical to the repository;
+`account-delete-process` v10, whose `index.ts` was compared with the source by eye
+because the script read-back could not be run). The decision is `decideDeletionAccountGuard` in
 `supabase/functions/_shared/accountDeletion.ts`; the handlers are pinned by
 `accountDeletionStaffWiring.test.ts`.
