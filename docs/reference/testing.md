@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**312 TypeScript test files declaring 4506 test blocks, plus 105 SQL suites.**
+**314 TypeScript test files declaring 4523 test blocks, plus 105 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -289,7 +289,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-142 files, 1885 declared test blocks.
+144 files, 1902 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -305,7 +305,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LazywaitPanel.test.tsx` | 7 | LazywaitPanel |
 | `src/components/admin/LegalDocumentsPanel.test.tsx` | 1 | requires-acceptance control |
-| `src/components/admin/LiveOrdersPanel.test.tsx` | 19 | permission gate |
+| `src/components/admin/LiveOrdersPanel.test.tsx` | 21 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
@@ -315,7 +315,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 7 | OperationsHealthPanel — push failure metrics |
-| `src/components/admin/PushToolsPanel.test.tsx` | 2 | PushToolsPanel device counts |
+| `src/components/admin/PushToolsPanel.test.tsx` | 10 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 5 | StaffAccessPanel |
@@ -331,9 +331,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/health/HealthSystemCard.test.tsx` | 6 | branch_availability health card |
 | `src/components/admin/view/health/healthView.test.ts` | 25 | polling contract |
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 6 | admin rule filter ↔ watchdog rule set |
+| `src/components/admin/view/integrity/IntegritySummary.test.tsx` | 3 | IntegritySummary stranded orders |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 4 | OrderReceiptModal — customer note |
+| `src/components/admin/view/orders/OrdersRequiringVerificationCard.test.tsx` | 4 | OrdersRequiringVerificationCard |
 | `src/components/admin/view/orders/ordersView.test.ts` | 28 | needsPaymentConfirm — the money contract |
 | `src/components/admin/view/orders/PaymentDetails.test.tsx` | 7 | a Moyasar payment |
 | `src/components/admin/view/orders/paymentsAttentionView.test.ts` | 8 | which failed reads hide the card |

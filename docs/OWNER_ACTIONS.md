@@ -3153,6 +3153,20 @@ exists on the menu / already appears earlier in this file under …"). The
 integration cards' refusal of a stale save is English-only, like the rest of
 that screen.
 
+**Widened 2026-11-24 — the Push tools confirm and the verification-queue card.**
+Staff-console copy, engineering-drafted, on the same read. The Push tools
+broadcast confirm (`src/components/admin/PushToolsPanel.tsx`) now re-reads the
+audience size when it opens and refuses the send while that number is loading or
+failed: «جارٍ التحقق من عدد الأجهزة…» ("Checking how many devices this will
+reach…"), «تعذّر قراءة عدد الأجهزة المستهدفة، لذلك الإرسال متوقف.» ("Could not
+read how many devices this will reach, so sending is blocked.") and the retry
+button «إعادة المحاولة» ("Try again"). The Live Orders verification-queue card
+(`verify_admin_only` in `src/components/admin/adminLocales.ts`) shows, to anyone
+who is not an administrator, «قائمة الطلبات التي تحتاج تحقق من نظام الكاشير
+متاحة للمشرفين فقط.» ("The queue of orders needing POS verification is visible to
+administrators only."). The Order Integrity summary line about stranded orders is
+English-only, like the rest of that panel.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**

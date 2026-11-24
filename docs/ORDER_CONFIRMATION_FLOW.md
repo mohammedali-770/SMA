@@ -1361,6 +1361,12 @@ through"* with **no** retry button, and remain in the admin
 reading under which "retries never create duplicate Lazywait orders" is true
 without a provider idempotency key.
 
+The feed's RPC is `is_admin()`-gated, so the Live Orders card
+(`OrdersRequiringVerificationCard`) is only read for the administrator role: for
+an accountant, call-centre or branch-staff console it sends no request and shows
+a one-line "visible to administrators only" notice. It used to call the refused
+RPC every 60 seconds and hide itself on the failure.
+
 Three manual attempts are allowed. The count lives in
 `orders.pos_customer_retry_count` and is incremented only by the server. The RPC
 returns `{ outcome, state }` and nothing else — **no counter, no limit** — so
