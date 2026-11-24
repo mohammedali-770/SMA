@@ -15,6 +15,7 @@ import type { DbPushDevice } from '../../types/db';
 const mocks = vi.hoisted(() => ({
   mine: vi.fn(),
   register: vi.fn(),
+  deactivate: vi.fn(),
   token: 'ExponentPushToken[test-token-0001]',
 }));
 
@@ -29,10 +30,10 @@ vi.mock('expo-notifications', () => ({
   AndroidImportance: { HIGH: 4 },
 }));
 vi.mock('../../services/api', () => ({
-  pushDevices: { mine: mocks.mine, register: mocks.register, deactivateToken: vi.fn() },
+  pushDevices: { mine: mocks.mine, register: mocks.register, deactivateToken: mocks.deactivate },
 }));
 
-import { syncDeviceLang } from './pushRegistration';
+import { deactivateThisDeviceStrict, registerThisDevice, syncDeviceLang } from './pushRegistration';
 
 const device = (over: Partial<DbPushDevice> = {}): DbPushDevice => ({
   id: 'd1',
@@ -51,6 +52,8 @@ const device = (over: Partial<DbPushDevice> = {}): DbPushDevice => ({
 beforeEach(() => {
   mocks.mine.mockReset();
   mocks.register.mockReset();
+  mocks.deactivate.mockReset();
+  mocks.deactivate.mockResolvedValue(undefined);
   mocks.register.mockImplementation(async (i: { lang: 'en' | 'ar' }) => device({ lang: i.lang }));
 });
 
@@ -132,13 +135,85 @@ describe('the hook runs the sync, and nothing else in it can rewrite preferences
   });
 
   it("syncDeviceLang passes the policy's stored preferences, never the defaults", () => {
-    const fn = registration.split('export async function syncDeviceLang')[1].split('\nexport ')[0];
-    expect(fn).toContain('registerThisDevice(lang, prefs)');
+    const fn = registration.split('export function syncDeviceLang')[1].split('\nexport ')[0];
+    expect(fn).toContain('registerUnserialised(lang, prefs)');
     expect(fn).not.toContain('DEFAULT_DEVICE_PREFS');
     expect(fn).toContain("lookup.status !== 'found'");
   });
 
+  it('every write to the device row goes through the one queue', () => {
+    for (const name of ['registerThisDevice', 'syncDeviceLang', 'deactivateThisDeviceStrict']) {
+      const fn = registration.split(`export function ${name}`)[1].split('\nexport ')[0];
+      expect(fn, name).toContain('serialiseDeviceWrite(');
+    }
+    // The queue entry for the sync holds the read AND the write: they must not be split.
+    const sync = registration.split('export function syncDeviceLang')[1].split('\nexport ')[0];
+    expect(sync.indexOf('lookupThisDevice()')).toBeLessThan(sync.indexOf('registerUnserialised'));
+  });
+
   it('the web build mirrors the signature and writes nothing', () => {
     expect(web).toContain("export async function syncDeviceLang(_lang: 'en' | 'ar')");
+  });
+});
+
+/**
+ * Review finding on F-X08-001: the sync reads the stored preferences and writes
+ * them back, and `register_push_device` forces `is_active = true`. A Profile
+ * change that lands between that read and that write must not be undone.
+ */
+describe('device writes run one at a time, so a language sync never undoes a preference change', () => {
+  const deferred = <T>() => {
+    let resolve!: (v: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  };
+  const flush = async () => {
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+  };
+
+  it('an opt-out asked for while the sync is reading is the LAST write', async () => {
+    const read = deferred<DbPushDevice[]>();
+    mocks.mine.mockReturnValue(read.promise);
+
+    const sync = syncDeviceLang('ar');
+    await flush(); // the sync is now waiting on its read of the stored row
+    const optOut = registerThisDevice('en', { orderUpdatesEnabled: true, promosEnabled: false });
+    await flush();
+    // The stored row still says offers ON (the read is stale by the time it lands).
+    read.resolve([device({ promos_enabled: true })]);
+    await Promise.all([sync, optOut]);
+
+    const writes = mocks.register.mock.calls.map((c) => c[0] as { promosEnabled: boolean });
+    expect(writes).toHaveLength(2);
+    expect(writes[writes.length - 1].promosEnabled).toBe(false);
+  });
+
+  it('a deactivation asked for while the sync is reading comes AFTER the sync write', async () => {
+    const read = deferred<DbPushDevice[]>();
+    mocks.mine.mockReturnValue(read.promise);
+
+    const sync = syncDeviceLang('ar');
+    await flush();
+    const off = deactivateThisDeviceStrict();
+    await flush();
+    read.resolve([device({ promos_enabled: true })]);
+    await Promise.all([sync, off]);
+
+    expect(mocks.register).toHaveBeenCalledTimes(1);
+    expect(mocks.deactivate).toHaveBeenCalledTimes(1);
+    expect(mocks.deactivate.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.register.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('a failed write rejects its own caller and does not block the next one', async () => {
+    mocks.register.mockRejectedValueOnce(new Error('rpc down'));
+    const first = registerThisDevice('en', { orderUpdatesEnabled: true, promosEnabled: true });
+    const second = registerThisDevice('ar', { orderUpdatesEnabled: true, promosEnabled: false });
+    await expect(first).rejects.toThrow('rpc down');
+    await expect(second).resolves.toBeTruthy();
+    expect(mocks.register).toHaveBeenCalledTimes(2);
   });
 });
