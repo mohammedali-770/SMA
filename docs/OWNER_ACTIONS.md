@@ -5845,6 +5845,94 @@ service is unavailable. Your payment will be refunded automatically", which is
 not true of a cancelled order the branch received. That is an app change and a
 build (§47.17).
 
+## 62. Erasure and the kitchen system — ask Lazywait, then decide the wording
+
+**Opened 2026-11-24.** From the privacy audit (cross-cutting item X06), read
+against the default branch at `dee0044`. Nothing live was read. **Nothing here
+is legal advice, and nothing here edits the live privacy policy.** The policy
+is a database row; changing it is an owner action under CLAUDE.md §5, as in §44.
+
+### What the code does
+
+Deleting an account runs two steps: `anonymize_account_data` clears the name,
+number, notes and address on the customer's retained orders in **our** database,
+then the Auth user is deleted (`supabase/functions/account-delete-process`).
+Neither step calls Lazywait. Every order sent to the POS carries the customer's
+name, number (local part and country code), delivery address (as its own field
+and again in the order note), order note, item notes and, once known, the POS
+customer id. Our server also searches Lazywait's customer list by phone number
+and stores the matching id on the profile. The POS wrapper in the repository can
+delete products, categories and add-ons, and nothing about a customer or an
+order, and the vendor reference kept in `docs/integrations/` documents no such
+call. **What Lazywait keeps, for how long, and whether it can remove one
+customer's details is not known from the repository.**
+
+What the customer is told today: in the app, "Retained records will be
+anonymized where reasonably possible"; in the live policy, "Your personal
+details on those records are anonymised" (quoted from the v2.3 text in
+`docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md`; the live row was not read).
+Both are true of our database. Neither says the kitchen system holds a copy.
+
+### 1. Ask Lazywait, in writing — yours to send
+
+Five questions. Record the answers, with the date and who gave them, in
+`docs/RECORD_OF_PROCESSING.md` (activity 3, and the recipients table, where
+Lazywait is "Unknown" today).
+
+1. How long does Lazywait keep a ticket's customer name, phone number and
+   delivery address, and the ticket itself?
+2. Does Lazywait create or update a customer record from a ticket or from a
+   customer search? If so, what does that record hold, and how long is it kept?
+3. Can Lazywait delete or anonymise one customer's details, and their tickets,
+   on request? By API call or by support request, and how fast?
+4. Where is the data hosted? (`RECORD_OF_PROCESSING.md` lists this as unknown,
+   and it matters for the transfer question in §44 item 5.)
+5. Is any of it copied elsewhere, for example into the printer's or the
+   branch's own logs?
+
+### 2. Then decide the wording — yours, and counsel's if you ask for it
+
+Drafts, so that the decision is a choice and not a blank page. **English only;
+the Arabic must be written and read by a native speaker, the same standard as
+§26.** Which one applies depends on the answers above. Neither is live.
+
+**In-app deletion screen** (`apps/mobile/src/i18n/strings.ts`, `delBulletAnon`;
+a code change and a build, which is a separate request):
+
+- *If Lazywait cannot remove a customer's details or keeps them:* "Retained
+  records will be anonymized in our systems where reasonably possible. The
+  branch's ordering system may keep the details printed on past orders. Contact
+  us to ask about them."
+- *If Lazywait confirms it can and we call it on deletion:* the present
+  sentence stays true, and the call is a code change in the erasure processor
+  that needs its own review and deploy.
+
+**Live policy, the sentence under "How long we keep it"** (a live row; owner
+action; the card-payments draft carries the surrounding text):
+
+- *Until Lazywait has answered:* replace "Your personal details on those records
+  are anonymised." with "Your personal details on those records are anonymised
+  in our own systems. The branch's ordering system, run by another company,
+  receives the name, number and address printed on your order; we are asking it
+  how long it keeps them." **Use the last clause only after the question has
+  been sent.**
+- *After the answer:* state the vendor's real period, or its real deletion route.
+
+### 3. Two smaller decisions the same audit raised
+
+- **Checkout attempts.** `checkout_sessions` keeps a copy of the address and
+  notes for every online checkout attempt, with no period and no sweep
+  (`RECORD_OF_PROCESSING.md` activity 16, finding 8). Decide a period; the sweep
+  is a migration and a §5 apply, like the three in §44 item 3.
+- **The comp audit reason.** The administrator's typed reason survives erasure
+  by design (activity 9, finding 9). Decide whether to blank it on erasure, or
+  to tell administrators not to type a customer's name into it.
+
+**Done looks like:** Lazywait's answers recorded in the record of processing
+with a date; the in-app and policy wording chosen and, where it changes,
+entered by you in the database row and in a build; the two smaller decisions
+answered; this section closed with the date.
+
 ## Owner-action closeout rule
 
 When an item is completed:
