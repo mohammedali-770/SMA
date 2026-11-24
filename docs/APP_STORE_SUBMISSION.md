@@ -398,7 +398,7 @@ Both directions are checked above.
 | Location | Coarse Location | Yes, optional | **Linked** | same picker, coarse fallback |
 | Identifiers | User ID | Yes | **Linked** | `profiles.id` |
 | Identifiers | Device ID | Yes, **required** | **Linked** | `push_devices.expo_push_token` |
-| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card. **True only while online payment is off — see "Card payment through Moyasar" below** |
+| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card. **True only while online payment is off — see "Card payment through Moyasar" below.** **Flagged 2026-11-24: read live, `online_payment_enabled` is `true`, so this condition now fails; the answer to give is the owner's decision (`OWNER_ACTIONS.md` §65), not decided here.** |
 | User Content | Other User Content | Yes, optional | **Linked** | `orders.notes`, `order_items.note` — free-text, printed on the kitchen ticket |
 | Diagnostics | Crash Data | Yes, **required** | **Linked** | Sentry. No user opt-out |
 | Diagnostics | Performance Data | Yes, **required** | **Linked** | Sentry, `tracesSampleRate` sampled |
@@ -408,8 +408,8 @@ NO. Sensitive Info: NO. Contacts: NO.**
 
 ### Card payment through Moyasar — OWNER DECISION PENDING, before online payment is switched on
 
-**Added 2026-11-12. The answers above are not changed here.** They are true while
-online payment is off, which it was on 2026-11-11 (read-only). On 2026-11-11 the
+**Added 2026-11-12. The answers above are not changed here.** They were true while
+online payment was off, which it was on 2026-11-11 (read-only). **Read live 2026-11-24 it is on (`online_payment_enabled` is `true`), so the condition now fails and the re-decision below is due (`OWNER_ACTIONS.md` §65).** On 2026-11-11 the
 owner chose Moyasar as the payment provider (CLAUDE.md §6). The day online payment
 is switched on (`OWNER_ACTIONS.md` §47.18), two answers need re-deciding by the
 owner, and a submission that declares them must go first:

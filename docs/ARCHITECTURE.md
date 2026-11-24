@@ -31,7 +31,7 @@
           Lazywait POS       Meta / WhatsApp       Other integrations
                                                     (email, maps, etc.)
 
-          Payments: Moyasar (decided 2026-11-11) — online payment is OFF; see §9.
+          Payments: Moyasar (decided 2026-11-11) — online payment setting read ON 2026-11-24; see §9.
           Push notifications (Expo) are LIVE — see §10.
 ```
 
@@ -207,6 +207,8 @@ as the caller — role `admin` **and** AAL2, the same predicate every RLS policy
 customer. Role and branch assignment run through the existing audited RPCs using
 the caller's JWT, so `role_change_audit` records the human who acted rather than
 the service role.
+
+The `list`, `create`, `reset_password` and `delete` actions are the whole surface. Passwords are never logged, echoed or stored, and `reset_password` and `delete` also write an `admin_action_audit` row (through `record_admin_action`) naming the verified caller, the target's id and role. **This section is the owning document for `supabase/functions/staff-accounts/**`** (`docs/ownership.json`, rule `staff-accounts`): a change to the function's actions, guards or audit rows is documented here in the same pull request.
 
 ## 4. Data and business authority
 
@@ -461,16 +463,16 @@ Sentry is wired across native mobile, Expo web and admin web. Release/source-map
 
 ## 9. Payments — Moyasar
 
-**Decided by the owner on 2026-11-11** (CLAUDE.md §6). On the branch `feat/moyasar-only-20261111` Moyasar is the only provider; the Tap and Geidea code is removed. Online payment was **off** on 2026-11-11 (read-only), and every payment function deployed in Production was still a July Tap-era bundle. The steps that change that, each a separate owner approval, are [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §47. Runbook: [`PAYMENTS.md`](PAYMENTS.md).
+**Decided by the owner on 2026-11-11** (CLAUDE.md §6). Moyasar is the only provider on the default branch: the Tap and Geidea code was removed in #446 (`c15928c`, branch `feat/moyasar-only-20261111`, merged). Online payment was **off** on 2026-11-11 (read-only), and every payment function deployed in Production was then still a July Tap-era bundle; that is history. **Read live 2026-11-24, `app_settings.online_payment_enabled` is `true`, the `payment-refund-worker` cron job is active, and 19 online orders have `payment_status` paid.** The deploy and apply steps, each a separate owner approval, are [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §47. Runbook and current state: [`PAYMENTS.md`](PAYMENTS.md) §1.
 
-The shape, as the code on that branch has it:
+The shape, as the code on the default branch has it:
 
 - the signed-in app calls `payment-initiate`, which opens one payment attempt per order or checkout session and a Moyasar **invoice** for the server-computed total;
 - the app opens Moyasar's hosted page **only inside its own payment screen** (a WebView). Card details and Apple Pay are entered there, never in our code;
 - Moyasar sends the customer to our return address (`payment-return`). The payment screen recognises it and closes, and the app asks `payment-verify`;
 - `payment-webhook` receives Moyasar's events and **re-fetches the payment from Moyasar** before confirming anything;
 - a payment confirms an order only if its invoice, amount, currency and **live** mode match the attempt. Customer checkout is refused in TEST mode; the sandbox is the console's admin test (`payment-test-config`);
-- refunds go through `payment-refund`, driven by the `payment-refund-worker` cron job, which is off.
+- refunds go through `payment-refund`, driven by the `payment-refund-worker` cron job, which was switched on 2026-11-19 04:47 UTC and read active on 2026-11-24.
 
 The web build (`/app`) never offers online payment.
 

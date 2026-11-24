@@ -18,10 +18,12 @@ The owner's answers the same day:
 - Moyasar's live Allowed IPs list is met with a static-IP outbound proxy
   service.
 
-**Card payments are not switched on.** The decision covers repository code,
-tests and documents. Every step that reaches Production is a separate owner
-approval under [CLAUDE.md §5](../CLAUDE.md), named when it is due (§7 below).
-The steps up to and including the sandbox test are done (§1); the rest are not.
+**Card payments were not switched on when this page was first written; read
+live on 2026-11-24, `online_payment_enabled` is `true` (§1).** The decision
+covers repository code, tests and documents. Every step that reaches Production
+is a separate owner approval under [CLAUDE.md §5](../CLAUDE.md), named when it
+is due (§7 below). The steps up to and including the sandbox test are done (§1);
+§7 records which of the rest are known to have happened.
 
 Other documents:
 
@@ -37,6 +39,8 @@ Other documents:
 
 ## 1. Live state, read-only, 2026-11-11
 
+> **Updated 2026-11-24, read live about 12:15 UTC (read-only): `app_settings.online_payment_enabled` is `true`, the `payment-refund-worker` cron job is active, and 19 online orders have `payment_status` paid.** This is the newest read and it supersedes every "card payments are off", "online_payment_enabled is false" and "refund job is off or inactive" statement in this section and in the rest of this document that is not itself dated as history. Not read: the payment row's mode and enabled state, and whether the test-checkout secrets (§3) are set.
+>
 > **Updated 2026-11-22: a read-only query made during a migration apply (07:14 UTC) returned `app_settings.online_payment_enabled` = `true`.** Every statement below that card payments are off, or that `online_payment_enabled` is false, is the state of 2026-11-11 to 2026-11-13 and is history. Nothing else about the payment settings was re-read then, and the payment row's mode and enabled state in particular were not. Re-read before acting on any of it.
 >
 > **Updated 2026-11-13, evening: the sandbox test is DONE** (§7 step 6,
@@ -67,14 +71,14 @@ Read-only reads of Production on 2026-11-11, also recorded in
 
 | What | State |
 | --- | --- |
-| `app_settings.online_payment_enabled` | **false** since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode; the owner switched it off. Cash is on. |
+| `app_settings.online_payment_enabled` | **false** since 10:56 UTC **on 2026-11-11; read `true` on 2026-11-22 and again on 2026-11-24**. An admin had switched it on that morning with Moyasar in TEST mode; the owner switched it off. Cash is on. |
 | Payment integration row | provider `moyasar`, enabled (**wrong when written**: disabled at 10:55:54 UTC, before this read), mode `test`, a test publishable key saved. Tap leftovers (`merchant_id`, `source_id`, `transaction_expiry_minutes`) are still in `public_config`. |
 | Deployed payment functions | every one is a July Tap-era bundle |
 | `20260824100000_moyasar_payment_provider` | **not applied**, so `begin_payment_attempt`, `begin_session_attempt` and `payment_records.provider_checkout_ref` do not exist in Production |
 | `20261003120000`, `20261004120000` | not applied (new on this branch) |
 | `payment_records` | only `tap` rows: 6 failed, 3 initiated and expired, 0 paid |
 | `order_refunds` | empty |
-| `payment-refund-worker` cron job | disabled since 2026-07-29 (`PAYMENT_POSTPONEMENT.md` §3) |
+| `payment-refund-worker` cron job | disabled since 2026-07-29 (`PAYMENT_POSTPONEMENT.md` §3) **as of this read; switched on 2026-11-19 04:47 UTC (§6) and read active 2026-11-24** |
 | `refund_trigger_secret` | **not in Vault** (no Vault secret named like it). A names-only read on 2026-11-11 listed the key on the payment row (`BACKUP_RECOVERY.md` §4.3); its value was not read, so whether it is non-blank is unknown. Check it by length (`OWNER_ACTIONS.md` §47.16). No console field sets it. |
 
 Because the functions are July bundles and the migration is missing, online
@@ -209,7 +213,7 @@ The request column holds the event id, the type, the payment id (each cut to 64
 characters or fewer), and the mode. It never holds the token, the key or the
 body. These errors are none of `finalize_failed` and `confirm_failed`, which is
 all watchdog rule R17 and its partial index read, so **a deferral raises no
-alert**: a console reader finds it by searching the log, and it ends when the
+alert**: no console screen lists these rows (the console reads only the newest webhook-verification row from the log, `api.ts` `latestWebhookVerification`), so they are found by a database query on `integration_sync_logs`, and it ends when the
 redelivery confirms the payment. At most six rows per event, then Moyasar
 stops.
 
@@ -782,7 +786,7 @@ dialog) is in flight. Older builds keep a short window here; see §12.
 
 ### A cash retry with other details, and a retry while an expired checkout can still be paid (audit F-D1-001, F-D1-003)
 
-Written 2026-11-24, **not applied**: `20261024120000_cash_order_input_match_expired_session_lookup`
+Written and **applied 2026-11-24 06:11 UTC** (ledger row 129): `20261024120000_cash_order_input_match_expired_session_lookup`
 (`MIGRATIONS.md` §76). Two gaps the F-X02-001 fix left.
 
 **Cash (F-D1-001).** `place_order` returns the order that holds (customer, key)
@@ -952,11 +956,12 @@ with 0 refunds queued at that moment (`OWNER_ACTIONS.md` §47.16). So, once
 `20261018120000` is applied, a cancelled paid card order is refunded on the
 next run, within about five minutes.
 
-**The hand procedure for cancelled orders is retired from the apply.** Until
-`20261018120000` is applied, a cancelled paid order still gets no automatic
-refund (the trigger has skipped cancelled orders since `20261012120000`, gap
-PG-03) and is refunded by hand in Moyasar's dashboard, as before. **After the
-apply, staff must not also refund a cancelled order by hand.** It would not pay
+**The hand procedure for cancelled orders is retired from the apply.** Before
+`20261018120000` was applied, a cancelled paid order got no automatic
+refund (the trigger had skipped cancelled orders since `20261012120000`, gap
+PG-03) and was refunded by hand in Moyasar's dashboard. **That file is applied
+(live `20261119051739`) and the refund job is active (read live 2026-11-24), so
+staff must not also refund a cancelled order by hand.** It would not pay
 the customer twice: Moyasar's documentation says a refund is made only from a
 `paid` or `captured` payment and for at most its amount (Moyasar API reference
 §3.2, read from Moyasar's public documentation, not tested), so the worker's
@@ -980,7 +985,8 @@ the first half is not true. Changing that copy is an app change, not part of
   2026-11-17 (refund draft D2): duplicates are refunded by hand** from Moyasar's
   dashboard, from the R15 listing on the "Refunds and payments needing
   attention" card. That is the design, not a gap.
-- **A cancelled paid order before `20261018120000` is applied**, as above.
+- **A cancelled paid order from before `20261018120000` was applied**, as above:
+  there is no backfill.
 
 Either one is refunded by hand in Moyasar's dashboard. That is a live money
 action and an owner approval (§5 of CLAUDE.md). **A refund made in the
@@ -1213,12 +1219,16 @@ Approval for one is not approval for the next. Steps 1 to 6 are done
     versions. After that check, re-decide the App Store "Financial Info" and
     Play "Payment info" answers.
 12. **Make sure `refund_trigger_secret` exists (generate it if not) and
-    re-enable the `payment-refund-worker` cron job** (§6).
+    re-enable the `payment-refund-worker` cron job** (§6). *The job was
+    switched on 2026-11-19 04:47 UTC and read active 2026-11-24; the secret was
+    last read as present on 2026-11-13 and not since.*
 13. **Ship the EAS build** that carries the app half (§5), with the app-side
     gap fixes in it: PG-03, PG-04, PG-05, PG-20 if the owner chooses the code
     fix, and PG-31 ([the card-payment gaps](readiness/20261113-card-payments-gaps.md)).
     A fix that misses this build needs another build and another store review.
-14. **Turn on Online Payment** (Settings → Payment Methods). Not before
+14. **Turn on Online Payment** (Settings → Payment Methods). *Read `true` on
+    2026-11-22 and again on 2026-11-24; this document does not record who
+    switched it on or whether every condition below held at that moment.* Not before
     Moyasar's written answer on which payment methods and card schemes its
     hosted page offers on our account (`OWNER_ACTIONS.md` §47.19; gap PG-11, a
     gate); each of the 12 gaps that must be fixed before card payments go live
@@ -1458,12 +1468,11 @@ record.
 
 **Nothing refunds a duplicate automatically, by decision.** The owner decided on
 2026-11-17 (refund draft D2) that duplicates are refunded by hand from Moyasar's
-dashboard, from the R15 listing below. **Live today, nothing alerts on it either:** no
-watchdog rule or alert reads `duplicate_payment` (the watchdog's double-capture
+dashboard, from the R15 listing below. **Before 2026-11-17 nothing alerted on it** (the watchdog's double-capture
 rule counts `paid` rows, and a duplicate is `failed`).
 
 **Written 2026-11-14, live since 2026-11-17**, when `20261013120000` was
-applied (gap PG-02, `MIGRATIONS.md` §65). Each duplicate raises the critical watchdog incident R15
+applied (gap PG-02, `MIGRATIONS.md` §65), so a duplicate is now alerted. Each duplicate raises the critical watchdog incident R15
 `DUPLICATE_PAYMENT_RECORDED`, which reaches the alert inbox and, while the
 payment row is enabled and configured, turns the payment card to failing. The
 Live Orders card "Refunds and payments needing
@@ -1593,13 +1602,15 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
   applied on 2026-11-18 (§6, PG-01): from 5 minutes to 6 hours, then `failed`
   at the tenth attempt with its last reason. Before that apply, one stuck
   refund took one claim a run, for ever (since `20261013120000` and the
-  `payment-refund` redeploy of 2026-11-17). The refund job's cron is still
-  inactive, so no refund runs until it is turned on.
+  `payment-refund` redeploy of 2026-11-17). The refund job's cron was inactive
+  when this was written; it was switched on 2026-11-19 at 04:47 UTC and read
+  active on 2026-11-24, so a refund runs on the next five-minute tick.
 - **A refund stopped by the cap may still have landed.** Its last reason is
   what the worker last saw, and several reasons do not rule out a refund at
   Moyasar. Check the dashboard before refunding by hand (§6 runbook).
 - **A refund never tried raises nothing.** R18 needs at least one attempt, so a
-  refund waiting while the refund job is off is seen only by a database query.
+  refund waiting (for instance one whose job has been switched off again) is
+  seen only by a database query.
 - **Refund and payment problems reach the console's alert inbox** since
   `20261013120000` was applied on 2026-11-17 (PG-01, PG-02); outside the console they reach nobody until external alert email is on
   (PG-10).

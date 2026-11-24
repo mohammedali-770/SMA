@@ -541,7 +541,7 @@ say what they say (PRIV-1).
   status filter (`supabase/migrations/20260919120000_security_audit_db_hardening.sql:88`;
   the live body, md5 `c44b5c79…`, has the same line). It deletes **all** of the
   customer's sessions, consumed ones included, once no session is still
-  `pending_payment` (`supabase/functions/account-delete-process/index.ts:109-135`).
+  `pending_payment` (`supabase/functions/account-delete-process/index.ts:129-138` (re-anchored 2026-11-24)).
 - So deleting an account deletes the `payment_records` row of every card payment
   made through the app: Moyasar's ids, card network, last four, authorisation
   codes, and any `duplicate_payment` row staff would need for a hand refund
@@ -625,7 +625,7 @@ change would allow different wording, the alternative is in an
    - a duplicate payment not yet refunded loses its record: nothing refunds it
      automatically (`PAYMENTS.md` §10), and account deletion does not wait for
      it, since it waits only for active orders, unpaid online orders and
-     `pending_payment` sessions (`account-delete-process/index.ts:109-116`).
+     `pending_payment` sessions (`account-delete-process/index.ts:129-138` (the blocker-check stage; `pending_payment` is at :136; re-anchored 2026-11-24 at `99b79d8`, the cited :109-116 is now the staff-hold stage)).
      Live `account_data_deletion` v2.0 says a request "may wait if your account
      still has an active order or an unfinished financial matter";
    - live `account_data_deletion` v2.0 says only "Your open checkout sessions"
@@ -676,11 +676,11 @@ change would allow different wording, the alternative is in an
    (fact-check aside). One live session has been in that state since
    2026-07-19, past its expiry, and nothing moves it out. A deletion request by
    that customer would wait and then go to manual review
-   (`account-delete-process/index.ts:109-135`). The live sentence pointing to
+   (`account-delete-process/index.ts:129-138` (re-anchored 2026-11-24)). The live sentence pointing to
    the Account and Data Deletion page stays true, because that page says a
    request needing manual review takes longer. Wider than card payment, and not
    introduced by it: an order blocks deletion until it is delivered or
-   cancelled (`account-delete-process/index.ts:28`), and orders do not move past
+   cancelled (`account-delete-process/index.ts:29`, `TERMINAL_ORDER_STATES`), and orders do not move past
    Received unless an administrator moves them (`docs/readiness/20261113-card-payments-gaps.md` PG-21,
    PG-23). Live on 2026-11-13, all 7 accounts that have ordered hold an order
    that is neither delivered nor cancelled (75 of 82 orders are Received), so a

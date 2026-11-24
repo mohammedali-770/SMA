@@ -81,7 +81,7 @@ anticipated the migration that would lift it. That is what
 | Severity floor | `dispatch_min_severity`, default **`critical`** |
 | Language | `dispatch_language`, default `en` |
 | Recipients | derived from admin profiles at send time by `operations_alerts_dispatch_recipients()`. **No address is stored**, which was v1's stated property |
-| Delivery | at most once — a per-invocation fencing token on claim, and every completion write guarded by it |
+| Delivery | **exactly once in the normal case and at-least-once across a crash**, not at-most-once (corrected 2026-11-24, from `20260903120000_operations_alert_email_dispatch.sql` lines 78-88): a per-invocation fencing token on claim, and every completion write guarded by it, make concurrent dispatchers safe, but an email cannot be unsent, so a dispatcher that dies between SMTP accepting a message and `sent` being written has it re-sent when the lease expires. A duplicate after a crash is by design |
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
 | Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The driver **signs** (nonce + timestamp + HMAC-SHA256, 10-minute freshness window) rather than sending the secret, so the Edge Function never receives it — the first scheduler did, while claiming otherwise (#329). Before that there was **no caller at all** (#328). An admin can still invoke it by hand |
 
@@ -653,10 +653,10 @@ migration-history tables.
    (`*/5 * * * *`), `operations-digest-generator` (`0 * * * *`) and — since
    `20260903130000` — `operations-alert-dispatch` (`*/5 * * * *`).
    **Corrected 2026-09-13: this said "exactly 5 jobs (3 pre-existing + the 2
-   above)".** The database now holds **10** jobs, **9** active; the single
-   inactive one is `payment-refund-worker`, deliberately off under the §6
-   payment freeze. *(2026-11-12: the freeze is lifted for repository work; the
-   job stays off until the owner re-enables it, `OWNER_ACTIONS.md` §47.16.)* Count this subsystem's three rather than the total, which
+   above)".** On 2026-09-13 the database held **10** jobs, **9** active; the single
+   inactive one was `payment-refund-worker`, then off under the §6
+   payment freeze. *(2026-11-12: the freeze was lifted for repository work. The
+   job was switched on 2026-11-19 and read active on 2026-11-24, `OWNER_ACTIONS.md` §47.16, so the total and the inactive count above are history.)* Count this subsystem's three rather than the total, which
    grows with unrelated features.
 2. Latest evaluator runs are `success` (or safe skips), cadence ≈ 5 min.
 3. Yesterday's digest exists in both languages after 08:00 Riyadh.

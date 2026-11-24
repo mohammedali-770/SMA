@@ -27,8 +27,8 @@
 > made under this decision was **disabling the `payment-refund-worker` cron
 > job** so no automated refund processing can start while the area is frozen.
 
-This document is the authoritative record of the postponement. It supplements
-— and does not replace — the standing freeze in `CLAUDE.md` §6.
+This document was the authoritative record of the postponement, and is history since 2026-11-11 (see the note at the top). It supplemented,
+and did not replace, the freeze that `CLAUDE.md` §6 then recorded.
 
 > **UPDATE 2026-08-24 — a SECOND candidate provider now exists in the
 > repository.** The owner said "maybe we will go with MOYASAR" and pointed at

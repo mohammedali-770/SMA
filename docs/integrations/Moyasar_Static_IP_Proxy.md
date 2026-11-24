@@ -91,8 +91,8 @@ inbox someone reads (gap PG-19).
 tried at most once per run, so one stuck refund makes at least 288 calls a day,
 about 8,600 a month. That is still over 40% of the Starter plan, from one
 refund. It holds since 2026-11-17, when `20261013120000` was applied and
-`payment-refund` then redeployed as version 5 (the refund job's cron is
-still inactive, so no refund runs yet). Only an attempt cap or a back-off bounds it, and those numbers
+`payment-refund` then redeployed as version 5 (the refund job's cron was
+inactive then; it was switched on 2026-11-19 and read active on 2026-11-24). Only an attempt cap or a back-off bounds it, and those numbers
 are yours (gap PG-01).
 
 **2026-11-18: bounded.** `20261016120000` was applied (`MIGRATIONS.md` §68):

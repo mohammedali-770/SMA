@@ -1,5 +1,7 @@
 # Store answers for card payment through Moyasar (draft)
 
+> **Flagged 2026-11-24.** Every "true only while online payment is off" condition in this file now fails: `app_settings.online_payment_enabled` was read `true` on 2026-11-22 and 2026-11-24 (`PAYMENTS.md` §1). The replacement answers are the owner's and are not written here: `OWNER_ACTIONS.md` §65.
+
 > **Status: DRAFT, engineering-written 2026-11-13, revised the same day against
 > its fact-check (`docs/readiness/20261113-card-payments-reviews/store_answers.review.md`), then re-checked the same
 > evening by an independent checker against the code, the live rows and the
@@ -111,7 +113,7 @@ every "current" text below is still true today.
 `docs/store/LISTING_COPY.md:32`
 
 ````markdown
-| **C-CASH** | full ar/en · release notes | payment is **cash**, on pickup or delivery | `app_settings.online_payment_enabled` is false. *Changed 2026-11-11: this column said "no payment provider is selected; the freeze holds". The owner chose Moyasar that day, so only the switch keeps this claim true* | CLAUDE.md §6 · PR #377 · [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) §47 |
+| **C-CASH** | full ar/en · release notes | payment is **cash**, on pickup or delivery | `app_settings.online_payment_enabled` is false. **Flagged 2026-11-24: read live, it is `true`, so this claim's condition now fails (`OWNER_ACTIONS.md` §65).** *Changed 2026-11-11: this column said "no payment provider is selected; the freeze holds". The owner chose Moyasar that day, so only the switch keeps this claim true* | CLAUDE.md §6 · PR #377 · [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) §47 |
 ````
 
 **A2. The paragraph under the claims table.**
@@ -184,7 +186,7 @@ Arabic, recorded as *365 characters* (line 190):
 `docs/PLAY_STORE_SUBMISSION.md:479`
 
 ````markdown
-| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **True only while online payment is off — owner decision pending, see §6b** |
+| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **True only while online payment is off — owner decision pending, see §6b.** **Flagged 2026-11-24: read live, `online_payment_enabled` is `true`, so this condition now fails; the answer to give is the owner's decision (`OWNER_ACTIONS.md` §65), not decided here.** |
 ````
 
 **B2. §6b, in full.**
@@ -264,7 +266,7 @@ online payment is switched on (§6b, `OWNER_ACTIONS.md` §47.15).
 `docs/APP_STORE_SUBMISSION.md:398`
 
 ````markdown
-| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card. **True only while online payment is off — see "Card payment through Moyasar" below** |
+| Purchases | Purchase History | Yes | **Linked** | `orders`, `order_items`. **No payment instrument** — launch is cash-only; `payment_method` records *how*, not a card. **True only while online payment is off — see "Card payment through Moyasar" below.** **Flagged 2026-11-24: read live, `online_payment_enabled` is `true`, so this condition now fails; the answer to give is the owner's decision (`OWNER_ACTIONS.md` §65), not decided here.** |
 ````
 
 `docs/APP_STORE_SUBMISSION.md:403-404`

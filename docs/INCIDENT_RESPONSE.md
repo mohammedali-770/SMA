@@ -23,11 +23,10 @@ Therefore:
 
 ## 1b. The launch-week alert watch — until dispatch exists, this IS the pager
 
-**Added 2026-09-03 for X3.** The alert engine works and has never once reached a
-human: every row it has ever produced is `('in_app','recorded')` and stops in the
-database. A dispatcher is being built (`OPERATIONS_ALERTS_DIGEST.md`), but it is
-inert until three separate owner actions land. Until then **this scheduled human
-check is the entire notification system**, and it should be read that way rather
+**Added 2026-09-03 for X3.** The alert engine works and, when this was written, had never once reached a
+human: every row it had ever produced was `('in_app','recorded')` and stopped in the
+database. **Updated 2026-11-24:** the email dispatcher has since been built and deployed (`operations-alert-dispatch`, v9 on 2026-11-24, CLAUDE.md §7; `OPERATIONS_ALERTS_DIGEST.md`), but it sends nothing until `external_dispatch_enabled` is switched on, which is the owner's action, and nothing in this repository records that it has been. Unless the owner has told you it is on, **this scheduled human
+check is still the entire notification system**, and it should be read that way rather
 than as a nice-to-have.
 
 ### Who — owner must fill
@@ -165,11 +164,11 @@ If a customer reports a money movement:
 5. Escalate any “provider movement with no internal record,” duplicate charge, or unexpected refund as SEV-1.
 6. Any manual provider refund/financial correction is an explicit owner action and must be recorded.
 
-**A second payment for an already-paid order** is recorded, not reported paid: a `failed` `payment_records` row with `failure_code = 'duplicate_payment'`, plus an `integration_sync_logs` row. **Nothing alerts on it.** How to find and refund one: `PAYMENTS.md` §10.
+**A second payment for an already-paid order** is recorded, not reported paid: a `failed` `payment_records` row with `failure_code = 'duplicate_payment'`, plus an `integration_sync_logs` row. **It raises the critical watchdog incident R15 `DUPLICATE_PAYMENT_RECORDED`** (live since 2026-11-17, `20261013120000`), which reaches the alert inbox and the "Refunds and payments needing attention" card, with the Moyasar payment id to search for. A duplicate is **not** refunded automatically, by decision (D2, 2026-11-17): it is refunded by hand in Moyasar's dashboard, as an owner action. How to find and refund one: `PAYMENTS.md` §10.
 
-**A cancelled paid online order is not refunded automatically** (`OWNER_ACTIONS.md` §47.20). Refund it by hand in the Moyasar dashboard, as an owner action.
+**A paid card order that is cancelled is refunded automatically** (`20261018120000`, applied; `PAYMENTS.md` §6; `OWNER_ACTIONS.md` §47.20 and §61), by the refund worker, in full, on its next five-minute run. **Do not also refund it by hand in the Moyasar dashboard.** The automatic attempt that follows is expected to be refused, and that raises R14 `REFUND_FAILED`, a critical incident for a refund that was in fact made, which then stays open. Look at the order's refund status in the console first. An order cancelled before that file was applied was not enrolled (no backfill) and is the one case still refunded by hand.
 
-The refund worker (`payment-refund-worker`) stays off until the owner re-enables it as `OWNER_ACTIONS.md` §47.16. After a restore/rebuild, re-verify it before traffic resumes (`BACKUP_RECOVERY.md`).
+The refund worker (`payment-refund-worker`, cron job 6) was switched on 2026-11-19 at 04:47 UTC (`OWNER_ACTIONS.md` §47.16) and read active on 2026-11-24; stopping it is `active := false` there. After a restore/rebuild, re-verify it before traffic resumes (`BACKUP_RECOVERY.md`).
 
 ## 8. Authentication / staff access incidents
 

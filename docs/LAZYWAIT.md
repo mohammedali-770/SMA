@@ -344,7 +344,7 @@ no blocked orders).
    `FOR UPDATE SKIP LOCKED` so concurrent workers never double-send — flipping
    claimed rows to `'syncing'`. **Neither claim takes a cancelled order**
    (`status <> 'cancelled'`, `20261012120000`, gap PG-03; written 2026-11-14,
-   not applied). Cancelling does not touch the sync state, so until this a
+   applied 2026-11-14 17:27 UTC, ledger row 117). Cancelling did not touch the sync state, so before it a
    cancelled order that was queued, re-queued by a customer resend or re-queued
    by an admin Retry was sent to the kitchen. It now stays in the queue unsent;
    see the cancelled-order note under *Retry / backoff / dead-letter*.
@@ -959,10 +959,22 @@ recompute). `is_paid` left this list on 2026-11-19 (above).
 by a printed ticket rather than by the vendor.
 
 ## Retry / backoff / dead-letter
-- Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
-  `sync_next_attempt_at = now()+backoff` (30s→60s→…→1h, ±20% jitter; 429 honors
-  `Retry-After`, delta-seconds or HTTP-date). After `MAX_SYNC_ATTEMPTS` (8) →
-  `dead_letter` (off the queue).
+- **Correction 2026-11-24: there is no automatic retry.** The worker still
+  classifies a failure as retryable (429, 5xx, network/timeout) and writes
+  `sync_attempt_count++`, state `failed` and a `sync_next_attempt_at`
+  (30s→60s→…→1h, ±20% jitter; 429 honors `Retry-After`) — **but the database
+  discards it.** A BEFORE trigger (`20260813143000_manual_only_pos_resend`)
+  sets `sync_next_attempt_at` to null for `failed`, `dead_letter` and `blocked`,
+  and `claim_lazywait_sync_batch` selects only `pending` rows (restated in
+  `20261012120000`), so nothing ever claims a `failed` order again. It stays
+  `failed` until the customer resends or an admin presses **Retry**, which
+  resets it to `pending`. A `pos_retrying` event the worker writes for it is
+  rewritten to `pos_failed`, so the customer is told "we could not send your
+  order" with a resend button, not that the restaurant is confirming it.
+  `MAX_SYNC_ATTEMPTS` (8, `_shared/lazywait.ts`) is therefore not an automatic
+  retry budget; each manual requeue clears the count. Read the rest of this
+  bullet list, and the 30s→1h schedule, as the worker's code, not the system's
+  behaviour.
 - Terminal (401 INVALID_KEY, 403 LICENSE_EXPIRED, other 4xx, missing mapping) →
   `blocked` (no auto-retry; admin fixes config/mapping then **Retry**).
 - **Ambiguous 2xx** (HTTP success but no usable `order_ref`, or `success` not
@@ -970,8 +982,8 @@ by a printed ticket rather than by the vendor.
   retried: the POS may have created the order and Create Order has no idempotency
   key, so a blind re-send would duplicate the ticket. Admin confirms in Lazywait,
   then **Retry** or resolves manually.
-- The queue index `orders_lazywait_queue_idx` pulls due `pending`/`failed` rows
-  oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
+- The queue index `orders_lazywait_queue_idx` serves the claim, which pulls due
+  `pending` rows oldest-first (a `failed` row is never due: see the correction above). `requeue_lazywait_order(id)` (admin-only) resets to `pending`
   **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
 - **A cancelled order is never claimed, and never resent by the customer**
   (`20261012120000`, gap PG-03; applied 2026-11-14, ledger row 117). Both
@@ -1026,9 +1038,8 @@ by a printed ticket rather than by the vendor.
   live and both are being scanned (45,808 and 34,622), which is what
   interchangeable indexes look like. Every insert and every sync-state update on
   `orders` maintains both for one query's benefit.
-  `20260902120000_orders_index_cleanup.sql` drops the duplicate; it is **written
-  and not applied** (a §5 owner action — see `docs/MIGRATIONS.md` §42). Until it
-  is applied, expect to see two.
+  `20260902120000_orders_index_cleanup.sql` drops the duplicate; it was **applied
+  2026-09-02 12:37 UTC** (ledger row 78, `docs/MIGRATIONS.md` §42), so one of the two is gone.
 
 ### Stale-'syncing' reaper (crash/timeout recovery)
 `claim_lazywait_sync_batch` flips a whole batch to `syncing` up front, then the
@@ -1291,8 +1302,9 @@ does not exist locally would achieve nothing. Both properties are pinned by
 ## Admin monitoring
 Admin → Settings → Integrations → **Lazywait Sync Monitor**: branch mapping
 (with unmapped count), per-order sync state / POS ref / attempts / blocked-reason
-/ last-error, and a **Retry** button (failed/blocked/dead-letter; delivery
-excluded). Accountants can view but not edit. Secrets are never shown.
+/ last-error, and a **Retry** button (failed/blocked/dead-letter; delivery orders
+are retryable since `20260827120000`, except one parked at
+`delivery_schema_unconfirmed`, which is `not_retryable` by design). Accountants can view but not edit. Secrets are never shown.
 
 **The monitor lists the 50 newest orders whose sync state is set and not
 `skipped`**, read through `admin_lazywait_sync_monitor` (migration
@@ -1311,8 +1323,10 @@ fetches the `raw` snapshot column, which it never displayed.
 
 ## Deployment
 ```bash
-# 1) DB migration
-supabase db push                       # applies 20260708130000_lazywait_integration
+# 1) DB migration. NEVER `supabase db push` against Production (CLAUDE.md §8,
+#    permanently forbidden). Apply each file by version through the
+#    owner-approved workflow in docs/MIGRATIONS.md. For a LOCAL database only,
+#    the first migrations were:   20260708130000_lazywait_integration
                                        #     + 20260708140000_lazywait_stale_reap
                                        #     + 20260708150000_lazywait_catalog_mapping
 
