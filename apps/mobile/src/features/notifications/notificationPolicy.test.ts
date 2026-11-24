@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { STRINGS } from '../../i18n/strings';
 import {
-  consentScreenVisible, DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan,
+  consentScreenVisible, DEFAULT_DEVICE_PREFS, deviceLangSyncPrefs, deviceShouldStayActive, enableFlowPlan,
   NOTIFICATION_FALLBACK_ROUTE, notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute,
   shouldHandleResponse, shouldRegisterOnSignIn, shouldShowConsentNotice, toggleRequiresPermission,
 } from './notificationPolicy';
@@ -144,6 +144,57 @@ describe('shouldRegisterOnSignIn — surviving sign-out, and shared phones', () 
     // dropped request would reactivate a silenced device and flip promotions
     // back on. Only a definite absence may cause a write.
     expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'indeterminate' })).toBe(false);
+  });
+});
+
+describe('deviceLangSyncPrefs — the server language follows the app, preferences never move (F-X08-001)', () => {
+  const row = (over: Partial<{
+    lang: 'en' | 'ar'; is_active: boolean; order_updates_enabled: boolean; promos_enabled: boolean;
+  }> = {}) => ({
+    lang: 'en' as 'en' | 'ar', is_active: true, order_updates_enabled: true, promos_enabled: false, ...over,
+  });
+
+  it('a stored language that differs from the app asks for a write', () => {
+    expect(deviceLangSyncPrefs({ lang: 'ar', device: row({ lang: 'en' }) })).not.toBeNull();
+    expect(deviceLangSyncPrefs({ lang: 'en', device: row({ lang: 'ar' }) })).not.toBeNull();
+  });
+
+  it('passes the STORED preferences through, whatever they are', () => {
+    expect(deviceLangSyncPrefs({
+      lang: 'ar', device: row({ order_updates_enabled: true, promos_enabled: true }),
+    })).toEqual({ orderUpdatesEnabled: true, promosEnabled: true });
+    expect(deviceLangSyncPrefs({
+      lang: 'ar', device: row({ order_updates_enabled: false, promos_enabled: true }),
+    })).toEqual({ orderUpdatesEnabled: false, promosEnabled: true });
+    expect(deviceLangSyncPrefs({
+      lang: 'ar', device: row({ order_updates_enabled: true, promos_enabled: false }),
+    })).toEqual({ orderUpdatesEnabled: true, promosEnabled: false });
+  });
+
+  it('never re-defaults: a customer with offers ON keeps them, one with order updates OFF keeps that', () => {
+    const on = deviceLangSyncPrefs({ lang: 'ar', device: row({ promos_enabled: true }) });
+    expect(on?.promosEnabled).toBe(true);
+    expect(on).not.toEqual(DEFAULT_DEVICE_PREFS);
+    const off = deviceLangSyncPrefs({
+      lang: 'ar', device: row({ order_updates_enabled: false, promos_enabled: true }),
+    });
+    expect(off?.orderUpdatesEnabled).toBe(false);
+  });
+
+  it('writes nothing when the language already matches', () => {
+    expect(deviceLangSyncPrefs({ lang: 'en', device: row({ lang: 'en' }) })).toBeNull();
+    expect(deviceLangSyncPrefs({ lang: 'ar', device: row({ lang: 'ar', promos_enabled: true }) })).toBeNull();
+  });
+
+  it('leaves a deliberately silenced (inactive) row alone: registering would reactivate it', () => {
+    expect(deviceLangSyncPrefs({
+      lang: 'ar', device: row({ is_active: false, order_updates_enabled: false, promos_enabled: false }),
+    })).toBeNull();
+  });
+
+  it('writes nothing without a row', () => {
+    expect(deviceLangSyncPrefs({ lang: 'ar', device: null })).toBeNull();
+    expect(deviceLangSyncPrefs({ lang: 'ar', device: undefined })).toBeNull();
   });
 });
 
