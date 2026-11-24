@@ -3153,6 +3153,23 @@ exists on the menu / already appears earlier in this file under …"). The
 integration cards' refusal of a stale save is English-only, like the rest of
 that screen.
 
+**Added 2026-11-24 (F-X11-001, staff-facing).** The console's new "Held account
+deletions" panel (Operations Health tab, administrators only) carries
+engineering-drafted Arabic that needs the same read, in
+`src/components/admin/AccountDeletionReviewPanel.tsx`: the title «طلبات حذف
+الحسابات المعلّقة»; the buttons «إعادة المحاولة» ("Retry") and «إغلاق كفاشل»
+("Close as failed"); the three reason explanations («حساب موظف طلب الحذف. لا
+يُحذف حساب الموظف عبر هذا المسار.» / «ما زال هناك طلب أو دفعة مفتوحة بعد انتهاء
+المهلة.» / «فشلت المعالجة بشكل متكرر.»); and the two confirmations. The one that
+matters is the Close confirmation, «إغلاق الطلب … كفاشل؟ سيُرفع قفل الحساب. لا
+يُحذف أي شيء، وعلى صاحب الحساب إعادة التحقق من هويته ليطلب الحذف مجدداً.»
+(English: "Close request … as failed? This releases the account lock. Nothing is
+erased, and the account holder must re-verify to ask again."): check it reads as
+"the lock is released and nothing is deleted", not as "the account is deleted".
+The panel is live on merge of the console build; it writes only through the
+existing `resolve_account_deletion_request` RPC, which needs an administrator at
+AAL2. `docs/STAFF_MANUAL.md` §7 has the matching bilingual paragraph.
+
 **Widened 2026-11-24 — three more engineering-drafted Arabic strings, one
 customer-facing and two on staff tickets.** Read them in the same pass.
 
