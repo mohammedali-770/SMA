@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -383,5 +384,99 @@ describe('alert dispatcher SMTP wiring', () => {
     // The pre-guard code read `pub.host` straight into `Deno.connect`.
     expect(source).not.toMatch(/hostname:\s*String\(/);
     expect(source).not.toMatch(/pub\.host/);
+  });
+});
+
+/*
+ * THE CONTROL-CHARACTER CLASS, AND THE DEPLOY TOOL THAT COULD NOT SEND IT
+ * (2026-11-24). The guard above used to be written with a backslash-u escape for
+ * each code point. The tool that deploys Edge Functions decodes such an escape in
+ * the text it is sent, so U+2028 arrived as a REAL line separator inside a regular
+ * expression literal, which ends the line, and the bundler refused the file
+ * ("Unterminated regexp literal"). `operations-alert-dispatch` and
+ * `email-test-config` both import this file, so neither could be deployed. The
+ * class is now written with Unicode property escapes. These tests pin that the
+ * rule did not change, and that the hazard cannot come back unnoticed.
+ *
+ * Built from numbers on purpose: this file must not carry a backslash-u escape
+ * either, for the same reason it would be wrong to put one in the source.
+ */
+describe('the sender control-character class', () => {
+  const REFUSED: number[] = [];
+  for (let cp = 0x0000; cp <= 0x001f; cp++) REFUSED.push(cp);
+  REFUSED.push(0x007f);
+  for (let cp = 0x0080; cp <= 0x009f; cp++) REFUSED.push(cp);
+  REFUSED.push(0x2028, 0x2029);
+
+  const ACCEPTED: Array<[string, number]> = [
+    ['a space', 0x0020],
+    ['a tilde, the last printable ASCII', 0x007e],
+    ['a no-break space, the first character after the C1 block', 0x00a0],
+    ['an e with an acute accent', 0x00e9],
+    ['an Arabic letter', 0x0633],
+    ['a zero-width space', 0x200b],
+    ['U+2027, the character before the line separator', 0x2027],
+    ['U+202A, the character after the paragraph separator', 0x202a],
+    ['an emoji outside the basic plane', 0x1f600],
+  ];
+
+  const inName = (cp: number) => String.fromCodePoint(cp);
+
+  it('refuses exactly 67 characters: C0, DEL, C1, and the line and paragraph separators', () => {
+    expect(REFUSED).toHaveLength(67);
+    expect(new Set(REFUSED).size).toBe(67);
+  });
+
+  it.each(
+    REFUSED.map((cp) => [`U+${cp.toString(16).toUpperCase().padStart(4, '0')}`, cp] as [string, number]),
+  )('refuses %s inside the From name', (_label, cp) => {
+    const t = parseSmtpTarget({ ...LIVE, from_name: 'A' + inName(cp) + 'B' });
+    expect(t.reason).toBe(SMTP_SENDER_INVALID);
+  });
+
+  it.each(ACCEPTED)('accepts %s inside the From name', (_label, cp) => {
+    const name = 'A' + inName(cp) + 'B';
+    const t = parseSmtpTarget({ ...LIVE, from_name: name });
+    expect(t.reason).toBeNull();
+    expect(t.fromName).toBe(name);
+  });
+
+  it('refuses the line separator in the address fields too', () => {
+    for (const cp of [0x2028, 0x2029]) {
+      expect(parseSmtpTarget({ ...LIVE, from_email: 'a' + inName(cp) + 'b@c.example' }).reason).toBe(
+        SMTP_SENDER_INVALID,
+      );
+      expect(parseSmtpTarget({ ...LIVE, reply_to: 'a' + inName(cp) + 'b@c.example' }).reason).toBe(
+        SMTP_SENDER_INVALID,
+      );
+    }
+  });
+
+  it('is written with property escapes, not one escape per code point', () => {
+    const source = readFileSync(fileURLToPath(new URL('./smtpTarget.ts', import.meta.url)), 'utf8');
+    const bs = String.fromCharCode(92);
+    expect(source).toContain('const CONTROL_CHARS = /[' + bs + 'p{Cc}' + bs + 'p{Zl}' + bs + 'p{Zp}]/u;');
+  });
+
+  it('keeps every deployable source file free of a backslash-u escape', () => {
+    const bs = String.fromCharCode(92);
+    const escape = new RegExp(bs + bs + 'u[0-9a-fA-F]{4}');
+    const root = fileURLToPath(new URL('..', import.meta.url));
+    const testFile = /(?:\.test\.ts|_test\.ts)$/;
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) {
+          if (entry !== 'node_modules') walk(full);
+        } else if (entry.endsWith('.ts') && !testFile.test(entry)) {
+          if (escape.test(readFileSync(full, 'utf8'))) found.push(relative(root, full));
+        }
+      }
+    };
+    walk(root);
+    // A file listed here cannot be deployed through the tool that decodes the
+    // escape: write the character class with a property escape instead.
+    expect(found).toEqual([]);
   });
 });
