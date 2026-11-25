@@ -21,13 +21,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const row = (type: DbIntegrationSetting['provider_type'], name: string, enabled: boolean, pub: Record<string, unknown> = {}): DbIntegrationSetting => ({
-  provider_type: type, provider_name: name, enabled, public_config: pub, has_secret: true, updated_at: '2026-11-25T08:00:00.000Z',
+const row = (
+  type: DbIntegrationSetting['provider_type'],
+  name: string,
+  enabled: boolean,
+  pub: Record<string, unknown> = {},
+): DbIntegrationSetting => ({
+  provider_type: type,
+  provider_name: name,
+  enabled,
+  public_config: pub,
+  has_secret: true,
+  updated_at: '2026-11-25T08:00:00.000Z',
 });
 
 function renderCard(r: DbIntegrationSetting, isRTL = false) {
   const onSave = vi.fn(async (input: UpsertIntegrationInput) => ({ ...r, enabled: input.enabled }));
-  render(<IntegrationCard providerType={r.provider_type} row={r} disabled={false} isRTL={isRTL} onSave={onSave} />);
+  render(
+    <IntegrationCard providerType={r.provider_type} row={r} disabled={false} isRTL={isRTL} onSave={onSave} />,
+  );
   return { onSave };
 }
 const toggle = () => fireEvent.click(screen.getByRole('checkbox'));
@@ -41,7 +53,9 @@ describe('Lazywait POS', () => {
     save();
 
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn OFF the Lazywait POS integration\? New orders stop being sent to the kitchen POS/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Turn OFF the Lazywait POS integration\? New orders stop being sent to the kitchen POS/,
+    );
     expect(onSave).not.toHaveBeenCalled();
   });
 
@@ -69,7 +83,9 @@ describe('Push', () => {
     const { onSave } = renderCard(row('push', 'expo', false));
     toggle();
     save();
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn ON push notifications\? Real messages start reaching customers/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Turn ON push notifications\? Real messages start reaching customers/,
+    );
     expect(onSave).not.toHaveBeenCalled();
   });
 
@@ -78,7 +94,9 @@ describe('Push', () => {
     renderCard(row('push', 'expo', true));
     toggle();
     save();
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn OFF push notifications\? Customers stop receiving order-status messages/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Turn OFF push notifications\? Customers stop receiving order-status messages/,
+    );
   });
 });
 
@@ -90,7 +108,9 @@ describe('WhatsApp', () => {
     const { onSave } = renderCard(login(true));
     fireEvent.change(screen.getByLabelText(/Enable WhatsApp customer LOGIN/), { target: { value: 'false' } });
     save();
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn OFF WhatsApp customer login\?.*may be unable to sign in/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Turn OFF WhatsApp customer login\?.*may be unable to sign in/,
+    );
     expect(onSave).not.toHaveBeenCalled();
   });
 

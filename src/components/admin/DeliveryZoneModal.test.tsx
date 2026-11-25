@@ -18,13 +18,30 @@ import type { Branch, DeliveryZone } from '../../types';
 const draw = vi.hoisted(() => ({
   deleteAll: vi.fn(),
   getAll: vi.fn(() => ({
-    features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] } }],
+    features: [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [1, 0],
+              [1, 1],
+              [0, 0],
+            ],
+          ],
+        },
+      },
+    ],
   })),
 }));
 
 vi.mock('mapbox-gl', () => {
   class Map {
-    on(event: string, cb: () => void) { if (event === 'load') cb(); }
+    on(event: string, cb: () => void) {
+      if (event === 'load') cb();
+    }
     addControl() {}
     resize() {}
     remove() {}
@@ -32,17 +49,40 @@ vi.mock('mapbox-gl', () => {
     fitBounds() {}
   }
   class NavigationControl {}
-  class Marker { setLngLat() { return this; } setPopup() { return this; } addTo() { return this; } }
-  class Popup { setText() { return this; } }
-  class LngLatBounds { extend() {} isEmpty() { return true; } }
+  class Marker {
+    setLngLat() {
+      return this;
+    }
+    setPopup() {
+      return this;
+    }
+    addTo() {
+      return this;
+    }
+  }
+  class Popup {
+    setText() {
+      return this;
+    }
+  }
+  class LngLatBounds {
+    extend() {}
+    isEmpty() {
+      return true;
+    }
+  }
   return { default: { Map, NavigationControl, Marker, Popup, LngLatBounds, accessToken: '' } };
 });
 vi.mock('@mapbox/mapbox-gl-draw', () => ({
   default: class {
     add() {}
     changeMode() {}
-    deleteAll() { draw.deleteAll(); }
-    getAll() { return draw.getAll(); }
+    deleteAll() {
+      draw.deleteAll();
+    }
+    getAll() {
+      return draw.getAll();
+    }
   },
 }));
 vi.mock('mapbox-gl/dist/mapbox-gl.css', () => ({}));
@@ -50,23 +90,44 @@ vi.mock('@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css', () => ({}));
 vi.mock('../../lib/map', () => ({
   ensureRtlTextPlugin: () => {},
   mapConfig: {
-    provider: 'mapbox', isConfigured: true, publicToken: 't', styleUrl: 's',
-    defaultCenter: { lng: 46.7, lat: 24.7 }, defaultZoom: 10,
+    provider: 'mapbox',
+    isConfigured: true,
+    publicToken: 't',
+    styleUrl: 's',
+    defaultCenter: { lng: 46.7, lat: 24.7 },
+    defaultZoom: 10,
   },
 }));
 vi.mock('../../lib/googleMaps', () => ({
-  circleRing: () => [], geometryToPolygons: () => [], loadGoogleMaps: async () => {},
-  locateMe: async () => ({ lat: 0, lng: 0 }), polygonsToGeometry: () => null,
+  circleRing: () => [],
+  geometryToPolygons: () => [],
+  loadGoogleMaps: async () => {},
+  locateMe: async () => ({ lat: 0, lng: 0 }),
+  polygonsToGeometry: () => null,
 }));
 vi.mock('../MapSearchBox', () => ({ MapSearchBox: () => null }));
 
 import { DeliveryZoneModal } from './DeliveryZoneModal';
 
 const branch = {
-  id: 'b1', nameEn: 'Olaya', nameAr: 'العليا', addressEn: '', addressAr: '', phone: '',
-  latitude: 24.7, longitude: 46.6, isActive: true, deliveryFee: 0, minDeliveryOrder: 0,
+  id: 'b1',
+  nameEn: 'Olaya',
+  nameAr: 'العليا',
+  addressEn: '',
+  addressAr: '',
+  phone: '',
+  latitude: 24.7,
+  longitude: 46.6,
+  isActive: true,
+  deliveryFee: 0,
+  minDeliveryOrder: 0,
 } as Branch;
-const zone = { id: 'z1', branchId: 'b1', isActive: true, geojson: { type: 'Polygon', coordinates: [] } } as unknown as DeliveryZone;
+const zone = {
+  id: 'z1',
+  branchId: 'b1',
+  isActive: true,
+  geojson: { type: 'Polygon', coordinates: [] },
+} as unknown as DeliveryZone;
 
 const onSave = vi.fn(async (_branchId: string, _geometry: unknown) => {});
 const onClear = vi.fn(async (_branchId: string) => {});
@@ -75,8 +136,13 @@ const onClose = vi.fn();
 function open(isRTL = false, withZone = true) {
   render(
     <DeliveryZoneModal
-      branch={branch} existingZone={withZone ? zone : undefined} disabled={false} isRTL={isRTL}
-      onClose={onClose} onSave={onSave} onClear={onClear}
+      branch={branch}
+      existingZone={withZone ? zone : undefined}
+      disabled={false}
+      isRTL={isRTL}
+      onClose={onClose}
+      onSave={onSave}
+      onClear={onClear}
     />,
   );
 }
@@ -88,7 +154,10 @@ const button = async (name: RegExp) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class { observe() {} disconnect() {} };
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
 });
 afterEach(() => {
   cleanup();
@@ -102,7 +171,9 @@ describe('Clear delivery area', () => {
     fireEvent.click(await button(/Clear delivery area/));
 
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Clear the delivery area for “Olaya”\? Every delivery order for this branch is refused/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Clear the delivery area for “Olaya”\? Every delivery order for this branch is refused/,
+    );
     expect(onClear).not.toHaveBeenCalled();
     // Declining must not wipe what is drawn on the map either.
     expect(draw.deleteAll).not.toHaveBeenCalled();

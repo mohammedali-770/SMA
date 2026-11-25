@@ -84,7 +84,7 @@ describe('BranchEditModal — working hours', () => {
     config.workingHours.mockRejectedValue(new Error('network'));
     const onSave = open();
     await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
-    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: '+966522222222' } });
+    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: 'phone-two' } });
     fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
   });
@@ -151,12 +151,12 @@ describe('BranchEditModal — sends only what was changed (F-WAD-01-002)', () =>
   it('a phone edit does not carry the fee, the pin or the open/closed state', async () => {
     const onSave = open();
     await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
-    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: '+966511111111' } });
+    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: 'phone-one' } });
     fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     // Everything else on the branch may have been changed by someone else while
     // this modal was open; writing it back would undo that.
-    expect(onSave.mock.calls[0][0]).toEqual({ phone: '+966511111111' });
+    expect(onSave.mock.calls[0][0]).toEqual({ phone: 'phone-one' });
   });
 
   it('a toggle edit sends that toggle alone', async () => {

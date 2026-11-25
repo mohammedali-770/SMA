@@ -20,9 +20,19 @@ vi.mock('../../lib/api', () => ({ legalDocs: api }));
 import { LegalDocumentsPanel } from './LegalDocumentsPanel';
 
 const doc = (over: Record<string, unknown> = {}) => ({
-  id: 'd1', document_type: 'privacy', title_en: 'Privacy Policy', title_ar: 'سياسة الخصوصية',
-  content_en: 'We keep little.', content_ar: 'نحتفظ بالقليل.', version: '1.0', effective_date: null,
-  is_active: true, requires_acceptance: false, created_at: '', updated_at: 't1', updated_by: null,
+  id: 'd1',
+  document_type: 'privacy',
+  title_en: 'Privacy Policy',
+  title_ar: 'سياسة الخصوصية',
+  content_en: 'We keep little.',
+  content_ar: 'نحتفظ بالقليل.',
+  version: '1.0',
+  effective_date: null,
+  is_active: true,
+  requires_acceptance: false,
+  created_at: '',
+  updated_at: 't1',
+  updated_by: null,
   ...over,
 });
 
@@ -102,7 +112,9 @@ describe('switching a policy off', () => {
     fireEvent.click(saveButton());
 
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Switch “Privacy Policy” OFF\? It is removed from the app for every customer immediately/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Switch “Privacy Policy” OFF\? It is removed from the app for every customer immediately/,
+    );
     expect(api.update).not.toHaveBeenCalled();
   });
 

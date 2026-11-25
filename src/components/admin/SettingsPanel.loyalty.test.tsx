@@ -24,12 +24,25 @@ const updateLoyaltySettings = vi.fn();
 
 function mockContext(lang: 'en' | 'ar', over: Record<string, unknown> = {}) {
   useApp.mockReturnValue({
-    brandSettings: { primaryColor: '#422e87', secondaryColor: '#e02d3d', vatPercentage: 15, instagram: '', twitter: '' },
+    brandSettings: {
+      primaryColor: '#422e87',
+      secondaryColor: '#e02d3d',
+      vatPercentage: 15,
+      instagram: '',
+      twitter: '',
+    },
     updateBrandSettings: vi.fn(),
     loyaltySettings: {
-      isEnabled: true, pointsPerRiyal: 1, minPointsToRedeem: 100, discountPerPoint: 0.1,
-      expiryEnabled: false, expiryAnchorMonth: 1, expiryAnchorDay: 1, expiryPeriodMonths: 12,
-      expiryNextRunOn: null, pickupOnly: true,
+      isEnabled: true,
+      pointsPerRiyal: 1,
+      minPointsToRedeem: 100,
+      discountPerPoint: 0.1,
+      expiryEnabled: false,
+      expiryAnchorMonth: 1,
+      expiryAnchorDay: 1,
+      expiryPeriodMonths: 12,
+      expiryNextRunOn: null,
+      pickupOnly: true,
       ...over,
     },
     updateLoyaltySettings,
@@ -50,7 +63,9 @@ function mockContext(lang: 'en' | 'ar', over: Record<string, unknown> = {}) {
 
 function openLoyalty(lang: 'en' | 'ar' = 'en') {
   render(<SettingsPanel />);
-  fireEvent.click(screen.getByRole('button', { name: lang === 'en' ? /Loyalty Program/ : /برنامج النقاط والولاء/ }));
+  fireEvent.click(
+    screen.getByRole('button', { name: lang === 'en' ? /Loyalty Program/ : /برنامج النقاط والولاء/ }),
+  );
 }
 
 afterEach(() => {
@@ -67,7 +82,9 @@ describe('the rewards programme switch', () => {
     fireEvent.change(screen.getByDisplayValue('Yes (Active Campaign)'), { target: { value: 'false' } });
 
     expect(confirm).toHaveBeenCalledTimes(1);
-    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn the rewards programme OFF\? Earning and redeeming points stops for every customer immediately/);
+    expect(String(confirm.mock.calls[0][0])).toMatch(
+      /Turn the rewards programme OFF\? Earning and redeeming points stops for every customer immediately/,
+    );
     expect(updateLoyaltySettings).not.toHaveBeenCalled();
   });
 
