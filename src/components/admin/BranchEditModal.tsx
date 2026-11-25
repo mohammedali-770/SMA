@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { MapPin } from 'lucide-react';
 
 import { Button } from '../../design-system/ui/Button';
@@ -26,9 +26,18 @@ interface Props {
   onSave: (patch: Partial<Branch>) => Promise<void>;
 }
 
-const num = (v: string): number => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n : 0;
+/**
+ * A typed number, or `null` when the box is blank or not a number. The fields
+ * keep the TEXT as state and parse it only here, at save: a number round-tripped
+ * through `parseFloat` on every keystroke rewrites `10.0` to `10` and loses the
+ * zero the next digit needed (`10.05` became `105`), and turns a cleared field
+ * into a real `0`.
+ */
+const parseTyped = (v: string): number | null => {
+  const t = v.trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
 };
 
 /**
@@ -56,26 +65,71 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
   // A read that failed, as opposed to one that has not finished. The editor
   // says so rather than showing seven closed days as if they were the truth.
   const [hoursError, setHoursError] = useState(false);
-  const [lat, setLat] = useState<number>(Number.isFinite(branch.latitude) ? branch.latitude : 0);
-  const [lng, setLng] = useState<number>(Number.isFinite(branch.longitude) ? branch.longitude : 0);
-  const [deliveryFee, setDeliveryFee] = useState<number>(branch.deliveryFee ?? 0);
-  const [minDeliveryOrder, setMinDeliveryOrder] = useState<number>(branch.minDeliveryOrder ?? 0);
+  // Typed text, not numbers: see `parseTyped`. An unset pin (0, 0) shows blank.
+  const [latText, setLatText] = useState<string>(
+    Number.isFinite(branch.latitude) && branch.latitude ? String(branch.latitude) : '');
+  const [lngText, setLngText] = useState<string>(
+    Number.isFinite(branch.longitude) && branch.longitude ? String(branch.longitude) : '');
+  const [feeText, setFeeText] = useState<string>(String(branch.deliveryFee ?? 0));
+  const [minText, setMinText] = useState<string>(String(branch.minDeliveryOrder ?? 0));
   const [etaMin, setEtaMin] = useState<string>(branch.estimatedDeliveryMinutes != null ? String(branch.estimatedDeliveryMinutes) : '');
   const [deliveryEnabled, setDeliveryEnabled] = useState<boolean>(branch.deliveryEnabled ?? true);
   const [pickupEnabled, setPickupEnabled] = useState<boolean>(branch.pickupEnabled ?? true);
   const [isActive, setIsActive] = useState<boolean>(branch.isActive ?? true);
+  // What each field held when the modal opened. Save sends only the fields that
+  // differ from this: the branch board writes toggles and fees at once, so a
+  // modal left open across someone else's change must not write the old values
+  // of fields it never touched back over it (F-WAD-01-002).
+  const initial = useRef({
+    nameEn, nameAr, addressEn, addressAr, phone, email, latText, lngText, feeText, minText, etaMin,
+    deliveryEnabled, pickupEnabled, isActive,
+  });
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const locationSet = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+  // Blank means "no pin" (stored as 0, 0, as before). Unparseable text is not
+  // blank, so it fails validation instead of silently becoming "no pin".
+  const lat = latText.trim() === '' ? 0 : parseTyped(latText);
+  const lng = lngText.trim() === '' ? 0 : parseTyped(lngText);
+  const locationSet = lat !== null && lng !== null && !(lat === 0 && lng === 0);
 
   const validate = (): string | null => {
     if (!nameEn.trim() || !nameAr.trim()) return isRTL ? 'الاسم بالعربية والإنجليزية مطلوب.' : 'English and Arabic names are required.';
+    if (lat === null || lng === null) return isRTL ? 'إحداثيات الفرع يجب أن تكون أرقاماً.' : 'The branch coordinates must be numbers.';
+    if ((latText.trim() === '') !== (lngText.trim() === '')) return isRTL ? 'أدخل خط العرض وخط الطول معاً، أو اتركهما فارغين.' : 'Enter both latitude and longitude, or leave both blank.';
     if (locationSet && (lat < -90 || lat > 90)) return isRTL ? 'خط العرض يجب أن يكون بين -90 و 90.' : 'Latitude must be between -90 and 90.';
     if (locationSet && (lng < -180 || lng > 180)) return isRTL ? 'خط الطول يجب أن يكون بين -180 و 180.' : 'Longitude must be between -180 and 180.';
-    if (deliveryFee < 0 || minDeliveryOrder < 0) return isRTL ? 'القيم لا يمكن أن تكون سالبة.' : 'Values cannot be negative.';
+    const fee = parseTyped(feeText);
+    const min = parseTyped(minText);
+    if (fee === null) return isRTL ? 'رسوم التوصيل يجب أن تكون رقماً.' : 'The delivery fee must be a number.';
+    if (min === null) return isRTL ? 'الحد الأدنى للتوصيل يجب أن يكون رقماً.' : 'The delivery minimum must be a number.';
+    if (fee < 0 || min < 0) return isRTL ? 'القيم لا يمكن أن تكون سالبة.' : 'Values cannot be negative.';
     return null;
+  };
+
+  /** Only the fields the administrator changed since the modal opened. */
+  const changedPatch = (): Partial<Branch> => {
+    const was = initial.current;
+    const out: Partial<Branch> = {};
+    if (nameEn !== was.nameEn) out.nameEn = nameEn.trim();
+    if (nameAr !== was.nameAr) out.nameAr = nameAr.trim();
+    if (addressEn !== was.addressEn) out.addressEn = addressEn.trim();
+    if (addressAr !== was.addressAr) out.addressAr = addressAr.trim();
+    if (phone !== was.phone) out.phone = phone.trim();
+    if (email !== was.email) out.email = email.trim();
+    // The pin is one fact: both coordinates travel together.
+    if (latText !== was.latText || lngText !== was.lngText) {
+      out.latitude = lat ?? 0;
+      out.longitude = lng ?? 0;
+    }
+    if (feeText !== was.feeText) out.deliveryFee = parseTyped(feeText) ?? 0;
+    if (minText !== was.minText) out.minDeliveryOrder = parseTyped(minText) ?? 0;
+    if (etaMin !== was.etaMin && etaMin.trim() !== '') out.estimatedDeliveryMinutes = Math.max(0, parseInt(etaMin, 10) || 0);
+    if (deliveryEnabled !== was.deliveryEnabled) out.deliveryEnabled = deliveryEnabled;
+    if (pickupEnabled !== was.pickupEnabled) out.pickupEnabled = pickupEnabled;
+    if (isActive !== was.isActive) out.isActive = isActive;
+    return out;
   };
 
   const handleSave = async () => {
@@ -84,17 +138,15 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
     if (v) { setError(v); return; }
     setBusy(true);
     try {
-      const eta = etaMin.trim() === '' ? undefined : Math.max(0, parseInt(etaMin, 10) || 0);
-      await onSave({
-        nameEn: nameEn.trim(), nameAr: nameAr.trim(),
-        addressEn: addressEn.trim(), addressAr: addressAr.trim(), phone: phone.trim(),
-        latitude: lat, longitude: lng,
-        deliveryFee, minDeliveryOrder, estimatedDeliveryMinutes: eta,
-        deliveryEnabled, pickupEnabled, isActive,
-        email: email.trim(),
-      });
-      // Hours are a separate table with its own admin RPC. Written after the
-      // branch patch so a rejected branch edit does not leave hours changed.
+      const patch = changedPatch();
+      // Nothing changed on the branch row: an empty update is not a write worth
+      // making (hours below are their own table).
+      if (Object.keys(patch).length > 0) await onSave(patch);
+      // Hours are a separate table with its own admin RPC. NOTE: this does not
+      // wait for the branch write to land. `updateBranchSettings` is
+      // fire-and-forget, so `onSave` resolves at once and a refused branch edit
+      // still reaches here (audit F-WAD-01-001, open: it needs the context
+      // function to return its promise).
       if (hoursLoaded) await branchConfig.saveWorkingHours(branch.id, week);
       onClose();
     } catch (e) {
@@ -156,8 +208,8 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
         <Field label={label('Phone', 'الهاتف')} value={phone} onValueChange={setPhone} disabled={disabled} numeric placeholder="+9665XXXXXXXX" />
         <Field label={label('Contact email', 'البريد الإلكتروني')} type="email" value={email} onValueChange={setEmail} disabled={disabled} placeholder="branch@example.com" hint={label('Visible to customers, like the phone number.', 'ظاهر للعملاء، مثل رقم الهاتف.')} />
         <Field label={label('Estimated delivery (min)', 'وقت التوصيل (دقيقة)')} type="number" value={etaMin} onValueChange={setEtaMin} disabled={disabled} numeric placeholder="—" />
-        <Field label={label('Delivery fee (SAR)', 'رسوم التوصيل')} type="number" value={String(deliveryFee)} onValueChange={(v) => setDeliveryFee(num(v))} disabled={disabled} numeric />
-        <Field label={label('Delivery minimum (SAR)', 'الحد الأدنى للتوصيل')} type="number" value={String(minDeliveryOrder)} onValueChange={(v) => setMinDeliveryOrder(num(v))} disabled={disabled} numeric />
+        <Field label={label('Delivery fee (SAR)', 'رسوم التوصيل')} type="number" value={feeText} onValueChange={setFeeText} disabled={disabled} numeric />
+        <Field label={label('Delivery minimum (SAR)', 'الحد الأدنى للتوصيل')} type="number" value={minText} onValueChange={setMinText} disabled={disabled} numeric />
       </div>
 
       {/* Branch location setter */}
@@ -180,11 +232,11 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
           </Text>
         )}
         <Suspense fallback={<div className="h-40 rounded-[var(--radius-ds-md)] bg-con-surface-2" />}>
-          <LocationPicker lat={lat} lng={lng} isRTL={isRTL} onChange={(la, lo) => { if (!disabled) { setLat(la); setLng(lo); } }} />
+          <LocationPicker lat={lat ?? 0} lng={lng ?? 0} isRTL={isRTL} onChange={(la, lo) => { if (!disabled) { setLatText(String(la)); setLngText(String(lo)); } }} />
         </Suspense>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={label('Latitude', 'خط العرض')} type="number" step="0.000001" value={lat ? String(lat) : ''} onValueChange={(v) => setLat(num(v))} disabled={disabled} numeric />
-          <Field label={label('Longitude', 'خط الطول')} type="number" step="0.000001" value={lng ? String(lng) : ''} onValueChange={(v) => setLng(num(v))} disabled={disabled} numeric />
+          <Field label={label('Latitude', 'خط العرض')} type="number" step="0.000001" value={latText} onValueChange={setLatText} disabled={disabled} numeric />
+          <Field label={label('Longitude', 'خط الطول')} type="number" step="0.000001" value={lngText} onValueChange={setLngText} disabled={disabled} numeric />
         </div>
       </div>
 

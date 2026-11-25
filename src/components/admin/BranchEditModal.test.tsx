@@ -84,7 +84,95 @@ describe('BranchEditModal — working hours', () => {
     config.workingHours.mockRejectedValue(new Error('network'));
     const onSave = open();
     await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: '+966522222222' } });
     fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
+  });
+});
+
+describe('BranchEditModal — numeric fields keep what was typed (F-WAD-01-003)', () => {
+  const field = (name: RegExp) => screen.getByLabelText(name) as HTMLInputElement;
+
+  it('does not drop a trailing zero while a fee is being typed', async () => {
+    open();
+    const fee = field(/Delivery fee/i);
+    fireEvent.change(fee, { target: { value: '10.0' } });
+    // The old state was a number round-tripped through parseFloat, so the box
+    // was rewritten to "10" and the next digit landed one place wrong.
+    expect(fee.value).toBe('10.0');
+    fireEvent.change(fee, { target: { value: '10.05' } });
+    expect(fee.value).toBe('10.05');
+  });
+
+  it('does not drop a trailing zero while a coordinate is being typed', async () => {
+    open();
+    const lat = field(/Latitude/i);
+    fireEvent.change(lat, { target: { value: '24.70' } });
+    expect(lat.value).toBe('24.70');
+  });
+
+  it('lets a field be cleared without turning it into 0', async () => {
+    open();
+    const min = field(/Delivery minimum/i);
+    fireEvent.change(min, { target: { value: '' } });
+    expect(min.value).toBe('');
+  });
+
+  it('saves 10.05 as 10.05', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.change(field(/Delivery fee/i), { target: { value: '10.0' } });
+    fireEvent.change(field(/Delivery fee/i), { target: { value: '10.05' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0].deliveryFee).toBe(10.05);
+  });
+
+  it('refuses a blank or non-numeric fee instead of saving 0', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.change(field(/Delivery fee/i), { target: { value: '' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    expect(await screen.findByText(/must be a number/i)).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('refuses a pin with only one coordinate', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.change(field(/Longitude/i), { target: { value: '' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    expect(await screen.findByText(/both latitude and longitude/i)).toBeTruthy();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+describe('BranchEditModal — sends only what was changed (F-WAD-01-002)', () => {
+  it('a phone edit does not carry the fee, the pin or the open/closed state', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.change(screen.getByLabelText(/^Phone/i), { target: { value: '+966511111111' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    // Everything else on the branch may have been changed by someone else while
+    // this modal was open; writing it back would undo that.
+    expect(onSave.mock.calls[0][0]).toEqual({ phone: '+966511111111' });
+  });
+
+  it('a toggle edit sends that toggle alone', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole('button', { name: /Pickup/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0]).toEqual({ pickupEnabled: false });
+  });
+
+  it('an hours-only edit writes the hours and does not write an empty branch patch', async () => {
+    const onSave = open();
+    await waitFor(() => expect(config.workingHours).toHaveBeenCalled());
+    fireEvent.click(await screen.findByRole('button', { name: /^Save$/i }));
+    await waitFor(() => expect(config.saveWorkingHours).toHaveBeenCalled());
+    expect(onSave).not.toHaveBeenCalled();
   });
 });
