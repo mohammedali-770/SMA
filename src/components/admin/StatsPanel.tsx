@@ -147,7 +147,7 @@ export const StatsPanel: React.FC = () => {
           <Text variant="caption" tone="tertiary" as="p">{t.stats_ticket}</Text>
           <Text variant="title" as="p" className="mt-1"><Price amount={averageTicketValue} lang={adminLang} /></Text>
           <Text variant="caption" tone="tertiary" as="p" className="mt-1">
-            {isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'VAT-inclusive average ticket'}
+            {isRTL ? 'شامل الضريبة، ويضم كل الطلبات بما فيها الملغاة وغير المدفوعة' : 'VAT-inclusive; cancelled and unpaid orders included'}
           </Text>
         </Card>
 

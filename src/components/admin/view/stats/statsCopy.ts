@@ -23,6 +23,7 @@ export const STATS_COPY = {
   en: {
     branchSales: 'Branch Sales',
     ranked: 'Ranked by sales',
+    salesBasis: 'Counts every order, cancelled and unpaid ones included, so it will not match the delivered revenue figure.',
     top5: 'Top 5',
     top8: 'Top 8',
     allActive: 'All active branches',
@@ -53,6 +54,7 @@ export const STATS_COPY = {
   ar: {
     branchSales: 'مبيعات الفروع',
     ranked: 'مرتّبة حسب المبيعات',
+    salesBasis: 'تشمل كل الطلبات بما فيها الملغاة وغير المدفوعة، لذلك لا تطابق رقم إيرادات الطلبات المسلَّمة.',
     top5: 'أعلى ٥',
     top8: 'أعلى ٨',
     allActive: 'كل الفروع النشطة',

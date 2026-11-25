@@ -6,7 +6,7 @@ export const ADMIN_LOCALES = {
   en: {
     dashboard_title: 'Spicy Meal Command Center',
     role_accountant_warning: 'Accountant profile active: Database write and POS state modifications are disabled.',
-    stats_revenue: 'Today\'s Gross Sales',
+    stats_revenue: 'Delivered Revenue (All Time)',
     stats_orders: 'Total Active Orders',
     stats_ticket: 'Average Ticket Value',
     stats_branches: 'Operational Branches',
@@ -127,8 +127,8 @@ export const ADMIN_LOCALES = {
   ar: {
     dashboard_title: 'لوحة تحكم سبايسي ميل الإدارية',
     role_accountant_warning: 'حساب محاسب نشط: تم تعطيل تعديل الأسعار والمنيو والتحكم بحالات الطلب.',
-    stats_revenue: 'إجمالي المبيعات اليومية',
-    stats_orders: 'الطلبات النشطة اليوم',
+    stats_revenue: 'إيرادات الطلبات المسلَّمة (منذ البداية)',
+    stats_orders: 'الطلبات النشطة',
     stats_ticket: 'متوسط الفاتورة الشرائية',
     stats_branches: 'الفروع المفتوحة الآن',
     live_alerts: 'بث الطلبات المباشرة الواردة',
