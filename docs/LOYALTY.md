@@ -20,6 +20,16 @@ redemption and configuration to this file, so behaviour and prose move together
 | `min_points_to_redeem` | `100` | An order uses no points at all when fewer than 100 whole points fit it, so at 0.10 a point an order under SAR 10.00 uses none; see "How many points an order uses" below |
 | `loyalty_pickup_only` | `true` (default) | **Pickup only** — see §2 |
 
+**The console asks before the programme switch writes (2026-11-25).** Turning
+`loyalty_enabled` on or off from **Admin → Settings → Loyalty Program** now shows a
+confirmation first (`loyaltyProgrammeConfirmMessage`, `src/lib/confirmCopy.ts`),
+because the switch gates earning and redemption for every customer at once. It
+changes only the console: what the switch writes, the defaults and every rule in
+this document are unchanged. A manual points adjustment on a customer's ledger is
+likewise confirmed and is limited to **1,000 points at a time** by the console
+(`MAX_LOYALTY_ADJUSTMENT`, about SAR 100 at the default rate); the database has no
+ceiling, so this is a guard against a slipped digit, not a server rule.
+
 Earning and redemption both live in **two** SQL functions that must agree line
 for line:
 
@@ -391,6 +401,11 @@ read the guarantees before changing anything in
 | `loyalty_expiry_next_run_on` | **System-owned, read-only to the admin form.** `loyaltyPatchToDb` deliberately omits it, so a stale form value cannot schedule a wipe |
 
 Set from **Admin → Settings → Loyalty Program → Points Expiry**.
+
+**Turning expiry ON asks for confirmation (2026-11-25).** The console shows a
+warning before the switch writes: on the reset date every customer's points are set
+to zero, and the loyalty terms promise advance notice. Turning it off does not ask.
+The prompt does not make enabling lawful or ready: §7 still decides that.
 
 ### The customer is told before it happens
 
