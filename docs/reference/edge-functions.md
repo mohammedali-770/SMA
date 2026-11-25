@@ -84,6 +84,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/legacyKeyGuard.test.ts`
 - `_shared/moyasar.test.ts`
 - `_shared/moyasar.ts`
+- `_shared/moyasarBindingMismatch.test.ts`
 - `_shared/moyasarDuplicatePayment.test.ts`
 - `_shared/moyasarHttp.test.ts`
 - `_shared/moyasarHttp.ts`
@@ -107,6 +108,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/posPaidFlag.test.ts`
 - `_shared/posPaidFlag.ts`
 - `_shared/publicHost.ts`
+- `_shared/pushAdminGateBehaviour.test.ts`
 - `_shared/pushDispatchTimeoutWiring.test.ts`
 - `_shared/pushPosSyncCancelled.test.ts`
 - `_shared/pushReadyCopyWiring.test.ts`
