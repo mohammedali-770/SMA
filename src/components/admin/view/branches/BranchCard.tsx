@@ -21,6 +21,7 @@ import { Card } from '../../../../design-system/ui/Card';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
 import { useDsFontClass } from '../../../../design-system/ui/useDsLang';
+import { BRANCH_CLOSE_LABEL } from '../../../../lib/branchDeletion';
 import type { Branch, Product } from '../../../../types';
 import { ADMIN_LOCALES } from '../../adminLocales';
 import { ToggleChip } from '../shared/ToggleChip';
@@ -278,7 +279,7 @@ export function BranchCard({
           className={`${ROW_BTN} ${branch.isActive ? 'border-danger-line bg-danger-tint hover:brightness-95' : 'border-mint-line bg-mint-tint hover:brightness-95'}`}
         >
           <Text variant="caption" tone={branch.isActive ? 'danger' : 'success'} as="span">
-            {branch.isActive ? 'Close Branch Maintenance' : 'Open Branch Operational'}
+            {BRANCH_CLOSE_LABEL[branch.isActive ? 'close' : 'open'][isRTL ? 'ar' : 'en']}
           </Text>
         </button>
       </div>

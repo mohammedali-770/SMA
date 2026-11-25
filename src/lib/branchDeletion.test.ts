@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  BRANCH_CLOSE_LABEL,
   BranchHasDependenciesError,
   FK_VIOLATION_CODE,
   branchDeletionBlockedMessage,
@@ -53,14 +56,24 @@ describe('branchDeletionBlockedMessage', () => {
     expect(msg).toContain('existing orders');
     expect(msg).toContain('can’t be deleted');
     expect(msg).toContain('Deactivate');
-    expect(msg).toContain('Close Branch');
+    expect(msg).toContain('Close Branch Maintenance');
     expect(msg).not.toMatch(/foreign key|constraint|23503/i);
   });
 
   it('Arabic guidance steers the admin to deactivation', () => {
     const msg = branchDeletionBlockedMessage(true);
     expect(msg).toContain('أوقِف');
-    expect(msg).toContain('إغلاق الفرع');
+    expect(msg).toContain('«إغلاق الفرع للصيانة»');
     expect(msg).not.toMatch(/foreign key|constraint|23503/i);
+  });
+});
+
+describe('the toggle the messages name', () => {
+  it('is the label the branch card renders, in both languages', () => {
+    const card = readFileSync(join(process.cwd(), 'src/components/admin/view/branches/BranchCard.tsx'), 'utf8');
+    expect(card).toContain('BRANCH_CLOSE_LABEL[branch.isActive ?');
+    expect(card).not.toContain("'Close Branch Maintenance'");
+    expect(BRANCH_CLOSE_LABEL.close.en).toBe('Close Branch Maintenance');
+    expect(BRANCH_CLOSE_LABEL.close.ar).toBe('إغلاق الفرع للصيانة');
   });
 });
