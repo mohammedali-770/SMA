@@ -581,7 +581,7 @@ if the product changes first. None of these is fixed by this document.
   executable by `authenticated` and forwards `p_payment_method`; live
   `place_order` accepts `'online'` whenever online payment is on (it raises only
   when it is off); `payment-initiate` still serves the order flow
-  (`initiateMoyasar`, `payment-initiate/index.ts:395-407`). "Until then there is
+  (`initiateMoyasar`, defined at `payment-initiate/index.ts:492` at `99b79d8`; re-anchored 2026-11-24). "Until then there is
   no order" holds because no app build uses that path. No text change; for the
   code owners (`docs/readiness/20261113-card-payments-gaps.md` PG-27).
 
@@ -601,7 +601,7 @@ if the product changes first. None of these is fixed by this document.
   They do not. The app confirms an order only once the branch's POS has returned
   its reference (`apps/mobile/src/features/orders/orderConfirmation.ts:66`,
   `:148`); the sync worker writes that reference and the branch's order number
-  together (`supabase/functions/lazywait-sync/index.ts:528-545`); and live, all
+  together (`supabase/functions/lazywait-sync/index.ts:649-680` (re-anchored 2026-11-24 at `99b79d8`; `lazywait_ref: ref` is at :656)); and live, all
   71 orders that reached the POS carry both (read 2026-11-13). The
   terms_conditions draft rejected PAY-8 on this evidence. N4 was right about the
   first draft's online sentence, where "confirmation" could be read as the
@@ -699,8 +699,8 @@ re-checked in the default branch at `04eb351` or the live database (read-only,
   Confirmed in `RELEASE_CHECKLIST.md:161-173` and `OWNER_ACTIONS.md` §47.15,
   §47.18. → PAY-5.
 - **S1 → fixed.** "Where it is offered, online payment is available only in the
-  app …". Confirmed: switch off live, TEST-mode refusal at
-  `payment-initiate/index.ts:495`, `:509`.
+  app …". Confirmed: switch off live, TEST-mode refusal in
+  `payment-initiate/index.ts` (`initiateMoyasar`, from :492 at `99b79d8`; the cited :495 and :509 no longer land on it).
 - **S2 → fixed.** Confirmed: masked number, name and payer IP reach the server
   and are dropped (`moyasar.ts:732-768`, `moyasar.test.ts:669`).
 - **S3 → fixed, one change.** "Includes", with an example; the pointer says the
@@ -782,7 +782,7 @@ read for consistency. Each line below was re-checked before it was applied.
   session-expiry gap); the proxy bullet under "Left unchanged" corrected.
 - **re-check R5 (should-fix, notes) → fixed.** PAY-8 withdrawn: confirmation and
   the branch's number arrive together (`orderConfirmation.ts:66`,
-  `lazywait-sync/index.ts:528-545`; 71 of 71 synced orders live). The PAYING IN
+  `lazywait-sync/index.ts:649-680` (re-anchored 2026-11-24); 71 of 71 synced orders live). The PAYING IN
   CASH bullet under "Left unchanged" corrected.
 - **re-check R6 (nit) → fixed.** "the app does not confirm your order" → "the
   app could not confirm your payment", the app's `payUnknown` copy and the refund

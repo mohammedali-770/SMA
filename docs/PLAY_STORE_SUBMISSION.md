@@ -476,10 +476,10 @@ if anything changes.
 
 | Play data type | Collected | Leaves our systems to | Purpose | Evidence |
 | --- | --- | --- | --- | --- |
-| Name | Yes, **OPTIONAL** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:323`. **This row said "required" and that was wrong — measured live 2026-09-15:** `profiles.full_name` is nullable and **3 of 9** profiles have none; `orders.customer_name` is nullable and **19 orders carry no name at all**. The POS payload substitutes `'Guest'` (`lazywait-sync/index.ts:323`). Declaring it required would have been a false Data Safety answer about the one field easiest to check |
-| Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`; the login path also writes the number to `otp_send_reservations.phone_e164` and `whatsapp_message_logs.phone` (`otp_challenges.phone_e164` is written only by the older verification send, not by login — corrected 2026-11-24, `RECORD_OF_PROCESSING.md` activity 1); POS at `lazywait-sync/index.ts:333`, Meta receives it to deliver the OTP template |
+| Name | Yes, **OPTIONAL** | POS | App functionality, Account management | `profiles.full_name`, `orders.customer_name`; sent at `supabase/functions/lazywait-sync/index.ts:409` (`customerName`). **This row said "required" and that was wrong — measured live 2026-09-15:** `profiles.full_name` is nullable and **3 of 9** profiles have none; `orders.customer_name` is nullable and **19 orders carry no name at all**. The POS payload substitutes `'Guest'` (`lazywait-sync/index.ts:409`). Declaring it required would have been a false Data Safety answer about the one field easiest to check |
+| Phone number | Yes, **required** | POS, Meta | App functionality, Account management | `profiles.phone_number`, `orders.customer_phone`; the login path also writes the number to `otp_send_reservations.phone_e164` and `whatsapp_message_logs.phone` (`otp_challenges.phone_e164` is written only by the older verification send, not by login — corrected 2026-11-24, `RECORD_OF_PROCESSING.md` activity 1); POS at `lazywait-sync/index.ts:420` (`customerPhone`), Meta receives it to deliver the OTP template |
 | Email address | Yes, **optional** | — | Account management | `profiles.email`, written only by `apps/mobile/src/features/profile/profileService.ts:10`, `email \|\| null` — it is an optional field on the profile screen, never required to order |
-| Address | Yes, optional (delivery only) | POS; Google, Apple (the pin's point, to turn it into a street address) | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:339`. The street address is looked up from the pin's coordinates by `Location.reverseGeocodeAsync` (`LocationPickerMap.tsx:188`), which is Google's service on Android and Apple's on iPhone (`RECORD_OF_PROCESSING.md` activity 4) — corrected 2026-11-24, this row said "POS" alone. The address text itself is not sent to Google or Apple |
+| Address | Yes, optional (delivery only) | POS; Google, Apple (the pin's point, to turn it into a street address) | App functionality | `addresses.description`, `.national_short_address`; the POS gets `address_snapshot`, not a join, at `lazywait-sync/index.ts:426` (`deliveryAddress`). The street address is looked up from the pin's coordinates by `Location.reverseGeocodeAsync` (`LocationPickerMap.tsx:188`), which is Google's service on Android and Apple's on iPhone (`RECORD_OF_PROCESSING.md` activity 4) — corrected 2026-11-24, this row said "POS" alone. The address text itself is not sent to Google or Apple |
 | Precise location | Yes, optional | POS (the pin, as part of the address); Google (draws the map and receives the point picked); Google or Apple (turns the point into a street address) | App functionality | **Corrected 2026-11-24: this row said "—", and that under-declared a recipient.** The delivery map is Google's: `buildGoogleHtml` loads `maps.googleapis.com` into the picker page (`LocationPickerMap.tsx:107`), and `EXPO_PUBLIC_MAP_PROVIDER=google` was read in the EAS production environment on 2026-09-16 (`GO_LIVE_READINESS.md` A9); the pin's point then goes to the platform reverse geocoder (`:188`). The device's own position is read on the phone and is not sent anywhere on the pickup tab (`RECORD_OF_PROCESSING.md` activity 5), but a pin placed with "Use my location" is the same point. `addresses.latitude/longitude`; `ACCESS_FINE_LOCATION` is genuinely used — `apps/mobile/src/components/LocationPickerMap.tsx:226` requests `Accuracy.High` (see C2). **Asked only in context since 2026-11-10** — see the note under this table |
 | Approximate location | Yes, optional | — for the pickup tab's nearest-branch list (computed on the device); a pin placed from an approximate fix is sent as in the Precise location row | App functionality | `ACCESS_COARSE_LOCATION` |
 | Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
@@ -488,7 +488,7 @@ if anything changes.
 | Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
 | Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
 | Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is still declared:** the same token carries offers to any device whose customer has them on. Since the owner's 2026-11-18 opt-in decision `DEFAULT_DEVICE_PREFS` sets `promosEnabled: false`, so a NEW registration joins the promotional audience only when the customer switches offers on in Profile (§7) — that reaches customers in the next build. Under the superseded 2026-08-20 opt-out decision (`promosEnabled: true`) every granting device was enrolled, and devices registered then keep their setting. Declaring only "App functionality" would understate it either way |
-| **Payment info** | **NO** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **True only while online payment is off — owner decision pending, see §6b** |
+| **Payment info** | **NO — conditional, and the condition now fails** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **The "NO" was true only while online payment was off. Read live 2026-11-24, `app_settings.online_payment_enabled` is `true`, so the condition no longer holds.** The replacement answer is the owner's decision and is not written here: see §6b and `OWNER_ACTIONS.md` §65 |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
 
 **Permissions are requested in context — changed 2026-11-10, no form answer
@@ -564,8 +564,10 @@ to Supabase; **users can request data deletion** — yes, and the URL is below.
 
 ### 6b. Card payment through Moyasar — OWNER DECISION PENDING, before online payment is switched on
 
-**Added 2026-11-12. No answer in §6 is changed here.** They are true while online
-payment is off, which it was on 2026-11-11 (read-only). On 2026-11-11 the owner
+**Added 2026-11-12. No answer in §6 is changed here.** They were true while online
+payment was off, which it was on 2026-11-11 (read-only). **Read live 2026-11-24 it is
+on (`online_payment_enabled` is `true`), so the condition they depend on now fails
+and the decision below is due, not future.** On 2026-11-11 the owner
 chose Moyasar as the payment provider (CLAUDE.md §6). Before online payment is
 switched on (`OWNER_ACTIONS.md` §47.18), the owner re-decides:
 
@@ -990,8 +992,7 @@ whether the status bar was cropped or whether the image shows this app at all.
 Those are review judgements, and the script's own header says so; a check whose
 limits are not written down gets read as proving more than it does.
 
-**Still outstanding on the listing:** the 1024 × 500 feature graphic, the short
-and full descriptions in both languages, and the Console-only app category.
+**Corrected 2026-11-24.** This paragraph said the 1024 × 500 feature graphic and the short and full descriptions were still outstanding. The graphic exists in the repository (`assets/store/play-feature-graphic-1024x500.png`, measured 1024 × 500), and the short and full descriptions in both languages are drafted in `docs/store/LISTING_COPY.md`. Whether either has been entered in the Console is not recorded here. **Still outstanding as far as this document records:** the Console-only app category.
 
 
 ---

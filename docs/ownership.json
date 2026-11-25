@@ -21,7 +21,7 @@
   "rules": [
     {
       "id": "payments",
-      "why": "Moyasar is the only payment provider (owner decision, 2026-11-11), and every step that reaches Production is still a separate owner approval. Any change here has to be reconciled with the payment runbook and the Moyasar API reference in the same pull request, or the runbook silently stops describing what the code does with real money. The mobile paths are listed because the rule originally covered only Edge Functions, and a change to the app's own payment surface — the payment WebView, the hosted-checkout handoff, the interrupted-payment recovery — fired no rule at all; a branch once took a self-declared 'scoped exception' in CheckoutScreen and CI had nothing to say about it. The shared Moyasar helpers, the proxy transport and the console's payment panel, receipt and Online Payment guard are listed because a change can be payment-critical without touching a function directory, and the console is where an operator points real customers at the gateway. The tap-* function glob stays so that a resurrected Tap function cannot land without this rule firing.",
+      "why": "Moyasar is the only payment provider (owner decision, 2026-11-11), and every step that reaches Production is still a separate owner approval. Any change here has to be reconciled with the payment runbook and the Moyasar API reference in the same pull request, or the runbook silently stops describing what the code does with real money. The mobile paths are listed because the rule originally covered only Edge Functions, and a change to the app's own payment surface — the payment WebView, the hosted-checkout handoff, the interrupted-payment recovery — fired no rule at all; a branch once took a self-declared 'scoped exception' in CheckoutScreen and CI had nothing to say about it. The shared Moyasar helpers, the proxy transport and the console's payment panel, receipt and Online Payment guard are listed because a change can be payment-critical without touching a function directory, and the console is where an operator points real customers at the gateway. The tap-* function glob stays so that a resurrected Tap function cannot land without this rule firing. paymentTestCheckout.ts is listed because it decides who may complete a card payment with TEST keys and test cards (the PAYMENT_ALLOW_TEST_CHECKOUT secret and the customer allow-list, CLAUDE.md section 6, PAYMENTS.md section 3, OWNER_ACTIONS.md section 60): it sits outside every payment-* directory, so before 2026-11-24 a change to it fired no rule.",
       "sources": [
         "supabase/functions/payment-*/**",
         "supabase/functions/tap-*/**",
@@ -30,6 +30,7 @@
         "supabase/functions/_shared/moyasarRefund.ts",
         "supabase/functions/_shared/moyasarHttp.ts",
         "supabase/functions/_shared/paymentSync.ts",
+        "supabase/functions/_shared/paymentTestCheckout.ts",
         "src/components/admin/MoyasarPaymentPanel.tsx",
         "src/components/admin/view/orders/PaymentDetails.tsx",
         "src/lib/moyasarAdminTest.ts",
@@ -337,6 +338,16 @@
       ],
       "docs": [
         "docs/SENTRY_WEB_OBSERVABILITY.md"
+      ]
+    },
+    {
+      "id": "staff-accounts",
+      "why": "The staff-accounts Edge Function creates auth users, assigns the branch_staff and call_center roles, pins a branch, resets passwords and deletes accounts, through the service-role client, which bypasses RLS. Its safety is a short list of guards (verify_jwt plus is_admin(), the manageable-roles allow-list, the caller's own JWT for role assignment so the audit names the human, no password ever logged or stored, and an admin_action_audit row for reset and delete). A change to any of them is a change to who can be given access to the staff consoles, and before 2026-11-24 it fired no rule and had no owning document. The owning section is 'Staff account provisioning' in docs/ARCHITECTURE.md.",
+      "sources": [
+        "supabase/functions/staff-accounts/**"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md"
       ]
     }
   ]

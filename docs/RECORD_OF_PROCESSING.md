@@ -140,9 +140,11 @@ them; the owner can.
    period for inactive device records is the fix, and it needs an owner
    decision on the period, as for finding 1. Found in review on #427.
 6. **The privacy policy does not name Moyasar** (added 2026-11-12). The owner chose
-   Moyasar on 2026-11-11. Activity 15 is not in use while online payment is off
+   Moyasar on 2026-11-11. Activity 15 was not in use while online payment was off
    (read-only, 2026-11-11), but the policy must name Moyasar before it is switched
-   on. Editing the live policy is an owner action (`OWNER_ACTIONS.md` §47.15).
+   on. **Read live 2026-11-24, online payment is on (`online_payment_enabled`
+   true, 19 online orders paid), so activity 15 is in use; whether the live policy
+   has been edited to name Moyasar was not read** (`OWNER_ACTIONS.md` §65). Editing the live policy is an owner action (`OWNER_ACTIONS.md` §47.15).
 
 7. **Erasure does not reach the POS, and what Lazywait keeps is unknown** (added
    2026-11-24). `account-delete-process` anonymises our database and deletes

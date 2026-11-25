@@ -74,7 +74,9 @@ Approval for one action is not blanket approval for later actions.
 - any live payment or refund, including the planned small live payment with its automatic refund;
 - the customer documents and store answers that card payment needs (`docs/OWNER_ACTIONS.md` §47.15, whose publishing plan is proposed, not decided): before customers can pay by card, the four documents, published together in both languages under that plan (naming Moyasar in the live privacy policy; updating the payment and cancellation/refund policies, both still cash only, and the terms' payment clause, also cash only), then a rebuild of the public legal page, then the App Store and Play payment answers; after the small live payment has ended with card payment still on, the cash-only listing claim and every other store text that says card payment is available; and the App Review notes, in the variant that matches the switch when a build is submitted.
 
-**What keeps it safe while it is off.** Each is code in this repository, with tests:
+**Where those approvals stand, read live 2026-11-24:** the card-payment switch is on and the refund job is active (see the 2026-11-24 read below). The list above is kept as the record of what each step needed an approval for, not as a statement that they are still pending. The rule has not moved: any further live payment or refund action, key, secret or setting change is still its own §5 approval.
+
+**What keeps it safe (written while card payment was off; read live 2026-11-24 it is on, so these now guard a live setting).** Each is code in this repository, with tests:
 - customer checkout is refused while Moyasar is in TEST mode: `payment-initiate` answers `{status:'disabled', reason:'test_mode'}`. The sandbox is the console's admin test;
 - an attempt opened in TEST mode never confirms an order or a checkout session;
 - **the one exception to both (added 2026-11-18, owner request, testing phase only):** the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT`, exactly `true`, lets a customer pay a real order with Moyasar TEST keys and test cards, and confirms it. Unset, nothing changes. Setting it is a §5 action, and it **must be unset before card payments go live** (`docs/PAYMENTS.md` §3, `docs/OWNER_ACTIONS.md` §60). **Narrowed in #513 (merged 2026-11-22, `4791e50`) and DEPLOYED 2026-11-22** (`payment-initiate` v20, `payment-verify` v16, `payment-webhook` v18, `payment-test-config` v17, `lazywait-sync` v25), and redeployed 2026-11-24 from `c1de1f9` (`payment-initiate` v21, `payment-verify` v17, `payment-webhook` v19, `payment-test-config` v18), so the narrowed behaviour is the live one. **Four more functions were deployed 2026-11-24 from `8697576`, each on its own approval:** `lazywait-sync` v26 and `payment-webhook` v20 (#526 and #527), then `account-delete-request` v9 and `account-delete-process` v10 (#527); `verify_jwt` is unchanged on all four. Read back from Supabase: `account-delete-request` is byte-identical across all eight files; `lazywait-sync` and `payment-webhook` each differ from the repository in ONE re-wrapped comment (`_shared/lazywait.ts` lines 496-499 and `_shared/moyasarVerify.ts` lines 446-447, code identical with comments stripped), and were not redeployed for a comment; `account-delete-process` returned its file text inline and the script read-back could not be run, so only `index.ts` was compared with the source, by eye and line by line, and the rest is not byte-verified. The flag alone admits nobody: the order's owner must also be listed in the Edge Function secret `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` (comma-separated profile ids, read from the database server-side and applied at initiate and again at confirmation); unset or empty admits nobody and any error fails closed. Set that secret **before** deploying, or test cards are refused for everyone. It too must be deleted before card payments go live;
@@ -82,22 +84,29 @@ Approval for one action is not blanket approval for later actions.
 - the web build (`/app`) never offers online payment;
 - payment history is data: the `tap` rows stay and are shown read-only.
 
-**Live state, read-only 2026-11-13 22:37 UTC, after the sandbox (§47.7-47.9 done):**
-- the payment row is provider `moyasar`, mode `test`, **enabled** since 18:17:02 UTC. The owner enabled it for the sandbox, which refuses to run on a disabled row. **Card payments are still OFF**: `online_payment_enabled` is false, and customer checkout is refused in TEST mode. With the row enabled, `payment-webhook` processes ordinary events and `payment-refund` checks its secret (401 without it) instead of answering "disabled";
+**Live state, read-only 2026-11-24 (about 12:15 UTC) — the newest read. It supersedes every "card payments are still OFF" and "refund job inactive" statement in the dated reads below, which describe 2026-11-11 to 2026-11-13:**
+- `app_settings.online_payment_enabled` is **TRUE**. (`docs/PAYMENTS.md` §1 had already recorded a first read of `true` at 07:14 UTC on 2026-11-22.)
+- the `payment-refund-worker` cron job is **ACTIVE**. It was switched on 2026-11-19 at 04:47 UTC on the owner's approval ("do the auto refund", `docs/OWNER_ACTIONS.md` §47.16). A cancelled paid card order is therefore refunded automatically, and staff must not also refund it by hand (`docs/PAYMENTS.md` §6).
+- **19 online orders have `payment_status` paid.** Whether any of them were test-card payments under the `PAYMENT_ALLOW_TEST_CHECKOUT` exception above was not read.
+- **Not read, so not claimed here:** the payment row's mode and enabled state, whether `PAYMENT_ALLOW_TEST_CHECKOUT` and `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` are set, and whether `refund_trigger_secret` is still present. Re-read them before acting on any of it.
+- this corrects dated state facts. It does not change what needs an approval: the rules in this section and in §5 are as they were.
+
+**Live state, read-only 2026-11-13 22:37 UTC, after the sandbox (§47.7-47.9 done; card payments and the refund job as of then, superseded by the 2026-11-24 read above):**
+- the payment row is provider `moyasar`, mode `test`, **enabled** since 18:17:02 UTC. The owner enabled it for the sandbox, which refuses to run on a disabled row. **Card payments were still OFF at that read**: `online_payment_enabled` was false, and customer checkout is refused in TEST mode. With the row enabled, `payment-webhook` processes ordinary events and `payment-refund` checks its secret (401 without it) instead of answering "disabled";
 - the TEST keys and the TEST webhook token are saved, and Test connection answered "Connection OK". The TEST webhook is verified: its one `webhook_verification` event was recorded at 18:21:57 UTC, and the owner entered the code in Moyasar;
 - the sandbox ran. An approved test card read paid at 1.00 SAR. The decline card left its invoice `initiated`, because Moyasar keeps an invoice payable after a declined payment (the runbook said "failed"; corrected). Eight payment events, 18:24-18:58 UTC, were each acknowledged and logged as `unknown payment`, as designed for an invoice with no attempt;
-- nothing else moved: 82 orders, the newest at 17:43 UTC, before the sandbox; `payment_records` still only the 9 `tap` rows; `order_refunds` empty; the refund job inactive;
+- nothing else moved: 82 orders, the newest at 17:43 UTC, before the sandbox; `payment_records` still only the 9 `tap` rows; `order_refunds` empty; the refund job inactive (at that read);
 - **next is §47.10: send the two emails in `docs/integrations/Moyasar_Static_IP_Proxy.md` §7, then choose the static-IP proxy**, alongside the card-payment gap fixes and decisions in `docs/readiness/20261113-card-payments-gaps.md` (31 verified gaps: 12 to fix before card payments go live, PG-01 to PG-11 and PG-31, and 9 to decide). Read it before §47.15 and §47.17, not only before §47.18: the app-side fixes (PG-03, PG-04, PG-05, PG-20 if the owner chooses the code fix, and PG-31) must be in the §47.17 build. Then the live steps. Each remains its own §5 approval.
 
-**Live state, read and done 2026-11-13 (§47.2-47.5 complete; the row state below is superseded by the read above):**
+**Live state, read and done 2026-11-13 (§47.2-47.5 complete; the row state below is superseded by the read above, and its card-payment and refund-job lines by the 2026-11-24 read):**
 - the three payment migrations are APPLIED, each named by version: `20260824100000` (live `20261113171942`), `20261003120000` (`20261113172609`) and `20261004120000` (`20261113174500`). The two `tap_begin_*` functions are gone;
 - all seven payment functions are DEPLOYED from the default branch at `b17ee00` and read back byte-identical: `payment-initiate` v9, `-verify` v5, `-webhook` v7, `-return` v9, `-refund` v4, `-test-config` v6 (its AAL2 gate is now live), `-admin-test-return` v1;
 - the retired `tap-admin-test-return` is DELETED (§47.6): the owner deleted it in the dashboard, because the connector has no delete; it answered 404 at 18:01:54 UTC while `payment-admin-test-return` answered 200;
-- **card payments are still OFF**: the payment row is provider `moyasar`, mode `test`, **disabled**: its last write is 2026-11-11 10:55:54 UTC, before the 2026-11-11 read below that called it enabled, so that read was wrong on this point; and `online_payment_enabled` is false. An empty probe of `payment-refund` therefore answers 200 "disabled" before any secret check. `payment-webhook` answers an ordinary event 200 "ignored" for the same reason, **but checks a `webhook_verification` event's token even while the row is disabled, on purpose** (Moyasar sends that code once and never retries), so its 401 path is live now;
-- `refund_trigger_secret` is present on the payment row (checked by length, 64); the `payment-refund-worker` cron job is still inactive;
+- **card payments were still OFF at that read**: the payment row is provider `moyasar`, mode `test`, **disabled**: its last write is 2026-11-11 10:55:54 UTC, before the 2026-11-11 read below that called it enabled, so that read was wrong on this point; and `online_payment_enabled` is false. An empty probe of `payment-refund` therefore answers 200 "disabled" before any secret check. `payment-webhook` answers an ordinary event 200 "ignored" for the same reason, **but checks a `webhook_verification` event's token even while the row is disabled, on purpose** (Moyasar sends that code once and never retries), so its 401 path is live now;
+- `refund_trigger_secret` is present on the payment row (checked by length, 64); the `payment-refund-worker` cron job was still inactive (at that read);
 - `payment_records` holds only the 9 `tap` history rows; `order_refunds` is empty.
 
-**Live state, read-only, 2026-11-11 (superseded above, kept as the before-picture):**
+**Live state, read-only, 2026-11-11 (superseded above, kept as the before-picture; "online payment is OFF" below is the state of that day):**
 - online payment is OFF since 10:56 UTC. An admin had switched it on that morning with Moyasar in TEST mode, which customers could not have completed; the owner switched it off;
 - the payment row is provider `moyasar`, enabled, mode `test` (**wrong when written**: the row's last write, which disabled it, is 10:55:54 UTC, and this read came after 10:56);
 - every deployed payment function is still a July Tap-era bundle;
@@ -148,7 +157,7 @@ Push is an **active production customer channel**. Both gates are open:
 - **The two mail functions were deployed the same day (2026-11-24), each on its own approval, from the default branch at `73f5392`: `operations-alert-dispatch` v9 (11:36 UTC; `verify_jwt` false; ezbr `becbd97b…fe8e`) and `email-test-config` v10 (`verify_jwt` true; ezbr `ebd2c3a5…fe67`).** Both read back with all 8 bundle files byte-identical, and no POST was sent to either, only an `OPTIONS` probe. They carry the sender guard (`_shared/smtpTarget.ts`: a line break, control character or angle bracket in the From name, From email or reply-to is refused as `smtp_sender_invalid`). This is not the push channel and changes no customer message; it is recorded here because it closes the same §64 list. `external_dispatch_enabled` is untouched and still the owner's to flip. The first deploy of `operations-alert-dispatch` was refused at bundling over a backslash-u escape (fixed in #540); never retype one in a file that is sent to the deploy tool (`docs/OWNER_ACTIONS.md` §64 step 4).
 - signing out no longer silences a device. Sign-out used to deactivate the `push_devices` row while the first-run permission flag is device-scoped and never re-raised, so push stayed dead after signing back in. The row is now left alone and the token is re-claimed at the next sign-in (`usePushDeviceSync`). Account **deletion** still deactivates;
 - a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code;
-- **`push-dispatch` sends Expo's access token once `EXPO_ACCESS_TOKEN` is set** (added 2026-11-12, checklist S03#1; not yet deployed or set). Until the secret exists the request is byte-for-byte unchanged. Expo's Enhanced Security must be enabled only AFTER a deploy that sends the token and a confirmed real order push, or every customer push stops (`docs/OWNER_ACTIONS.md` §52);
+- **`push-dispatch` sends Expo's access token once `EXPO_ACCESS_TOKEN` is set** (added 2026-11-12, checklist S03#1, merged in #459). **The code half is deployed:** `expoHeaders.ts` and its call at `push-dispatch/index.ts` are in the 8-file bundle this document records as deployed from `0dd6a20` (v10, 2026-11-18) and again as v15 from `2c5f7bb`, so the function has been able to send the token since v10. **Whether the secret is set is NOT recorded anywhere in this repository and cannot be read from it:** the handler never reports it, a blank token sends exactly the old request, and `docs/readiness/20261111-app-hardening-checklist.md` S03 says its presence was not read; `docs/OWNER_ACTIONS.md` §52 records no step 2 to 5 as done. Do not state it as set, or as not set, without a names-only read of the function's secrets. Until the secret exists the request is byte-for-byte unchanged. Expo's Enhanced Security must be enabled only AFTER a deploy that sends the token and a confirmed real order push, or every customer push stops (`docs/OWNER_ACTIONS.md` §52);
 - **admin actions on `push-dispatch` require AAL2, not just the admin role** — fixed and **deployed to Production 2026-08-23** (v4). `verify_jwt = false` for this function, so its caller check is the only gate on the path; it previously tested `profile?.role === 'admin'` alone, which let an administrator who had not completed TOTP send an unrecallable broadcast. It now asks Postgres for `is_admin()` through the caller's own client — role **and** AAL2, the same predicate every RLS policy uses. The service-role path used by `order-intake` and `lazywait-webhook` is unchanged. An admin without an enrolled TOTP factor cannot send a broadcast or a manual order-status push; automated order pushes are unaffected. The redeploy was the owner-approved §5 action that made this live.
 
 Do not treat the old "push is dormant" framing anywhere as current. Sending an actual broadcast, widening the audience model, adding credentials, or turning the master flag back off all remain owner-approval actions under §5.
@@ -192,7 +201,9 @@ The superseded statement, kept for its history: since 2026-11-10 the language wa
 
 Production schema changes go only through the owner-approved migration workflow documented in `docs/MIGRATIONS.md`.
 
-Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files **as of that date**.
+**Where the current position is:** the paragraph headed "**Current position 2026-11-24 (later)**" further down this section is the newest one, and each "Current position" or "Superseded" paragraph supersedes the ones after it in the text. Re-derive the repository figure with `ls supabase/migrations/*.sql | wc -l` and read the live figure from `supabase_migrations.schema_migrations`; do not quote a count from this section without its date.
+
+Historical snapshot, **superseded** (2026-08-22): 97 repository migration files / 103 live migration-history rows, latest live version `20260822123940` (`order_item_notes`), with zero unapplied repository files **as of that date only**.
 
 **Superseded 2026-08-25 — the two variant migrations are now APPLIED.** On the owner's explicit approval, `20260824120000_product_variants` and `20260824130000_place_order_variants` were applied to Production, in that dependency order, via MCP `apply_migration` — one call per file, each followed by read-only verification. Live history moved **103 → 105**. Full record: `docs/MIGRATIONS.md` §32, ledger rows 59–60.
 
@@ -378,9 +389,9 @@ rolled-back probe left nothing behind, and burned no order number
 Reconciled **by name** against the default branch at `902cd1a`: 158 applied,
 2 superseded (rows 8-9), 0 unapplied. Money-path pair unchanged (`12b6816d…` /
 `22e2d429…`). Refund back-off, the 10-attempt cap and R18 `REFUND_STUCK` are
-live in the database; no deploy is implied, and **automated refunds are still
-OFF** — the `payment-refund-worker` cron job is inactive, and turning it on is
-its own §5 action. With nothing outstanding the rule does not relax: the next
+live in the database; no deploy is implied, and **automated refunds were still
+OFF at that apply** — the `payment-refund-worker` cron job was inactive; it was
+switched on 2026-11-19 04:47 UTC (see the 2026-11-19 amendment above). With nothing outstanding the rule does not relax: the next
 file written is the next referent. **Name the target by version.** Detail:
 `docs/MIGRATIONS.md` §68; steps: `docs/OWNER_ACTIONS.md` §58.
 
@@ -427,9 +438,9 @@ ledger row 118) and `20261013120000_payment_refund_visibility` (11:49:24, live
 (12:03:44 UTC), after the second apply was verified, as `docs/OWNER_ACTIONS.md`
 §55 requires. Reconciled **by name** against the default branch at `8aac448`:
 156 applied, 2 superseded (rows 8-9), 0 unapplied. Money-path pair unchanged
-(`12b6816d…` / `22e2d429…`). **Automated refunds are still OFF:** the
-`payment-refund-worker` cron job is inactive, and turning it on is its own §5
-action. With nothing outstanding the rule does not relax: the next file written
+(`12b6816d…` / `22e2d429…`). **Automated refunds were still OFF at that apply:** the
+`payment-refund-worker` cron job was inactive; it was switched on 2026-11-19
+04:47 UTC. With nothing outstanding the rule does not relax: the next file written
 is the next referent. **Name the target by version.** Detail:
 `docs/MIGRATIONS.md` §65 and §66.
 
@@ -443,7 +454,7 @@ ledger row 114), `20261003120000_moyasar_only_payments` (17:26:09,
 and read back byte-identical, `20261004120000_drop_tap_payment_rpcs` (17:45:00,
 `20261113174500`, row 116). Reconciled **by name**: 153 applied, 2 superseded
 (rows 8-9), 0 unapplied. Money-path pair unchanged. **This changes no customer
-behaviour yet:** the payment row is disabled and online payment is off.
+behaviour yet:** on 2026-11-13 the payment row was disabled and online payment was off (read live 2026-11-24: `online_payment_enabled` is true).
 
 **APPLIED 2026-11-14 — `20261012120000_cancelled_orders_guard`** (17:27:37 UTC,
 live `20261114172737`, ledger row 117, on the owner's approval naming it by

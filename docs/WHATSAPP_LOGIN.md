@@ -106,7 +106,7 @@ Key guarantees:
 - `src/features/auth/PhoneOtpLogin.tsx` — WhatsApp login screen (Saudi field).
 - `src/features/auth/LoginScreen.tsx` — WhatsApp only; shows an "unavailable"
   card when the feature flag is off (no email path to fall back to).
-- `src/features/profile/VerifyPhoneWhatsApp.tsx` — same Saudi field.
+- ~~`src/features/profile/VerifyPhoneWhatsApp.tsx`~~ — same Saudi field. **Deleted 2026-09-02** (see "The customer-facing surface is gone" below); no file by this name exists.
 - `src/i18n/strings.ts` — WhatsApp/Saudi login strings (en/ar); the email-auth
   strings are gone.
 
@@ -539,7 +539,7 @@ does not cover (§10).
   UPDATE grant on `profiles.role` (only `full_name`, `email`, `phone_number`), and
   neither trigger sets role. Verified against the live DB.
 - Existing profiles are never overwritten (`on conflict (id) do nothing`).
-- **Since `20261005120000` (written 2026-11-12, NOT applied), a verified phone is
+- **Since `20261005120000` (written 2026-11-12, applied 2026-11-13 16:43 UTC, ledger row 111), a verified phone is
   what lets an account order.** `place_customer_order` refuses a caller whose
   profile is not `phone_verified`, with `P0001` and *"Please verify your phone
   number before placing an order."* The app shows it as *"To place an order,

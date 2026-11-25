@@ -9,7 +9,7 @@
 - Vault secrets:
   - `account_deletion_project_url`
   - `account_deletion_process_secret`
-- Scheduler SQL: `supabase/migrations/20260716170000_account_deletion_scheduler.sql`
+- Scheduler SQL: three migrations, in this order: `supabase/migrations/20260716160000_account_deletion_scheduler_auth.sql` (verifies the scheduler secret against Vault), `20260716170000_account_deletion_scheduler_runtime.sql` (enables `pg_net` and `pg_cron`), and `20260716180000_account_deletion_scheduler_job.sql` (defines `invoke_account_deletion_processor()`; the Production cron job itself is environment configuration created separately). A file named `20260716170000_account_deletion_scheduler.sql` does not exist; this line named it until 2026-11-24.
 
 The cron job stores only `select public.invoke_account_deletion_processor();`. The helper reads the endpoint and dedicated credential from Supabase Vault at runtime and invokes `account-delete-scheduler` through `pg_net`. The gateway verifies the Vault credential through the restricted database RPC and forwards the request to `account-delete-process` using its built-in service-role credential. The service-role key is never placed in Vault, Git, cron.job, or the request sent by Postgres.
 
