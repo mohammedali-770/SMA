@@ -12,6 +12,7 @@ import { Branch, DeliveryZone } from '../../types';
 import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
 import { circleRing, geometryToPolygons, loadGoogleMaps, locateMe, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
 import type { GeoJSONGeometry } from '../../lib/geo';
+import { deliveryZoneConfirmMessage } from '../../lib/confirmCopy';
 import { MapSearchBox } from '../MapSearchBox';
 import { AdminModal } from './view/shared/AdminModal';
 
@@ -259,6 +260,8 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
     setError(null);
     const geometry = collectGeometry();
     if (!geometry) { setError(isRTL ? 'ارسم منطقة التوصيل أولاً.' : 'Draw a delivery area first.'); return; }
+    // The area is live the moment this returns (audit F-WAD-02-002).
+    if (!window.confirm(deliveryZoneConfirmMessage('save', isRTL ? branch.nameAr : branch.nameEn, isRTL, !!existingZone))) return;
     setBusy(true);
     try {
       await onSave(branch.id, geometry);
@@ -272,6 +275,11 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
   const handleClear = async () => {
     setError(null);
+    // Ask BEFORE touching the drawing, so declining leaves the map as it was.
+    // Clearing a saved area makes place_order refuse every delivery order for
+    // the branch (audit F-WAD-02-002). With nothing saved it only wipes the
+    // drawing, which is not a live change and needs no prompt.
+    if (existingZone && !window.confirm(deliveryZoneConfirmMessage('clear', isRTL ? branch.nameAr : branch.nameEn, isRTL))) return;
     clearDrawing();
     if (!existingZone) return; // nothing saved to remove
     setBusy(true);

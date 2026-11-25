@@ -14,6 +14,7 @@ import { LoyaltyCampaignsPanel } from './LoyaltyCampaignsPanel';
 import { LoyaltyLedgerSection } from './LoyaltyLedgerSection';
 import { loyaltyCampaigns, type LoyaltyCampaign } from '../../lib/loyaltyCampaignsApi';
 import { loyaltyRulesSummary } from '../../lib/loyaltyRulesSummary';
+import { loyaltyExpiryEnableConfirmMessage, loyaltyProgrammeConfirmMessage } from '../../lib/confirmCopy';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -607,7 +608,12 @@ export const SettingsPanel: React.FC = () => {
                           <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'تفعيل نظام المكافآت المالي' : 'Active Rewards Campaign'}</label>
                           <select
                             value={loyaltySettings.isEnabled ? 'true' : 'false'}
-                            onChange={(e) => updateLoyaltySettings({ isEnabled: e.target.value === 'true' })}
+                            onChange={(e) => {
+                              // Gates earning AND redeeming for every customer, and the
+                              // write is queued the moment the select moves (F-WAD-08-005).
+                              const next = e.target.value === 'true';
+                              if (window.confirm(loyaltyProgrammeConfirmMessage(next, isRTL))) updateLoyaltySettings({ isEnabled: next });
+                            }}
                             className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
                             disabled={isAccountant}
                           >
@@ -688,7 +694,13 @@ export const SettingsPanel: React.FC = () => {
                             </label>
                             <select
                               value={loyaltySettings.expiryEnabled ? 'true' : 'false'}
-                              onChange={(e) => updateLoyaltySettings({ expiryEnabled: e.target.value === 'true' })}
+                              onChange={(e) => {
+                                // Only ARMING asks: it schedules the reset that zeroes every
+                                // balance. Switching it off is the safe direction.
+                                const next = e.target.value === 'true';
+                                if (next && !window.confirm(loyaltyExpiryEnableConfirmMessage(isRTL))) return;
+                                updateLoyaltySettings({ expiryEnabled: next });
+                              }}
                               className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
                               disabled={isAccountant}
                             >

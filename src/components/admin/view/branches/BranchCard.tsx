@@ -22,6 +22,7 @@ import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
 import { useDsFontClass } from '../../../../design-system/ui/useDsLang';
 import { BRANCH_CLOSE_LABEL } from '../../../../lib/branchDeletion';
+import { branchServiceOffConfirmMessage, type BranchServiceOff } from '../../../../lib/confirmCopy';
 import type { Branch, Product } from '../../../../types';
 import { ADMIN_LOCALES } from '../../adminLocales';
 import { ToggleChip } from '../shared/ToggleChip';
@@ -71,6 +72,18 @@ export function BranchCard({
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const family = useDsFontClass();
+
+  /**
+   * Taking the branch or a channel away from customers is live the moment it is
+   * pressed, so it asks first, naming the branch and the effect (audit
+   * F-WAV-02-003). Only the OFF direction asks: reopening is the safe move, and
+   * the card's own rule that a typed fee applies at once stays as it was.
+   */
+  const confirmOff = (kind: BranchServiceOff, patch: Partial<Branch>) => {
+    if (window.confirm(branchServiceOffConfirmMessage(kind, isRTL ? branch.nameAr : branch.nameEn, isRTL))) {
+      onUpdate(patch);
+    }
+  };
 
   const deliveryEnabled = branch.deliveryEnabled ?? true;
   const pickupEnabled = branch.pickupEnabled ?? true;
@@ -175,7 +188,9 @@ export function BranchCard({
           <ToggleChip
             on={deliveryEnabled}
             disabled={isAccountant}
-            onToggle={() => onUpdate({ deliveryEnabled: !deliveryEnabled })}
+            onToggle={() => (deliveryEnabled
+              ? confirmOff('delivery', { deliveryEnabled: false })
+              : onUpdate({ deliveryEnabled: true }))}
             label={isRTL ? 'التوصيل' : 'Delivery'}
             onLabel={isRTL ? 'مفعّل' : 'ON'}
             offLabel={isRTL ? 'معطّل' : 'OFF'}
@@ -183,7 +198,9 @@ export function BranchCard({
           <ToggleChip
             on={pickupEnabled}
             disabled={isAccountant}
-            onToggle={() => onUpdate({ pickupEnabled: !pickupEnabled })}
+            onToggle={() => (pickupEnabled
+              ? confirmOff('pickup', { pickupEnabled: false })
+              : onUpdate({ pickupEnabled: true }))}
             label={isRTL ? 'الاستلام' : 'Pickup'}
             onLabel={isRTL ? 'مفعّل' : 'ON'}
             offLabel={isRTL ? 'معطّل' : 'OFF'}
@@ -192,7 +209,9 @@ export function BranchCard({
 
         <button
           type="button"
-          onClick={() => onUpdate({ deliveryTemporarilyClosed: !deliveryClosed })}
+          onClick={() => (deliveryClosed
+            ? onUpdate({ deliveryTemporarilyClosed: false })
+            : confirmOff('pause', { deliveryTemporarilyClosed: true }))}
           disabled={isAccountant}
           aria-pressed={deliveryClosed}
           className={`${ROW_BTN} ${deliveryClosed ? 'border-warn-line bg-warn-tint' : 'border-con-line bg-con-surface-2'}`}
@@ -274,7 +293,9 @@ export function BranchCard({
 
         <button
           type="button"
-          onClick={() => onUpdate({ isActive: !branch.isActive })}
+          onClick={() => (branch.isActive
+            ? confirmOff('close', { isActive: false })
+            : onUpdate({ isActive: true }))}
           disabled={isAccountant}
           className={`${ROW_BTN} ${branch.isActive ? 'border-danger-line bg-danger-tint hover:brightness-95' : 'border-mint-line bg-mint-tint hover:brightness-95'}`}
         >

@@ -80,19 +80,19 @@ export const IntegrationsPanel: React.FC = () => {
 
           {group === 'messaging' && (
             <>
-              <IntegrationCard providerType="whatsapp" row={rowFor('whatsapp')} disabled={isAccountant} onSave={saveIntegration} />
+              <IntegrationCard providerType="whatsapp" row={rowFor('whatsapp')} disabled={isAccountant} onSave={saveIntegration} isRTL={isRTL} />
               <WhatsAppOtpPanel disabled={isAccountant} />
               <IntegrationCard providerType="sms" row={rowFor('sms')} disabled={isAccountant} onSave={saveIntegration} />
               <IntegrationCard providerType="email" row={rowFor('email')} disabled={isAccountant} onSave={saveIntegration} />
               <EmailServerPanel disabled={isAccountant} />
-              <IntegrationCard providerType="push" row={rowFor('push')} disabled={isAccountant} onSave={saveIntegration} />
+              <IntegrationCard providerType="push" row={rowFor('push')} disabled={isAccountant} onSave={saveIntegration} isRTL={isRTL} />
               <PushToolsPanel disabled={isAccountant} />
             </>
           )}
 
           {group === 'pos' && (
             <>
-              <IntegrationCard providerType="lazywait" row={rowFor('lazywait')} disabled={isAccountant} onSave={saveIntegration} />
+              <IntegrationCard providerType="lazywait" row={rowFor('lazywait')} disabled={isAccountant} onSave={saveIntegration} isRTL={isRTL} />
               <LazywaitPanel disabled={isAccountant} />
             </>
           )}

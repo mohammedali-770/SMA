@@ -163,25 +163,76 @@ describe('unpaid-order confirmation', () => {
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'preparing');
   });
 
-  it('does NOT prompt for a paid order', async () => {
+  it('a PAID order is confirmed too, and the prompt says the customer is notified (F-WAD-04-004)', async () => {
     const confirm = confirmWith(true);
     mockContext({ orders: [makeOrder({ paymentStatus: 'paid' })] });
     render(<LiveOrdersPanel />);
     await openReceipt();
 
     fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'preparing' } });
-    expect(confirm).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const text = String(confirm.mock.calls[0][0]);
+    expect(text).toMatch(/Move this order to “Preparing”/);
+    expect(text).toMatch(/customer is sent an order-update notification/);
+    // Not the unsettled-payment warning: this order is paid.
+    expect(text).not.toMatch(/Online payment/);
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'preparing');
   });
 
-  it('does NOT prompt for a CASH order — it is legitimately unpaid until collected', async () => {
+  it('DECLINING the prompt on a paid order leaves it untouched', async () => {
+    confirmWith(false);
+    mockContext({ orders: [makeOrder({ paymentStatus: 'paid' })] });
+    render(<LiveOrdersPanel />);
+    await openReceipt();
+
+    fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'preparing' } });
+    expect(updateOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('Delivered is confirmed as final (F-WAV-03-001)', async () => {
+    const confirm = confirmWith(true);
+    mockContext({ orders: [makeOrder({ paymentStatus: 'paid', status: 'ready' })] });
+    render(<LiveOrdersPanel />);
+    await openReceipt();
+
+    fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'delivered' } });
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0][0])).toMatch(/“Delivered” is final/);
+    expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'delivered');
+  });
+
+  it('the prompt follows the console language', async () => {
+    const confirm = confirmWith(true);
+    mockContext({ orders: [makeOrder({ paymentStatus: 'paid' })], adminLang: 'ar' });
+    render(<LiveOrdersPanel />);
+    fireEvent.click((await screen.findAllByText('عرض الفاتورة'))[0]);
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByLabelText('حالة الطلب'), { target: { value: 'preparing' } });
+    expect(String(confirm.mock.calls[0][0])).toMatch(/نقل الطلب إلى «قيد التحضير»/);
+  });
+
+  it('an unpaid online order gets ONE prompt carrying both warnings, not two in a row', async () => {
+    const confirm = confirmWith(true);
+    render(<LiveOrdersPanel />);
+    await openReceipt();
+
+    fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'preparing' } });
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const text = String(confirm.mock.calls[0][0]);
+    expect(text).toMatch(/Online payment for this order has not completed/);
+    expect(text).toMatch(/order-update notification/);
+  });
+
+  it('a CASH order is confirmed for the customer message but not told its payment is incomplete', async () => {
     const confirm = confirmWith(true);
     mockContext({ orders: [makeOrder({ paymentMethod: 'cash' })] });
     render(<LiveOrdersPanel />);
     await openReceipt();
 
     fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'preparing' } });
-    expect(confirm).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0][0])).not.toMatch(/Online payment/);
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'preparing');
   });
 

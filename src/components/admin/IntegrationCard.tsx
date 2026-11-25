@@ -8,6 +8,7 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import { DbIntegrationSetting, IntegrationConflictError, UpsertIntegrationInput } from '../../lib/api';
+import { integrationSwitchConfirmMessage } from '../../lib/confirmCopy';
 import { initialProviderName } from '../../lib/integrationProvider';
 
 const SELECT = [
@@ -150,9 +151,14 @@ interface Props {
   row?: DbIntegrationSetting;
   disabled: boolean; // accountant / non-admin
   onSave: (input: UpsertIntegrationInput) => Promise<DbIntegrationSetting>;
+  /**
+   * Language of the switch confirmations below only. The card's own labels are
+   * English, as they have always been; the payment card is passed nothing.
+   */
+  isRTL?: boolean;
 }
 
-export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, onSave }) => {
+export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, onSave, isRTL = false }) => {
   const spec = PROVIDER_SPECS[providerType];
   // The stored row this form was last built from. Its `updated_at` is sent with
   // every save so a form that has fallen behind the row is refused (F-X09-004),
@@ -180,6 +186,20 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
         );
         if (!okLive) return;
       }
+    }
+    // The POS feed, customer push and WhatsApp sign-in are live systems, and a
+    // save that flips their switch takes effect at once (audit F-WAD-03-002).
+    // The payment card is not touched by this: it keeps its own LIVE prompt
+    // above and nothing else (CLAUDE.md section 6).
+    if (providerType === 'lazywait' || providerType === 'push' || providerType === 'whatsapp') {
+      const wasEnabled = base?.enabled ?? false;
+      const wasLogin = ((base?.public_config as Record<string, unknown> | undefined)?.whatsapp_login_enabled) === true;
+      const nowLogin = pub.whatsapp_login_enabled === true;
+      const change = {
+        enabled: enabled !== wasEnabled ? (enabled ? 'on' : 'off') as 'on' | 'off' : null,
+        login: providerType === 'whatsapp' && nowLogin !== wasLogin ? (nowLogin ? 'on' : 'off') as 'on' | 'off' : null,
+      };
+      if ((change.enabled || change.login) && !window.confirm(integrationSwitchConfirmMessage(providerType, change, isRTL))) return;
     }
     setSaving(true);
     setMsg(null);

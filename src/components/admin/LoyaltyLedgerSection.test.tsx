@@ -24,6 +24,7 @@ vi.mock('../../lib/api', async (importOriginal) => {
   };
 });
 
+import { MAX_LOYALTY_ADJUSTMENT } from '../../lib/confirmCopy';
 import { LoyaltyLedgerSection } from './LoyaltyLedgerSection';
 
 const customer = (i: number, points = i) => ({
@@ -53,7 +54,10 @@ beforeEach(() => {
   ledgerPage.mockReset();
   adjustPoints.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('LoyaltyLedgerSection', () => {
   it('shows the server totals, not a sum of the rows it happens to hold', async () => {
@@ -126,6 +130,7 @@ describe('LoyaltyLedgerSection', () => {
   });
 
   it('adjusts by the delta from the row it shows, then re-reads the totals', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     stats.mockResolvedValueOnce({ member_count: 1, points_total: 120 });
     stats.mockResolvedValueOnce({ member_count: 1, points_total: 170 });
     ledgerPage.mockResolvedValue({ rows: [customer(1, 120)], total: 1 });
@@ -148,5 +153,77 @@ describe('LoyaltyLedgerSection', () => {
     await waitFor(() =>
       expect(screen.getByTestId('loyalty-ledger-empty').textContent).toBe('لا يوجد عملاء بعد.'),
     );
+  });
+});
+
+describe('point adjustments are confirmed and bounded (F-WAD-04-001)', () => {
+  const load = async (points = 120) => {
+    stats.mockResolvedValue({ member_count: 1, points_total: points });
+    ledgerPage.mockResolvedValue({ rows: [customer(1, points)], total: 1 });
+    adjustPoints.mockResolvedValue(customer(1, points + 50));
+    renderSection();
+    await waitFor(() => expect(screen.getByText('Customer 1')).toBeTruthy());
+  };
+  const typeAmount = (n: string) => fireEvent.change(screen.getByPlaceholderText('Pts'), { target: { value: n } });
+
+  it('a quick button asks first, stating the delta, the new balance and its riyal worth', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await load();
+    fireEvent.click(screen.getByText('+100'));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    const text = String(confirm.mock.calls[0][0]);
+    expect(text).toMatch(/Add 100 points to Customer 1\?/);
+    expect(text).toMatch(/Balance: 120 → 220\./);
+    expect(text).toMatch(/0\.1 SAR per point they are worth up to SAR 10\.00/);
+    // Declining writes nothing.
+    expect(adjustPoints).not.toHaveBeenCalled();
+  });
+
+  it('accepting applies the delta', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await load();
+    fireEvent.click(screen.getByText('+50'));
+    await waitFor(() => expect(adjustPoints).toHaveBeenCalledWith('c1', 50));
+  });
+
+  it('a typed Deduct asks first and says the points are removed', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await load();
+    typeAmount('30');
+    fireEvent.click(screen.getByRole('button', { name: '-Deduct' }));
+    expect(String(confirm.mock.calls[0][0])).toMatch(/Remove 30 points from Customer 1\?/);
+    expect(adjustPoints).not.toHaveBeenCalled();
+    // A declined entry stays in the box rather than being thrown away.
+    expect((screen.getByPlaceholderText('Pts') as HTMLInputElement).value).toBe('30');
+  });
+
+  it('refuses a typed amount over the ceiling WITHOUT a prompt and without a write', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await load();
+    typeAmount(String(MAX_LOYALTY_ADJUSTMENT + 1));
+    fireEvent.click(screen.getByRole('button', { name: '+Add' }));
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(adjustPoints).not.toHaveBeenCalled();
+    expect(await screen.findByText(/limited to 1,000 points at a time/)).toBeTruthy();
+  });
+
+  it('the ceiling itself is allowed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await load();
+    typeAmount(String(MAX_LOYALTY_ADJUSTMENT));
+    fireEvent.click(screen.getByRole('button', { name: '+Add' }));
+    await waitFor(() => expect(adjustPoints).toHaveBeenCalledWith('c1', MAX_LOYALTY_ADJUSTMENT));
+  });
+
+  it('asks in Arabic when the console is Arabic', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    stats.mockResolvedValue({ member_count: 1, points_total: 120 });
+    ledgerPage.mockResolvedValue({ rows: [customer(1, 120)], total: 1 });
+    renderSection({ adminLang: 'ar' });
+    await waitFor(() => expect(screen.getByText('Customer 1')).toBeTruthy());
+    fireEvent.click(screen.getByText('+100'));
+    expect(String(confirm.mock.calls[0][0])).toMatch(/إضافة 100 نقطة إلى Customer 1؟/);
   });
 });

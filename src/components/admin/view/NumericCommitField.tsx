@@ -61,7 +61,6 @@ export const NumericCommitField: React.FC<Props> = ({
       updateDraft(next);
       settled.current = next;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- updateDraft only touches a ref and a state setter
   }, [value]);
 
   const commit = () => {
