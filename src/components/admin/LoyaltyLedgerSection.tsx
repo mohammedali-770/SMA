@@ -30,6 +30,9 @@ import {
   loyaltyTiles,
   type LoyaltyStatsError,
 } from '../../lib/loyaltyStats';
+import {
+  MAX_LOYALTY_ADJUSTMENT, loyaltyAdjustConfirmMessage, loyaltyAdjustLimitMessage,
+} from '../../lib/confirmCopy';
 import { mapProfile } from '../../lib/mappers';
 import type { UserProfile } from '../../types';
 
@@ -118,11 +121,27 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
     };
   }, [loadStats, loadPage]);
 
-  /** Move one customer to `target` points through the admin-only RPC, then re-read the totals. */
-  const setPoints = (customer: UserProfile, target: number) => {
+  /**
+   * Move one customer to `target` points through the admin-only RPC, then
+   * re-read the totals. Returns whether the adjustment was started, so a typed
+   * amount is only cleared when it was actually applied.
+   *
+   * Every path comes through here, so this is where the two guards live (audit
+   * F-WAD-04-001): a ceiling per adjustment, which the RPC does not have, and a
+   * confirmation stating the delta, the new balance and its riyal worth.
+   */
+  const setPoints = (customer: UserProfile, target: number): boolean => {
     const current = customer.loyaltyPoints || 0;
     const delta = Math.round(target - current);
-    if (delta === 0 || busyId) return;
+    if (delta === 0 || busyId) return false;
+    if (Math.abs(delta) > MAX_LOYALTY_ADJUSTMENT) {
+      setAdjustError(loyaltyAdjustLimitMessage(isRTL));
+      return false;
+    }
+    if (!window.confirm(loyaltyAdjustConfirmMessage(
+      { customerName: customer.fullName, current, target: current + delta, ratePerPoint: rate },
+      isRTL,
+    ))) return false;
     setBusyId(customer.id);
     setAdjustError(null);
     void (async () => {
@@ -138,6 +157,7 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
         if (alive.current) setBusyId(null);
       }
     })();
+    return true;
   };
 
   const tiles = loyaltyTiles(stats, discountPerPoint);
@@ -255,15 +275,13 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
 
             const handleAddPoints = () => {
               const val = parseInt(adjustmentValue) || 0;
-              if (val > 0) {
-                setPoints(customer, currentPoints + val);
+              if (val > 0 && setPoints(customer, currentPoints + val)) {
                 setPointAdjustments((prev) => ({ ...prev, [customer.id]: '' }));
               }
             };
             const handleDeductPoints = () => {
               const val = parseInt(adjustmentValue) || 0;
-              if (val > 0) {
-                setPoints(customer, currentPoints - val);
+              if (val > 0 && setPoints(customer, currentPoints - val)) {
                 setPointAdjustments((prev) => ({ ...prev, [customer.id]: '' }));
               }
             };

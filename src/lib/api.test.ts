@@ -69,9 +69,10 @@ describe('admin.deleteBranch', () => {
     await expect(admin.deleteBranch('b1')).resolves.toBeUndefined();
     expect(del).toHaveBeenCalledTimes(1);
     expect(deleteEq).toHaveBeenCalledWith('id', 'b1');
-    // Silent-cascade awareness: the pre-check consults ONLY the FK-blocking
-    // tables; the cascade tables are intentionally not counted (they go away
-    // with the branch) so pristine deletes are never falsely blocked.
+    // The pre-check consults ONLY the two FK-blocking tables. The fourteen
+    // cascade tables (BRANCH_CASCADE_TABLES) are deliberately not counted, so a
+    // branch holding only those stays deletable; the console prompt is what
+    // tells the admin they go with it.
     expect(tablesQueried).toContain('orders');
     expect(tablesQueried).toContain('checkout_sessions');
     expect(tablesQueried).not.toContain('branch_product_availability');

@@ -1121,10 +1121,12 @@ export const admin = {
   /**
    * Admin-only branch delete with a friendly dependent-data guard.
    *
-   * The delete CASCADES the branch's delivery zone + product-availability rows,
-   * but `orders.branch_id` (ON DELETE RESTRICT) and `checkout_sessions.branch_id`
-   * (NO ACTION) HARD-BLOCK deleting any branch that owns order history — that FK,
-   * plus the admin-only RLS, is the real guarantee. This wrapper only adds UX:
+   * The delete CASCADES to fourteen tables (`BRANCH_CASCADE_TABLES`, in
+   * `branchDeletion.ts`), three of them append-only audit tables, and leaves any
+   * Vault secret behind; only `orders.branch_id` (ON DELETE RESTRICT) and
+   * `checkout_sessions.branch_id` (NO ACTION) HARD-BLOCK deleting a branch that
+   * owns order history — that FK, plus the admin-only RLS, is the real guarantee.
+   * This wrapper only adds UX:
    *   1. Advisory pre-check: count orders + checkout sessions and, if any exist,
    *      block locally with a typed {@link BranchHasDependenciesError} (carrying
    *      the counts) instead of firing a delete the FK would reject anyway.

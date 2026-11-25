@@ -5,6 +5,7 @@ import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
+import { orderStatusChangeConfirmMessage } from '../../lib/confirmCopy';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { Order, OrderStatus } from '../../types';
 import { ADMIN_LOCALES } from './adminLocales';
@@ -98,18 +99,21 @@ export const LiveOrdersPanel: React.FC = () => {
 
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
     if (isAccountant) return; // accountant is view-only (also enforced by RLS server-side)
-    const target = orders.find((o) => o.id === orderId) ?? activeReceiptOrder ?? undefined;
-    // Cash orders are legitimately unpaid until collected — keep the banner but
-    // don't block. Only confirm when an ONLINE payment (or unknown method) has
-    // not completed before advancing past "Received".
-    const st = target ? paymentDisplayState(target) : 'paid';
-    if (target && needsPaymentConfirm(st, status)) {
-      const proceed = window.confirm(
-        isRTL
-          ? 'لم يكتمل الدفع الإلكتروني لهذا الطلب بعد. هل أنت متأكد من تغيير حالته؟'
-          : 'Online payment for this order has not completed. Are you sure you want to advance its status?'
-      );
-      if (!proceed) return;
+    // Cancelling is confirmed by the receipt's own Cancel action, with its own
+    // text about refunds, so it is not asked a second time here.
+    //
+    // Every other move is confirmed: each one sends the customer a push (live,
+    // CLAUDE.md section 7) and the transition table is forward-only, so a wrong
+    // choice on the select cannot be taken back (audit F-WAD-04-004,
+    // F-WAV-03-001). Cash orders are legitimately unpaid until collected, so
+    // they are NOT told their payment is incomplete; only an ONLINE payment (or
+    // unknown method) that has not completed adds that warning, in the same
+    // prompt rather than a second one.
+    if (status !== 'cancelled') {
+      const target = orders.find((o) => o.id === orderId) ?? activeReceiptOrder ?? undefined;
+      const st = target ? paymentDisplayState(target) : 'paid';
+      const unpaidOnline = !!target && needsPaymentConfirm(st, status);
+      if (!window.confirm(orderStatusChangeConfirmMessage(status, isRTL, { unpaidOnline }))) return;
     }
     updateOrderStatus(orderId, status);
     if (activeReceiptOrder?.id === orderId) {

@@ -359,3 +359,35 @@ describe('when the aggregate cannot be read', () => {
     expect(await screen.findByText(/migration that has not been applied/i)).toBeTruthy();
   });
 });
+
+describe('the tiles say what they compute (F-WAD-09-001, F-WAD-09-002, F-WAV-05-001)', () => {
+  // `admin_order_stats` has no date predicate and sums every status for the
+  // average and the branch bars. Changing that is a migration; until then the
+  // labels must not claim a period or a basis the figures do not have.
+  it('the revenue tile does not claim to be today’s', async () => {
+    await renderPanel();
+    expect(screen.queryByText(/Today/i)).toBeNull();
+    expect(screen.getByText('Delivered Revenue (All Time)')).toBeTruthy();
+  });
+
+  it('the Arabic tiles claim no day either', async () => {
+    mockContext({ adminLang: 'ar' });
+    await renderPanel();
+    expect(screen.queryByText(/اليومية|اليوم/)).toBeNull();
+    expect(screen.getByText('إيرادات الطلبات المسلَّمة (منذ البداية)')).toBeTruthy();
+  });
+
+  it('the average ticket says it counts cancelled and unpaid orders too', async () => {
+    await renderPanel();
+    expect(screen.getByText(/cancelled and unpaid orders included/i)).toBeTruthy();
+  });
+
+  it('the branch sales card says its figures count cancelled and unpaid orders, in both languages', async () => {
+    await renderPanel();
+    expect(screen.getByText(/Counts every order, cancelled and unpaid ones included/)).toBeTruthy();
+    cleanup();
+    mockContext({ adminLang: 'ar' });
+    await renderPanel();
+    expect(screen.getByText(/تشمل كل الطلبات بما فيها الملغاة وغير المدفوعة/)).toBeTruthy();
+  });
+});

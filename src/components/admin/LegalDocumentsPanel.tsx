@@ -10,6 +10,7 @@ import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import { legalDocs as legalApi, DbLegalDocument } from '../../lib/api';
+import { legalDeactivateConfirmMessage, legalSaveConfirmMessage } from '../../lib/confirmCopy';
 import { activeLegalDocs, legalDocOrder } from '../../lib/legal';
 
 /**
@@ -92,7 +93,20 @@ export const LegalDocumentsPanel: React.FC = () => {
 
   const save = async () => {
     if (!selected || !draft) return;
-    setSaving(true); setError(null); setSavedOk(false);
+    setSavedOk(false);
+    // Refuse blank text outright, active or not: the columns are `not null` but
+    // an empty string satisfies that, and an emptied policy is live at once with
+    // no earlier copy to restore (audit F-WAD-04-002).
+    if (![draft.title_en, draft.title_ar, draft.content_en, draft.content_ar].every((v) => v.trim() !== '')) {
+      setError(isRTL ? 'العنوان والمحتوى مطلوبان بالعربية والإنجليزية.' : 'The title and content are required in both languages.');
+      return;
+    }
+    const title = (isRTL ? selected.title_ar : selected.title_en) || selected.document_type;
+    // Switching a policy OFF removes it from the app, so it is a decision of its
+    // own, asked before (and apart from) the one every save gets.
+    if (selected.is_active && !draft.is_active && !window.confirm(legalDeactivateConfirmMessage(title, isRTL))) return;
+    if (!window.confirm(legalSaveConfirmMessage(title, isRTL))) return;
+    setSaving(true); setError(null);
     try {
       await legalApi.update(selected.id, {
         title_en: draft.title_en, title_ar: draft.title_ar,

@@ -177,3 +177,89 @@ describe('timed delivery pause', () => {
     expect(btns.every((b) => b.disabled)).toBe(true);
   });
 });
+
+describe('taking a branch or a channel away from customers is confirmed (F-WAV-02-003)', () => {
+  const confirmWith = (answer: boolean) => vi.spyOn(window, 'confirm').mockReturnValue(answer);
+
+  it('Close Branch names the branch and the customer effect, and a decline writes nothing', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({ updateBranchSettings });
+    const confirm = confirmWith(false);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Close Branch Maintenance/i })[0]);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0][0])).toMatch(/Close “Branch A”\? Customers can no longer order/);
+    expect(updateBranchSettings).not.toHaveBeenCalled();
+  });
+
+  it('Close Branch writes isActive=false once the admin accepts', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({ updateBranchSettings });
+    confirmWith(true);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Close Branch Maintenance/i })[0]);
+    expect(updateBranchSettings).toHaveBeenCalledWith('a', { isActive: false });
+  });
+
+  it('turning Delivery OFF and Pickup OFF are each confirmed and each declinable', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({ updateBranchSettings });
+    const confirm = confirmWith(false);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Delivery/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Pickup/ })[0]);
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(String(confirm.mock.calls[0][0])).toMatch(/Turn delivery OFF for “Branch A”/);
+    expect(String(confirm.mock.calls[1][0])).toMatch(/Turn pickup OFF for “Branch A”/);
+    expect(updateBranchSettings).not.toHaveBeenCalled();
+  });
+
+  it('accepting writes the toggle', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({ updateBranchSettings });
+    confirmWith(true);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Pickup/ })[0]);
+    expect(updateBranchSettings).toHaveBeenCalledWith('a', { pickupEnabled: false });
+  });
+
+  it('turning a channel back ON, and reopening a closed branch, are not prompted', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({
+      updateBranchSettings,
+      branches: [{ ...branchA, isActive: false, pickupEnabled: false }, branchB],
+    });
+    const confirm = confirmWith(false);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^Pickup/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /Open Branch Operational/i })[0]);
+    expect(confirm).not.toHaveBeenCalled();
+    expect(updateBranchSettings).toHaveBeenCalledWith('a', { pickupEnabled: true });
+    expect(updateBranchSettings).toHaveBeenCalledWith('a', { isActive: true });
+  });
+
+  it('the untimed delivery pause is confirmed and says it does not resume by itself', () => {
+    const updateBranchSettings = vi.fn();
+    mockContext({ updateBranchSettings });
+    const confirm = confirmWith(false);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Pause delivery \(no timer\)/i })[0]);
+    expect(String(confirm.mock.calls[0][0])).toMatch(/does not resume by itself/);
+    expect(updateBranchSettings).not.toHaveBeenCalled();
+  });
+
+  it('the prompt is in Arabic when the console is', () => {
+    mockContext({ adminLang: 'ar' });
+    const confirm = confirmWith(false);
+    render(<BranchPoliciesPanel />);
+
+    fireEvent.click(screen.getAllByRole('button', { name: /إغلاق الفرع للصيانة/ })[0]);
+    expect(String(confirm.mock.calls[0][0])).toMatch(/إغلاق فرع «فرع أ»/);
+  });
+});

@@ -91,6 +91,37 @@ describe('NumericCommitField', () => {
     expect(input.value).toBe('25');
   });
 
+  it('Escape on a FOCUSED field abandons the edit without writing (F-WAV-01-001)', () => {
+    // The test above never focuses the input, and jsdom fires no blur on an
+    // element that never had focus, so it passed while the defect was live: the
+    // programmatic blur inside Escape ran the committed closure, whose draft was
+    // still the typed value, and wrote it.
+    const { onCommit, input } = setup();
+    input.focus();
+    fireEvent.change(input, { target: { value: '999' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(input.value).toBe('25');
+  });
+
+  it('Enter on a FOCUSED field commits a non-canonical spelling exactly once (F-WAV-01-002)', () => {
+    const { onCommit, input } = setup();
+    input.focus();
+    fireEvent.change(input, { target: { value: '30.50' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(30.5);
+  });
+
+  it('a normal focused edit still commits on blur after the fix', () => {
+    const { onCommit, input } = setup();
+    input.focus();
+    fireEvent.change(input, { target: { value: '30' } });
+    input.blur();
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith(30);
+  });
+
   it('commits an explicit zero, because free delivery is a real setting', () => {
     const { onCommit, input } = setup();
     fireEvent.change(input, { target: { value: '0' } });

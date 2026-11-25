@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**323 TypeScript test files declaring 4636 test blocks, plus 106 SQL suites.**
+**327 TypeScript test files declaring 4709 test blocks, plus 106 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -292,27 +292,30 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-148 files, 1943 declared test blocks.
+152 files, 2016 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `src/App.test.tsx` | 22 | console shell — unknown identity (#415 P1) |
 | `src/components/admin/AccountDeletionReviewPanel.test.tsx` | 9 | AccountDeletionReviewPanel |
 | `src/components/admin/BranchDataImportPanel.test.tsx` | 12 | BranchDataImportPanel — working hours |
-| `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
-| `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
-| `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
+| `src/components/admin/branchDeletion.test.ts` | 7 | branchDeletionConfirmation |
+| `src/components/admin/BranchEditModal.test.tsx` | 13 | BranchEditModal — working hours |
+| `src/components/admin/BranchPoliciesPanel.test.tsx` | 18 | BranchPoliciesPanel — branch deletion |
 | `src/components/admin/CompMembersPanel.test.tsx` | 13 | CompMembersPanel |
-| `src/components/admin/CouponsPanel.test.tsx` | 24 | the standing answer to |
+| `src/components/admin/CouponsPanel.test.tsx` | 27 | the standing answer to |
+| `src/components/admin/DeliveryZoneModal.test.tsx` | 7 | Clear delivery area |
 | `src/components/admin/IntegrationCard.payment.test.tsx` | 7 | payment card |
+| `src/components/admin/IntegrationCard.switches.test.tsx` | 11 | Lazywait POS |
 | `src/components/admin/IntegrationCard.test.ts` | 9 | Lazywait base_url placeholder |
 | `src/components/admin/IntegrationsPanel.test.tsx` | 1 | Integrations → Payments |
 | `src/components/admin/LazywaitPanel.test.tsx` | 7 | LazywaitPanel |
+| `src/components/admin/LegalDocumentsPanel.save.test.tsx` | 7 | Save |
 | `src/components/admin/LegalDocumentsPanel.test.tsx` | 1 | requires-acceptance control |
-| `src/components/admin/LiveOrdersPanel.test.tsx` | 21 | permission gate |
+| `src/components/admin/LiveOrdersPanel.test.tsx` | 25 | permission gate |
 | `src/components/admin/LoyaltyCampaignsPanel.test.tsx` | 2 | LoyaltyCampaignsPanel — the dates in the list |
 | `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
-| `src/components/admin/LoyaltyLedgerSection.test.tsx` | 7 | LoyaltyLedgerSection |
+| `src/components/admin/LoyaltyLedgerSection.test.tsx` | 13 | LoyaltyLedgerSection |
 | `src/components/admin/MenuManagementPanel.image.test.tsx` | 4 | old product image cleanup |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 21 | product price validation — the money contract |
 | `src/components/admin/MoyasarPaymentPanel.test.tsx` | 14 | against the payment-test-config deployed before Moyasar |
@@ -322,10 +325,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/PushToolsPanel.test.tsx` | 10 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
 | `src/components/admin/SettingsPanel.brand.test.tsx` | 5 | Settings -> Brand tab |
+| `src/components/admin/SettingsPanel.loyalty.test.tsx` | 7 | the rewards programme switch |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 5 | StaffAccessPanel |
 | `src/components/admin/staffAccounts.test.ts` | 10 | validateNewOpsAccount |
-| `src/components/admin/StatsPanel.test.tsx` | 24 | the ranked chart |
+| `src/components/admin/StatsPanel.test.tsx` | 28 | the ranked chart |
 | `src/components/admin/view/adminNav.test.ts` | 23 | grouping is total |
 | `src/components/admin/view/AdminSidebar.test.tsx` | 29 | structure |
 | `src/components/admin/view/adminTime.test.ts` | 4 | exactTime |
@@ -338,7 +342,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/integrity/integrityRuleParity.test.ts` | 6 | admin rule filter ↔ watchdog rule set |
 | `src/components/admin/view/integrity/IntegritySummary.test.tsx` | 3 | IntegritySummary stranded orders |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
-| `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
+| `src/components/admin/view/NumericCommitField.test.tsx` | 14 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 4 | OrderReceiptModal — customer note |
 | `src/components/admin/view/orders/OrdersRequiringVerificationCard.test.tsx` | 4 | OrdersRequiringVerificationCard |
 | `src/components/admin/view/orders/ordersView.test.ts` | 28 | needsPaymentConfirm — the money contract |
@@ -386,14 +390,14 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/auditGate.test.ts` | 26 | audit gate — the real 2026-11-18 web shape |
 | `src/lib/authSignOut.test.ts` | 2 | auth.signOut |
 | `src/lib/banners.test.ts` | 17 | selectActiveBanners |
-| `src/lib/branchDeletion.test.ts` | 8 | branchHasBlockingDependencies |
+| `src/lib/branchDeletion.test.ts` | 9 | branchHasBlockingDependencies |
 | `src/lib/branchImport.test.ts` | 47 | splitRows |
 | `src/lib/bundleForbiddenLibs.test.ts` | 12 | forbidden-library signatures — positive control |
 | `src/lib/campaigns.test.ts` | 12 | selectLiveCampaigns (mirrors the public RLS) |
 | `src/lib/confirmCopy.test.ts` | 5 | cancel-order confirmation |
 | `src/lib/consoleAudience.test.ts` | 12 | console audience |
 | `src/lib/consoleLoadApi.test.ts` | 15 | orders.lazywaitMonitor |
-| `src/lib/couponsApi.test.ts` | 41 | normaliseCode — the difference between a working code and a dead one |
+| `src/lib/couponsApi.test.ts` | 43 | normaliseCode — the difference between a working code and a dead one |
 | `src/lib/documentLang.test.ts` | 6 | applyDocumentLang |
 | `src/lib/e2eServeDist.test.ts` | 3 | e2e/serve-dist.mjs source patterns |
 | `src/lib/geo.test.ts` | 11 | pointInPolygon (UX pre-check) |

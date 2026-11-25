@@ -40,30 +40,48 @@ export const NumericCommitField: React.FC<Props> = ({
    * to prevent. Comparing against the resolved draft makes commit idempotent.
    */
   const settled = useRef<string>(numericFieldDisplay(value));
+  /**
+   * The live draft, kept beside the state. A programmatic `blur()` fires its
+   * handler synchronously, inside the same event, so the handler that runs is
+   * the one from the render that is still committed, and its `draft` is the
+   * text typed BEFORE the Escape or Enter that triggered it. Reading the draft
+   * from here means every path agrees on what is currently in the box.
+   */
+  const draftRef = useRef<string>(numericFieldDisplay(value));
+  const updateDraft = (next: string) => {
+    draftRef.current = next;
+    setDraft(next);
+  };
 
   // Re-sync from the server value, but never while the operator is typing —
   // a realtime refresh mid-edit would otherwise wipe the entry.
   useEffect(() => {
     if (!focused.current) {
       const next = numericFieldDisplay(value);
-      setDraft(next);
+      updateDraft(next);
       settled.current = next;
     }
   }, [value]);
 
   const commit = () => {
-    if (draft === settled.current) return; // nothing new to resolve
-    const result = parseNumericCommit(draft, { min, max, allowEmpty, integer });
+    const typed = draftRef.current;
+    if (typed === settled.current) return; // nothing new to resolve
+    const result = parseNumericCommit(typed, { min, max, allowEmpty, integer });
     if (!result.ok) {
       // Reject: restore what is actually stored. Crucially NOT a write of 0.
       const restored = numericFieldDisplay(value);
-      setDraft(restored);
+      updateDraft(restored);
       settled.current = restored;
       setRejected(true);
       return;
     }
     setRejected(false);
-    settled.current = numericFieldDisplay(result.value);
+    // Show, and remember, the canonical spelling. `30.50` is settled as `30.5`,
+    // so the blur that follows Enter finds nothing new instead of committing
+    // the same value a second time.
+    const canonical = numericFieldDisplay(result.value);
+    settled.current = canonical;
+    updateDraft(canonical);
     const current = value === undefined ? null : value;
     if (result.value !== current) onCommit(result.value);
   };
@@ -81,13 +99,15 @@ export const NumericCommitField: React.FC<Props> = ({
           aria-label={label}
           aria-invalid={rejected || undefined}
           onFocus={() => { focused.current = true; }}
-          onChange={(e) => { setDraft(e.target.value); if (rejected) setRejected(false); }}
+          onChange={(e) => { updateDraft(e.target.value); if (rejected) setRejected(false); }}
           onBlur={() => { focused.current = false; commit(); }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); commit(); (e.target as HTMLInputElement).blur(); }
             if (e.key === 'Escape') {
+              // Abandon BEFORE the blur below: commit() reads the draft ref, so
+              // restoring it here is what makes the blur a no-op.
               const restored = numericFieldDisplay(value);
-              setDraft(restored);
+              updateDraft(restored);
               settled.current = restored;
               setRejected(false);
               (e.target as HTMLInputElement).blur();

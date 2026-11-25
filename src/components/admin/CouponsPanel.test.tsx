@@ -258,6 +258,39 @@ describe('an existing code can be re-bounded — the thing the screen is for', (
   });
 });
 
+describe('the Bounds editor and a FIXED code (F-WLB-03-001)', () => {
+  const cap = () => screen.getByLabelText('Discount cap', { selector: '#cb-cap-c1' }) as HTMLInputElement;
+
+  it('disables the discount cap for a fixed code, as the create form does', async () => {
+    api.list.mockResolvedValue([coupon({ type: 'fixed', value: 50 })]);
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    fireEvent.click(screen.getByRole('button', { name: /^Bounds$/i }));
+    await screen.findByLabelText('Expires', { selector: '#cb-end-c1' });
+    expect(cap().disabled).toBe(true);
+  });
+
+  it('leaves it editable for a percentage code', async () => {
+    api.list.mockResolvedValue([coupon()]);
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    fireEvent.click(screen.getByRole('button', { name: /^Bounds$/i }));
+    await screen.findByLabelText('Expires', { selector: '#cb-end-c1' });
+    expect(cap().disabled).toBe(false);
+  });
+
+  it('tells the API the type, so the cap is dropped on save', async () => {
+    api.list.mockResolvedValue([coupon({ type: 'fixed', value: 50, usage_count: 1 })]);
+    renderPanel();
+    await screen.findByText('WELCOME10');
+    fireEvent.click(screen.getByRole('button', { name: /^Bounds$/i }));
+    await screen.findByLabelText('Expires', { selector: '#cb-end-c1' });
+    fireEvent.click(screen.getByRole('button', { name: /Save bounds/i }));
+    await waitFor(() => expect(api.updateBounds).toHaveBeenCalledTimes(1));
+    expect(api.updateBounds.mock.calls[0][3]).toBe('fixed');
+  });
+});
+
 describe('dates are Riyadh dates, and an untouched expiry stays where it is', () => {
   // PostgREST returns timestamptz in the database session zone — UTC in
   // Production — so this is what the panel receives for an expiry set to the

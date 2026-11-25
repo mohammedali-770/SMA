@@ -43,7 +43,10 @@ would have rendered those two codes perfectly and told the operator nothing:
   use, because that is when the decision is actually made.
 - **An existing code can be RE-BOUNDED**, which is the action the screen exists
   for. Expiry, usage limit, minimum spend and discount cap are editable on any
-  row; `code`, `type` and `value` are not — `guard_used_coupon_identity` raises
+  row, except that a FIXED code takes no cap (the field is disabled and
+  `updateBounds` writes `null`: `validate_coupon` applies the cap to both types,
+  so a fixed 50 with a cap of 10 would pay 10; fixed 2026-11-25, audit
+  F-WLB-03-001); `code`, `type` and `value` are not — `guard_used_coupon_identity` raises
   23503 on a code change for a referenced coupon, and re-pricing a live code is
   a different decision from bounding it. Without this the screen could not fix
   the very situation it was built for: a redeemed unbounded code can never be

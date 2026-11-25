@@ -673,7 +673,10 @@ export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
                                 onChange={(e) =>
                                   setBounds((b) => ({ ...b, maxDiscountAmount: e.target.value }))
                                 }
-                                disabled={busy}
+                                // A cap on a FIXED code would replace its value
+                                // (validate_coupon applies it to both types), so
+                                // the create form already refuses it; so does this.
+                                disabled={busy || c.type === 'fixed'}
                               />
                             </div>
                           </div>
@@ -686,7 +689,7 @@ export function CouponsPanel({ lang }: { lang: 'en' | 'ar' }) {
                                 // Expires field left as loaded is written back
                                 // exactly rather than re-parsed (couponsApi's
                                 // `boundsEndsAt`).
-                                await couponsApi.updateBounds(c.id, bounds, c.ends_at);
+                                await couponsApi.updateBounds(c.id, bounds, c.ends_at, c.type);
                                 setEditing(null);
                               })
                             }

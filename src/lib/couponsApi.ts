@@ -368,14 +368,25 @@ export const couponsApi = {
    * the operator was still left with the direct database write the panel is
    * supposed to replace. Review caught that on #358.
    *
+   * `type` is the code's type: a FIXED code is always written with no cap.
+   *
    * `storedEndsAt` is the `ends_at` the editor was opened with. When the
    * Expires field still shows it, that instant is written back unchanged —
    * see `boundsEndsAt`. A caller that omits it gets the plain conversion.
    */
-  async updateBounds(id: string, bounds: CouponBounds, storedEndsAt: string | null = null): Promise<void> {
+  async updateBounds(
+    id: string,
+    bounds: CouponBounds,
+    storedEndsAt: string | null = null,
+    type?: Coupon['type'],
+  ): Promise<void> {
     const patch = {
       min_order_amount: optionalNumber(bounds.minOrderAmount) ?? 0,
-      max_discount_amount: optionalNumber(bounds.maxDiscountAmount),
+      // Never for a FIXED code, for the reason `create` gives: validate_coupon
+      // applies the cap to both types, so a fixed 50 with a cap of 10 pays 10.
+      // `type` is optional only so older callers keep compiling; the panel
+      // always passes it (audit F-WLB-03-001).
+      max_discount_amount: type === 'fixed' ? null : optionalNumber(bounds.maxDiscountAmount),
       usage_limit: optionalNumber(bounds.usageLimit),
       ends_at: boundsEndsAt(bounds.endsAt, storedEndsAt),
     };

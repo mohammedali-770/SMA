@@ -138,6 +138,9 @@ export function BranchSalesSection({
         <div className="min-w-0">
           <Text variant="heading" as="h3">{c.branchSales}</Text>
           <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">{c.ranked}</Text>
+          {/* `admin_order_stats` sums every status per branch. Fixing that is a
+              migration; until then the card says what the figure is. */}
+          <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">{c.salesBasis}</Text>
         </div>
         <StatusPill label={lang === 'ar' ? 'تحديث تلقائي' : 'Realtime Sync'} tone="info" />
       </div>
