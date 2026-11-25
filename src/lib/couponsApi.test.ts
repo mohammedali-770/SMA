@@ -264,6 +264,30 @@ describe('a FIXED coupon never carries a discount cap', () => {
   });
 });
 
+describe('updateBounds never writes a discount cap on a FIXED code (F-WLB-03-001)', () => {
+  const patchFor = async (type: 'fixed' | 'percentage' | undefined) => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    const { supabase } = await import('./supabase');
+    (supabase.from as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ update });
+    await couponsApi.updateBounds(
+      'c1',
+      { minOrderAmount: '', maxDiscountAmount: '10', usageLimit: '', endsAt: '' },
+      null,
+      type,
+    );
+    return update.mock.calls[0][0];
+  };
+
+  it('drops the cap for a fixed code, as create does: validate_coupon would pay the cap instead of the value', async () => {
+    expect(await patchFor('fixed')).toMatchObject({ max_discount_amount: null });
+  });
+
+  it('keeps the cap for a percentage code', async () => {
+    expect(await patchFor('percentage')).toMatchObject({ max_discount_amount: 10 });
+  });
+});
+
 describe('updateBounds changes what a code is bounded by, never what it is', () => {
   it('writes only the four bound columns', async () => {
     const eq = vi.fn().mockResolvedValue({ error: null });
