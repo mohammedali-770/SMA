@@ -34,6 +34,15 @@ import { OPS_STRINGS, OpsLang, OpsStringKey, opsT } from './opsStrings';
  */
 const KEY = 'sm-ops-lang-v2';
 
+/**
+ * Fired on `window` after somebody CHOOSES a language, so the console shell
+ * (header, loaders, error panels — mounted outside the ops console) can follow
+ * a toggle made inside it. Storage alone cannot do that: the `storage` event
+ * fires only in OTHER tabs, and private mode has no storage at all, hence the
+ * language travels in the event as well.
+ */
+export const OPS_LANG_EVENT = 'sm-ops-lang-change';
+
 function readStored(fallback: OpsLang): OpsLang {
   try {
     const v = window.localStorage.getItem(KEY);
@@ -68,6 +77,7 @@ export function useOpsLang(fallback: OpsLang = 'ar'): OpsLangValue {
     applyDocumentLang(lang);
     if (!chosen.current) return;
     try { window.localStorage.setItem(KEY, lang); } catch { /* private mode */ }
+    window.dispatchEvent(new CustomEvent<OpsLang>(OPS_LANG_EVENT, { detail: lang }));
   }, [lang]);
 
   const toggle = useCallback(() => {
@@ -79,6 +89,50 @@ export function useOpsLang(fallback: OpsLang = 'ar'): OpsLangValue {
   return useMemo(
     () => ({ lang, isRTL: lang === 'ar', dir: lang === 'ar' ? 'rtl' : 'ltr', t, toggle }),
     [lang, t, toggle],
+  );
+}
+
+export interface OpsLangFollower {
+  lang: OpsLang;
+  isRTL: boolean;
+  dir: 'rtl' | 'ltr';
+  t: (key: OpsStringKey) => string;
+}
+
+/**
+ * Read-only view of the operations language, for the console shell.
+ *
+ * It deliberately does NOT call `applyDocumentLang` and never writes storage:
+ * the surface that owns the language (the ops console, the sign-in screen, the
+ * access notices) already does both, and a second writer mounted ABOVE the admin
+ * dashboard would run its effect after the dashboard's and put the document
+ * back on the wrong language. `fallback` is read on every render, so it may
+ * change with the audience without remounting anything.
+ */
+export function useOpsLangFollower(fallback: OpsLang): OpsLangFollower {
+  const [chosen, setChosen] = useState<OpsLang | null>(null);
+
+  useEffect(() => {
+    const onChange = (e: Event) => {
+      const next = (e as CustomEvent<OpsLang>).detail;
+      if (next === 'en' || next === 'ar') setChosen(next);
+    };
+    window.addEventListener(OPS_LANG_EVENT, onChange);
+    return () => window.removeEventListener(OPS_LANG_EVENT, onChange);
+  }, []);
+
+  const stored = readStored(fallback);
+  // A choice made in this page wins over storage (which may be unavailable);
+  // before any choice, the stored value, then the audience's fallback.
+  const lang: OpsLang = chosen ?? stored;
+  return useMemo(
+    () => ({
+      lang,
+      isRTL: lang === 'ar',
+      dir: lang === 'ar' ? 'rtl' : 'ltr',
+      t: (key: OpsStringKey) => opsT(lang, key),
+    }),
+    [lang],
   );
 }
 

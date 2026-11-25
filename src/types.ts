@@ -258,19 +258,11 @@ export interface Banner {
 }
 
 export interface BrandSettings {
-  logoUrl: string;
   primaryColor: string;
   secondaryColor: string;
   vatPercentage: number;
-  vatIncluded: boolean;
-  supportPhone: string;
-  whatsappNumber: string;
   instagram: string;
   twitter: string;
-  privacyPolicyEn: string;
-  privacyPolicyAr: string;
-  termsEn: string;
-  termsAr: string;
 }
 
 // (Removed ProductBranchAvailability, LazywaitSettings, SmsSettings,

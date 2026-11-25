@@ -18,6 +18,11 @@
   --color-sky: #60A5FA;
   --color-warn: #FBBF24;
   --color-danger-ds: #FF8B99;
+  /* On the dark tints the hues already clear AA (mint 8.84, sky 6.07, danger
+     7.33:1), so the inks are the hues; darkening them would FAIL on dark. */
+  --color-mint-ink: #4ADE80;
+  --color-sky-ink: #60A5FA;
+  --color-danger-ink: #FF8B99;
   --color-amber-ink: #FBBF24;
 
   --color-warn-tint: #302611;

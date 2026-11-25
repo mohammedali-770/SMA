@@ -59,7 +59,7 @@ export const DatabasePlayground: React.FC = () => {
               RAW JSON
             </button>
           </div>
-          <span className="text-[10px] bg-mint-tint border border-mint-line text-mint font-extrabold px-2.5 py-1 rounded-lg">
+          <span className="text-[10px] bg-mint-tint border border-mint-line text-mint-ink font-extrabold px-2.5 py-1 rounded-lg">
             ● SYSTEM ACTIVE
           </span>
         </div>
@@ -181,7 +181,7 @@ export const DatabasePlayground: React.FC = () => {
                             <td className="px-3 py-2.5">{row.phone}</td>
                             <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.deliveryFee} /></td>
                             <td className="px-3 py-2.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${row.isActive ? 'bg-mint-tint text-mint' : 'bg-danger-tint text-danger-ds'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${row.isActive ? 'bg-mint-tint text-mint-ink' : 'bg-danger-tint text-danger-ink'}`}>
                                 {row.isActive ? 'TRUE' : 'FALSE'}
                               </span>
                             </td>
@@ -210,7 +210,7 @@ export const DatabasePlayground: React.FC = () => {
                             <td className="px-3 py-2.5 font-bold text-white">{row.customerName}</td>
                             <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.total} /></td>
                             <td className="px-3 py-2.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${row.status === 'delivered' ? 'bg-mint-tint text-mint' : 'bg-info-tint text-sky'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${row.status === 'delivered' ? 'bg-mint-tint text-mint-ink' : 'bg-info-tint text-sky-ink'}`}>
                                 {row.status}
                               </span>
                             </td>

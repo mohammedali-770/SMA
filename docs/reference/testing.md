@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**321 TypeScript test files declaring 4611 test blocks, plus 106 SQL suites.**
+**323 TypeScript test files declaring 4636 test blocks, plus 106 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -292,11 +292,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-146 files, 1918 declared test blocks.
+148 files, 1943 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
-| `src/App.test.tsx` | 12 | console shell — unknown identity (#415 P1) |
+| `src/App.test.tsx` | 22 | console shell — unknown identity (#415 P1) |
 | `src/components/admin/AccountDeletionReviewPanel.test.tsx` | 9 | AccountDeletionReviewPanel |
 | `src/components/admin/BranchDataImportPanel.test.tsx` | 12 | BranchDataImportPanel — working hours |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
@@ -321,6 +321,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 7 | OperationsHealthPanel — push failure metrics |
 | `src/components/admin/PushToolsPanel.test.tsx` | 10 | PushToolsPanel device counts |
 | `src/components/admin/ReportsPanel.test.tsx` | 19 | CSV export — the machine contract |
+| `src/components/admin/SettingsPanel.brand.test.tsx` | 5 | Settings -> Brand tab |
 | `src/components/admin/SettingsPanel.payments.test.tsx` | 8 | the Online Payment caption |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 5 | StaffAccessPanel |
 | `src/components/admin/staffAccounts.test.ts` | 10 | validateNewOpsAccount |
@@ -358,7 +359,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/ops/opsRefreshQueue.test.ts` | 5 | makeRefreshQueue |
 | `src/components/ops/opsStrings.test.ts` | 4 | ops console copy |
 | `src/components/ops/RequestsWaitingCard.test.tsx` | 7 | RequestsWaitingCard |
-| `src/components/ops/useOpsLang.test.ts` | 7 | useOpsLang |
+| `src/components/ops/useOpsLang.test.ts` | 11 | useOpsLang |
 | `src/components/Price.contract.test.tsx` | 13 | digits render mono |
 | `src/components/Price.test.tsx` | 6 | Price (web) |
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
@@ -375,6 +376,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/design-system/ui/consolePrimitives.test.ts` | 6 | admin console primitives |
 | `src/design-system/ui/Field.test.tsx` | 9 | Field (web) — accessibility |
 | `src/design-system/ui/FieldAccessibility.test.tsx` | 12 | required indicator is excluded from the accessible name |
+| `src/design-system/ui/statusInkWiring.test.ts` | 5 | Text tones resolve to the inks |
 | `src/design-system/ui/typographyLanguage.test.tsx` | 10 | console typography follows the active language |
 | `src/legal/legalPage.test.ts` | 26 | slugForType |
 | `src/legal/prerender.test.ts` | 17 | escapeHtml — the whole reason this module can use string concatenation |
@@ -405,7 +407,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/legal.test.ts` | 6 | legal document registry |
 | `src/lib/loyaltyRulesSummary.test.ts` | 14 | loyaltyRulesSummary |
 | `src/lib/loyaltyStats.test.ts` | 8 | loyaltyTiles |
-| `src/lib/mappers.test.ts` | 31 | catalog mappers |
+| `src/lib/mappers.test.ts` | 32 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/mirrorParity.test.ts` | 4 | cross-app lib mirrors stay identical |

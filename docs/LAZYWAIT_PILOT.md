@@ -337,7 +337,7 @@ controlled pickup orders, then plan widening) or **halt** (flip Enabled OFF).
 - Local order state, pricing, VAT, coupon, or loyalty is altered by anything
   Lazywait-related (Supabase must remain the source of truth).
 
-**Corrected 2026-11-24: this paragraph described the pilot as written, and most of it is no longer true.** Delivery orders (`order_type` and `delivery_address`) go to the POS since 2026-08-27, add-ons since 2026-08-26, and `price_id` is sent, as are `customer_cell`/`customer_id` per the contract of 2026-08-24; `is_paid` and `order_payments` are sent since 2026-11-19, but only for a card order whose captured payment is verified server-side. The current list of what is still not sent is `LAZYWAIT.md` "Still intentionally NOT sent". As written for the pilot, the list was: delivery, addons/
+**Corrected 2026-11-24: this paragraph described the pilot as written, and most of it is no longer true.** Delivery orders (`order_type` and `delivery_address`) go to the POS since 2026-08-27, add-ons since 2026-08-26, and `price_id` is sent, as are `customer_cell`/`customer_id` per the contract of 2026-08-24; `is_paid` and `order_payments` are sent since 2026-11-19, but only for a card order whose captured payment is verified server-side. The current list of what is still not sent is `LAZYWAIT.md` "Still intentionally NOT sent". The mapping screen's caption was corrected to say the same. As written for the pilot, the list was: delivery, addons/
 modifiers, `price_id`, `customer_id`/`customer_cell`, online-payment update
 (unless a real online payment — Moyasar since 2026-11-11 — is verified server-side, which the pilot excludes).
 

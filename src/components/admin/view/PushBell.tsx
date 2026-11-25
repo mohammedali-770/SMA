@@ -102,7 +102,7 @@ export function PushBell({
       className={[
         shell,
         'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60',
-        on ? 'border-mint-line bg-mint-tint text-mint' : 'border-con-line bg-con-surface-2 text-con-text-2',
+        on ? 'border-mint-line bg-mint-tint text-mint-ink' : 'border-con-line bg-con-surface-2 text-con-text-2',
       ].join(' ')}
     >
       {on ? (

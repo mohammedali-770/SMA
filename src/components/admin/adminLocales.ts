@@ -116,6 +116,13 @@ export const ADMIN_LOCALES = {
     loyalty_ledger_shown: 'Showing',
     loyalty_ledger_of: 'of',
     loyalty_adjust_failed: 'Could not adjust points',
+    brand_scope_title: 'Only the two colours and the VAT rate are saved on this tab',
+    brand_scope_body:
+      'The logo, VAT mode, support numbers and the privacy and terms text used to have fields here that saved nothing, so they were removed. Support numbers are on the Support & Contact tab. The privacy policy and terms are on the Legal Documents screen.',
+    brand_open_support: 'Open Support & Contact',
+    brand_vat_inclusive:
+      'All prices include VAT. The VAT on a receipt is worked out from the total, and that cannot be changed here.',
+    brand_saved_note: 'Colours and the VAT rate are saved automatically.',
   },
   ar: {
     dashboard_title: 'لوحة تحكم سبايسي ميل الإدارية',
@@ -230,6 +237,13 @@ export const ADMIN_LOCALES = {
     loyalty_ledger_shown: 'المعروض',
     loyalty_ledger_of: 'من',
     loyalty_adjust_failed: 'تعذّر تعديل النقاط',
+    brand_scope_title: 'يُحفظ في هذا التبويب اللونان ونسبة الضريبة فقط',
+    brand_scope_body:
+      'كانت هنا حقول للشعار ووضع الضريبة وأرقام الدعم ونص الخصوصية والشروط لا تحفظ أي شيء، فأُزيلت. أرقام الدعم في تبويب «التواصل والدعم»، وسياسة الخصوصية والشروط في شاشة «المستندات القانونية».',
+    brand_open_support: 'فتح التواصل والدعم',
+    brand_vat_inclusive:
+      'جميع الأسعار شاملة الضريبة، وتُحسب ضريبة الإيصال من الإجمالي. لا يمكن تغيير ذلك من هنا.',
+    brand_saved_note: 'يُحفظ اللونان ونسبة الضريبة تلقائياً.',
   }
 };
 

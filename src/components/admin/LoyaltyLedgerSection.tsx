@@ -171,7 +171,7 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
           <p className="text-sm font-black text-con-text mt-1" data-testid="loyalty-tile-members">
             {tiles.members === null ? DASH : formatCount(tiles.members)} {isRTL ? 'عميل' : 'Users'}
           </p>
-          <span className="text-[8px] text-mint font-bold block mt-0.5">● Live Database</span>
+          <span className="text-[8px] text-mint-ink font-bold block mt-0.5">● Live Database</span>
         </div>
 
         <div className="bg-con-surface p-3 rounded-xl border border-con-line">
@@ -202,7 +202,7 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
           <span className="text-[8.5px] font-bold text-con-text-3 uppercase block">
             {isRTL ? 'متوسط قيمة الاسترداد لكل عميل' : 'Average Cashback per User'}
           </span>
-          <p className="text-sm font-black text-mint mt-1" data-testid="loyalty-tile-average">
+          <p className="text-sm font-black text-mint-ink mt-1" data-testid="loyalty-tile-average">
             {tiles.averageValue === null ? DASH : <Price amount={tiles.averageValue} lang={adminLang} />}
           </p>
           <span className="text-[8px] text-con-text-3 block mt-0.5">
@@ -228,7 +228,7 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
         {adjustError && (
           <p
             role="alert"
-            className="text-[9.5px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2"
+            className="text-[9.5px] text-danger-ink font-bold bg-danger-tint border border-danger-line rounded-lg p-2"
           >
             {adjustError}
           </p>
@@ -367,7 +367,7 @@ export const LoyaltyLedgerSection: React.FC<LoyaltyLedgerSectionProps> = ({
         {ledgerError && (
           <p
             role="alert"
-            className="text-[9.5px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2"
+            className="text-[9.5px] text-danger-ink font-bold bg-danger-tint border border-danger-line rounded-lg p-2"
           >
             {t.loyalty_ledger_failed} {ledgerError}
           </p>

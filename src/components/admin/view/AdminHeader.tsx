@@ -74,8 +74,8 @@ export function AdminHeader({
             'ds-motion inline-flex size-11 items-center justify-center rounded-[var(--radius-ds-md)]',
             'border transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2',
             soundMuted
-              ? 'border-danger-line bg-danger-tint text-danger-ds'
-              : 'border-mint-line bg-mint-tint text-mint',
+              ? 'border-danger-line bg-danger-tint text-danger-ink'
+              : 'border-mint-line bg-mint-tint text-mint-ink',
           ].join(' ')}
         >
           {soundMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}

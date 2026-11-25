@@ -305,8 +305,10 @@ export function orderDisplayNumber(
 // Settings (the single app_settings row feeds both brand + loyalty config)
 // ---------------------------------------------------------------------------
 export function mapBrandSettings(s: DbAppSettings): BrandSettings {
-  // Only colour + VAT are modelled server-side; the rest (logo, socials, legal
-  // text, support numbers) have no backend yet, so keep the bundled defaults.
+  // Only colour + VAT are modelled server-side. The logo, VAT mode, support
+  // numbers and legal text had fields on `BrandSettings` with no backend; they
+  // were removed (F-X20-001) rather than left to show bundled placeholders. The
+  // real support settings and legal documents have their own screens.
   return {
     ...INITIAL_BRAND_SETTINGS,
     primaryColor: s.primary_color,

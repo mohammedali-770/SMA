@@ -35,10 +35,10 @@ const TONE: Record<TextTone, string> = {
   secondary: 'text-con-text-2',
   tertiary: 'text-con-text-3',
   ember: 'text-ember',
-  success: 'text-mint',
-  danger: 'text-danger-ds',
+  success: 'text-mint-ink',
+  danger: 'text-danger-ink',
   warning: 'text-amber-ink',
-  info: 'text-sky',
+  info: 'text-sky-ink',
   onEmber: 'text-on-ember',
 };
 

@@ -102,7 +102,7 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           {error !== null && (
-            <p role="alert" className="text-[11px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2">
+            <p role="alert" className="text-[11px] text-danger-ink font-bold bg-danger-tint border border-danger-line rounded-lg p-2">
               {error ? `${t('authFailed')} — ${error}` : t('authFailed')}
             </p>
           )}
