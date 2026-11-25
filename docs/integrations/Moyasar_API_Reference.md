@@ -345,7 +345,7 @@ reach a person; `failed` frees the one-live-refund slot and surfaces the row in
 for the same stated reason.
 
 This answers §7 for this provider. It does **not** authorise re-enabling the
-refund worker, which was still disabled on 2026-11-11. Re-enabling it is an owner
+refund worker, which was disabled on 2026-11-11 (switched on 2026-11-19, read active 2026-11-24). Enabling it was an owner
 step, after `refund_trigger_secret` exists (`docs/PAYMENTS.md` §6).
 
 ---

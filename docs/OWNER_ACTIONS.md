@@ -4318,6 +4318,8 @@ CLAUDE.md §5 approval**, named when it is due. Approval for one step is not
 approval for the next. **None of them had been done on 2026-11-12.** Where a step needs a secret, the value goes into the
 console or the Supabase dashboard, never into a chat.
 
+**Newest read, 2026-11-24 (read-only, about 12:15 UTC): `app_settings.online_payment_enabled` is TRUE, the `payment-refund-worker` cron job is ACTIVE, and 19 online orders have `payment_status` paid.** This supersedes "Online Payment is still off", "card payments are still off" and "the refund job is inactive" in the dated progress notes and the before-picture below, which describe 2026-11-11 to 2026-11-13. Of steps 47.10 to 47.19 only 47.16 carries a DONE mark; **how and when the others were done, if they were, is not recorded in this section**, and the store answers that depended on the switch being off are flagged in §65.
+
 **Progress, 2026-11-13, evening: 47.7-47.9 are DONE, and 47.10 is next.** The
 owner saved the TEST keys and webhook token (Test connection: "Connection OK"),
 registered the TEST webhook and entered its code (the verification event was
@@ -4326,7 +4328,7 @@ recorded at 18:21:57 UTC), and ran the sandbox: an approved card read paid at
 (47.9 now says why). A read-only check at 22:37 UTC found no order, payment
 record or refund changed. **The payment row is enabled, in TEST mode, since
 18:17:02 UTC**, because the sandbox refuses a disabled row, so 47.14 is now a
-check rather than a switch. Online Payment is still off. Evidence: CLAUDE.md §6.
+check rather than a switch. Online Payment was still off at that read (on by 2026-11-22, see the newest read above). Evidence: CLAUDE.md §6.
 
 **Read `readiness/20261113-card-payments-gaps.md` before 47.15 and 47.17, not
 only before 47.18** (moved here from 47.18 on 2026-11-14). It lists 31 verified
@@ -4348,7 +4350,7 @@ row's state): 47.1-47.6 are DONE. The owner approved 47.2-47.5 together,
 each step named, in one multi-select, and 47.6 in a separate answer, then did
 47.6 in the dashboard, because the connector cannot delete a function. 47.7 is
 next.** Evidence: `MIGRATIONS.md` ledger rows 114-116 and CLAUDE.md
-§6. Card payments are still off: the payment row is **disabled** (its last write is
+§6. Card payments were still off at that read: the payment row was **disabled** (its last write is
 2026-11-11 10:55:54 UTC, before the read below that called it enabled, so that
 read was wrong on this point), so 47.14
 must turn it back on, and `refund_trigger_secret` is already present on the row
@@ -4370,7 +4372,7 @@ must turn it back on, and `refund_trigger_secret` is already present on the row
   exist;
 - `payment_records` holds only `tap` rows: 6 failed, 3 initiated and expired,
   0 paid. `order_refunds` is empty;
-- the `payment-refund-worker` cron job is inactive. `refund_trigger_secret` is
+- the `payment-refund-worker` cron job is inactive (on 2026-11-11; switched on 2026-11-19, 47.16). `refund_trigger_secret` is
   not in Vault. **Whether it is in the payment row's `secret_config` is not
   settled here:** `BACKUP_RECOVERY.md` §4.3 lists that key name on the row on
   2026-11-11 (names only), while the Moyasar work's notes say it must be
@@ -5017,7 +5019,7 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
 
 - ~~**A cancelled paid order is NOT refunded automatically.**~~ **DECIDED
   2026-11-19: "do the auto refund". Superseded once
-  `20261018120000_refund_cancelled_paid_orders` is applied (§61).** From the
+  `20261018120000_refund_cancelled_paid_orders` is applied (§61): applied, live `20261119051739`, found by a live read on 2026-11-22.** From the
   apply, the cancellation of a paid card order enrols one automatic refund in
   full (reason `order_cancelled`), and **staff must not also refund a cancelled
   order by hand**: Moyasar's documentation says a refund is made only from a
@@ -5040,9 +5042,10 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   `payment_records` row with `failure_code = 'duplicate_payment'` and the message
   *"Duplicate payment: the order was already paid. Refund this payment."*, plus
   one `integration_sync_logs` row with `error = 'duplicate_payment'`. It is never
-  reported paid. **Nothing alerts on it**: the watchdog's
-  `MULTIPLE_SUCCESSFUL_CAPTURES` rule counts paid rows only. Finding and
-  refunding one is `PAYMENTS.md` §10.
+  reported paid. *Superseded 2026-11-17: since `20261013120000` was applied it
+  raises the critical watchdog incident R15 `DUPLICATE_PAYMENT_RECORDED`; before
+  then nothing alerted, because the watchdog's `MULTIPLE_SUCCESSFUL_CAPTURES`
+  rule counts paid rows only.* Finding and refunding one is `PAYMENTS.md` §10.
   Refunding duplicates automatically is a separate decision.
 - **A refund refused by Moyasar's Allowed IPs is retried forever.** It is
   released, not failed, and re-claimed every run until the configuration is
@@ -5307,6 +5310,15 @@ refuse **every** push from this project, order updates included.
 values through `push_devices_admin_select`, while the console only ever needs
 counts. `20261010120000` adds an `is_admin()`-gated count RPC; the console
 switch and the policy drop follow it, in that order.
+
+**Status, corrected 2026-11-24 (not closed).** Step 3 is effectively done:
+`expoHeaders.ts` and its call are in the 8-file `push-dispatch` bundle that
+CLAUDE.md §7 records as deployed from `0dd6a20` (v10, 2026-11-18) and again from
+`2c5f7bb` (v15, 2026-11-24), so the function can send the token. **Steps 1, 2, 4
+and 5 are recorded nowhere in this repository**, and whether the secret is set
+cannot be read from it (the handler never reports it, and a blank token sends
+exactly the old request). The section stays open until the owner records them
+with dates, or a names-only read of the function's secrets settles step 2.
 
 **Done looks like:** steps 2-5 recorded with dates and the `push-dispatch`
 version, and the readiness record's S03 row closed.
@@ -5713,7 +5725,9 @@ PG-01 marked live in the gaps list.
 **Not decided here, still yours:** who receives refund alerts outside the
 console (PG-10), and turning the refund job on (§47.16).
 
-## 59. Advisor fixes: one RLS policy and 21 covering indexes — one apply
+## 59. Advisor fixes: one RLS policy and 21 covering indexes — one apply — DONE (found applied by a live read 2026-11-22)
+
+**DONE.** `20261017120000_advisor_fixes` is applied (live version `20261118120101`); `MIGRATIONS.md` §69 is marked APPLIED and ledger row 122 is filled in. The apply was not recorded when it happened, so who applied it and how is not recorded; the steps below are kept as the record of the plan, not as open work.
 
 **Opened 2026-11-18.** You asked for Supabase's advisors to be run and anything
 new fixed. Two findings are fixed in `20261017120000_advisor_fixes`:
@@ -5749,7 +5763,7 @@ ungated**. Detail: [`MIGRATIONS.md`](MIGRATIONS.md) §69.
    indexes, the money-path pair, and the performance advisor at 0 for both
    findings.
 
-**Done looks like:** §69 marked APPLIED with ledger row 122 filled in.
+**Done looks like:** §69 marked APPLIED with ledger row 122 filled in. *Met: see the DONE note under the heading.*
 
 **Not decided here, still yours:** leaked-password protection, after the plan
 upgrade (a dashboard setting).
@@ -5853,7 +5867,9 @@ explicit word, and the secret and each deploy are separate approvals):
 and the same attempt from any other account answers `{status:'disabled',
 reason:'test_mode'}` with nothing opened.
 
-## 61. A cancelled paid card order is refunded automatically — one apply
+## 61. A cancelled paid card order is refunded automatically — one apply — DONE (found applied by a live read 2026-11-22)
+
+**DONE.** `20261018120000_refund_cancelled_paid_orders` is applied (live version `20261119051739`); `MIGRATIONS.md` §70 is marked APPLIED, ledger row 123 is filled in, and §47.20's first bullet is struck through and marked decided. The refund job is active (read live 2026-11-24), so **step 3 is in force: staff do not also refund a cancelled order by hand.** The apply was not recorded when it happened. The steps below are the record of the plan.
 
 **Opened 2026-11-19.** Your decision, 2026-11-19: "do the auto refund". A paid
 card order that is cancelled is refunded automatically, in full, by the refund
@@ -5884,7 +5900,7 @@ already refunds any queued refund.
    console.
 
 **Done looks like:** §70 marked APPLIED with ledger row 123 filled in, and
-§47.20's first bullet closed.
+§47.20's first bullet closed. *Met: see the DONE note under the heading.*
 
 **Not decided here, still yours:** the customer's wording. An order with a
 refund in progress reads "we could not send your order because the ordering
@@ -6084,6 +6100,21 @@ late: the customers an outage hurt most still hear that their order failed
 versions recorded here; a pickup order marked delivered pushes «Collected»; a
 broadcast sent while a test account has an open deletion request reports one
 fewer targeted device than the opt-in count.
+
+## 65. Store-form answers that were conditional on card payment being off — re-decide
+
+**Opened 2026-11-24. OWNER DECISION.** Several store answers and listing claims were written as true only while `app_settings.online_payment_enabled` is false. **Read live 2026-11-24 (read-only, about 12:15 UTC) it is `true`, and 19 online orders have `payment_status` paid.** So the condition they depend on now fails. This section flags them; **it does not write the new answers**, because they are yours (and, for Play and App Store, depend on Google's and Apple's definitions on the day).
+
+| Where | Answer or claim that was conditional | Condition |
+| --- | --- | --- |
+| `PLAY_STORE_SUBMISSION.md` §6, §6b, §9 | Data Safety, Financial info → **Payment info: NO**; Purchase history; App content → Financial features | "True only while online payment is off" |
+| `APP_STORE_SUBMISSION.md` privacy labels and its "Card payment through Moyasar" section | Financial Info → **Payment Info: NO**; Purchases → Purchase History ("no payment instrument") | same |
+| `store/LISTING_COPY.md` C-CASH | the listing says payment is **cash**, on pickup or delivery | `online_payment_enabled` is false |
+| `store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md` | the same rows, and the cash-only release-notes variant | same |
+
+What is known: a submitted listing or label that still says cash only, while card orders are being paid, is the mismatch these conditions existed to prevent. What is **not** known from the repository: whether any of these answers has been entered in Play Console or App Store Connect, which build customers are running, whether the live `privacy_policy`, `payment_policy`, `cancellation_refund_policy` and `terms_conditions` have been edited to name Moyasar (§47.15; `RECORD_OF_PROCESSING.md` item 6 still records that the policy did not), and whether the 19 paid orders include test-card payments under the `PAYMENT_ALLOW_TEST_CHECKOUT` exception (CLAUDE.md §6).
+
+**To close:** decide the answers, enter them, and record the date and the console they were entered in here. Entering them is an owner step; engineering writes nothing live.
 
 ## Owner-action closeout rule
 

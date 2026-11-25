@@ -239,8 +239,8 @@ cap writes `failed`, R18 stops detecting the refund, its incident resolves after
 two clean scans, and R14 opens.
 
 **What R18 does not see:** a refund never tried (`attempt_count = 0`). A refund
-waits in that state when the `payment-refund-worker` cron job is off, which it is
-when read on 2026-11-17. The owner chose "at least one attempt"; a never-tried
+waits in that state when the `payment-refund-worker` cron job is off, which it was
+when read on 2026-11-17 (switched on 2026-11-19, read active 2026-11-24, so with the job on a refund is tried within about five minutes and this blind spot is narrow). The owner chose "at least one attempt"; a never-tried
 refund is listed nowhere but the database until the job runs once.
 
 **R18 is the one rule whose severity changes.** Every other rule has one

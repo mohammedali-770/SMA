@@ -58,7 +58,7 @@ never remove them.
 | --- | --- |
 | `features/auth/LoginScreen.tsx` | Cream ground, DS `Text` + `Card`; the WhatsApp-unavailable panel is now a `warning` card. Legal links keep the platform `Text` because inline links must compose inside one text node. |
 | `features/auth/PhoneOtpLogin.tsx` | DS `Button` + `Text`; the code destination renders mono (structured number). |
-| `features/profile/VerifyPhoneWhatsApp.tsx` | DS `Card` + `Button` + `Text`; drop-shadow removed. |
+| ~~`features/profile/VerifyPhoneWhatsApp.tsx`~~ | DS `Card` + `Button` + `Text`; drop-shadow removed. **File deleted 2026-09-02**; the entry point had been gone since 2026-08-13 (`WHATSAPP_LOGIN.md`). |
 | `components/SaudiPhoneInput.tsx` | DS tokens, mono digits, ember focus edge, `error` prop. **Removed the "Saudi numbers only" helper line** — the `+966` prefix and the phone keypad already say it, and the DS voice rule is that a field never explains the format in advance. |
 | `features/otp/OtpCodeInput.tsx` | DS tokens; OTP boxes render in IBM Plex Mono. |
 

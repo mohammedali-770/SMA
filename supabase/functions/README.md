@@ -70,7 +70,7 @@ Moyasar's hosted invoice is the only payment provider (owner decision, 2026-11-1
 | `payment-verify` | true | The verification the app trusts: fetches the invoice and its payment from Moyasar and confirms only a clean `paid` |
 | `payment-webhook` | false | Moyasar webhook, authenticated by its `secret_token`; the payment is re-fetched before anything is confirmed. A `webhook_verification` event's one-time code is stored in `integration_sync_logs` for the console, never logged. A paid invoice no attempt stores is matched through its own metadata's `reference_transaction` (`docs/PAYMENTS.md` §2); a payment nothing matches is logged as `moyasar_unknown_payment` |
 | `payment-return` | false | Public HTTPS return page (`success_url` / `back_url`); marks nothing paid and bounces into the app |
-| `payment-refund` | false | Refund worker, Moyasar refunds only. Fails closed without `refund_trigger_secret` in the payment row's `secret_config` (sent as `x-refund-secret`); automated scheduling (the `payment-refund-worker` cron job) is off |
+| `payment-refund` | false | Refund worker, Moyasar refunds only. Fails closed without `refund_trigger_secret` in the payment row's `secret_config` (sent as `x-refund-secret`); automated scheduling is the `payment-refund-worker` cron job, switched on 2026-11-19 and read active 2026-11-24 |
 | `payment-test-config` | true | Admin-only (AAL2) status, connection test, re-verify and the isolated sandbox test invoice, which is where TEST-mode testing happens |
 | `payment-admin-test-return` | false | Public informational page the admin sandbox test invoice returns to (renamed from `tap-admin-test-return` on 2026-11-11) |
 

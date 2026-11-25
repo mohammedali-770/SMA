@@ -339,7 +339,7 @@ Every clause that card payment touches was read against the code.
   appears only once the order has reached the branch's POS and the POS has
   returned its reference (`apps/mobile/src/features/orders/orderConfirmation.ts:66`,
   `:148`); the branch's number is written together with that reference
-  (`supabase/functions/lazywait-sync/index.ts:528-545`) and shown as the POS
+  (`supabase/functions/lazywait-sync/index.ts:649-680` (re-anchored 2026-11-24 at `99b79d8`)) and shown as the POS
   issued it (`apps/mobile/src/features/orders/view/ConfirmationHero.tsx:25-30`);
   and a paid order that never reaches the branch is titled "Order not placed"
   (`apps/mobile/src/i18n/strings.ts:374`; «لم يتم إنشاء الطلب», `:718`). Live,
@@ -648,7 +648,7 @@ was applied.
   evidence is right; the conclusion is not. The app confirms an order only once
   the branch's POS has returned its reference (`orderConfirmation.ts:66`,
   `:148`), the worker writes the reference and the branch's number together
-  (`lazywait-sync/index.ts:528-545`), and an order that never reaches the
+  (`lazywait-sync/index.ts:649-680` (re-anchored 2026-11-24)), and an order that never reaches the
   branch is "Order not placed" (`strings.ts:374`). Live, all 71 orders that
   reached the POS carry both. One theoretical gap remains, the same for cash and
   card and so not a card-payment change: a POS reply with a reference but no

@@ -38,7 +38,7 @@ authoritative columns to one customer-visible state, and
 `apps/mobile/src/features/orders/orderConfirmation.test.ts` are the shared
 contract. Change one, change the other in the same commit.
 
-### Refused before an order exists (2026-11-12, NOT applied)
+### Refused before an order exists (2026-11-12; applied 2026-11-13, `MIGRATIONS.md` ledger row 111)
 
 `20261005120000_server_input_bounds` adds four refusals that happen before any
 order row is written, so none of the states below is entered and no POS ticket
@@ -54,8 +54,8 @@ checkout shows it in the customer's language (`userMessage.ts`):
 | more than 50 of one item on a line | *order_items_quantity_max: at most 50 of one item per order line.* (SQLSTATE 23514) | `errOrderQuantityLimit` |
 
 A retry with the idempotency key of an order that already exists still returns
-that order **when it asks for the same thing**. From `20261024120000` (written,
-not applied) `place_customer_order` compares the retry's branch, order type,
+that order **when it asks for the same thing**. From `20261024120000` (applied 2026-11-24 06:11 UTC,
+ledger row 129) `place_customer_order` compares the retry's branch, order type,
 address, coupon, notes, points and items with those the order was placed with
 (a stored sha256, `order_input_fingerprints`) and refuses a different retry with
 `checkout_session_mismatch: order_placed` instead of showing success for the old
@@ -64,7 +64,7 @@ The numbers are owner decisions (`OWNER_ACTIONS.md` §48); detail in
 `MIGRATIONS.md` §57. These cover cash orders only: the online checkout-session
 path does not go through `place_customer_order`.
 
-**A fifth refusal, written 2026-11-14 and not applied** (`20261012120000`, gap
+**A fifth refusal, written 2026-11-14 and applied 2026-11-14 17:27 UTC (ledger row 117)** (`20261012120000`, gap
 PG-27): `place_customer_order` refuses an online order, whether the call asks
 for `online` or sends no method and the default would resolve to online
 (SQLSTATE P0001, *Card payment orders cannot be placed here. Pay by card at
@@ -92,7 +92,7 @@ session total differs from the screen (`checkoutTotalChanged`). Detail:
 | `payment_pending` | Online payment not verified | no | no | no |
 | `accepted_no_pos_channel` | PAID; this channel has no branch step | **no** | no | no |
 | `accepted_no_pos_channel_unpaid` | Unpaid (cash); no branch step | **no** | no | no |
-| `sending_to_branch` | Send in flight, or an automatic retry is queued | no | no | **yes** |
+| `sending_to_branch` | Send in flight, or a first send or a customer resend is queued (there is no automatic retry since 2026-08-13) | no | no | **yes** |
 | `confirmed_by_branch` | Lazywait accepted it | **yes** | no | **yes** |
 | `verifying_with_branch` | Ambiguous — a ticket may exist | no | **no** | **yes** |
 | `branch_failed_retry_available` | PAID, proven not sent | no | **yes** | no |
@@ -1072,7 +1072,7 @@ receipt shows the branch number as pending and polls for it, which is the design
 behaviour for an order that has not synced yet.
 
 This is the house pattern for a post-write read-back: `payment-webhook`,
-`_shared/tapVerify.ts` and `_shared/moyasarVerify.ts` all degrade to the write's
+`_shared/moyasarVerify.ts` (and `_shared/tapVerify.ts`, which #446 removed) all degrade to the write's
 own return rather than reporting a failure.
 
 #### Why it is a shape test and not `?? `
@@ -1295,7 +1295,7 @@ truth:
 | Outcome | Event | What the customer is told |
 | --- | --- | --- |
 | reached the branch | `pos_confirmed` | "confirmed by the restaurant" |
-| retryable failure | `pos_retrying` | "confirming it with the restaurant, no need to place it again" |
+| retryable failure | `pos_retrying` is written, then **rewritten to `pos_failed`** (`20260813143000`, because the order is `failed` with no next attempt: there is no automatic retry) | what the customer actually receives is "we could not send it" and a resend button. The "confirming it with the restaurant, no need to place it again" copy exists but is not reached in this case |
 | ambiguous | `pos_confirmation_required` | "we are verifying" |
 | terminal failure | `pos_failed` | "we could not send it" |
 
@@ -1353,7 +1353,7 @@ The customer resend therefore fires **only** from proven-not-sent state:
 
 - no stored `lazywait_ref` (any non-null marker, even blank, blocks it), and
 - no `pos_create_attempted_at` phase marker, and
-- a terminal `failed`/`dead_letter`/`blocked` state with no queued auto-retry.
+- a terminal `failed`/`dead_letter`/`blocked` state (there is no queued automatic retry: the database clears `sync_next_attempt_at` for all three).
 
 Ambiguous orders show *"We are checking with the branch whether your order went
 through"* with **no** retry button, and remain in the admin
@@ -1374,7 +1374,7 @@ the budget is not disclosed in any client-visible payload. One refusal adds a
 reason, below, and it discloses only what the customer can already see.
 
 **A cancelled order is never resent** (`20261012120000`, gap PG-03, written
-2026-11-14 and not applied). The check sits after the order lock and the
+2026-11-14; applied the same day, ledger row 117). The check sits after the order lock and the
 ownership test and before the eligibility predicate, so no other state can let
 a cancelled order through, and a customer who does not own the order still gets
 "not found" and writes no log row. The file's own check and suite case 15 pin
@@ -1848,6 +1848,8 @@ verification binding stays on `reference.order`, unchanged. `tap.test.ts` pins
 both halves: the description carries no `SM-…`, and `reference.order` still
 carries the exact attempt reference.
 
+*Tap-era names, kept as written: `validateAndConfirmTapCharge` and `tap.test.ts` were removed in #446. Today's equivalents are `validateAndConfirmMoyasarPayment` (`_shared/moyasarVerify.ts`), which binds on the payment's `invoice_id` (§4), and `_shared/moyasar.test.ts`, which pins that the invoice `description` is the constant `'Spicy Meal order'` and never carries an `SM-…` number.*
+
 ## 10c. The order note — bounded at 280 characters (closed)
 
 The free-text note a customer attaches at Checkout reaches a cashier and is
@@ -1884,7 +1886,7 @@ over-long note would start failing status transitions that never touched
 which `finalize_checkout_session` calls with the note it reads back from
 `checkout_sessions.notes`. Guarding only `orders` would move the failure past
 the point of no return — finalize runs *after* the provider has captured, and a
-failure there is caught by `_shared/tapVerify.ts`, logged, and retried forever
+failure there is caught by the payment verifier (`_shared/moyasarVerify.ts` since #446; `tapVerify.ts` when this was written), logged, and retried forever
 against a session that can never succeed. Rejecting the note when the session is
 created means it is refused before any money moves. This is a uniform input rule
 applied to a column: no provider logic, no pricing and no session lifecycle is
