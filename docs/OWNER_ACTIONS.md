@@ -3237,6 +3237,81 @@ out from the total, and that cannot be changed here."); and «يُحفظ الل�
 that the first reads as "these two things are saved here, nothing else", not as
 "these two are the only brand settings that exist".
 
+**Widened 2026-11-25 — console confirmations, the branch-delete prompt and the
+dashboard labels (audit Phase 3 line pass).** Staff-console copy,
+engineering-drafted, on the same read. They are `window.confirm` texts in
+`src/lib/confirmCopy.ts` unless a file is named. The first thing to check in each
+is the verb: these ask before an action that is live the moment it is confirmed.
+
+- **Order status select**, every move except Cancel: «نقل الطلب إلى «قيد
+  التحضير»؟» (the status name changes: «تم الاستلام», «قيد التحضير», «جاهز»,
+  «خرج للتوصيل», «تم التسليم»), then «سيصل العميل إشعار بتحديث حالة الطلب إن كانت
+  إشعارات الطلبات مفعّلة لديه، ولا يمكن سحبه بعد إرساله.» and «لا يمكن إرجاع
+  الطلب إلى حالة سابقة.»; Delivered adds «حالة «تم التسليم» نهائية: لا يمكن تعديل
+  الطلب أو إلغاؤه بعدها.»; an unsettled online payment prefixes «لم يكتمل الدفع
+  الإلكتروني لهذا الطلب بعد.»
+- **Branch Close, Delivery off, Pickup off, untimed pause**: «إغلاق فرع «…»؟ لن
+  يتمكن العملاء من الطلب من هذا الفرع إلى أن يُفتح من جديد.»; «إيقاف التوصيل
+  لفرع «…»؟ لن يتمكن العملاء من تقديم طلبات توصيل لهذا الفرع إلى أن يُعاد
+  تفعيله.»; the same for «الاستلام»; and «إيقاف التوصيل لفرع «…» بدون مدة؟ لن
+  يُستأنف من تلقاء نفسه، ويبقى موقوفاً إلى أن يستأنفه أحد.»
+- **Delivery-zone Clear and Save**: «مسح منطقة التوصيل لفرع «…»؟ سيتم رفض كل
+  طلبات التوصيل لهذا الفرع إلى أن تُحفظ منطقة جديدة.»; «استبدال منطقة التوصيل
+  الحالية لفرع «…»؟ ستُقبل طلبات التوصيل داخل المنطقة الجديدة فقط ابتداءً من
+  الآن، ولا يُحتفظ بالمنطقة القديمة.»; and, for a first area, «حفظ منطقة التوصيل
+  لفرع «…»؟ ستُقبل طلبات التوصيل داخل هذه المنطقة ابتداءً من الآن.»
+- **Loyalty point adjustment**: «إضافة ‏N نقطة إلى …؟» / «خصم ‏N نقطة من …؟»,
+  «الرصيد: ‏A ← ‏B.», «بسعر ‏R ريال للنقطة، تعادل هذه النقاط خصماً يصل إلى ‏V ريال
+  على طلبات العميل.» and «يسري التعديل فوراً ويُسجَّل كتعديل من المشرف، ولا يمكن
+  التراجع عنه إلا بتعديل معاكس.» The ceiling message is «يُسمح بتعديل ‏1,000 نقطة
+  كحدٍّ أقصى في كل مرة. نفّذ التعديلات الأكبر على عدة مرات.» The 1,000-point
+  ceiling is a console-only limit: at the default 0.10 SAR a point it is about
+  SAR 100, and the RPC `adjust_loyalty_points` has no ceiling of its own.
+- **Legal documents**: «حفظ التغييرات على «…»؟ سيظهر النص الجديد لكل العملاء فوراً
+  بالعربية والإنجليزية، ولا يُحتفظ بالنص السابق.»; «إيقاف «…»؟ سيُزال من التطبيق
+  لكل العملاء فوراً. النص محفوظ، وإعادة تفعيله تعيده.»; and the refusal «العنوان
+  والمحتوى مطلوبان بالعربية والإنجليزية.»
+- **Rewards programme and points expiry** (`SettingsPanel.tsx`): «تفعيل برنامج
+  المكافآت؟ سيبدأ العملاء بكسب النقاط على الطلبات المؤهلة ويمكنهم استبدال ما
+  لديهم منها.»; «إيقاف برنامج المكافآت؟ سيتوقف كسب النقاط واستبدالها لكل العملاء
+  فوراً. لا تتغير الأرصدة الحالية.»; and «تفعيل انتهاء صلاحية النقاط؟ في موعد
+  التصفير المحدد ستُصفَّر نقاط جميع العملاء ويُسجَّل ذلك في سجل كل عميل. لا تنتهي
+  أي نقاط اليوم، لكن شروط الولاء تَعِد العملاء بإشعار مسبق قبل أي تغيير يقلّل
+  قيمة النقاط التي يملكونها. هل تريد المتابعة؟» The last sentence is a claim
+  about the live loyalty terms; check it against what the terms actually promise.
+- **Integration switches** (Lazywait, Push, WhatsApp): «تفعيل ربط نقطة البيع
+  Lazywait؟ ستبدأ الطلبات الجديدة بالانتقال إلى نقطة بيع المطبخ.» / «إيقاف …
+  ستتوقف الطلبات الجديدة عن الانتقال إلى نقطة بيع المطبخ إلى أن يُعاد
+  تفعيله.»; «تفعيل الإشعارات الفورية؟ ستبدأ رسائل حقيقية بالوصول إلى هواتف
+  العملاء: تحديثات الطلبات، والعروض للأجهزة التي وافقت عليها.» / «إيقاف
+  الإشعارات الفورية؟ سيتوقف العملاء عن تلقي رسائل حالة الطلب، ولا يمكن إرسال
+  البث.»; «تفعيل تكامل واتساب؟ تُرسل رموز التحقق عبره.» / «إيقاف تكامل واتساب؟ لن
+  تُرسل رموز التحقق عبره.»; «تفعيل تسجيل دخول العملاء عبر واتساب؟ سيستلم العملاء
+  رموز الدخول على واتساب.» / «إيقاف تسجيل دخول العملاء عبر واتساب؟ لن يتمكن
+  العملاء من استلام رموز الدخول، وقد لا يتمكنون من تسجيل الدخول.» The Payment card
+  has none of these and was not touched.
+- **Branch delete prompt** (`src/components/admin/branchDeletion.ts`), now listing
+  the fourteen cascading tables and the vault secrets that stay behind: «لا يمكن
+  التراجع عن ذلك. سيُحذف معه كل ما يخصه: ساعات العمل، ومناطق التوصيل، وتوفر
+  المنتجات والإضافات والأحجام، وتعيينات الموظفين، والحملات والخصومات الخاصة
+  بالفرع (مع سجلات استخدامها)، وحملات مضاعفة النقاط الخاصة به، وطلبات التوصيل،
+  وورقة مرجع الفرع (الروابط والأرقام والملاحظات وبيانات الدخول)، وسجلات الأحداث:
+  أحداث إيقاف التوصيل، وأحداث إغلاق التوفر، وسجل من كشف بيانات دخول محفوظة.
+  الأسرار المحفوظة في الخزنة لا تُحذف مع الفرع وتبقى دون جهة ترتبط بها.» Also the
+  card button now has an Arabic name, «إغلاق الفرع للصيانة» / «فتح الفرع
+  للتشغيل», which both the delete prompt and the "has orders" message quote.
+- **Branch editor validation** (`BranchEditModal.tsx`): «إحداثيات الفرع يجب أن
+  تكون أرقاماً.», «أدخل خط العرض وخط الطول معاً، أو اتركهما فارغين.», «رسوم
+  التوصيل يجب أن تكون رقماً.», «الحد الأدنى للتوصيل يجب أن يكون رقماً.»
+- **Dashboard labels**: the revenue tile «إيرادات الطلبات المسلَّمة (منذ
+  البداية)» ("Delivered Revenue (All Time)", replacing «إجمالي المبيعات
+  اليومية»), the active-orders tile «الطلبات النشطة» (the word «اليوم» is gone),
+  the average-ticket caption «شامل الضريبة، ويضم كل الطلبات بما فيها الملغاة وغير
+  المدفوعة», and the branch-sales note «تشمل كل الطلبات بما فيها الملغاة وغير
+  المدفوعة، لذلك لا تطابق رقم إيرادات الطلبات المسلَّمة.» The branch figures
+  and the average ticket still count cancelled and unpaid orders, because
+  `admin_order_stats` does; changing that is a migration and an owner action.
+
 ## 36. ~~Two live promo codes~~ — BOTH DEACTIVATED 2026-09-10 (closed)
 
 > **CLOSED on explicit owner approval ("deactivate both promo codes"), 2026-09-10.**
