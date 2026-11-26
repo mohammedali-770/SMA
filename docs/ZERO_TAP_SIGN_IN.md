@@ -240,8 +240,9 @@ the same proof a new device asks for today, with the number already filled in.
 
 ## 8. Build plan and the owner actions it needs
 
-1. **The Expo SDK 58 upgrade first.** The module is written once, against the
-   SDK that ships it.
+1. ~~**The Expo SDK 58 upgrade first.**~~ **Done (corrected 2026-11-26):** the
+   upgrade merged on 2026-11-11 (#430) and `apps/mobile/package.json` depends on
+   `expo ~58.0.23`. The module is written once, against the SDK that ships it.
 2. **A device test**, as a throwaway build. Its four checks:
    - create a key;
    - restore through Android Studio's device-to-device test (cloud cannot be

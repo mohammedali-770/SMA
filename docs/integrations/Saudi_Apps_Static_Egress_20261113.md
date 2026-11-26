@@ -9,6 +9,15 @@
 > system come from the [proxy comparison draft](Moyasar_Static_IP_Proxy.md), which this
 > goes with. Nobody was contacted and nothing was signed up for.
 >
+> **Dated facts, re-check before acting (added 2026-11-26).** Every claim about a
+> vendor or another company is as of 2026-11-13. The Moyasar Allowed IPs page cited
+> below as "updated 11 November 2026" read "Last updated on Nov 24, 2026" when
+> re-read on 2026-11-25, with every rule used here still matching; AWS's Saudi
+> region was re-confirmed "on track to launch in December 2026" the same day;
+> Azure's Saudi region ("announced for November 2026") can change within days.
+> Re-read the Moyasar page on the day, before the live Allowed IPs list is saved
+> (it cannot be set back to any address).
+>
 > How to read the labels:
 >
 > - **Published:** the company or vendor says it.
@@ -31,8 +40,12 @@ apps run their own servers on large clouds (Google Cloud, AWS, Tencent Cloud).
 Three of them publish the fixed addresses they send webhooks or orders from, so
 that partners can allow them: Delivery Hero (which owns HungerStation), Keeta
 and Tabby. Every address sits in a cloud that company is documented to use
-(checked by us). For Tabby (Google Cloud, Dammam) and Keeta (Tencent), where no
-proxy service we looked at operates, that suggests addresses reserved on their
+(checked by us; *softened 2026-11-26: for Tabby and Delivery Hero the cloud is
+documented, for Keeta it rests on registry and routing records and one press
+report, as §6 item 1 says*). For Tabby (Google Cloud, Dammam) and Keeta (Tencent), where no
+proxy service we looked at operates (*the document names only QuotaGuard and Fixie
+as checked, and records no check of the other proxy sellers it lists, so this
+premise is asserted rather than shown*), that suggests addresses reserved on their
 own cloud network (inferred). For Delivery Hero (AWS) the check cannot decide,
 because proxy services such as QuotaGuard also run on AWS, in the same regions.
 None of them says how its servers reach its payment gateway.
@@ -313,7 +326,7 @@ Three reasons:
 | Upkeep | Low, and no server: watch the monthly request count against the plan, keep the card current, and keep the vendor's written answers on file | Ours: updates, certificates and monitoring, about 1 to 2 hours a month (estimate) | Same as Saudi |
 | Reliability | 2 addresses behind one name. Every Shield plan includes "High availability and automated failover", and QuotaGuard states 99.95% and 99.98% historic uptime ([QuotaGuard](https://www.quotaguard.com/products/pricing/)). Its SLA covers only Enterprise plans bought directly and "does not apply to other plans" ([SLA](https://www.quotaguard.com/docs/support/service-level-agreement)). One vendor in one region: if it is down, card payments stop until it recovers, or until we switch the Supabase secret to a second vendor whose addresses are already on Moyasar's list | One server is a single point of failure. Card payments stop until someone fixes it or switches the Supabase secret to the standby | Same as Saudi |
 | What the relay keeps, and where | Tunnel only: the relay sees `api.moyasar.com`, the times and the sizes, never the content. QuotaGuard keeps connection records about 60 days and says data may leave the EU ([QuotaGuard](https://www.quotaguard.com/privacy-security-gdpr-faqs)). Fixie: probably the US unless it confirms the EU, since it says it "operates in the same data center as Heroku's US region" ([Fixie](https://usefixie.com/features)) | Same tunnel. The records stay in Saudi Arabia | Same tunnel. The records stay with us, in the EU |
-| Latency to Moyasar | Not measured. Our functions run in several regions (Mumbai, Zurich and N. Virginia in one day), so any relay adds a detour, estimated at a second at most against a 12 to 15 second limit ([draft](Moyasar_Static_IP_Proxy.md) §1). Pinning the payment functions to Frankfurt would remove most of the detour to a Frankfurt relay. It is a code change, and a pinned call is not re-routed if that region has an outage ([Supabase](https://supabase.com/docs/guides/functions/regional-invocation)) | Not measured. Possibly a little closer to Moyasar, which says it stores and processes personal data in Saudi Arabia ([Moyasar](https://moyasar.com/en/resources/privacy-policy/)). Supabase has no Middle East region to pin the functions to ([Supabase](https://supabase.com/docs/guides/functions/regional-invocation)). Not a deciding factor | Same as managed |
+| Latency to Moyasar | Not measured. Our functions run in several regions (Mumbai, Zurich and N. Virginia in one day), so any relay adds a detour, estimated at a second at most against a 12 to 15 second limit ([draft](Moyasar_Static_IP_Proxy.md) §1). Pinning the payment functions to Frankfurt would remove most of the detour to a Frankfurt relay. *(Done in code since 2026-11-18, corrected 2026-11-26: the app's calls and the POS kick are pinned with Supabase's `forceFunctionRegion` query parameter to `eu-central-1`, in `apps/mobile/src/lib/functionRegion.ts`; the pin reaches customers with the next app and web build and function-to-function calls when those functions are redeployed, and the Moyasar webhook is not pinned unless its URL carries the parameter: `docs/PAYMENTS.md`.)* A pinned call is not re-routed if that region has an outage ([Supabase](https://supabase.com/docs/guides/functions/regional-invocation)) | Not measured. Possibly a little closer to Moyasar, which says it stores and processes personal data in Saudi Arabia ([Moyasar](https://moyasar.com/en/resources/privacy-policy/)). Supabase has no Middle East region to pin the functions to ([Supabase](https://supabase.com/docs/guides/functions/regional-invocation)). Not a deciding factor | Same as managed |
 | Sign-up | A card. QuotaGuard has a 3-day trial ([draft](Moyasar_Static_IP_Proxy.md) §6) | Google: CNTXT only, on invoiced billing, and forum users report that individuals are turned away ([Google](https://docs.cloud.google.com/docs/dammam-region-access), [forum](https://discuss.google.dev/t/ksa-region-cntxt-individual-onboarding-unavailable-completely-blocks-sandbox-testing/378547)). Oracle refuses PIN-debit, virtual and prepaid cards ([Oracle](https://www.oracle.com/cloud/free/faq/)). stc's general business terms ask a new business client for a commercial registration, licence or entity ID, without mentioning stc cloud ([stc](https://www.stc.com.sa/en/business/static/terms-and-conditions.html)); a registered company presumably has one (our inference). Alibaba and Huawei take cards ([Alibaba](https://www.alibabacloud.com/help/en/user-center/instruction-of-payment-management), [Huawei](https://support.huaweicloud.com/intl/en-us/usermanual-account/account_id_001.html)) | A card |
 
 **Why shared addresses matter.** With a shared pair, other customers' traffic

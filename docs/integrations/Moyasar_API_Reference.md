@@ -325,7 +325,8 @@ the worker runs it before any retry rather than re-POSTing blind:
 | `status = refunded` | **succeeded** — do not retry |
 | cumulative `refunded` ≥ the amount we sent | **succeeded** — do not retry |
 | nothing refunded, no `refunded_at` | **pending** — a retry is safe |
-| `refunded_at` set but the amount does not reconcile | **parked** — written `failed` with `refund_ambiguous_needs_review`, never retried |
+| `refunded_at` set and no usable `refunded` amount (not above 0) | **parked** — written `failed` with `refund_ambiguous_needs_review`, never retried |
+| some `refunded` above 0 but below the amount we sent (with or without `refunded_at`) | **pending** — a later attempt asks again and retries; it is NOT parked. *Corrected 2026-11-26: this row used to read "`refunded_at` set but the amount does not reconcile — parked". `resolveRefundFromPayment` parks only the no-amount case, and `moyasarRefund.test.ts` pins the partial case as `pending`. Moyasar caps total refunds at the payment amount, so a retry's exposure is bounded, but it is a retry.* |
 | `status` `failed` / `voided` | **failed** |
 
 **The ordering is what makes this safe, and it is the part worth reviewing.** The
@@ -515,7 +516,10 @@ the stored attempt:
 
 `invoice_id` is set by Moyasar itself when a payment settles an invoice, so
 nothing a customer or an attacker controls can point somebody else's payment at
-our invoice. Confirmed present on the payment object (§ metadata example).
+our invoice. Confirmed present on the payment object (the section reference this line used to
+carry, "metadata example", points at nothing in this file; the evidence is
+Moyasar's payment-object documentation and a sandbox capture, neither reproduced
+here, and `moyasar.ts` relies on it).
 
 **`metadata` is deliberately NOT part of the binding.** Moyasar does not document
 metadata propagating from an invoice to the payment that settles it, so requiring
@@ -539,7 +543,14 @@ payment cannot be fetched with the test key that opened a test attempt. The
 `live` flag on a webhook envelope is compared as a second check that costs
 nothing.
 
-**A test-mode attempt never confirms (2026-11-11).** Moyasar's sandbox settles a
+**A test-mode attempt never confirms (2026-11-11), with one testing-phase
+exception (added 2026-11-26).** The Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT`,
+exactly `true`, together with the customer's id being listed in
+`PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`, lets a TEST attempt open and confirm as a live
+one does (`_shared/paymentTestCheckout.ts`, `_shared/moyasarVerify.ts`; owner
+request 2026-11-18; CLAUDE.md §6). It **must be unset before card payments go
+live** (`docs/PAYMENTS.md`, `docs/OWNER_ACTIONS.md` §60). The live value of those
+secrets is not known from the repository. Otherwise: Moyasar's sandbox settles a
 test invoice exactly as live settles a real one, so the binding above would
 match. Any attempt whose stored mode is not `live` is refused before any order
 or payment state is written, and the attempt is marked failed with
@@ -621,8 +632,9 @@ from **200.00 to 300.00 SAR** succeed, others fail. The admin test invoice is
 1.00 SAR, so it cannot show an Apple Pay success.
 
 Those numbers are only reachable through Moyasar's hosted page, which is where
-they belong: no card value is ever typed into, stored by, or transmitted through
-this repository.
+they belong: no customer card value is ever typed into, stored by, or transmitted through
+this repository (the numbers above are Moyasar's published sandbox test cards,
+not customer data).
 
 ---
 

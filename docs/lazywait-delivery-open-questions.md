@@ -8,8 +8,12 @@
 > attempt. **Q1, Q8 and Q9 are now answered on printed paper**, joining Q2, Q4,
 > Q5, Q6 and Q7. **Exactly two remain genuinely open: Q3** (coordinates, which
 > the contract has nowhere) **and Q10** (whether the POS sums `addons[].price`).
-> Both are inert — the fields behind them are not sent, and Q10 cannot activate
-> until a modifier is mapped.
+> Q3's fields are not sent. **Q10 is NOT inert (corrected 2026-11-26):** the
+> add-on importer (`20260826080000`) maps every modifier it creates, ten mapped
+> add-ons have existed since 2026-08-26 (all priced 0.00 then, so nothing
+> moved), and the decomposition takes effect on the first mapped add-on priced
+> above zero. See Q10. Also, `is_paid` is now sent (Q7), and `allowAssumedFields`
+> is a flag of the unused typed client only (see the note after this banner).
 
 The original framing, kept because the reasoning behind the remaining questions
 depends on it: the owner supplied a Create Order contract on **2026-08-24**, but
@@ -32,10 +36,12 @@ Four historical orders still carry the reason and are `not_retryable`; nothing
 reachable can produce it again.
 
 What still protects the remaining open questions is **not** the block but the
-payload itself: the fields behind Q3 are simply not sent and stay behind
-`allowAssumedFields` (default OFF), and Q10 stays inert while no modifier
-carries a `lazywait_addon_id`. An order is
-still never marked `synced` unless the POS actually accepts it.
+payload itself: the fields behind Q3 are simply not sent (the live builder
+`buildCreateOrderPayload` has no coordinate field; `allowAssumedFields` exists
+only in `serializeCreateOrder` of `_shared/lazywaitApi.ts`, which no production
+code calls). *Written 2026-08-24: "Q10 stays inert while no modifier carries a
+`lazywait_addon_id`" — that stopped being true on 2026-08-26, see Q10.* An
+order is still never marked `synced` unless the POS actually accepts it.
 
 ## Questions for Lazywait
 
@@ -68,7 +74,9 @@ still never marked `synced` unless the POS actually accepts it.
    the missing piece.~~
 3. **OPEN** — Can we send customer latitude/longitude? The contract contains **no
    coordinate field anywhere**. Our assumed top-level `latitude`/`longitude` are
-   therefore *not* confirmed by it and stay gated behind `allowAssumedFields`.
+   therefore *not* confirmed by it and are not sent (corrected 2026-11-26: the
+   live builder has no coordinate field; `allowAssumedFields` belongs to the
+   unused typed client only).
    If coordinates are accepted at all, they are most likely inside an
    **`order_deliveries[]`** element — see Q2.
 4. **ANSWERED** — Can we send the customer phone number? Yes, but **split**:
@@ -84,15 +92,23 @@ still never marked `synced` unless the POS actually accepts it.
    name was wrong and has been removed. Both are now sent on the pickup path.
 6. **ANSWERED** — Can we send a delivery fee? Yes: the field is
    **`order_delivery_fee`**, not the assumed `delivery_fee`. The name is
-   corrected, but it is still only meaningful on a delivery order, so it remains
-   gated behind `allowAssumedFields` along with the rest of Q1–Q3. See also Q9:
-   nothing about the money fields is being sent today.
+   corrected, but it is still only meaningful on a delivery order. *(Corrected
+   2026-11-26: this said it "remains gated behind `allowAssumedFields`" and that
+   "nothing about the money fields is being sent today". Both were true on
+   2026-08-24 and false from 2026-08-27: `buildCreateOrderPayload` sends
+   `order_delivery_fee` whenever the order is delivery and the fee is above
+   zero, with no gate, and Q9 records the money fields being sent.)*
 7. **ANSWERED** — Can the POS show whether the order is paid or
-   cash-payment-required? Yes: **`is_paid`** (boolean). The builder supports it;
-   the live worker deliberately does **not** set it. Telling a cashier that an
-   order needs no cash is a financial signal, and payment work was frozen
-   when this was written (CLAUDE.md §6; Moyasar is the provider since
-   2026-11-11) — wiring it is a separate owner decision.
+   cash-payment-required? Yes: **`is_paid`** (boolean). *Superseded 2026-11-19:
+   the worker sets it now.* When this was written the builder supported it and
+   the live worker deliberately did **not** set it, because telling a cashier an
+   order needs no cash is a financial signal and payment work was frozen
+   (CLAUDE.md §6). On the owner's decision of 2026-11-19, `lazywait-sync` passes
+   `isPaid` only when the payment is certain: an online order whose row says
+   paid **and** a server-written captured payment record exists
+   (`_shared/posPaidFlag.ts`, `lazywait-sync/index.ts`); the ticket is created
+   paid in the same call, never marked paid later. Cash orders, and anything
+   uncertain, send no `is_paid`.
 8. **ANSWERED 2026-08-27, negatively — and the duplication is now permanent.**
    The owner read a real delivery ticket: it shows `Order Type: Delivery` but
    **no address row at all**. The POS does **not** render the confirmed
@@ -171,12 +187,19 @@ still never marked `synced` unless the POS actually accepts it.
    for the summing reading, but it is evidence, not vendor confirmation — and
    the failure direction is a ticket worth less than the customer paid.
 
-   **It is inert today, and that is the only reason this is not urgent.** Zero
-   of the three live modifiers carry a `lazywait_addon_id`, so `addons[]` is
-   never emitted, nothing is ever subtracted, and the full VAT-inclusive
-   `unit_price` goes out exactly as the pre-contract worker sent it. Unmapped
+   **It was inert on 2026-08-24, and it is not now (corrected 2026-11-26).**
+   When this was written, zero of the three live modifiers carried a
+   `lazywait_addon_id`, so `addons[]` was never emitted and nothing was
+   subtracted. Two days later `import_lazywait_addon_groups` (applied
+   2026-08-26) began creating one `modifiers` row per (group, add-on) pair with
+   `lazywait_addon_id` already set, so every imported add-on is mapped from the
+   moment it exists: ten were imported then, all at price 0.00, so the
+   subtraction was zero and no ticket changed. **The assumption is live:** the
+   first orderable add-on priced above zero goes out decomposed. The current
+   count of mapped modifiers, and whether any order line has used one, are not
+   known from the repository. Q10 is still unanswered by Lazywait. Unmapped
    modifiers are folded into `details` as text and keep their money inside
-   `price`. **The assumption activates the first time a modifier is mapped.**
+   `price`.
 
    **The alternative that was rejected**, recorded because it is the safer
    answer if Lazywait ever confirms the inclusive reading: closed PR #245 sent
@@ -184,8 +207,10 @@ still never marked `synced` unless the POS actually accepts it.
    correct under *both* readings. It was not adopted because it contradicts the
    contract's example and hides the add-on's price from the POS entirely.
 
-   **Before mapping the first modifier**, settle this — ask Lazywait, or map one
-   add-on, place a single test order and read the POS total against ours.
+   **Before a priced add-on is imported or mapped** (the importer maps by
+   default, so this gate is the price, not the mapping), settle this — ask
+   Lazywait, or place a single test order with one priced add-on and read the
+   POS total against ours.
 
 ## What the contract already changed
 
@@ -195,9 +220,14 @@ Implemented in this repository (see `buildCreateOrderPayload` in
 - per-item `names{en,ar}`, `details`, `price_id`, `menu_category_id` and
   `addons[{addon_id, names{en,ar}, price, quantity}]`;
 - order-level `order_details`, `customer_id`, `customer_cell` + `country_code`;
-- `is_paid` supported but not wired (Q7).
+- `is_paid`, sent only when the payment is certain (since 2026-11-19, Q7).
 
 ## When the remaining answers arrive
+
+*Historical, written 2026-08-24 as a to-do list. The first two items were done
+on 2026-08-27 (delivery orders enqueue as `pending`; `buildCreateOrderPayload`
+builds the delivery payload, using the top-level `delivery_address` plus the
+`DELIVER TO` line, not `order_deliveries[]`). Only the last bullet still applies.*
 
 - Extend `buildCreateOrderPayload` (`supabase/functions/_shared/lazywait.ts`) to
   build a delivery payload from confirmed fields only — most likely by filling

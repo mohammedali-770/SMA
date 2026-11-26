@@ -1,6 +1,6 @@
 # Deploying Spicy Meal Web Surfaces to Vercel
 
-> **Updated 2026-08-12; §2 and §7 updated 2026-11-12.** This runbook describes the current two-surface build. It does not document native EAS/store deployment; use `README_MOBILE.md` and `RELEASE_CHECKLIST.md` for that.
+> **Updated 2026-08-12; §2 and §7 updated 2026-11-12; §5, §9 and §12 carry later edits and were corrected again 2026-11-26.** This runbook describes the current two-surface build. It does not document native EAS/store deployment; use `README_MOBILE.md` and `RELEASE_CHECKLIST.md` for that.
 
 ## 1. What Vercel serves
 
@@ -147,8 +147,10 @@ and `vite.config.ts` calls it for every build.
 - **Preview builds only warn**, loudly, in the build log. A build outside Vercel
   (CI, local) sets no `VERCEL_ENV` and is not checked.
 - **`/app` has no such gap.** `apps/mobile/scripts/export-web.js` falls back to
-  committed public values for `EXPO_PUBLIC_SUPABASE_URL` and the legacy anon key,
-  so the Expo web export always has a configuration. It is not checked here.
+  committed public values for `EXPO_PUBLIC_SUPABASE_URL` and the **publishable**
+  key (corrected 2026-11-26: this said the legacy anon key, which was
+  deactivated and is no longer read, as the paragraph above says), so the Expo web
+  export always has a configuration. It is not checked here.
 
 ### Secret rule
 
@@ -317,6 +319,12 @@ return at it.
 `20261003120000_moyasar_only_payments`, each named by version, before this
 deploy. Apply `20261004120000_drop_tap_payment_rpcs` only after it. The full
 order, with what "done" looks like at each step, is `OWNER_ACTIONS.md` §47.
+**Done 2026-11-13** (corrected 2026-11-26: this paragraph and the next one were
+written as a to-do list): all three migrations were applied (`MIGRATIONS.md` rows
+114-116), the seven functions were deployed and `tap-admin-test-return` was
+deleted (`OWNER_ACTIONS.md` §47.6). The order above is kept because it governs
+any replay or rebuild, and each later payment redeploy is still its own owner
+approval.
 
 ### `verify_jwt` comes from `supabase/config.toml`
 
@@ -344,9 +352,11 @@ must use the same `verify_jwt` values as the table above.
 
 ### The old slug is deleted separately, later
 
-`tap-admin-test-return` is still deployed in Production (2026-11-11). Deleting it
-is a separate, destructive owner action, done only after the seven-function
-deploy (`OWNER_ACTIONS.md` §47.6). Until then a function-name drift report lists
+*(Done 2026-11-13, corrected 2026-11-26: the function was deleted — it answered
+404 — per `OWNER_ACTIONS.md` §47.6; the text below is the 2026-11-11 position.)*
+`tap-admin-test-return` was still deployed in Production (2026-11-11). Deleting it
+was a separate, destructive owner action, done only after the seven-function
+deploy (`OWNER_ACTIONS.md` §47.6). Until then a function-name drift report listed
 it as extra and `payment-admin-test-return` as missing.
 
 ### A secret the payment functions read

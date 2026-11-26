@@ -1,6 +1,6 @@
 # Restaurant Branch Onboarding Checklist
 
-> **Updated 2026-08-12.** Everything that must be true before a new restaurant branch takes its first approved test/real order.
+> **Updated 2026-08-12; sections 4 and 7b were added later (2026-08-27, 2026-09-13) and sections 5 and 6 corrected 2026-11-26.** Everything that must be true before a new restaurant branch takes its first approved test/real order. This checklist does not yet have a step for the branch's per-size/per-option closing controls, the delivery-closure request flow or the branch reference sheet (links, numbers, notes and credentials, `branch_reference_entries`): all three are live features that a new branch will meet, and their steps are not written here.
 
 This document is about a Spicy Meal **restaurant branch**, not a Git branch.
 
@@ -62,7 +62,7 @@ Set each order type deliberately.
 
 ## 5. Operating hours / open-close process
 
-The repository has historically not had a full automatic branch-hours model. Verify the current schema/admin behavior before onboarding and document who owns daily open/close/temporary-delivery-closure operations.
+*(Corrected 2026-11-26: this said the repository "has historically not had a full automatic branch-hours model". Branch working hours and delivery areas exist — `branch_working_hours`, section 7b below — though the live tables were empty on 2026-09-13.)* Verify the current schema/admin behavior before onboarding and document who owns daily open/close/temporary-delivery-closure operations.
 
 - [ ] named person/role owns opening state;
 - [ ] named person/role owns closing state;
@@ -73,7 +73,7 @@ Do not assume `is_active` is a harmless setup flag; it directly affects customer
 
 ## 6. Approved pre-launch test
 
-Do not use an online payment/refund test while the payment area is frozen unless separately approved.
+*(Corrected 2026-11-26: this said "while the payment area is frozen". The freeze was lifted for repository work on 2026-11-11 when the owner chose Moyasar; a live online payment or refund is still a CLAUDE.md §5 action and still needs the owner's approval, and it is not a routine smoke test.)* Do not use an online payment/refund test unless separately approved.
 
 For an approved cash/non-payment pickup test:
 
@@ -102,7 +102,7 @@ If delivery is being launched, perform a separate approved delivery process vali
 ## 7b. Trading hours and delivery areas — Admin → Branches → Data import
 
 Two branch-level features are fully built, tested and RLS'd, and were **entirely
-empty in Production** as of 2026-09-13: across 40 branch rows there were **zero
+empty in Production** as of 2026-09-13 (a dated reading; not re-read since): across 40 branch rows there were **zero
 working-hours rows and zero delivery areas**. Every screen that answers "when is
 this branch open" or "where does it deliver" therefore rendered a dash, for every
 branch. Filling that in through the per-branch editors is forty visits.

@@ -51,6 +51,10 @@ git diff --stat apps/mobile/tsconfig.json     # expect: no output
 git checkout -- apps/mobile/tsconfig.json     # if it is dirty, revert it
 ```
 
-`scripts/check-design-system-hygiene.mjs` fails the build if the file drifts
-from its committed contents, so CI catches it even if the check above is
-forgotten.
+`scripts/check-design-system-hygiene.mjs` fails the `design-system` CI job
+(`npm run design-system:check`) if `apps/mobile/tsconfig.json`'s `include` no
+longer contains `.expo/types/**/*.ts` and `expo-env.d.ts`, so CI catches that
+particular edit even if the check above is forgotten. *(Corrected 2026-11-26: this
+said it "fails the build if the file drifts from its committed contents". It
+checks only those two entries; any other edit to the file passes, and it does not
+run in `npm run build`.)*

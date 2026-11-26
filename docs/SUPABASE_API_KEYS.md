@@ -5,8 +5,10 @@
 > 2026-11-09 compliance plan. Owner steps are mirrored in `OWNER_ACTIONS.md` §42.
 >
 > **Amended 2026-11-18 by the step 9 cleanup (§5 below).** That change removes every
-> legacy fallback and may be merged **only after step 8 has been done and has
-> held, with no legacy-key traffic in the logs**. Where §2 says "before step 9",
+> legacy fallback and was to be merged **only after step 8 had been done and had
+> held, with no legacy-key traffic in the logs**. *(Corrected 2026-11-26: it was
+> merged on 2026-11-18 as `0b7d453`, #487; see Progress in §3. Only its redeploys
+> remain separate owner actions.)* Where §2 says "before step 9",
 > it describes the code that shipped from 2026-11-09 until that merge.
 
 ## 1. Why, and by when
@@ -14,7 +16,10 @@
 Supabase is retiring the JWT-based `anon` and `service_role` keys. Its migration
 guide (supabase.com/docs/guides/getting-started/migrating-to-new-api-keys, read
 2026-11-09) says they "keep working until the end of 2026", and its timetable
-lists deletion as "Late 2026, TBC". The replacements are opaque keys:
+lists deletion as "Late 2026, TBC" *(that quotation is as read on 2026-11-09;
+the hosted page was re-read on 2026-11-25 and words the deadline as "by the end
+of 2026" with no other date, so treat the dates here as dated, not current)*. The
+replacements are opaque keys:
 
 | legacy | replacement | used by |
 | --- | --- | --- |
@@ -123,8 +128,9 @@ allow-list is test files only: there is no production exception.
   seven Moyasar-only functions (`payment-initiate`, `-verify`, `-webhook`,
   `-refund`, `-test-config`) build their clients with `adminClient()` /
   `userClient()`, so the seven-function deploy (`OWNER_ACTIONS.md` §47.4) moves
-  them to the helper. **`_shared/paymentSync.ts:25` still reads
-  `SUPABASE_ANON_KEY` directly**, and that was not changed by the Moyasar work.
+  them to the helper. **`_shared/paymentSync.ts:25` still read
+  `SUPABASE_ANON_KEY` directly** *(at 2026-11-12; fixed by step 9 below)*, and
+  that was not changed by the Moyasar work.
   If online payment is on before step 8, check that file first.
 
   **Fixed by step 9 (#487).** `triggerLazywaitSyncOnce` now sends
@@ -163,7 +169,7 @@ allow-list is test files only: there is no production exception.
 ## 3. Owner steps, in order (each is a separate §5 action)
 
 **Progress, 2026-11-18.**
-- **Step 9 is written and NOT merged** (`security/legacy-key-cleanup-20261118`, §5 below). Merge it only after step 8 has held.
+- ~~**Step 9 is written and NOT merged** (`security/legacy-key-cleanup-20261118`, §5 below). Merge it only after step 8 has held.~~ **Merged 2026-11-18 as `0b7d453` (#487), after step 8 held** (corrected 2026-11-26; the entry below says so).
 - **Step 2 is done.** A publishable key (`default`) and a secret key exist alongside the legacy ones (owner-confirmed; the publishable key read through the Supabase connector).
 - **§4's open question is settled:** sending the publishable key on both `apikey` and `Authorization: Bearer` returned 200 from `GET /auth/v1/settings` and from the `legal_documents` read.
 - **Step 6's `eas.json` prerequisite landed in #485:** all three profiles carry `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, pinned by `apps/mobile/src/lib/env.test.ts`, which also refuses any `sb_secret_` value. The legacy anon variable stayed as the fallback until step 9, which removes it from all three.
@@ -229,7 +235,7 @@ depends on them.
 | 1 | Merge this PR (CI green) | code is inert until step 2 | — |
 | 2 | Dashboard → Settings → API Keys → **create** publishable + secret keys | additive: legacy keys keep working | Edge Functions → Secrets lists `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS` |
 | 3 | Deploy the **receivers**: `push-dispatch`, `admin-push-dispatch`, `operations-alert-dispatch`, `account-delete-process` | they must accept the new format before anything sends it | each function's logs; a POS-sync push still arrives |
-| 4 | Deploy the **senders** and shared-client users: `lazywait-sync`, `account-delete-request`, `account-delete-scheduler`, `order-intake` (all four bundle files, see `ORDER_CONFIRMATION_FLOW.md`), then the rest | senders switch to `apikey`-only on this deploy | place a test order: the POS kick and the confirmation push both happen; the scheduler's next run succeeds |
+| 4 | Deploy the **senders** and shared-client users: `lazywait-sync`, `account-delete-request`, `account-delete-scheduler`, `order-intake` (all **five** bundle files, see the manifest test `_shared/restNoSupabaseJs.test.ts`: `order-intake/index.ts`, `_shared/apiKeys.ts`, `_shared/cors.ts`, `_shared/functionRegion.ts`, `_shared/rest.ts`; `functionRegion.ts` joined on 2026-11-18, #496), then the rest | senders switch to `apikey`-only on this deploy | place a test order: the POS kick and the confirmation push both happen; the scheduler's next run succeeds |
 | 5 | Vercel env (Production **and** Preview), then a gated redeploy — **after #420 and #421, and after the §4 check passes**. **Two** variables, same value: `VITE_SUPABASE_PUBLISHABLE_KEY` (console, legal pages, prerender) and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (the `/app` web export, built by the same `npm run build`) | the console must send `apikey` only first; with only the `VITE_` variable set, `/app` would keep shipping the legacy key and break at step 8 | console sign-in and reads work; `/app` loads the menu and reaches the login screen |
 | 6 | **December EAS build pair** with the publishable key, distributed to every tester. Needs `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` added to the three `apps/mobile/eas.json` profiles first: a small PR, and the value is public | installed binaries carry the old key until replaced | the app signs in and orders on the new build |
 | 7 | Logs: confirm no remaining legacy-key traffic | a remaining caller would break at step 8 | — |
@@ -266,7 +272,7 @@ way are fixed by restoring the Vercel variable.
 - Supabase's exact deletion date ("Late 2026, TBC"). Steps 2-8 should therefore
   finish in December, not wait for an announcement.
 
-## 5. Step 9 — the cleanup (written 2026-11-18, not merged)
+## 5. Step 9 — the cleanup (written 2026-11-18, merged 2026-11-18 as `0b7d453`, #487)
 
 Branch `security/legacy-key-cleanup-20261118` (#487). It removes every
 legacy-key fallback in the tree, including the direct `SUPABASE_ANON_KEY` read in
@@ -325,7 +331,8 @@ branch at `5c78d17`. A function is listed when any file in its bundle differs.
   `admin-push-dispatch`, `operations-alert-dispatch`, `account-delete-process`.
 - **Senders and the checkout path:** `lazywait-sync`, `account-delete-request`,
   `account-delete-scheduler` (`handler.ts`), and `order-intake`. `order-intake`
-  is four files, of which `index.ts`, `rest.ts` and `apiKeys.ts` change;
+  is five files (the test `_shared/restNoSupabaseJs.test.ts` is the manifest;
+  `ORDER_CONFIRMATION_FLOW.md` says four, which predates #496), of which `index.ts`, `rest.ts` and `apiKeys.ts` change;
   `ORDER_CONFIRMATION_FLOW.md`.
 - **Shared client only:** `auth-send-sms-whatsapp`, `email-test-config`,
   `lazywait-catalog`, `lazywait-webhook`, `staff-accounts`, `whatsapp-send-otp`,

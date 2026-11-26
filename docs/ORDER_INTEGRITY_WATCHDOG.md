@@ -16,7 +16,9 @@ Admin UI: **Admin → Order Integrity** (`src/components/admin/OrderIntegrityPan
 ## 1. Scope — what it MAY and MUST NOT do
 
 **MAY (the only side effects that exist):**
-- READ operational state: `orders`, `payment_records`, `checkout_sessions`,
+- READ operational state: `orders`, `payment_records`, (`checkout_sessions` was
+  listed here; corrected 2026-11-26: the scanner never selects from it, it only
+  carries `payment_records.checkout_session_id`),
   `cron.job` (own job only). Since `20261013120000` (written 2026-11-14,
   applied 2026-11-17) also `order_refunds`, and the failed Moyasar
   confirmation rows of `integration_sync_logs` through a partial index that
@@ -49,9 +51,12 @@ are considered safe operational identifiers and are shown.
 - **"successful / captured payment"** == `public.payment_records.status = 'paid'`
   — the exact marker set atomically by `confirm_order_payment` /
   `finalize_checkout_session`, which also mark the order paid and enforce
-  `amount == order total` at capture time. (`payment_records.confirmed_at` is
-  vestigial — always null — so the scanner uses `coalesce(confirmed_at,
-  updated_at)` for capture age.)
+  `amount == order total` at capture time. (`payment_records.confirmed_at` was described here as "vestigial — always null".
+  Corrected 2026-11-26: the trigger `stamp_payment_record_ts`
+  (`20260712120000_tap_payments.sql`, never dropped) sets it to `now()` whenever a
+  row reaches `paid` with it null, so for paid rows the scanner's
+  `coalesce(confirmed_at, updated_at)` uses `confirmed_at`; the `updated_at`
+  fallback is a safety net for rows written before the trigger.)
 - **usable POS reference** == `public.lazywait_pos_ref_is_usable(ref)` — the
   canonical JS-`.trim()`-equivalent helper (a whitespace-only marker is NOT a
   usable reference).
@@ -79,7 +84,7 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 |---|-----------|-----|------------|
 | 1 | `PAID_ORDER_NOT_SYNCED` | critical | paid order of **either** type, not cancelled, `paid_at` > 5 min ago, `lazywait_sync_state ∈ {pending,failed,syncing,blocked}`, and NOT intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
 | 2 | `PAID_ORDER_AWAITING_PAYMENT` | critical | order is paid but still `lazywait_sync_state='awaiting_payment'` (the paid→pending flip was missed). |
-| 3 | `CAPTURED_PAYMENT_WITHOUT_ORDER` | critical | `payment_records.status='paid'` for > 3 min but no corresponding **paid** order (DB-invariant variant — see §4). |
+| 3 | `CAPTURED_PAYMENT_WITHOUT_ORDER` | critical | `payment_records.status='paid'` for > 3 min but no corresponding **paid** order (DB-invariant variant — see "Out of scope for v1" in §6; §4 explains only R11's cutoff). |
 | 4 | `PAYMENT_AMOUNT_MISMATCH` | critical | a paid payment record's `round(amount,2)` differs from its order's `round(total,2)`. |
 | 5 | `DUPLICATE_PROVIDER_REFERENCE` | critical | one paid provider reference (`reference_transaction`/`provider_ref`) maps to **> 1 distinct order**. |
 | 6 | `MULTIPLE_SUCCESSFUL_CAPTURES` | critical | **> 1** paid `payment_records` row for a single order. |
@@ -96,7 +101,7 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 17 | `PAYMENT_CONFIRMATION_FAILED` | critical | a Moyasar payment logged in `integration_sync_logs` as `failed` with `error` `finalize_failed` (no order was created) or `confirm_failed` (the order was not marked paid), while no `payment_records` row for that payment id is `paid` or `refunded`, or is a duplicate or mismatch record. One incident per **payment**, fingerprinted by `md5('moyasar:'\|\|payment id)` like R5, so the payment id itself never enters the watchdog's tables. |
 | 18 | `REFUND_STUCK` | warning, then critical | an `order_refunds` row still `pending` with `attempt_count >= 1` (the worker tried it and released it), opened (`created_at`) **more than 1 hour** ago: **warning**; **more than 24 hours** ago: **critical**. A refund never tried, or one being processed, raises nothing. One incident per **order**; its severity follows the refund's age, so the same incident turns critical in place (§5). `safe_details` carries the last failure code, attempts, amount, age and seconds until the next try, and only a yes/no for the error text. Owner thresholds, gap PG-01, 2026-11-17. |
 
-> ### ✅ CLOSED by R12/R13 — R1 and R7 could not see a cash order, and every real order is cash
+> ### ✅ CLOSED by R12/R13 — R1 and R7 could not see a cash order, and every real order is cash *(as measured 2026-08-27; online payment was read live as enabled on 2026-11-24, with 19 online orders paid, so "every real order is cash" is history)*
 >
 > Removing the `order_type = 'pickup'` filter on 2026-08-27 was necessary and is
 > verified live (0 pickup filters in the deployed body). **It was not
@@ -279,8 +284,9 @@ All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 **no Production order IDs are hard-coded in the scanner logic.**
 
 - `rule_enabled` — per-rule on/off map (all 18 supported rules default `true`;
-  a rule code missing from the map counts as enabled, which is how R14-R18
-  start enabled without a config row).
+  a rule code missing from the map counts as enabled, which is how R12-R18
+  start enabled without a config row; corrected 2026-11-26 from "R14-R18": the seed
+  holds 11 rule keys and R12 and R13 are absent from it too).
   Setting a rule to `false` freezes it: its active incidents stop being updated
   **and stop being resolved** (they neither advance clean-counts nor close).
 - `abandoned_awaiting_payment_since` — seeded to `now()` at apply time, so all
@@ -315,7 +321,9 @@ All tunables live in this table as auditable data (`updated_by` / `updated_at`);
      `escalated` alert resolves this run.
 
 A resolved fingerprint that fires again opens a **new** incident, preserving the
-full history of the prior one. Triage: **acknowledge** (open → acknowledged,
+full history of the prior one. *(Retention, added 2026-11-26: `order_integrity_runs`
+is pruned to 30 days by `operational-history-prune`, `20261001120000`; incidents
+are not pruned.)* Triage: **acknowledge** (open → acknowledged,
 admin-only) or **suppress** (time-bounded, reason required, admin-only).
 Suppressed incidents keep being detected (occurrence still counts) but are not
 alert-eligible until the suppression expires.
@@ -350,7 +358,9 @@ alert-eligible until the suppression expires.
 
 ## 7. Health summary & admin surface
 
-`order_integrity_health_summary()` (service-role) returns a 15-key safe object.
+`order_integrity_health_summary()` (service-role) returns a safe object: 14 keys in
+its first version, 18 since `20260810113000` added the four stranded-order keys
+below (corrected 2026-11-26 from "a 15-key safe object").
 `overall_state` cascade (first match wins; watchdog runs every 2 min):
 
 - `configuration_error` — the latest **decisive** run failed for a non-benign
@@ -359,11 +369,12 @@ alert-eligible until the suppression expires.
   are **ignored** for state selection, so a benign newer run can never mask a
   real config failure. A later successful decisive run clears it.
 - `failing` — cron missing/inactive; OR no successful run in 6 min (or none
-  ever); OR ≥ 1 **unresolved** critical incident.
+  ever); OR ≥ 1 **unresolved** critical incident; OR any stranded order (below),
+  which needs no incident row.
 - `degraded` — ≥ 1 **unresolved** warning incident; OR the latest successful run
   is older than 4 min.
 - `healthy` — cron active, a success within 4 min, zero unresolved critical and
-  zero unresolved warning incidents.
+  zero unresolved warning incidents, and zero stranded orders.
 
 **Stranded orders are a `failing` cause with no incident row.** Since
 `20260810113000`, any non-cancelled blocked or dead-letter Lazywait order (other
@@ -438,7 +449,10 @@ incidents.
 ## 9. Enable / disable / rollback (all non-destructive)
 
 ```sql
--- Pause scanning (keeps all history):
+-- Pause scanning (keeps all history). Corrected 2026-11-26: pausing makes the
+-- health state `failing` (a missing/inactive cron is a `failing` cause, §7),
+-- which raises the critical `order_integrity:incidents` alert and reddens the
+-- platform rollup. It does not touch orders or customers.
 select cron.unschedule('order-integrity-watchdog');
 
 -- Freeze a single rule (its active incidents stop updating/resolving):
@@ -450,6 +464,12 @@ update public.order_integrity_config
 -- tables (see the migration header for the exact DROP list). Dropping the
 -- watchdog cannot affect orders, payments, POS sync, or any business logic —
 -- the objects are self-contained.
+-- Corrected 2026-11-26: "self-contained" holds for orders only. Other objects
+-- now read them: `operations_health_snapshot_internal` reads
+-- `order_integrity_health_summary()` and `order_integrity_incidents` (the order
+-- integrity and payment cards go `unavailable` if they are dropped), and the
+-- nightly `operational-history-prune` deletes from `order_integrity_runs`, so
+-- dropping the table leaves that job failing. List and handle them first.
 ```
 
 The migration is **additive and idempotent** (create-or-replace, `IF NOT
@@ -460,7 +480,10 @@ EXISTS`, `ON CONFLICT DO NOTHING` seeds, and a cron guard that only rejects a
 
 ## 10. Change control
 
-Repository-only until an owner-approved application. Apply **only** through the
+*(Corrected 2026-11-26: this opened "Repository-only until an owner-approved
+application". The migration and its later redefinitions are applied — ledger rows
+119 and 121, and `20261013120000`, applied 2026-11-17, in `docs/MIGRATIONS.md`; the
+rule below still governs any change.)* Apply **only** through the
 `apply_migration` workflow in `docs/MIGRATIONS.md`; never `supabase db push` or
 `migration repair`. Enabling alert dispatch, adding provider-side capture
 reconciliation, or any automatic remediation are **separate** future

@@ -5,8 +5,18 @@ Administrators can permanently delete a branch from **Dashboard → Branch Manag
 - Accountants remain read-only and do not see the delete control.
 - Deleting is confirmed with a **type-to-confirm** prompt: the admin must type the
   branch name (English or Arabic). The prompt names the branch, states the delete
-  cannot be undone, and spells out that it also removes the branch's **delivery
-  area** and **product-availability settings** (both cascade with the branch).
+  cannot be undone, and lists what is deleted with the branch. *(Corrected
+  2026-11-26: this named only the delivery area and product-availability
+  settings. Fourteen tables cascade with a branch, listed in
+  `BRANCH_CASCADE_TABLES` in `src/lib/branchDeletion.ts` and pinned by
+  `branchDeletion.test.ts`: product, add-on and size availability, delivery
+  zones and areas, working hours, staff assignments, branch-scoped campaigns
+  and points campaigns, delivery requests, the branch reference sheet, and
+  three append-only audit tables (delivery pause events, availability closure
+  events, and the log of who revealed a stored credential). The prompt in
+  `src/components/admin/branchDeletion.ts` now says all of it, and that vault
+  secrets held for the branch's reference entries are NOT deleted and stay
+  behind unreferenced.)*
 - The delete control is disabled **only for the row being deleted**, so other
   branches stay usable while one delete is in flight.
 

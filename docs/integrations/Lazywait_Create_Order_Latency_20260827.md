@@ -1,5 +1,13 @@
 # Lazywait — `POST /pos/orders/create` response time, 2026-08-27
 
+> **Dated 2026-08-27; do not send it as it stands (note added 2026-11-26).** Item 4
+> below lists what we sent on that date. Since 2026-11-19 a card order with a
+> captured payment also sends `is_paid` and an `order_payments` line, so refresh
+> item 4 first. The file also carries internal detail (our order numbers, an
+> internal RPC name and log lines) and a "Note for us, not for Lazywait" section
+> at the end; split the ticket text from that note before anything is sent to
+> the vendor. Whether it was ever sent is not recorded in the repository.
+
 **Purpose: this is a support ticket to send to Lazywait, written so it can be
 read by someone who does not know our system.** It asks one question — why does
 Create Order sometimes take eight seconds? — and gives four timestamped
@@ -85,7 +93,7 @@ nothing left to optimise on our side.
    `branch_id`, `order_items[]`, `customer_name`, `source`, `order_details`,
    `delivery_address`, `customer_cell` / `country_code`, and the money fields
    (`subtotal`, `total`, `tax`). We do **not** send `order_deliveries[]`,
-   coordinates, or `is_paid`.
+   coordinates, or `is_paid` *(as of 2026-08-27; `is_paid` and `order_payments` are sent for a card order since 2026-11-19)*.
 
 If it helps, we can supply the exact request bodies for any of the four orders
 above.

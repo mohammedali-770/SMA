@@ -7,6 +7,15 @@
 > blocked", and failure drill **3** — describe behaviour that no longer exists
 > and are annotated in place. Do not run them as current acceptance criteria; see
 > `docs/LAZYWAIT.md` for how delivery behaves now.
+>
+> **Corrected 2026-11-26 (documentation audit).** The recipes below also
+> predate the retry and scheduling changes, and are annotated in place where
+> they would mislead: the worker **is** scheduled (a `lazywait-sync` pg_cron job
+> exists since `20260720120000`), so §7's `cron.schedule` snippet must not be run;
+> there is **no automatic retry** and a 5xx, timeout or dropped connection is
+> `confirmation_required`, not `failed`; `supabase db push` is forbidden against
+> Production (CLAUDE.md §8); and the GO/NO-GO delivery items are retired. For
+> current behaviour read `docs/LAZYWAIT.md`.
 
 A controlled, reversible pilot that syncs **pickup** orders from **one** local
 branch (mapped to one Lazywait **test** branch) with **one or two simple
@@ -41,14 +50,20 @@ products**. Nothing else is exercised: no delivery, no addons/modifiers, no
 | Readiness | `lazywait_mapping_status()` | staff-only; counts + readiness + `secrets_configured` bool (no token) |
 | Sync worker | Edge fn `lazywait-sync` | claims due orders (SKIP LOCKED) → `POST /pos/orders/create` (pickup) → `record_lazywait_sync` |
 | Stale recovery | `reap_stale_lazywait_syncs()` | called at the start of every worker run |
-| Requeue | `requeue_lazywait_order()` + admin **Retry** button | resets attempt count |
+| Requeue | `requeue_lazywait_order()` + admin **Retry** button | resets the order to `pending`; does NOT reset the attempt count or the 10-minute deadline, and refuses (`deadline_expired`, `attempt_limit_reached`, `may_have_sent`, `confirmation_required`) rather than resend an order that may be at the POS |
 | POS status webhook | Edge fn `lazywait-webhook` | optional for the pilot (push works without it) |
-| Admin UI | Settings → Integrations → **Lazywait POS** card + **Lazywait Sync Monitor** | pull, map, status/readiness, per-order state, Retry |
+| Admin UI | System → Integrations → **Lazywait POS** card + the **Lazywait POS — Sync Monitor** panel | pull, map, status/readiness, per-order state, Retry |
 
 **Small code fixes required before the pilot: NONE.** Two operational facts to
 respect (not code changes):
-1. **The worker is not scheduled** — trigger `lazywait-sync` manually during the
-   pilot (§2), or add a `pg_cron` schedule (§7 has the snippet).
+1. ~~**The worker is not scheduled**~~ **Corrected 2026-11-26: it is.** A
+   `lazywait-sync` pg_cron job has run every minute since
+   `20260720120000_lazywait_sync_scheduler`; its whole command is
+   `select public.invoke_lazywait_sync_processor();` (it reads the project URL
+   and the trigger secret from Vault, and records each tick in
+   `lazywait_sync_cron_health`). The first-pilot instruction to trigger it by
+   hand (§2.4) still works as a manual extra run. Do **not** add a second
+   schedule (§7).
 2. **Set secrets & read readiness through the Admin UI** (admin JWT). The
    `upsert_integration_settings` / `lazywait_mapping_status` RPCs are
    `is_admin`/`is_staff`-gated and will raise `42501` in a raw SQL editor
@@ -63,7 +78,7 @@ recommended.
 
 - [ ] **[C]** Lazywait API token **rotated** (fresh token; the leaked one is dead).
 - [ ] **[C]** Lazywait secrets configured **server-side** (`integration_settings.secret_config.api_token`, `public_config.client_id`, `public_config.base_url`).
-- [ ] **[C]** DB migrations pushed (incl. `20260708130000`, `20260708140000`, `20260708150000`).
+- [ ] **[C]** DB migrations applied (incl. `20260708130000`, `20260708140000`, `20260708150000`) — by the owner-approved workflow in `docs/MIGRATIONS.md`, never `supabase db push` (see §2.1).
 - [ ] **[C]** `lazywait-sync` function deployed.
 - [ ] **[C]** `lazywait-catalog` function deployed.
 - [ ] `lazywait-webhook` function deployed (optional; only needed for POS→app status updates).
@@ -86,12 +101,22 @@ Run from the repo root with the Supabase CLI logged in and linked
 (`supabase link --project-ref <PROJECT_REF>`).
 
 ### 2.1 Database migrations
-```bash
-supabase db push          # applies all migrations, incl. the 3 lazywait ones
-supabase migration list   # confirm 20260708130000 / 140000 / 150000 are applied
-```
+> **Corrected 2026-11-26.** This section used to say `supabase db push`.
+> **`supabase db push` and `supabase migration repair` are PERMANENTLY FORBIDDEN
+> against Production** (CLAUDE.md §8), and an instruction that names no file is
+> not an instruction to apply anything. (While the Moyasar payment migration was
+> unapplied, a bulk apply would have taken it first; it was applied 2026-11-13,
+> `MIGRATIONS.md` ledger row 114, so that is history, not a current warning.)
+> Every Production migration is applied by version through
+> the owner-approved workflow in `docs/MIGRATIONS.md`; the three Lazywait files
+> named here were applied long ago. For a LOCAL database only, apply them from
+> `supabase/migrations/`; to read what is applied, use the live
+> `supabase_migrations.schema_migrations` read described in `docs/MIGRATIONS.md`.
+
 
 ### 2.2 Edge Functions
+> Every Edge Function deploy is an owner-approved action (CLAUDE.md §5);
+> follow `docs/DEPLOY.md`.
 ```bash
 supabase functions deploy lazywait-sync lazywait-catalog lazywait-webhook
 # (payment-webhook / order-intake unchanged; deploy only if not already live)
@@ -99,8 +124,11 @@ supabase functions deploy lazywait-sync lazywait-catalog lazywait-webhook
 
 ### 2.3 Secrets / config (server-side; NEVER committed)
 
-**Preferred — Admin UI:** sign in as an **admin**, go to
-Settings → Integrations → **Lazywait POS** card, enter:
+**Preferred — Admin UI** (for everything except `sync_trigger_secret`, which the
+card **cannot** set: its Lazywait secret fields are `api_token` and
+`webhook_secret` only, so the trigger secret is set in SQL, see the merge form
+below): sign in as an **admin**, go to System → Integrations → **Lazywait POS**
+card, enter:
 - `base_url` = `https://apiv2-dev.lazywait.com/v1`  (public) — **the dev host is the live POS**, see `LAZYWAIT.md` "Which host is live"
 - `client_id` = `<CLIENT_ID>`  (public)
 - `api_token` = `<ROTATED_API_TOKEN>`  (secret)
@@ -112,6 +140,14 @@ Settings → Integrations → **Lazywait POS** card, enter:
 Leave **Enabled OFF** for now (map first, enable last).
 
 **Alternative — SQL editor (runs as superuser, bypasses the admin-gated RPC):**
+> **Corrected 2026-11-26.** The statement below assigns whole objects: it drops
+> any other key already in `public_config` or `secret_config`, forces
+> `enabled = false` (which switches POS sync **off** on a live system; see §7 for
+> what that does to queued orders), and overwrites a stored `webhook_secret`
+> with whatever placeholder you leave. To set only the trigger secret on a
+> configured row, merge instead and do not touch `enabled`:
+> `update public.integration_settings set secret_config = coalesce(secret_config,'{}'::jsonb) || jsonb_build_object('sync_trigger_secret','<SYNC_TRIGGER_SECRET>') where provider_type = 'lazywait';`
+> The first-time form follows as written for the pilot.
 ```sql
 update public.integration_settings
    set enabled       = false,   -- flip to true only at GO (§8)
@@ -133,7 +169,7 @@ curl -sS -X POST "https://<PROJECT_REF>.supabase.co/functions/v1/lazywait-sync" 
   -H "Content-Type: application/json" \
   -H "x-sync-secret: <SYNC_TRIGGER_SECRET>" \
   -d '{"limit":5}'
-# → {"status":"ok","claimed":N,"synced":N,"failed":0,"blocked":0,"dead_letter":0,"reaped":{...}}
+# → {"status":"ok","claimed":N,"synced":N,"retrying":N,"confirmation_required":N,"dead_letter":N,"blocked":N,"skipped":N,"reaped":{...},"notified":...,"targeted":...}
 # "status":"disabled" means the integration is not enabled yet (expected pre-GO).
 ```
 
@@ -175,7 +211,7 @@ select order_id, direction, status, error, created_at
 
 Do these as a signed-in **admin** (accountants can view but every write is blocked).
 
-1. Open **Settings → Integrations**.
+1. Open **System → Integrations**.
 2. In the **Lazywait POS** card, confirm `base_url` + `client_id` are set and the
    secret shows *configured* (never the value). (Keep **Enabled OFF** for now.)
 3. In **Lazywait Sync Monitor → Catalog Mapping**, click **Pull from Lazywait**.
@@ -185,15 +221,20 @@ Do these as a signed-in **admin** (accountants can view but every write is block
    click **Confirm**. The row shows `mapped: <lazywait_branch_id>`.
 5. **Map 1–2 products:** on the **Products** tab, for each test product select the
    matching Lazywait item and **Confirm**. (If the item has multiple prices, pick
-   the price variant — stored for **reference only**, not sent.)
+   the price variant — *corrected 2026-11-26: the chosen tier's `price_id` IS sent
+   in Create Order; it selects the POS price line, so pick it deliberately*.)
 6. **Verify mapping status:** the summary shows Branches `1/…`, Products `≥1/…`,
    and **Blocked orders `0`** (before any test order).
 7. **Verify sync readiness:** the readiness card shows ✓ for *≥1 branch mapped*,
    *active products mapped*, *no blocked orders*. *Secrets configured* turns green
    only once **Enabled** is ON — so once mapping looks right, flip **Enabled ON**
    in the Lazywait POS card. With only the test branch/products mapped this is
-   safe (unmapped orders still block). The card then reads **READY**, and you can
-   run the §4 test order.
+   safe (unmapped orders still block). *Corrected 2026-11-26: the card reads
+   **READY** only when **every** active product is mapped ("All active products
+   mapped", `lazywait_mapping_status()`); with one or two of the whole menu
+   mapped it stays **NOT READY**, which is expected for this pilot and does not
+   stop the worker, which does not read the card.* You can run the §4 test order
+   once the other checks are green.
 
 ---
 
@@ -252,9 +293,9 @@ select status, error from public.integration_sync_logs
 | 1 | **Missing branch mapping** — clear the branch mapping, place a pickup order | `lazywait_sync_state='blocked'`, `sync_blocked_reason='missing_branch_mapping'`; **not** sent; a `skipped` sync log; local order unaffected |
 | 2 | **Missing product mapping** — order a product with no `lazywait_item_id` | `blocked`, `sync_blocked_reason='missing_item_mapping'`; not sent |
 | 3 | ~~**Delivery order** — place a delivery order~~ | ~~`blocked`, `delivery_schema_unconfirmed` at insert; never sent~~ **Retired 2026-08-27** — a delivery order now syncs and creates a real POS ticket. |
-| 4 | **Auth failure** — set an invalid `api_token`, trigger a run | order → `blocked` (`auth_invalid_key`), no retry storm; fix token + **Retry** |
-| 5 | **Retryable network/5xx** — (e.g. wrong `base_url` host, or Lazywait 5xx) | order → `failed`, `sync_attempt_count++`, `sync_next_attempt_at=now()+backoff`; auto-retries; after 8 attempts → `dead_letter` |
-| 6 | **Stale `syncing` reaper** — set a test order to `syncing` with an old `updated_at` (SQL below), trigger a run | ref-less row → `failed` (requeued) / `dead_letter`; a row *with* a `lazywait_ref` → recovered to `synced` (never re-sent); a `recovered_*` `integration_sync_logs` row is written |
+| 4 | **Auth failure** — set an invalid `api_token`, trigger a run | order → `blocked` (`auth_invalid_key`), no retry storm; fix token + **Retry** (*corrected 2026-11-26: Retry works only inside the order's 10-minute window from first becoming `pending`; after that `requeue_lazywait_order` refuses with `deadline_expired` and the order must be checked at the POS instead*) |
+| 5 | ~~**Retryable network/5xx** — (e.g. wrong `base_url` host, or Lazywait 5xx)~~ | ~~order → `failed`, `sync_attempt_count++`, `sync_next_attempt_at=now()+backoff`; auto-retries; after 8 attempts → `dead_letter`~~ **Corrected 2026-11-26 — none of that happens.** A 5xx, a timeout or a dropped connection is *ambiguous* (the POS may hold the order) and the order goes to `confirmation_required`, never auto-resent, with the customer told "verifying"; verify at the POS. Only HTTP 429, or a connection that provably never opened (DNS, refused, TLS), is a `safe_retry`: state `failed`, at most 5 attempts (`MAX_POS_ATTEMPTS`) inside the 10-minute deadline — and a database trigger clears `sync_next_attempt_at` for `failed`, so **nothing claims it again**; it waits for the customer's Resend or an admin Retry. A wrong `base_url` host returns 500 before anything is claimed. |
+| 6 | **Stale `syncing` reaper** — set a test order to `syncing` with an old `updated_at` (SQL below), trigger a run | a row *with* a `lazywait_ref` → recovered to `synced` (never re-sent); ref-less **with** `pos_create_attempted_at` set → `confirmation_required` (never re-sent); ref-less with that marker null → `failed` (requeued) or `dead_letter`. *(Corrected 2026-11-26: the old text listed only the last case, and the induce SQL below leaves the marker null.)* A `recovered_*` / `stale_syncing_*` `integration_sync_logs` row is written |
 
 Reaper induce (throwaway/staging only):
 ```sql
@@ -271,10 +312,30 @@ update public.orders
   card → toggle **Enabled OFF** (or `update integration_settings set enabled=false
   where provider_type='lazywait';`). The worker then returns `{"status":"disabled"}`
   and sends nothing. New orders still queue as `pending` but are never transmitted.
-- **Stop the worker entirely:** simply stop triggering it. If you scheduled it,
-  `select cron.unschedule('lazywait-sync');`.
+  **Corrected 2026-11-26 — this is not harmless or freely reversible.** Each
+  order gets a 10-minute deadline when it first becomes `pending`, and since
+  2026-11-24 the worker runs the stale-sync sweep even while the integration is
+  off (`docs/LAZYWAIT.md` "The sweeps run when the integration is off or
+  misconfigured"). An order still `pending` at its deadline therefore becomes
+  `dead_letter` and the customer is sent a "we could not send your order"
+  message, even though nothing was ever attempted. Orders placed during a
+  switch-off are not delivered to the kitchen when you switch back on; they
+  need the customer's Resend or an admin hand-off. Weigh that before pressing
+  the switch on a branch taking real orders.
+- **Stop the worker entirely:** ~~simply stop triggering it~~ **corrected
+  2026-11-26** — the `lazywait-sync` cron job runs every minute and
+  `order-intake` kicks the worker per order, so "stop triggering it" does not stop
+  anything. Disable the integration (above); to also stop the schedule,
+  `select cron.unschedule('lazywait-sync');`, which is an owner-approved
+  production change and also stops the stale-order sweep.
 - **Requeue a stuck/blocked order:** Admin **Retry** button, or
-  `select public.requeue_lazywait_order('<ORDER_ID>');` (admin). Ops in SQL editor:
+  `select public.requeue_lazywait_order('<ORDER_ID>');` (admin). It refuses once
+  the order's 10-minute deadline has passed, at 5 attempts, and for any order
+  that may already be at the POS (corrected 2026-11-26).
+  **The raw-SQL recipe below is retired (2026-11-26): do not run it.** It skips
+  those guards and the cancelled-order, refund and order-progress checks, and
+  the order it revives past its deadline is swept straight to `dead_letter` with
+  a customer message. Kept as the record of what the pilot offered:
   ```sql
   update public.orders set lazywait_sync_state='pending', sync_attempt_count=0,
     sync_next_attempt_at=now(), sync_last_error=null, sync_blocked_reason=null
@@ -293,10 +354,22 @@ update public.orders
   `lazywait_ref`, (b) persists the ref immediately on POST success, (c) blocks an
   ambiguous 2xx (`created_without_ref` / `unexpected_response`) instead of
   retrying, and (d) the reaper recovers a stale `syncing`-with-ref to `synced`.
-  If a `blocked` order's reason is `created_without_ref`/`unexpected_response`,
-  **check the POS first** — if the ticket exists, do not requeue (mark it synced
-  manually or leave blocked); only requeue if the POS has no such order.
-- **Scheduling (optional, if you want hands-off during the pilot):**
+  *(Corrected 2026-11-26: (c) is `confirmation_required`, not `blocked`. An
+  ambiguous 2xx (`created_without_ref` / `unexpected_response`) is recorded as
+  `confirmation_required` with `pos_confirmation_reason` set, and the order
+  appears in `list_pos_confirmation_required`, not under blocked orders.)*
+  For such an order **check the POS first** — if the ticket exists, do not
+  resend; the admin Retry refuses it anyway. There is no supported way to mark
+  it synced by hand: `record_lazywait_sync` turns a `synced` request without a
+  usable ref into `confirmation_required`.
+- **Scheduling — DO NOT RUN (corrected 2026-11-26).** The worker is already
+  scheduled (§0): a `lazywait-sync` cron job exists, installed by
+  `20260720120000_lazywait_sync_scheduler` with the command
+  `select public.invoke_lazywait_sync_processor();`. `cron.schedule` with the same
+  name **replaces** that job, so the snippet below would swap the Vault-backed
+  driver for one that writes the trigger secret in plain text into `cron.job`
+  and loses the per-tick health ledger (`lazywait_sync_requests`,
+  `lazywait_sync_cron_health`). Kept as the record of the original pilot text:
   ```sql
   select cron.schedule('lazywait-sync','* * * * *', $$
     select net.http_post(
@@ -321,16 +394,19 @@ controlled pickup orders, then plan widening) or **halt** (flip Enabled OFF).
 - [ ] **[C]** 1–2 active test products mapped; no missing `lazywait_item_id` on them.
 - [ ] **[C]** A pickup test order reaches `lazywait_sync_state='synced'` with a
       `lazywait_ref` **and** appears in the Lazywait POS.
-- [ ] **[C]** A delivery order is `blocked` and never sent.
+- [ ] ~~**[C]** A delivery order is `blocked` and never sent.~~ **Retired 2026-08-27** — delivery syncs; this check would now correctly fail.
 - [ ] **[C]** Missing-mapping cases `block` (never send); auth failure `blocks`
-      safely; a retryable error retries with backoff.
+      safely; ~~a retryable error retries with backoff~~ *(corrected 2026-11-26:
+      a 429 is a bounded safe retry that waits for a manual Resend or Retry; an
+      ambiguous failure goes to `confirmation_required` and is never resent
+      automatically)*.
 - [ ] **[C]** Rollback verified: toggling **Enabled OFF** stops all sending.
 
 **NO-GO — do not enable / halt the pilot — if ANY of these:**
 - Any token appears in the app bundle, repo, logs, or a client response.
 - A pickup order **duplicates** in the POS, or an order syncs from an **unmapped**
   branch/product.
-- A **delivery** order is transmitted to the POS.
+- ~~A **delivery** order is transmitted to the POS.~~ *(Retired 2026-08-27: delivery is transmitted by design.)*
 - A stuck `syncing` order is not recovered by the reaper.
 - The worker cannot be stopped (Enabled OFF still sends), or you cannot requeue/
   clear a mapping.
@@ -346,5 +422,6 @@ modifiers, `price_id`, `customer_id`/`customer_cell`, online-payment update
 ## 9. After a successful pilot (next, not now)
 Map the remaining active products for the pilot branch, run a few more pickup
 orders, then widen branch-by-branch — re-checking readiness (`blocked_orders=0`,
-all active products mapped) at each step. Only then revisit addons/`price_id`/
-delivery once Lazywait confirms those schemas.
+all active products mapped) at each step. ~~Only then revisit addons/`price_id`/
+delivery once Lazywait confirms those schemas.~~ *(Superseded: add-ons, `price_id`
+and delivery are live; see `docs/LAZYWAIT.md`.)*

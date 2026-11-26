@@ -3,8 +3,15 @@
 **The repository and Vercel production standard is Node 22.**
 
 `.nvmrc` at the repository root is the developer/CI source of truth. Every
-GitHub workflow that sets up Node reads it via `node-version-file: .nvmrc`
-rather than hardcoding a number, so the version cannot drift between workflows.
+`setup-node` step in the GitHub workflows (eight, across `dependency-audit-weekly.yml`,
+`design-system.yml`, `docs.yml`, `eas-build.yml`, `eas-status.yml` and three jobs of
+`production-gates.yml`, counted 2026-11-26 with `grep -c setup-node`) reads it via
+`node-version-file: .nvmrc` rather than hardcoding a number, so the version cannot
+drift between those steps. *(Two things are outside that guarantee:
+`change-control.yml` runs `node scripts/check-workflow-pins.mjs` with no
+`setup-node` step, so that gate uses whatever Node the `ubuntu-latest` runner
+carries, and its guard-test job uses the runner's Node as one of its parsers on
+purpose.)*
 
 The root `package.json` also declares `engines.node: "22.x"`. Vercel reads that
 field and uses it to select the build runtime, overriding the project-level Node
@@ -26,11 +33,13 @@ suite fails to start:
 Error: Node.js detected but native WebSocket not found.
 Suggested solution: Ensure you are running Node.js 22+ or provide a WebSocket
 implementation via the transport option.
- ❯ src/lib/supabase.ts:19:25
+ ❯ src/lib/supabase.ts   (the `createClient` call; the line number moves)
 ```
 
 Node 22 is therefore a floor, not a preference. It is also the version used by
-EAS-related GitHub workflows and the production web build.
+EAS-related GitHub workflows and the production web build. *(The Node version used
+by EAS **cloud** builds is not set by `.nvmrc`: `apps/mobile/eas.json` has no
+`node` key, so it is EAS's default, which is not known from the repository.)*
 
 ## Where the version applies
 
@@ -42,6 +51,8 @@ EAS-related GitHub workflows and the production web build.
 | `eas-build.yml` | `.nvmrc` | Fires on `workflow_dispatch` or a `mobile-build-*` tag only. |
 | `eas-status.yml` | `.nvmrc` | Read-only EAS query; never starts a build. |
 | `deploy-functions.yml` | n/a | Uses `supabase/setup-cli`; no Node/npm setup. |
+| `design-system.yml`, `docs.yml`, `production-gates.yml`, `dependency-audit-weekly.yml` | `.nvmrc` | Added 2026-11-26 to the table; `design-system.yml` is the job that runs `npm test`. |
+| `change-control.yml` | runner default | No `setup-node` step. |
 
 ## Why the Vercel pin was added separately
 
