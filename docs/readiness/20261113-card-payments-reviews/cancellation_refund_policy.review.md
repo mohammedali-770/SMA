@@ -6,6 +6,8 @@
 > "Draft L234" refer to that earlier version, not to the file as merged. Every
 > finding is answered in the draft's Fix log: what was changed, and why where a
 > finding was not applied as written. Read the draft for the current text.
+>
+> **Added 2026-11-26.** Every code, migration and document line number in this review is relative to the default branch at `04eb351`, the commit it names below, and not to any later commit; most of them no longer land on the cited text in a current tree (the full audit's document pass, plan dated 2026-11-19, found 7 of 23 sampled citations resolving at the default-branch tip `50a2241`). Open them with `git show 04eb351:<path>`, or find the symbol. Where a suggested wording below was not used, the draft's Fix log says so; do not copy a "Correction" from here into a published text.
 
 ## Fact-check: cancellation_refund_policy.md, the "Proposed text" section (EN and AR)
 
@@ -67,7 +69,7 @@
 **S1. The "Received" status does not mean preparation has not started (kept line, but it now decides a card refund).**
 - **Quoted:** "You can ask to cancel while your order is still Received, before the branch starts preparing it." (EN 137, AR 178)
 - **Evidence:**
-  - `orders.status` changes only through `admin_set_order_status`, which requires `is_admin()` (20260918120000:641-650, 794-796).
+  - `orders.status` changes only through `admin_set_order_status`, which requires `is_admin()` (`20260918120000`: the `is_admin()` check is at line 618; lines 641-650 are the transition table and 794-796 the status update, which the same audit found were cited in place of it).
   - The POS webhook never changes it (lazywait-webhook/index.ts:15-17).
   - Live, last 90 days: 50 received/synced, 3 received/blocked, 1 delivered. So 53 of 54 orders never left "Received", which is the label the Orders tab shows (OrdersScreen.tsx:23).
 - **Corrected wording:**
@@ -197,7 +199,7 @@
 - **Quoted:** "a credit card" / «البطاقة الائتمانية» (EN 161, AR 202)
 - **Evidence:**
   - The enabled methods are mada, Visa/Mastercard and Apple Pay (PAYMENTS.md:15). Debit Visa/Mastercard cards are not covered by "credit card".
-  - The 1-3 / 7-14 day figures could not be found in Moyasar's public docs on 2026-11-13: neither the refund API page nor the payment-operations guide states timing. The repo note (Moyasar_API_Reference.md:244-245, "not tested") is the only source.
+  - The 1-3 / 7-14 day figures could not be found in Moyasar's public docs on 2026-11-13: neither the refund API page nor the payment-operations guide states timing. The repo note (Moyasar_API_Reference.md:244-245, "not tested") is the only source. *(Superseded 2026-11-14: Moyasar's FAQ does state them, "Mada cards: 24 hours to 3 business days. Credit cards: 7 to 14 business days". See `docs/readiness/20261113-card-payments-gaps.md`, the section that lists refund timing as superseded.)*
 - **Correction:** "a Visa or Mastercard card" / «بطاقة فيزا أو ماستركارد».
 
 **N4. A live push message describes a different process.**

@@ -39,7 +39,7 @@
         "apps/mobile/src/app/payment/**",
         "apps/mobile/src/components/PaymentWebView*.tsx",
         "apps/mobile/src/features/checkout/CheckoutScreen.tsx",
-    "apps/mobile/src/features/checkout/checkoutHandoff*.ts",
+        "apps/mobile/src/features/checkout/checkoutHandoff*.ts",
         "apps/mobile/src/features/checkout/pendingSession*.ts",
         "apps/mobile/src/features/checkout/webviewPolicy*.ts",
         "apps/mobile/src/features/checkout/paymentWebViewWiring*.ts",
@@ -95,10 +95,11 @@
     },
     {
       "id": "lazywait-pos",
-      "why": "Orders reach the kitchen through Lazywait. The integration contract and its failure modes are documented because an outage here is invisible in the app but total in the branch.",
+      "why": "Orders reach the kitchen through Lazywait. The integration contract and its failure modes are documented because an outage here is invisible in the app but total in the branch. _shared/posPaidFlag.ts is listed because it decides whether a card order is sent to the POS as PAID and what card line the kitchen ticket and receipt carry, and its name does not start with lazywait, so before 2026-11-26 a change to the paid rule fired no rule; LAZYWAIT.md describes it.",
       "sources": [
         "supabase/functions/lazywait-*/**",
         "supabase/functions/_shared/lazywait*.ts",
+        "supabase/functions/_shared/posPaidFlag.ts",
         "src/components/admin/LazywaitPanel.tsx",
         "src/components/admin/LazywaitCatalogMapping.tsx"
       ],
@@ -217,7 +218,7 @@
     },
     {
       "id": "watchdog-rules",
-      "why": "The watchdog's rule set is the answer to 'would we find out if an order never reached the kitchen?', and it lives in a migration rather than in application source, so the order-integrity rule above cannot see it. Its own document carries the rule table an operator reads to know what is covered; a rule added or removed without that table moving makes the table actively misleading rather than merely stale. Single doc, for the same OR-semantics reason as database-migrations.",
+      "why": "The watchdog's rule set is the answer to 'would we find out if an order never reached the kitchen?', and it lives in a migration rather than in application source, so the order-integrity rule above cannot see it. Its own document carries the rule table an operator reads to know what is covered; a rule added or removed without that table moving makes the table actively misleading rather than merely stale. Single doc, for the same OR-semantics reason as database-migrations. KNOWN LIMIT (2026-11-26): the rule matches on the FILE NAME, because the checker has no content matching, and two migrations that redefine order_integrity_watchdog() do not carry the word (20261013120000_payment_refund_visibility.sql added rules R14 to R17 and 20261016120000_refund_retry_backoff.sql added R18). Both are applied and immutable, so naming them here would add no protection; the limit applies to the NEXT migration that redefines the function under a name without the word. Until the checker can match content, put \"watchdog\" in the file name of any migration that adds, changes or removes a watchdog rule, and update ORDER_INTEGRITY_WATCHDOG.md by hand in the same pull request if it does not.",
       "sources": [
         "supabase/migrations/*watchdog*.sql"
       ],
@@ -348,6 +349,26 @@
       ],
       "docs": [
         "docs/ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "admin-edge-gate",
+      "why": "_shared/adminAuth.ts is the single admin gate for the Edge Functions that act with the service-role client on an administrator's word (staff-accounts, whatsapp-test-config, email-test-config, push-dispatch, admin-push-dispatch, operations-alert-dispatch, payment-test-config). It asks Postgres for is_admin() as the caller, which is role admin AND AAL2, and a change to it alters which callers reach service-role code. It matched no rule before 2026-11-26. The owning section is 'Staff account provisioning' in docs/ARCHITECTURE.md, which records the predicate; each function's own document records what it does behind the gate.",
+      "sources": [
+        "supabase/functions/_shared/adminAuth.ts"
+      ],
+      "docs": [
+        "docs/ARCHITECTURE.md"
+      ]
+    },
+    {
+      "id": "provider-secrets",
+      "why": "_shared/secrets.ts is the one sanctioned way for an Edge Function to read a provider's secret configuration (integration_settings.secret_config, a table revoked from every client role) with the service-role client. A change to what it selects or returns is a change to the secret boundary, and it matched no rule before 2026-11-26. SECURITY_REVIEW.md records the boundary: secrets live only in secret_config and the client sees only has_secret.",
+      "sources": [
+        "supabase/functions/_shared/secrets.ts"
+      ],
+      "docs": [
+        "docs/SECURITY_REVIEW.md"
       ]
     }
   ]

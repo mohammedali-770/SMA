@@ -18,7 +18,7 @@ The practical consequence: **adding a route, an Edge Function, a table or an env
 
 ```sh
 npm run docs:generate   # rewrite the generated reference
-npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshness
+npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshness + the test-phone-number allowlist
 ```
 
 > **A standing warning about live state.** Nothing in this repository can prove what production currently holds. Source describes source. Dashboard settings, deployed function versions, Supabase configuration and store console state all change independently of Git. Where a document states a live fact it carries the date it was verified and how. Treat an undated live claim as unverified, and check it read-only rather than assuming — or writing.
@@ -36,7 +36,7 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | See whether something is already tested | [Test inventory](reference/testing.md) |
 | Know which environment variables exist and which are public | [Environment variables](reference/environment.md) |
 | Know which CI check is which | [CI gates and scripts](reference/ci-and-scripts.md) |
-| Write or change a migration | [Migration workflow](MIGRATIONS.md) · [latest live reconciliation](MIGRATION_RECONCILIATION_20260812.md) |
+| Write or change a migration | [Migration workflow](MIGRATIONS.md), whose ledger records every apply · the current position is [CLAUDE.md §8](../CLAUDE.md) (re-derive the counts, do not quote them) · [the 2026-08-12 snapshot](MIGRATION_RECONCILIATION_20260812.md) is historical |
 | Follow the repository's change-control rules | [CLAUDE.md](../CLAUDE.md) · [AGENTS.md](../AGENTS.md), the rules an automated reviewer applies |
 | Add or change documentation | [Contributing to the documentation](CONTRIBUTING.md) |
 
@@ -79,12 +79,14 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | --- | --- |
 | Lazywait POS | [Lazywait](LAZYWAIT.md) · [API reference](integrations/Lazywait_API_Reference.md) · [pilot](LAZYWAIT_PILOT.md) · [open questions](lazywait-delivery-open-questions.md) |
 | WhatsApp sign-in and OTP | [WhatsApp login](WHATSAPP_LOGIN.md) · [OTP autofill findings](OTP_AUTOFILL.md) · [Zero-Tap sign-in restoration — proposed design](ZERO_TAP_SIGN_IN.md) |
-| Push notifications | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
+| Push notifications (customer app, Expo) | [Owner actions §10](OWNER_ACTIONS.md) · [CLAUDE.md §7](../CLAUDE.md) |
+| Push notifications (staff console web push, a separate channel that never reaches a customer) | [Admin push notifications](ADMIN_PUSH_NOTIFICATIONS.md) |
 | Payments (Moyasar) | [Payments](PAYMENTS.md) — the runbook, read this first · [API reference](integrations/Moyasar_API_Reference.md) · [static-IP proxy comparison](integrations/Moyasar_Static_IP_Proxy.md) · [how Saudi apps get fixed addresses](integrations/Saudi_Apps_Static_Egress_20261113.md) · [card-payment gaps](readiness/20261113-card-payments-gaps.md) · [Faster card payment: Apple Pay and saved cards — proposed design](FASTER_CARD_PAYMENT.md) |
 | Maps | [Maps](MAPS.md) |
 | Sentry | [Mobile](SENTRY_OBSERVABILITY.md) · [Web and admin](SENTRY_WEB_OBSERVABILITY.md) |
 | Account deletion | [Deletion scheduler](account-deletion-scheduler.md) |
 | Email | [Owner actions](OWNER_ACTIONS.md) |
+| Personal data processing (the PDPL record of processing) | [Record of processing](RECORD_OF_PROCESSING.md) |
 
 ### I want to know why something is the way it is
 
@@ -94,8 +96,9 @@ npm run docs:check      # what CI runs: drift + ownership + recorded-hash freshn
 | [Discounts and campaigns](DISCOUNTS_CAMPAIGNS.md) | The schema, and the business questions still open |
 | [Loyalty](LOYALTY.md) | How points are earned and spent, the four rules that shape it, and the corrected customer terms |
 | [Legal documents audit](LEGAL_DOCUMENTS_AUDIT.md) | Every live legal document read against the code: what was false, what was corrected, and what was verified accurate |
-| [Offers & loyalty terms draft](legal/OFFERS_LOYALTY_TERMS_DRAFT.md) | The factual description counsel needs, and the switches that must not be flipped before it is published |
-| Card-payment document drafts: [privacy](legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md) · [payment](legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md) · [cancellation and refund](legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md) · [terms](legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md) · [store answers](store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md) | The exact text to publish before customers can pay by card, with the evidence for each change ([Owner actions §47.15](OWNER_ACTIONS.md)) |
+| [Offers & loyalty terms draft](legal/OFFERS_LOYALTY_TERMS_DRAFT.md) | The published v2.2 text (reproduced), the reasoning that fed it, and the acceptance and expiry analysis. Sections 1 to 4 and 6 are partly superseded: see the banner and [the 2026-11-26 state review](legal/DRAFTS_STATE_REVIEW_20261126.md) |
+| Card-payment document drafts: [privacy](legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md) · [payment](legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md) · [cancellation and refund](legal/CANCELLATION_REFUND_POLICY_CARD_PAYMENTS_DRAFT.md) · [terms](legal/TERMS_CONDITIONS_CARD_PAYMENTS_DRAFT.md) · [store answers](store/CARD_PAYMENTS_STORE_ANSWERS_DRAFT.md) | The exact text to publish before customers can pay by card, with the evidence for each change ([Owner actions §47.15](OWNER_ACTIONS.md)). Read [the 2026-11-26 state review](legal/DRAFTS_STATE_REVIEW_20261126.md) first: it lists, per draft, the customer-facing sentences that no longer match the code or the live state. Nothing in it has been published |
+| Privacy-policy correction drafts: [location uses](legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md) · [map processor, closed](legal/PRIVACY_POLICY_MAP_PROCESSOR_CORRECTION.md) | Drafts for [Owner actions §43 and §34](OWNER_ACTIONS.md); the second is historical because `privacy_policy` v2.3 is live |
 | [Security review](SECURITY_REVIEW.md) | Security posture and findings |
 | [Security policy](../SECURITY.md) | How to report a vulnerability |
 
@@ -116,7 +119,9 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 
 | Document | What it is |
 | --- | --- |
-| [Migration reconciliation, 12 Aug 2026](MIGRATION_RECONCILIATION_20260812.md) | Latest dated read-only production migration snapshot |
+| [Migration reconciliation, 12 Aug 2026](MIGRATION_RECONCILIATION_20260812.md) | A dated read-only production migration snapshot (79 repository files, 85 live rows). Historical: the current position is in [CLAUDE.md §8](../CLAUDE.md) and the [ledger](MIGRATIONS.md) |
+| [Migration application, 22 Aug 2026](MIGRATION_APPLICATION_20260822.md) | The record of the two 2026-08-22 applications |
+| [Lazywait create-order latency, 27 Aug 2026](integrations/Lazywait_Create_Order_Latency_20260827.md) | A support ticket for Lazywait with four timestamped measurements of the POS create-order call |
 | [Payment postponement](PAYMENT_POSTPONEMENT.md) | The payment freeze, 2026-07-29 to 2026-11-11, and why the code looked as it did. Superseded by [Payments](PAYMENTS.md) |
 | [Migrations ledger](MIGRATIONS.md) | Historical workflow and provenance record; its classification counts are a dated Aug 7 snapshot |
 | [Address delete runbook](MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md) | A specific migration, start to finish |
@@ -124,7 +129,7 @@ Useful as provenance. **Not** current-state authority, and not a work queue.
 | [Button and field inventory](BUTTON_FIELD_INVENTORY.md) | Design-system migration inventory |
 | [Health center baseline](OPERATIONS_HEALTH_CENTER_BASELINE.md) · [rollback](OPERATIONS_HEALTH_CENTER_ROLLBACK.md) | Point-in-time operational evidence |
 | [Readiness reviews](readiness/) | Dated pull-request review evidence |
-| [App-hardening checklist, 11–12 Nov 2026](readiness/20261111-app-hardening-checklist.md) | Evidence table for all 43 checklist IDs, with the prioritized action list as it stood on 2026-11-12 |
+| [App-hardening checklist, 11–18 Nov 2026](readiness/20261111-app-hardening-checklist.md) | Evidence table for all 43 checklist IDs and the prioritized action list. Created 2026-11-11 and amended in place through 2026-11-18, so its layers carry their own dates |
 | [Development visual review](DEV_VISUAL_REVIEW.md) | Fixture-based review workflow |
 
 ## Where things live
