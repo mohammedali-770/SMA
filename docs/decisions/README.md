@@ -33,7 +33,7 @@ A record has a **status**:
 
 ## Relationship to the rest of the documentation
 
-A decision record says *why we chose this*. It does not say *how to operate it* — that is a runbook — or *what exists* — that is [generated reference](../reference/README.md). Where an existing document already carries a decision in depth, the record can be short and link to it rather than duplicating the argument: [`PAYMENT_POSTPONEMENT.md`](../PAYMENT_POSTPONEMENT.md) is the authoritative payment decision and should stay that way.
+A decision record says *why we chose this*. It does not say *how to operate it* — that is a runbook — or *what exists* — that is [generated reference](../reference/README.md). Where an existing document already carries a decision in depth, the record can be short and link to it rather than duplicating the argument: the payment decision is carried in depth by [`PAYMENTS.md`](../PAYMENTS.md) and [`CLAUDE.md` §6](../../CLAUDE.md) (Moyasar, owner decision of 2026-11-11), not in a record here. [`PAYMENT_POSTPONEMENT.md`](../PAYMENT_POSTPONEMENT.md) is history: it was superseded on 2026-11-11 and its own banner says so.
 
 Older decisions have not been backfilled. Backfilling is worth doing when you are already in the area and the reasoning is still recoverable — write it from the pull request thread while you can still find it. Do not invent a rationale you cannot source; an honest "the reasoning was not recorded" is more useful than a plausible reconstruction.
 

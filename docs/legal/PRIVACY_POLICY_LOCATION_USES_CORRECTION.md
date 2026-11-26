@@ -1,5 +1,7 @@
 # Privacy policy — device location is used for more than the delivery pin
 
+> **State note, 2026-11-26 (added by a document review; the text below is unchanged).** The "Delivery map" row of the table says the only thing that leaves the phone is the point the customer then picks. That is not exact: on a successful "Use my location" fix, `LocationPickerMap` sends the rounded device position to the platform's reverse geocoder (Apple or Android's geocoder on the phone, Google's `Geocoder` on web) to name the address, before the customer has confirmed a pin (`apps/mobile/src/components/LocationPickerMap.tsx`, `LocationPickerMap.web.tsx`). `privacy_policy` v2.3 already names who does the geocoding (`docs/OWNER_ACTIONS.md` §34), so this is an evidence error in the table and not a missing disclosure. The pickup-tab and checkout rows ("No": the fix stays on the device) hold. The proposed text, "only the delivery point you choose is saved", is unaffected. The `path:line` citations in the table are line numbers at an earlier commit; find the symbol.
+
 > **Status: DRAFT, awaiting owner publication.** Editing a live `legal_documents`
 > row is a CLAUDE.md §5 action and is not something an agent does. This file
 > holds the exact replacement text and the evidence behind it, so publishing is

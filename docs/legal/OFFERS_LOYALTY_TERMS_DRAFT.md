@@ -35,6 +35,12 @@
 > §5's acceptance analysis is **unchanged and still correct**: nothing records
 > that a customer accepted a version, and `requires_acceptance` is still `false`.
 
+> **State note, 2026-11-26 (added by a document review; nothing below it has been changed).** Two sentences in the byte-accurate copy that follows no longer match what the system does. They are the published text, so they are not edited here, and whether the live row has been corrected since is **not known from the repository**; they are listed for the owner and counsel in `docs/legal/DRAFTS_STATE_REVIEW_20261126.md`.
+>
+> - **When points are added.** The published sentence "Points are added when you place the order, and your balance updates immediately." has been untrue since `20260918120000_loyalty_earn_on_settlement` and `20260921120000_loyalty_earn_snapshot_path` (applied 2026-09-14): an order records an `earn_pending` ledger row and the balance does not move; `admin_set_order_status` promotes it on delivery (cash always, online only when `payment_status = 'paid'`) (`docs/LOYALTY.md`). The draft sentences in §3 and §4 repeat it, and §1 (below) argues that points are granted when the order is created. Neither is current.
+> - **The 100-point minimum.** "You need at least 100 points before you can redeem" is a necessary condition. `place_order` applies the minimum to the points actually applied, after the order-value cap, so a customer holding 500 points on an order worth less than SAR 10.00 redeems nothing.
+> - **Sections superseded or historical.** §1 (the timing claim, not the three corrections), §2 ("None of this is live yet: four migrations are written and unapplied" is false: all four were applied on 2026-09-09), §3 and §4 (already marked), and §6's "due when the migration is applied". The paragraph above §1 that says the live document is "version 2.1 ... active" is history: v2.2 is the published text. **Still current:** §5 (acceptance analysis) and §6's rule not to enable expiry before §5 is resolved.
+
 ## 0. The PUBLISHED text — version 2.2, effective 9 September 2026
 
 Reproduced byte-for-byte from `public.legal_documents`. English md5
