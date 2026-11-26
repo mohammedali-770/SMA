@@ -10,6 +10,39 @@
 
 ## 1. Purpose and production status
 
+> **Current position, derived 2026-11-26 at default-branch tip `7b101e0` — read
+> this block first; every dated banner below it is history.**
+>
+> - **Repository files:** `ls supabase/migrations/*.sql | wc -l` gives **169**.
+> - **Frozen or unapplied files: none.** `20260824100000_moyasar_payment_provider`
+>   was the one deliberately unapplied file for most of this record; it was
+>   **applied 2026-11-13 17:19:42 UTC** (live `20261113171942`, ledger row 114),
+>   and the banner of that night is the record. Do not read the older banners'
+>   "Moyasar, unapplied on purpose" as a present fact.
+> - **Live history count:** not restated here, because it cannot be derived from
+>   the repository. `CLAUDE.md` §8 ("Current position 2026-11-24 (later)")
+>   records **175** live history rows and **0 unapplied**; cite that paragraph
+>   with its date, and re-read `supabase_migrations.schema_migrations` before
+>   relying on it.
+> - **The target-by-version rule has not changed.** A bulk apply takes the
+>   lowest-sorting unapplied file first — while Moyasar was unapplied that was
+>   the frozen payment file, `20260824100000` sorting ahead of everything — so
+>   an instruction that does not name a file is not an instruction to apply
+>   anything. **Name the target by version, one call per file.**
+> - **How to read what follows.** The banners from "Updated 2026-11-22" down
+>   to the end of this section's banner stack state the outstanding set as it
+>   was on their own dates (SIX, NINE, TWO, ONE, NOTHING, and so on). They are
+>   kept, each is history, and none of them is the current position. They are
+>   newest-first with exceptions (the 2026-11-11 and 2026-11-12 banners sit
+>   near the top, out of date order).
+> - **Which "§" is meant.** Inside the banners, a bare "§5", "§6" or "§15"
+>   that is about owner approvals, the payment freeze or "re-hash the MERGED
+>   copy before applying" means **`CLAUDE.md`** §5, §6 or §15 (and this file's
+>   own §9-B.7 for the re-hash rule); in this file §5 is the ledger, §6 is "Why
+>   `db push` is unsafe" and §15 is the Order Integrity Watchdog migration.
+>   Banner phrases such as "the note below" or "above" were true when written
+>   and are not now, because later banners were inserted around them.
+
 **As of 2026-08-22 class E is empty again: every repository migration is applied
 to Production.**
 
@@ -21,8 +54,11 @@ to Production.**
 > migrations of 2026-08-26, the add-on importer applied the same day, and the
 > three comped-customer migrations applied that afternoon. The counts in this
 > section are a dated snapshot and are kept as one; the current position is in
-> CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
-> detail in §5 rows 59–67 with §32, §33, §34 and §35.
+> CLAUDE.md §8 (as of 2026-08-26: **107 repository files / 112 live rows**), and the row-level
+> detail in §5 rows 59–67 with §32, §33, §34 and §35. **Corrected 2026-11-26:**
+> the figure in parentheses is the 2026-08-26 position, not a pointer to what
+> `CLAUDE.md` §8 says now; the current position is the block at the top of this
+> section.
 
 > **Updated 2026-11-22 — FIVE AUDIT-FIX MIGRATIONS ARE APPLIED, and NOTHING IS
 > OUTSTANDING. This note supersedes every banner below that calls any of these
@@ -63,6 +99,8 @@ to Production.**
 > `20261004120000`, each on its own approval. The second refuses to apply
 > before the first, and the fourth before the second. `20260824100000` still
 > sorts ahead of everything. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): SIX was the outstanding count on 2026-11-11 only. All six files are applied today, Moyasar's `20260824100000` included (ledger rows 114-116 and the 2026-11-13 banners below); the current position is the block at the top of this section.*
 
 > **Updated 2026-11-12 (later) — `20261007120000_audit_trail` is written,
 > validated and NOT applied (§60).** On merge it joins the unapplied set, which
@@ -72,6 +110,8 @@ to Production.**
 > and the money path is self-asserted. Apply it BEFORE deploying
 > `push-dispatch` and `staff-accounts`. Moyasar still sorts first. **Name the
 > target by version.**
+>
+> *Superseded history (note added 2026-11-26): NINE was the outstanding count on 2026-11-12 only. Every file this banner counts is applied today (`20261007120000` is §60, ledger row 112); the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (late night) — the Moyasar go-live chain is APPLIED, and
 > NOTHING is outstanding.** On the owner's approval naming each by version:
@@ -93,6 +133,9 @@ to Production.**
 > read was made by this change, so this banner does not restate the outstanding
 > count. `20261021120000` sorts after every other file, and an older unapplied
 > file still sorts ahead of it. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): `20261021120000` is APPLIED (2026-11-22, ledger row 124, §71), not "written ... NOT applied".*
+
 > **Updated 2026-11-22 (loyalty points reservation) — `20261019120000_loyalty_points_reservation`
 > is written, validated and NOT applied (§72, ledger row 125).** Four high audit
 > findings: points held by an open card checkout could be spent twice, and a
@@ -100,6 +143,8 @@ to Production.**
 > `place_order` moves to `7078c7dd…`. No live read was made by this change, so
 > it states no outstanding count. No deploy implied. **Name the target by
 > version.**
+>
+> *Superseded history (note added 2026-11-26): `20261019120000` is APPLIED (2026-11-22, ledger row 125, §72), not "written ... NOT applied".*
 
 > **Updated 2026-11-19 (refund on cancel) — `20261018120000_refund_cancelled_paid_orders`
 > is written, validated and NOT applied (§70, ledger row 123).** The owner's
@@ -112,6 +157,8 @@ to Production.**
 > superseded (rows 8-9) + 1 unapplied. ONE is the dangerous shape: "apply the
 > outstanding migration" has a plausible referent. Two function bodies, no
 > row, no deploy; money path asserted by the file. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): rows 122 and 123 and §§69-70 have since been corrected to APPLIED, so "still say otherwise" above is no longer true, and the "exactly ONE" outstanding file, `20261018120000`, was itself applied on 2026-11-19 (ledger row 123, §70).*
 
 > **Updated 2026-11-18 (advisor fixes) — `20261017120000_advisor_fixes` is
 > written, validated and NOT applied (§69, ledger row 122).** On merge it is the
@@ -120,6 +167,8 @@ to Production.**
 > `20261118055554`, reconciled by name). One policy wrapped and 21 covering
 > indexes; no function, no data, no deploy; money path asserted by the file.
 > **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): `20261017120000` is APPLIED (live `20261118120101`, ledger row 122, §69), not "written ... NOT applied".*
 
 > **Updated 2026-11-18 (refund back-off apply) — `20261016120000_refund_retry_backoff`
 > is APPLIED, and NOTHING is outstanding.** On the owner's approval naming it
@@ -193,6 +242,8 @@ to Production.**
 > order. No deploy is implied; the money path is self-asserted. Applying it
 > before `docs/OWNER_ACTIONS.md` §47.13 step 1 is recommended; §47.13 lists the
 > owner's other two choices. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-14 — `20261013120000_payment_refund_visibility` is written,
 > validated and NOT applied (§65).** On merge it is outstanding. Other gap-fix
@@ -201,6 +252,8 @@ to Production.**
 > watchdog rules, a console feed and the PG-25 filter; it sends, refunds and
 > writes nothing, and the money path is self-asserted. Apply it BEFORE deploying
 > `payment-refund`. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (night) — `20261006120000` is APPLIED** (16:59:39 UTC,
 > live `20261113165939`, ledger row 113, §58), on the owner's approval naming it
@@ -209,6 +262,8 @@ to Production.**
 > (§55) and `20261004120000` (§56), in that order, each with its own approval
 > and the payment deploy between the second and third (`docs/OWNER_ACTIONS.md`
 > §47). **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (evening) — two more files are APPLIED:
 > `20261005120000` (16:43:01 UTC, live `20261113164301`, ledger row 111, §57)
@@ -219,6 +274,8 @@ to Production.**
 > `20260824100000`, `20261003120000` (§55), `20261004120000` (§56) and
 > `20261006120000` (§58). Moyasar's `20260824100000` still sorts first. **Name
 > the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (afternoon) — three more files are APPLIED:
 > `20261011120000` (12:54:40 UTC, live `20261113125440`, ledger row 108, §63),
@@ -234,6 +291,8 @@ to Production.**
 > and the connector then dropped out of the session. A read through PostgREST
 > settled each outcome (`app_settings.order_limit_open` still `42703`). Moyasar's
 > `20260824100000` still sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (applied) — `20261009120000` and `20261010120000` are
 > APPLIED** (09:02:36 and 09:03:20 UTC, live versions `20261113090236` and
@@ -241,6 +300,8 @@ to Production.**
 > explicit approval of the two files the preceding message named by version.
 > Live history **150 → 152**. The outstanding set on the default branch is
 > back to the **EIGHT** of the 2026-11-13 position below.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (latest) — `20261011120000_drop_push_devices_admin_select`
 > is written, validated and NOT applied (§63).** On merge the outstanding set is
@@ -250,6 +311,8 @@ to Production.**
 > `20261010120000`, and must be applied only after the console change that
 > carries it has deployed (`docs/OWNER_ACTIONS.md` §53). Moyasar's
 > `20260824100000` still sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 (later) — two more files are written, validated and NOT
 > applied: `20261009120000_admin_lazywait_sync_monitor` (§61) and
@@ -261,6 +324,8 @@ to Production.**
 > outstanding file. The console change that calls them merges only after both
 > are applied (`docs/OWNER_ACTIONS.md` §53). Moyasar's `20260824100000` still
 > sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-13 — `20261008120000_admin_loyalty_stats` is APPLIED**
 > (06:38:43 UTC, live version `20261113063843`, ledger row 105, §59), on the
@@ -270,6 +335,8 @@ to Production.**
 > `20261005120000` (§57), `20261006120000` (§58) and `20261007120000` (§60).
 > Moyasar's `20260824100000` still sorts first. **Name the target by version.**
 > #456, the console half that reads the function, merged afterwards as `2974cac`.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-12 (latest) — `20261008120000_admin_loyalty_stats` is
 > written, validated and NOT applied, so on merge the outstanding set is
@@ -280,6 +347,8 @@ to Production.**
 > change that reads it (#456) merges only AFTER this file is applied, because a
 > merge deploys the console (CLAUDE.md §13, AGENTS.md change control). Moyasar's `20260824100000` still sorts first. **Name the target by
 > version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-12 (later) — `20261006120000_rls_initplan_live_board_order_year`
 > is written, validated and NOT applied, so on merge the outstanding set is
@@ -290,6 +359,8 @@ to Production.**
 > with the Riyadh year. It changes no visible row. The money path is
 > self-asserted unchanged. Moyasar still sorts first. **Name the target by
 > version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-12 — `20261005120000_server_input_bounds` is written,
 > validated and NOT applied.** On merge it joins the unapplied set. It changes
@@ -297,6 +368,8 @@ to Production.**
 > verified phone or over the open-order and hourly limits, and five input
 > bounds land with it (§57). Its three numbers are owner decisions. Moyasar
 > still sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-11 (later still) — `20261002120000_staff_actor_fk_set_null`
 > is written, validated and NOT applied, so on merge the count is THREE:**
@@ -305,6 +378,8 @@ to Production.**
 > same day. This file lets a staff account that filed, resolved or revealed
 > something be deleted. The two unfrozen files are independent; apply each on
 > its own approval. Moyasar still sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Superseded on the count by the note above:** with #436 merged the outstanding set is THREE. The record below of the prune apply stays true for its date.
 >
@@ -318,6 +393,8 @@ to Production.**
 > (frozen under §6) and `20260929120000_db_advisor_hardening.sql` (written,
 > validated, awaiting approval, §51). Moyasar still sorts first. **Name the
 > target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-11 (later) — `20261001120000_prune_operational_run_history`
 > is written, validated and NOT applied, so on merge the count is THREE:**
@@ -325,6 +402,8 @@ to Production.**
 > Free-plan database under the 500 MB read-only cap by pruning pg_cron's run log
 > and two monitor ledgers. The two unfrozen files are independent; apply each on
 > its own approval. Moyasar still sorts first. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-11-11 — `20260930120000_product_variants_guest_read` is
 > APPLIED, and the count is TWO.** 04:58:33 UTC on explicit owner approval
@@ -340,6 +419,8 @@ to Production.**
 > through the applies of 2026-09-17 and 2026-09-20 (ledger rows 97–102), so the
 > latest of them understates what is applied. Read the current position from
 > `CLAUDE.md` §8 and the ledger, not from the newest entry here.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-13 (later) — `20260916120000_branch_delivery_requests` is
 > APPLIED.** 12:40:39 UTC on explicit owner approval naming the target by
@@ -370,6 +451,9 @@ to Production.**
 > on the same data before and after: `idle` / 0 overdue / no alert, against
 > `degraded` / 1 overdue / `restores_overdue`.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the count is the point: the count was THREE** when
 > `20260924120000_place_order_variant_availability` was written. Outstanding:
 > `20260824100000_moyasar_payment_provider.sql` (frozen under §6),
@@ -496,6 +580,8 @@ to Production.**
 > the same logic with **0 comment lines** (103 vs 124). Functionally identical,
 > comments stripped. `place_order` matched live exactly. Deriving without
 > checking would have been deriving from a picture rather than the artifact.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-14 — `20260919120000_security_audit_db_hardening` is written,
 > validated and NOT applied. The count is now FOUR.** Outstanding: Moyasar
@@ -550,6 +636,9 @@ to Production.**
 > database. **An admin feature is not a reason to relax a customer boundary.**
 >
 > Cold chain: 132 migrations, 73 suites, 71 passed, 2 quarantined, **0 new
+> failures**.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-14 — `20260920120000_promo_disclosure_hardening` is written,
 > validated and NOT applied. The count is now FIVE.** Outstanding: Moyasar
@@ -633,6 +722,8 @@ to Production.**
 >
 > Cold chain: 132 migrations, 74 suites, 72 passed, 2 quarantined, **0 new
 > failures**.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-14 (latest) — `20260920120000_promo_disclosure_hardening`
 > is APPLIED. THE COUNT IS ONE, AND THAT IS THE DANGEROUS SHAPE.** The only
@@ -671,6 +762,9 @@ to Production.**
 > found"*. Both refuse; the new one stops confirming that an unlaunched code
 > exists.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded — `20260919120000_security_audit_db_hardening`
 > is APPLIED too. The count is TWO.** Outstanding: Moyasar (frozen under §6) and
 > `20260920120000_promo_disclosure_hardening`. **TWO is the shape that restores
@@ -855,6 +949,8 @@ to Production.**
 > The two are INDEPENDENT of each other — neither redefines a function the
 > other defines, and neither touches the money path — so they may be applied in
 > either order, each on its own approval.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-13 — `20260917120000_branch_reference_entries.sql` is
 > written, validated and NOT applied.** It gives a cashier a branch reference
@@ -881,14 +977,15 @@ to Production.**
 > created empty, which its own block asserts.
 >
 > **WHAT THE LOCAL SUITE PROVES, AND WHAT IT DOES NOT.** The harness stubs Vault
-> without encryption (`.github/sql-ci/harness.sql`), so the 15 cases prove
+> without encryption (`.github/sql-ci/harness.sql` when this was written; the
+> stubs moved to `.github/sql-ci/bootstrap.sql` on 2026-09-19), so the 15 cases prove
 > wiring, authorization, branch scoping and the audit row — and say **nothing**
 > about cryptography, which is Vault's and is exercised only in Production. A
 > passing local run is not evidence that a secret was encrypted.
 >
 > **An authoring failure worth recording: I added a second `vault.create_secret`
 > stub to `bootstrap.sql` without checking whether one already existed.** It
-> did, in `harness.sql`. The result was an ambiguous overload that broke an
+> did, in `harness.sql` (it has since moved to `bootstrap.sql`). The result was an ambiguous overload that broke an
 > unrelated suite (`operations_alert_email_dispatch_test`) as collateral. The
 > addition was reverted; the existing stub was exactly the right shape. **Look
 > for the helper before writing it — a duplicate is worse than an absence,
@@ -896,6 +993,8 @@ to Production.**
 > the harness takes three, real Vault takes four with the fourth defaulted, so
 > one call form reaches both. A four-argument call would compile locally and
 > fail in Production.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-13 — `20260916120000_branch_delivery_requests.sql`.**
 > `20260916120000_branch_delivery_requests.sql` is **written, validated and NOT
@@ -1008,6 +1107,8 @@ to Production.**
 > **The count is the dangerous shape again.** One file left means "apply the
 > outstanding migrations" reads like a no-op and is the one instruction that
 > would break the §6 freeze. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Superseded — TWO unapplied:
 > `20260914120000_platform_rollup_suppression` is written and awaiting approval.**
@@ -1048,6 +1149,8 @@ to Production.**
 > **The count is the dangerous shape again.** With one file left, "apply the
 > outstanding migrations" reads like a no-op and is the one instruction that
 > would break the §6 payment freeze. **Name the target by version.**
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Superseded — TWO unapplied, and the new one is an
 > ALERTING correctness fix rather than a feature.**
@@ -1108,6 +1211,8 @@ to Production.**
 > line and the *Get a copy of my data* screen are both merged and wired and both
 > reach customers only in the next EAS build (X2). Enabling loyalty expiry needs
 > corrected terms first (`docs/OWNER_ACTIONS.md` §32) and is not lawful yet.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 > **Updated 2026-09-08 (later) — SIX unapplied again, and the newest one closes a
 > LAUNCH-GATE gap rather than a documentation one.**
@@ -1124,6 +1229,9 @@ to Production.**
 > path, and is `authenticated`-only. No deploy implied; the mobile screen that
 > calls it ships with the next build.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the count is the point:**
 >
 > **Updated 2026-09-08 — SIX unapplied, and the newest one is the only file
@@ -1150,6 +1258,9 @@ to Production.**
 > the login rate limiter's behaviour. Both were mutation-tested. Detail:
 > [`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md).
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the count is the point:**
 >
 > **Updated 2026-09-07 (last of the series) — FIVE unapplied repository files,
@@ -1175,6 +1286,9 @@ to Production.**
 > a campaign. Behaviour and the clamp-ordering trap it avoids:
 > [`LOYALTY.md`](LOYALTY.md) §5.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the count is the point:**
 >
 > **Updated 2026-09-07 (later again) — FOUR unapplied repository files, and the
@@ -1204,6 +1318,9 @@ to Production.**
 > expiry at all. Behaviour, the five guarantees and the mutation that found a gap
 > in its own tests: [`LOYALTY.md`](LOYALTY.md) §4.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the shape of the warning is the point:**
 >
 > **Updated 2026-09-07 (later still) — THREE unapplied repository files, and
@@ -1234,6 +1351,9 @@ to Production.**
 > earning order has no fee. Detail and the comp trap it closes:
 > [`LOYALTY.md`](LOYALTY.md) §3.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Superseded, kept because the reasoning is the point:**
 >
 > **Updated 2026-09-07 (later the same day) — there are TWO unapplied
@@ -1262,6 +1382,9 @@ to Production.**
 > functions cannot apply at all. Behaviour, evidence and the admin control:
 > [`LOYALTY.md`](LOYALTY.md) §2.
 >
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
+
 > **Updated 2026-09-07 — `20260903120000_operations_alert_email_dispatch.sql` is
 > APPLIED.** Live version `20260907064638`, applied 06:46:38 UTC on explicit owner
 > approval naming the target by version; ledger row 79. It changed no behaviour,
@@ -1332,6 +1455,8 @@ to Production.**
 > not less. A bulk apply no longer sweeps the payment file in alongside something
 > legitimate; it applies the payment file and nothing else. Name the target by
 > version, as every apply since 2026-08-26 has done.
+>
+> *Superseded history (note added 2026-11-26): the outstanding set this banner states was true on its own date only. Every file it names is applied today; the current position is the block at the top of this section.*
 
 Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. Full evidence — pre-live gate,
@@ -1352,6 +1477,9 @@ default `check_function_bodies = on` — so applying only the second would have
 aborted there, in the apply output. The plpgsql write paths after it would have
 been accepted, since plpgsql defers resolution to runtime, but the migration
 never reaches them.
+
+**Snapshot as of 2026-08-22 only, kept as history. The current position is the
+block at the top of this section.**
 
 - Repository migration files (default branch `claude/project-build-ie4b56`): **97**
 - Live `schema_migrations` rows: **103**
@@ -1447,8 +1575,10 @@ procedure the run-book was written against, because it runs on every push.
 
 **Still outstanding: the application smoke test** (run-book Step 4.5). Adding two
 addresses and promoting one, and the three delete cases, must be exercised in the
-mobile app as a real customer. That needs a device and a signed-in account and has
-**not** been done.
+mobile app as a real customer. That needs a device and a signed-in account and had
+**not** been done *(as of 2026-08-05; whether it has been done since is not known
+from the repository, and no other document tracks it — owner to confirm, noted
+2026-11-26)*.
 
 ### Ten migrations were applied on 2026-07-29
 
@@ -1477,7 +1607,9 @@ generated apply-time version that differs from the repository filename):
 | `20260729090000_payment_refund_scheduler` | `20260729112224` | Wave C |
 | `20260729091000_caller_can_read_order_anon_revoke` | `20260729112238` | Wave C |
 
-**The refund worker scheduled by `payment_refund_scheduler` is DISABLED.** The
+**The refund worker scheduled by `payment_refund_scheduler` is DISABLED** *(as of
+2026-07-29; superseded — it was switched on 2026-11-19 and read active live on
+2026-11-24, see the note under §21's heading)*. The
 cron job `payment-refund-worker` (jobid 6, `*/5 * * * *`) was set
 `active = false` on 2026-07-29 when the owner postponed all payment work
 pending gateway selection. The job row, its schedule and every refund object
@@ -1498,12 +1630,17 @@ The 2026-07-20…22 wave, itemized in §5 (rows 39–46) and detailed in §13–
 
 The **five account-deletion migrations** (live `20260715120000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`;
-repository files of the same names) are applied and live but **not yet
-itemized/classified in §4/§5** — a known documentation gap, deliberately left
-for a separate documentation PR so this reconciliation stays reviewable. They
-are counted in the 64 / 65 totals above.
+repository files of the same names) are applied and live. They are itemized in §4 ("A is 8, not 3") and have no
+row in §5 (see its heading). *Corrected 2026-11-26: earlier text here called
+them "not yet itemized/classified in §4/§5" and counted them in "the 64 / 65
+totals above"; §4 itemizes them, and no 64 / 65 total exists above this
+paragraph.*
 
 ### Schema alignment
+
+*Dated 2026-07-14: the paragraph below records the catalog verification of that
+date and is not a statement of today's position; see the block at the top of
+this section.*
 
 The production schema is **functionally aligned with the repository in full**:
 every repository migration is applied and verified, based on catalog/object-state
@@ -1513,7 +1650,7 @@ triggers, indexes, storage bucket and policies, realtime publication
 membership). The 2026-07-14 trigger-function grant hardening is applied and
 verified (§10). **Historical version identifiers and several migration
 boundaries still differ** between the repository and production — a *history*
-divergence only; the full mapping is in §5.
+divergence only; the mapping is in §5, which is a subset (see its heading).
 
 ## 2. Non-negotiable safety rules
 
@@ -1652,6 +1789,12 @@ notes.
 > treat §4 as authoritative for counts and §5 as the detailed mapping of the
 > rows it covers.
 >
+> *Corrected 2026-11-26: "64/65" and "rows 62 to 64" described the 2026-08-06
+> and 2026-08-07 additions; the table was renumbered afterwards, and rows 62 to
+> 64 are now three 2026-08-26 files. §4 is a dated 2026-08-07 snapshot and is
+> not authoritative for today's counts; take those from the block at the top of
+> §1.*
+>
 > **Class E is empty again as of 2026-08-07.** It held the two rows added
 > 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
 > `20260806130000_admin_ranged_orders_and_stats` (§23) — applied that day with
@@ -1686,7 +1829,7 @@ deliberately not. Rows 97-100 follow the current convention so the column stays
 internally consistent with its neighbours. Verified by recomputing both hashes
 for every row from 85 to 100 against the repository file, not by reading.
 
-**Recomputed 2026-11-24, every `repo skel` cell against its file.** Of the 86 cells that hold a 12-hex fingerprint, 44 hold the skeleton MD5 and 39 hold the file's sha256 prefix, and those 83 reproduce exactly. **The other three did not, and are corrected here rather than left:** rows 75, 79 and 80 had recorded `5a295c494ffc`, `d3ea9fce042f` and `3109efb9c96a`, which match neither the skeleton nor the sha256 of their files, and how they were computed is not recoverable. They now hold the recomputed skeleton, `b3aa4d444af2`, `f6fc27eb01a4` and `f6bdec587ec8` (sha256 prefixes `d1126bcfc585`, `87030c05fcc6`, `c5dbc10e78fe`, which the three rows' notes already quoted correctly). No migration file changed: this is the record, not the artifact.
+**Recomputed 2026-11-24, every `repo skel` cell against its file.** Of the 86 cells that hold a 12-hex fingerprint, 44 hold the skeleton MD5 and 39 hold the file's sha256 prefix, and those 83 reproduce exactly. **The other three did not, and are corrected here rather than left:** rows 75, 79 and 80 had recorded `5a295c494ffc`, `d3ea9fce042f` and `3109efb9c96a`, which match neither the skeleton nor the sha256 of their files. *Corrected 2026-11-26: "and how they were computed is not recoverable" is false for rows 79 and 80. `d3ea9fce042f` and `3109efb9c96a` are the sha256 prefixes of `20260903120000_operations_alert_email_dispatch.sql` and `20260903130000_operations_alert_dispatch_scheduler.sql` after stripping `--` comments, collapsing whitespace and trimming, which is the transform those two rows' notes spell out; both reproduce today. Only row 75's old value, `5a295c494ffc`, was not reproduced.* They now hold the recomputed skeleton, `b3aa4d444af2`, `f6fc27eb01a4` and `f6bdec587ec8` (sha256 prefixes `d1126bcfc585`, `87030c05fcc6`, `c5dbc10e78fe`, which the three rows' notes already quoted correctly). No migration file changed: this is the record, not the artifact.
 
 ## 5. Migration ledger — rows 1 to 130, a subset (39 of the 169 repository files have no row)
 
@@ -1757,8 +1900,8 @@ production.
 | 54 | 20260724180000 | tap_reference_order_opaque | — | 20260729080617 | tap_reference_order_opaque | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Makes the provider-facing order reference opaque. Applied 2026-07-29 (Wave B, §20). **Payment area — frozen (§21)** |
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
 | 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). Latest live version until the 2026-08-05 application |
-| 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. Applied by a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), which applied this and row 58 one after the other via MCP `apply_migration` — one call per file, in dependency order, each followed by read-only verification — on the owner's explicit in-conversation approval. **Corrected 2026-08-24:** this row previously credited the **repository owner** directly, sourced to an owner statement of 2026-08-23; the owner authorised and drove both applications but did not issue the calls, and the mechanism is no longer unrecorded. Detail in §27 and §31 |
-| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the same **Claude Code session** as row 57, immediately after it, one after the other — see row 57, including the 2026-08-24 attribution correction. Detail in §31. |
+| 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides; *noted 2026-11-26: §4's skeleton of the repository file recomputes to `822b757e2d37…`, and this value does not reproduce from the file under any transform tried, so the "both sides" comparison is not verifiable from the repository*) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. Applied by a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), which applied this and row 58 one after the other via MCP `apply_migration` — one call per file, in dependency order, each followed by read-only verification — on the owner's explicit in-conversation approval. **Corrected 2026-08-24:** this row previously credited the **repository owner** directly, sourced to an owner statement of 2026-08-23; the owner authorised and drove both applications but did not issue the calls, and the mechanism is no longer unrecorded. Detail in §27 and §31 |
+| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides; *noted 2026-11-26: §4's skeleton of the repository file recomputes to `2d6cddccd85e…`, and this value does not reproduce from the file under any transform tried, so the "both sides" comparison is not verifiable from the repository*), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the same **Claude Code session** as row 57, immediately after it, one after the other — see row 57, including the 2026-08-24 attribution correction. Detail in §31. |
 | 59 | 20260824120000 | product_variants | — | 20260825061046 | product_variants | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **`product_variants` — the Lazywait price tier made first-class** (PR #256, `b36e7d8`; 572 lines). Applied **2026-08-25 06:10:46 UTC** on explicit owner approval, via MCP `apply_migration`. Adds `public.product_variants` (12 columns, RLS enabled, 2 policies, 3 indexes), `order_items.variant_id` + `variant_name_en` + `variant_name_ar` with a customer SELECT grant to `authenticated`, and four columns on `lazywait_catalog_items`. Redefines `set_lazywait_mapping`, `clear_lazywait_mapping` and `import_lazywait_catalog`. **Version NOT aligned** — live carries the apply-time stamp `20260825061046`, not the repository filename; realignment is a separate §9-D owner action and has not been performed. Fidelity proven rather than assumed: every function body applied was hashed against the merged file and matched byte-for-byte (`import_lazywait_catalog` md5 `58d2b732f11c17d442350b393db3928c`, 14 387 chars; `set_lazywait_mapping` `951093a076e2e95fb477808eea6e8a6f`; `clear_lazywait_mapping` `4dd0dc0c46a4db8b2c4cabc11199f05c`). File-level fidelity confirmed too: repo and live `skel` are **identical** (`5de875f4a2306f0de46adc23d6180520`, 13 927 normalised chars both sides), so the `live skel` column is `=` and the class-B version difference is the only deviation. Security advisors after the apply: **zero** naming `product_variants`. Detail in §32 |
 | 60 | 20260824130000 | place_order_variants | — | 20260825061502 | place_order_variants | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Carry the chosen tier through every order-writing path** (PR #256, `b36e7d8`; 798 lines). Applied **2026-08-25 06:15:02 UTC**, immediately after row 59, which it **depends on**: every redefined body references `public.product_variants`, so applying this one first would have failed on an unknown relation. Redefines exactly four functions — `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `admin_list_orders_with_items`. `begin_checkout_session` is deliberately NOT redefined: it delegates item work to `compute_order_snapshot` and never touches a line. **Version NOT aligned** — live carries `20260825061502` (§9-D, separate approval). All four bodies hashed against the merged file and byte-identical: `place_order` md5 `dcd117de2c3a0f63c048bfa47a96587a` (15 287 chars), `compute_order_snapshot` `a37ee893140629b3636271089df3f576`, `insert_order_from_snapshot` `60b753bc57ef4d20ef529fc42b3ead79`, `admin_list_orders_with_items` `4d2b5d10d9d8124ca8891eb4a39f4d37`. Repo and live `skel` are **identical** (`bbe1a916bc9a227f3211eed57364d497`, 22 947 normalised chars both sides), so `live skel` is `=`. No payment, coupon, loyalty or VAT arithmetic changed — the tier edits are the only difference from row 58's definitions. Detail in §32 |
 | 61 | 20260826050000 | place_order_variant_fallback | — | 20260826044204 | place_order_variant_fallback | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **INCIDENT FIX — ordering was impossible for ~22 hours** (PR #263). Applied **2026-08-26 04:42:04 UTC** on explicit owner approval, via MCP `apply_migration`, after CI including `Migration chain + SQL suites` went green. Row 60 made `place_order` refuse any cart line naming no `variant_id` for a product with active tiers; **all 55 active products have one**, and the client that sends `variant_id` shipped in the *same commit*, so no build in a customer's hands could satisfy it. From 2026-08-25 06:15:02 UTC to 2026-08-26 04:42:04 UTC **no order could be placed, for any product** — three attempts logged as 400s from `place_customer_order` with no order row written. This file replaces the refusal with a fallback to the cheapest active tier, applied in **both** passes of the function; fixing only the pricing pass would have stored `variant_id` null and left the POS ticket without a `price_id`. It cannot mis-charge: all **55 of 55** active products have cheapest-tier price equal to `products.price`, which is what a pre-tier client displays. Re-emits `place_order` verbatim from row 60 apart from those two blocks — generated from that file rather than retyped, diffed at generation: 3 hunks, 9 lines removed. Fidelity proven after applying: live body **byte-identical** to the file (`080be48e558798e0c393936d486fc738`, 16 915 chars), one overload, zero executable raises of the refusal, two executable fallback selects. **Version NOT aligned** — live carries `20260826044204` (§9-D, separate approval). Verified by the first order after the fix, `SM-2026-000051`: three lines, each recording its tier and a real `lazywait_price_id`, each charged exactly the card price, synced to the POS on the first attempt. Detail in §33 |
@@ -1775,30 +1918,30 @@ production.
 | 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | 20260827130000_watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). |
 | 73 | 20260827140000 | product_images_bucket | `7975fabde4b5` | 20260827195223 | product_images_bucket | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:52:23 UTC** on explicit owner approval ("apply the two migrations"), via MCP `apply_migration`, one call, immediately after PR #281 merged as `1837ca6`, with the file hashed against its merged copy first (`606d06ed9466f091`). **WAS A GAP ROW UNTIL 2026-09-02; now closed from a recovered record.** The provenance above was never lost — it was written on the day of the apply in **PR #282**, which was still open six days later while this row said the detail was unknown. That pull request is the source for the approval, the UTC time, the mechanism and the merged commit. Two independent corroborations were required before adopting any of it: the repository file's sha256 prefix computed today is `606d06ed9466f091`, **identical to the hash #282 recorded**, and the live version stamp `20260827195223` matches the claimed 19:52:23 apply time to the second. **The `=` and the class are MEASURED here, not adopted from #282**, which is the distinction that matters: #282's hashes compare a repository file to a repository file and say nothing about live content. §4's skeleton transform was run on both sides today — `7975fabde4b5` over the repository file and `7975fabde4b5` over the live row's joined statements (1 statement, 3 370 stored chars). That is what earns `=` and class B; without it these columns would have stayed `?`. **Storage only; NO table change.** Creates the public `product-images` bucket (5 MB; `image/jpeg,image/png,image/webp`) and three `storage.objects` policies — insert/update/delete — each gated on `public.is_admin()`, i.e. role **and** AAL2. A deliberate near-copy of `20260712130000_homepage_banners.sql`'s storage half: a separate bucket rather than a folder inside `banner-images`, so a cleanup that empties banners can never delete the menu's photography. **Why it was needed:** Lazywait cannot supply product photos — `GET /menu/products/items` carries a `photo` key on 77 of 95 cached items and every value is null — so all 55 active products sat at `image_url` NULL with no way to fill it. **Verified live 2026-09-02** (the post-apply verification #282 recorded, re-run rather than quoted): bucket present, `public`, limit 5 242 880, MIME list exactly as intended; **3** product-image policies; the **3** `banner_images_*` policies **intact**. **No longer dormant.** #282 recorded the bucket as holding zero objects with no product carrying an image. Live today: **1 object in the bucket and 1 product with an image** — the feature has been used since. **Version NOT aligned** (§9-D). |
 | 74 | 20260827150000 | menu_display_order | `bcf06b0084a1` | 20260827195309 | menu_display_order | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:53:09 UTC**, 46 seconds after row 73, on the same explicit owner approval and by the same mechanism, with the file hashed against its merged copy first (`d89df6be3b2f2409`). **WAS A GAP ROW UNTIL 2026-09-02**, closed from **PR #282** on the same corroborated basis as row 73: the repository file's sha256 prefix computed today is `d89df6be3b2f2409`, matching #282's recorded hash, and the live stamp `20260827195309` matches the claimed time to the second. **The `=` and class B are measured, not adopted** — §4's transform gives `bcf06b0084a1` over the repository file and `bcf06b0084a1` over the live row's joined statements (1 statement, 7 505 stored chars). **NO table change**: adds `reorder_categories(uuid[])` and `reorder_products(uuid, uuid[])` — the missing WRITE side of two `sort_order` columns already honoured on the READ side. Measured before that apply: 5 active categories over 3 distinct `sort_order` values, and **55 active products sharing ONE value**, so item order within a category was whatever Postgres returned for a tied sort — unstable between queries. **The property that makes it safe:** each function writes the whole ordering in ONE statement from an array whose *position* is the rank (`with ordinality`), so a gap or duplicate rank is not a producible failure mode and no client-computed integer is trusted. `reorder_products` additionally takes `FOR UPDATE` on the category before counting and demands the **complete** membership — checking only that every id belongs to the category would let a product moved in concurrently keep a colliding inherited rank. `reorder_categories` deliberately allows a partial list (a new category defaults to 0 and sorts to the front, visible and one click from correct), and the migration records that asymmetry so it does not read as an oversight. **Verified live 2026-09-02:** both functions present, **both `SECURITY DEFINER`**, both gating on `is_admin()`. Covered by `menu_display_order_test.sql` (11 cases; the admin-gate case was proven to fail against an ungated copy). **Version NOT aligned** (§9-D). |
-| 75 | 20260828090000 | customer_order_state_inflight | `b3aa4d444af2` | 20260828182228 | customer_order_state_inflight | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-28 18:22:28 UTC** on explicit owner approval ("apply the migration", given immediately after the session named this file and stated that applying it needed separate approval), via MCP `apply_migration`, one call, target named explicitly. Merged first as PR #287 squash `32a6f42`; the file was hashed from the **default branch** before sending (`d1126bcfc585fbf4fe3292b9b036bcd64d3b214f2621a1c7839833fe44af1922`) and confirmed identical to the branch copy CI had tested. Redefines **one** function, `public.customer_order_state`, with two corrections: the in-flight test `when p_sync_state = 'syncing' then 'sending_to_branch'` moves **ahead of** the phase-marker test, and the stale auto-retry arm (`p_sync_state = 'failed' and p_next_attempt_at > now()`) is deleted. **Why:** `pos_create_attempted_at` is stamped immediately before the Create Order POST leaves, so `syncing` + marker is the normal in-flight window of *every* order; the marker-first ordering therefore classified healthy orders as ambiguous. The TypeScript mirror was fixed in PR #286 (`d763d79`) after a customer was shown "we could not verify whether the branch received this order" for **SM-2026-000070** — synced as ticket #2 in 7.30 s, `sync_attempt_count 0`. The auto-retry arm predates the manual-resend-only policy — `20260813143000_manual_only_pos_resend.sql`, merged as `f7515e5` (PR #205) on 2026-08-13, which introduced the migration and the matching TypeScript change in the **same commit** while leaving this SQL clause behind. **That migration has no row in this ledger**, which stops at row 56 for 2026-07-29 and is an acknowledged subset (see the reconciliation note below the table) — cite the file, not a row number; SQL and TypeScript had disagreed on it for **15 days** with both suites green. **The `=` is earned rather than assumed:** §4's skeleton transform over the merged file gives `5a295c494ffc`, and over the exact statement text sent to `apply_migration` it gives `5a295c494ffc` — identical, because the file's entire 54-line header is `--` comments, which that transform strips. Content equivalence therefore holds by construction and was checked, not inferred. **Pure function replacement:** identical signature (`p_next_attempt_at` is retained as a parameter precisely so `CREATE OR REPLACE` replaces rather than adding an overload — confirmed after apply, overload count **1**), identical volatility (`stable`), `search_path` and grants; **no table is read or written**. **Verified after applying, behaviourally rather than only textually** — the five cases were executed against the live function: `syncing`+marker → `sending_to_branch` (was `verifying_with_branch`, THE fix); `failed`+future `sync_next_attempt_at` → `branch_failed_retry_available` (was `sending_to_branch`); and unchanged: `syncing`+ref → `verifying_with_branch`, marker-outlived-send → `verifying_with_branch`, `synced`+usable ref → `confirmed_by_branch`. All five now match the TypeScript mirror. The auto-retry arm is absent from the **CASE body** (`position('p_next_attempt_at' in <case body>) = 0`); an earlier probe that searched the full `pg_get_functiondef` reported it still present and was **wrong**, because that string includes the parameter list — the corrected measurement is the one recorded here. **The duplicate-ticket guard was confirmed intact, which is the safety-critical property:** `customer_manual_pos_resend_eligibility` hashes **unchanged** (`98a197ab4687350794ed5bf44c720a5a`) and still returns `may_have_sent` for an in-flight order, so a resend cannot be issued for an order whose POST is in flight — Create Order has no idempotency key. `request_customer_pos_resend` also hashes unchanged (`2c1f9d731fa54ec2d20a39be47844ec2`); it branches on the eligibility predicate, never on this function. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. **No order was touched:** 60 orders, 0 in flight at apply time, newest `updated_at` `15:45:12 UTC` — hours before the apply. Live history **119 → 120**. Covered by `order_confirmation_state_machine_test.sql` (in-flight, marker-outlived and syncing-with-ref cases added) and by the parity tripwire `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts`, which runs in the always-run vitest suite because `sql-suites.yml` gates its `suites` job on `supabase/(migrations|tests)` and so cannot catch a TypeScript-only drift. **Version NOT aligned** — live carries the apply-time stamp `20260828182228` (§9-D). Superseded as latest live version by row 76 on 2026-09-01. |
-| 76 | 20260831120000 | watchdog_cash_order_coverage | `c7013f5ba491` | 20260901115457 | 20260831120000_watchdog_cash_order_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-01 11:54:57 UTC** on explicit owner approval ("apply 20260831120000" — the file named by the owner, in a message answering a report that named it and stated that applying it was a separate §5 action), via MCP `apply_migration`, **one call, target named explicitly**. That last point is not ceremony here: at apply time **two** repository files were outstanding, not one, and the other is the frozen Moyasar file — see the §6 note below and the correction to CLAUDE.md §8 that shipped with this row. Merged first as PR #300 squash `14da59f`, on the default branch at `44a27cf`; the file was hashed **from the merged default branch** immediately before sending (`5c607ea282a6418e631d6de6b54545fe58462f42b7f8b3cdda8fd8fdda10f4ea`, 553 lines / 29 639 bytes) and confirmed identical to the copy that CI and the local harness had tested. **Redefines exactly one function**, `public.order_integrity_watchdog`, adding two rules and changing nothing else: **R12 `UNPAID_ORDER_NOT_SYNCED`** (critical) and **R13 `UNPAID_ORDER_DEAD_LETTER`** (critical). A `diff` of this function body against row 72's shows **54 lines added and zero removed**, so every pre-existing rule is byte-identical and no existing incident can change fingerprint, shape or severity. **Why:** R1 and R7 — the two rules that answer *"the order exists and the kitchen never got it"* — both require `payment_status = 'paid'`, and R1 additionally a non-null `paid_at`. Live, only **2 of 65** orders have ever been `paid`, and both are comped zero-total orders that synced normally. So those critical rules had essentially no population to match, and an unpaid order stuck in `syncing`, `blocked` or `dead_letter` raised nothing at any severity. That is not theoretical: SM-2026-000057 died silently, and SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days until a human cancelled them by hand. **The scope is deliberately narrower than "cash is uncovered", and this is the design rather than an oversight:** R10 `OVERDUE_SYNC_RETRY` carries **no** payment filter, so unpaid orders in `pending`/`failed` were already covered by it at warning severity. R12 therefore takes only `('syncing','blocked')` — the states R10 excludes and R1 cannot reach — so nothing double-reports under two rule codes. Whether a stuck `pending` order deserves critical rather than warning is a severity **policy** question and was left to the owner rather than changed quietly. **The `=` is earned rather than assumed:** §4's skeleton transform gives `c7013f5ba491` over the merged repository file, `c7013f5ba491` over the exact statement text sent to `apply_migration`, and `c7013f5ba491` over the live row's joined statements (1 statement, 29 607 stored chars) — three-way identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **Measured BEFORE applying, against Production read-only, and re-measured on the morning of the apply rather than reused from the day the file was written:** R12 with the `delivery_schema_unconfirmed` exclusion → **0** rows; R12 **without** it → **4** rows, exactly the four deliberately parked `not_retryable` delivery orders (SM-2026-000032, -000049, -000057, -000058); R13 → **0** rows. So the apply was predicted to raise **no incident**, and the exclusion is load-bearing rather than decorative — without it the first tick would have opened four critical incidents for food nobody is waiting for. **Verified after applying, from `pg_get_functiondef` rather than from the file:** overload count still **1** (no accidental second signature); **13** distinct rule guards in the live body once `--` comments are stripped, including both new codes. The raw grep reports 14 — the extra is the literal `'CODE'` inside the migration's own explanatory header comment, not a rule; comment-stripping is what distinguishes them, and the same stripping is what the parity test uses. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`. **No order was touched** — 0 orders in flight and 0 open incidents at apply time. Live history **120 → 121**. **Proven running, not merely defined**, which is the check a successful apply does not give you: cron run **29713** at 11:56:00 UTC — the first tick after the apply — `success`, **13** rules evaluated (up from 11 on run 29712 at 11:54:00), 0 incidents detected, 0 opened, 39 ms, no error code. Covered by `order_integrity_watchdog_test.sql` and by the parity tripwire `src/components/admin/view/integrity/integrityRuleParity.test.ts`, which asserts **set equality** between the admin filter's `RULE_CODES` and the rules in the latest migration defining the function — added because review, not a test, caught the dropdown falling behind. **One inaccuracy is carried in the applied file's header comment and is recorded here rather than edited away:** it says *"63 of 65 orders are `payment_method='cash'`"*, attributing the count to the wrong column. Live: `payment_status='pending'` is **63**; `payment_method='cash'` is **61**; and both `paid` orders are themselves cash-method comped orders, so cash does **not** imply pending. The file was left byte-identical because it is applied and its skeleton fingerprint is the evidence above; `docs/ORDER_INTEGRITY_WATCHDOG.md` carries the correction. **The rules are unaffected** — they key on `payment_status is distinct from 'paid'` and never on `payment_method`, which is the right predicate for exactly the reason the wrong column obscured. **Version NOT aligned** — live carries the apply-time stamp `20260901115457` (§9-D). Superseded as latest live version by row 77 the same day. |
+| 75 | 20260828090000 | customer_order_state_inflight | `b3aa4d444af2` | 20260828182228 | customer_order_state_inflight | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-28 18:22:28 UTC** on explicit owner approval ("apply the migration", given immediately after the session named this file and stated that applying it needed separate approval), via MCP `apply_migration`, one call, target named explicitly. Merged first as PR #287 squash `32a6f42`; the file was hashed from the **default branch** before sending (`d1126bcfc585fbf4fe3292b9b036bcd64d3b214f2621a1c7839833fe44af1922`) and confirmed identical to the branch copy CI had tested. Redefines **one** function, `public.customer_order_state`, with two corrections: the in-flight test `when p_sync_state = 'syncing' then 'sending_to_branch'` moves **ahead of** the phase-marker test, and the stale auto-retry arm (`p_sync_state = 'failed' and p_next_attempt_at > now()`) is deleted. **Why:** `pos_create_attempted_at` is stamped immediately before the Create Order POST leaves, so `syncing` + marker is the normal in-flight window of *every* order; the marker-first ordering therefore classified healthy orders as ambiguous. The TypeScript mirror was fixed in PR #286 (`d763d79`) after a customer was shown "we could not verify whether the branch received this order" for **SM-2026-000070** — synced as ticket #2 in 7.30 s, `sync_attempt_count 0`. The auto-retry arm predates the manual-resend-only policy — `20260813143000_manual_only_pos_resend.sql`, merged as `f7515e5` (PR #205) on 2026-08-13, which introduced the migration and the matching TypeScript change in the **same commit** while leaving this SQL clause behind. **That migration has no row in this ledger**, which stops at row 56 for 2026-07-29 and is an acknowledged subset (see the reconciliation note below the table) — cite the file, not a row number; SQL and TypeScript had disagreed on it for **15 days** with both suites green. **The `=` is earned rather than assumed:** §4's skeleton transform over the merged file gave `5a295c494ffc` *(corrected 2026-11-26: it does not — the skeleton of the merged file is `b3aa4d444af2`, which the cell now holds, and the sha256 prefix is `d1126bcfc585`)*, and over the exact statement text sent to `apply_migration` it gives `5a295c494ffc` — identical, because the file's entire 54-line header is `--` comments, which that transform strips. Content equivalence therefore holds by construction and was checked, not inferred. **Pure function replacement:** identical signature (`p_next_attempt_at` is retained as a parameter precisely so `CREATE OR REPLACE` replaces rather than adding an overload — confirmed after apply, overload count **1**), identical volatility (`stable`), `search_path` and grants; **no table is read or written**. **Verified after applying, behaviourally rather than only textually** — the five cases were executed against the live function: `syncing`+marker → `sending_to_branch` (was `verifying_with_branch`, THE fix); `failed`+future `sync_next_attempt_at` → `branch_failed_retry_available` (was `sending_to_branch`); and unchanged: `syncing`+ref → `verifying_with_branch`, marker-outlived-send → `verifying_with_branch`, `synced`+usable ref → `confirmed_by_branch`. All five now match the TypeScript mirror. The auto-retry arm is absent from the **CASE body** (`position('p_next_attempt_at' in <case body>) = 0`); an earlier probe that searched the full `pg_get_functiondef` reported it still present and was **wrong**, because that string includes the parameter list — the corrected measurement is the one recorded here. **The duplicate-ticket guard was confirmed intact, which is the safety-critical property:** `customer_manual_pos_resend_eligibility` hashes **unchanged** (`98a197ab4687350794ed5bf44c720a5a`) and still returns `may_have_sent` for an in-flight order, so a resend cannot be issued for an order whose POST is in flight — Create Order has no idempotency key. `request_customer_pos_resend` also hashes unchanged (`2c1f9d731fa54ec2d20a39be47844ec2`); it branches on the eligibility predicate, never on this function. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. **No order was touched:** 60 orders, 0 in flight at apply time, newest `updated_at` `15:45:12 UTC` — hours before the apply. Live history **119 → 120**. Covered by `order_confirmation_state_machine_test.sql` (in-flight, marker-outlived and syncing-with-ref cases added) and by the parity tripwire `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts`, which runs in the always-run vitest suite because `sql-suites.yml` gates its `suites` job on `supabase/(migrations|tests)` and so cannot catch a TypeScript-only drift. **Version NOT aligned** — live carries the apply-time stamp `20260828182228` (§9-D). Superseded as latest live version by row 76 on 2026-09-01. |
+| 76 | 20260831120000 | watchdog_cash_order_coverage | `c7013f5ba491` | 20260901115457 | 20260831120000_watchdog_cash_order_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-01 11:54:57 UTC** on explicit owner approval ("apply 20260831120000" — the file named by the owner, in a message answering a report that named it and stated that applying it was a separate §5 action), via MCP `apply_migration`, **one call, target named explicitly**. That last point is not ceremony here: at apply time **two** repository files were outstanding, not one, and the other is the frozen Moyasar file — see the §6 note below and the correction to CLAUDE.md §8 that shipped with this row. Merged first as PR #300 squash `14da59f`, on the default branch at `44a27cf`; the file was hashed **from the merged default branch** immediately before sending (`5c607ea282a6418e631d6de6b54545fe58462f42b7f8b3cdda8fd8fdda10f4ea`, 553 lines / 29 639 bytes) and confirmed identical to the copy that CI and the local harness had tested. **Redefines exactly one function**, `public.order_integrity_watchdog`, adding two rules and changing nothing else: **R12 `UNPAID_ORDER_NOT_SYNCED`** (critical) and **R13 `UNPAID_ORDER_DEAD_LETTER`** (critical). A `diff` of this function body against row 72's shows **54 lines added and zero removed** *(corrected 2026-11-26: measured on the two function bodies, 438 and 503 lines, the diff is 66 lines added and 1 removed; the removed line is a comment, "this v1 stays at the approved 11-rule scope", which the new file edits to say the scope is now 13, so no executable line was removed)*, so every pre-existing rule is byte-identical in executable code and no existing incident can change fingerprint, shape or severity. **Why:** R1 and R7 — the two rules that answer *"the order exists and the kitchen never got it"* — both require `payment_status = 'paid'`, and R1 additionally a non-null `paid_at`. Live, only **2 of 65** orders have ever been `paid`, and both are comped zero-total orders that synced normally. So those critical rules had essentially no population to match, and an unpaid order stuck in `syncing`, `blocked` or `dead_letter` raised nothing at any severity. That is not theoretical: SM-2026-000057 died silently, and SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days until a human cancelled them by hand. **The scope is deliberately narrower than "cash is uncovered", and this is the design rather than an oversight:** R10 `OVERDUE_SYNC_RETRY` carries **no** payment filter, so unpaid orders in `pending`/`failed` were already covered by it at warning severity. R12 therefore takes only `('syncing','blocked')` — the states R10 excludes and R1 cannot reach — so nothing double-reports under two rule codes. Whether a stuck `pending` order deserves critical rather than warning is a severity **policy** question and was left to the owner rather than changed quietly. **The `=` is earned rather than assumed:** §4's skeleton transform gives `c7013f5ba491` over the merged repository file, `c7013f5ba491` over the exact statement text sent to `apply_migration`, and `c7013f5ba491` over the live row's joined statements (1 statement, 29 607 stored chars) — three-way identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **Measured BEFORE applying, against Production read-only, and re-measured on the morning of the apply rather than reused from the day the file was written:** R12 with the `delivery_schema_unconfirmed` exclusion → **0** rows; R12 **without** it → **4** rows, exactly the four deliberately parked `not_retryable` delivery orders (SM-2026-000032, -000049, -000057, -000058); R13 → **0** rows. So the apply was predicted to raise **no incident**, and the exclusion is load-bearing rather than decorative — without it the first tick would have opened four critical incidents for food nobody is waiting for. **Verified after applying, from `pg_get_functiondef` rather than from the file:** overload count still **1** (no accidental second signature); **13** distinct rule guards in the live body once `--` comments are stripped, including both new codes. The raw grep reports 14 — the extra is the literal `'CODE'` inside the migration's own explanatory header comment, not a rule; comment-stripping is what distinguishes them, and the same stripping is what the parity test uses. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`. **No order was touched** — 0 orders in flight and 0 open incidents at apply time. Live history **120 → 121**. **Proven running, not merely defined**, which is the check a successful apply does not give you: cron run **29713** at 11:56:00 UTC — the first tick after the apply — `success`, **13** rules evaluated (up from 11 on run 29712 at 11:54:00), 0 incidents detected, 0 opened, 39 ms, no error code. Covered by `order_integrity_watchdog_test.sql` and by the parity tripwire `src/components/admin/view/integrity/integrityRuleParity.test.ts`, which asserts **set equality** between the admin filter's `RULE_CODES` and the rules in the latest migration defining the function — added because review, not a test, caught the dropdown falling behind. **One inaccuracy is carried in the applied file's header comment and is recorded here rather than edited away:** it says *"63 of 65 orders are `payment_method='cash'`"*, attributing the count to the wrong column. Live: `payment_status='pending'` is **63**; `payment_method='cash'` is **61**; and both `paid` orders are themselves cash-method comped orders, so cash does **not** imply pending. The file was left byte-identical because it is applied and its skeleton fingerprint is the evidence above; `docs/ORDER_INTEGRITY_WATCHDOG.md` carries the correction. **The rules are unaffected** — they key on `payment_status is distinct from 'paid'` and never on `payment_method`, which is the right predicate for exactly the reason the wrong column obscured. **Version NOT aligned** — live carries the apply-time stamp `20260901115457` (§9-D). Superseded as latest live version by row 77 the same day. |
 | 77 | 20260831130000 | otp_login_rate_limit | `5e2d98510696` | 20260901124615 | 20260831130000_otp_login_rate_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-01 12:46:15 UTC** on explicit owner approval ("apply 20260831130000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #301 as `44a27cf`; the file was hashed from the **default branch** before sending (`e0d313c89cae67f0110646117cabc91486941c3761c458d2d7c64d871b0fe15a`, 231 lines / 11 363 bytes) and confirmed identical to the copy CI and the local harness had tested. **What it creates:** `public.otp_send_reservations` (5 columns, RLS enabled, **no policy by design**, `otp_send_reservations_phone_idx`), plus `otp_reserve_send(text,text,int,int,int)` and `otp_release_send(uuid)`. **What it redefines:** `otp_begin_send`, whose limits now come from the shared reservation table instead of `otp_challenges`. **Why:** `auth-send-sms-whatsapp` — the Supabase Auth Send SMS Hook, the path every real customer login takes — called `deliverOtpTemplate` directly, the raw sender, with no cooldown, hourly or daily cap in our code. Every attempt is a billable Meta authentication-template message. The protected sender could not simply be reused, because it also writes an `otp_challenges` row and on the login path Supabase Auth is the sole OTP authority, so reusing it would mint a second code the customer never receives. **Why a reservation and not a check, which is the whole design:** an earlier revision counted `whatsapp_message_logs`, written AFTER the Meta POST returns, so a simultaneous burst all read the same pre-send history, all saw room, and all sent — the limit bounded nothing. Review raised this as a P1 and was right. The budget is now consumed BEFORE the send under `pg_advisory_xact_lock(hashtext(phone))`, which serialises callers for the same number only. **Both reserving functions were probed live after the apply and carry that lock**; `otp_release_send` deliberately does not, being id-scoped and idempotent. **The `=` is earned rather than assumed:** §4's skeleton transform gives `5e2d98510696` over the merged repository file and `5e2d98510696` over the live row's joined statements (1 statement, 11 336 stored chars). **Pure replacement, not an overload:** `otp_begin_send` keeps a byte-identical 13-argument signature, verified against `20260710140000_whatsapp_otp.sql` before the apply and confirmed after — overload count **1**, body md5 `68475c1de0c9097a03fa921d4f7c3f1c` → `7d7625fe4894d37b73b8c719049c145f`. `otp_reserve_send` and `otp_release_send` are 1 overload each. **Exposure verified, which matters because the table holds customer phone numbers and any read of it reveals who was recently sent a code:** `anon` and `authenticated` have **no** select or insert on the table and **no** execute on any of the three functions; `service_role` has execute on all three; RLS is on with **0** policies (deny-by-default, as the migration intends); `otp_reserve_send` is SECURITY DEFINER with `search_path=public` pinned. Supabase security advisors afterwards: **0 ERROR**, and the only finding naming any new object is the expected *"RLS enabled, but no policies exist"*. **Money path untouched and verified rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent**: 0 `%moyasar%` functions, 0 history rows. Live history **121 → 122**. **Applied into a quiet system:** 0 rows in `otp_challenges` in the preceding 2 days, so the one-time reset of per-phone limits at apply time throttled or freed nobody, and the reservation table starts empty (**0 rows** after apply). **FULLY LIVE AS OF 2026-09-02.** The login half needed one deploy and got it: `auth-send-sms-whatsapp` shipped as **version 2** on 2026-09-02 on explicit owner approval, `verify_jwt` preserved at `false`. Every real customer login now reserves against the shared budget before the Meta send (60 s cooldown, 5/hour, 10/day). Verified without sending an OTP: the function boots (`GET` → hook-shaped 405), the signature gate holds (unsigned `POST` → 401, at step 2 before any reservation), and the smoke test consumed nothing — `otp_send_reservations` still 0 rows. For a day between apply and deploy the login path stayed unprotected, which is the row's own caution: an applied migration is not a delivered feature. **The VERIFICATION half went live with the apply, and needs no deploy at all.** `otp_begin_send` was replaced body-only under a byte-identical signature, so the already-deployed `whatsapp-send-otp` binding resolves to the new body: from 12:46:15 UTC its limits come from `otp_send_reservations` under the per-phone lock, and a verification send consumes budget the login path will see. Verified three ways — PR #301's diff touches no file in that function's bundle (`_shared/whatsappSend.ts` and `whatsapp-send-otp/` are absent from it); the **deployed bundle read live (v2)** carries the unchanged 13-argument `admin.rpc('otp_begin_send', …)` call; and the overload count stayed **1**, so the signature did not fork. Return shape and reason strings are unchanged, so the handler's branching is unaffected. **CORRECTION, recorded rather than edited away:** the applied file's own header says the apply *"implies TWO function deploys"*, and PR #301 put the same sentence into `docs/WHATSAPP_LOGIN.md`. It implies **one**. A function body changing server-side does not require redeploying its caller; redeploying `whatsapp-send-otp` would have been a production write that changed nothing. Review caught this on PR #303. The migration file is left byte-identical because its skeleton fingerprint is the evidence above; `docs/WHATSAPP_LOGIN.md` carries the correction. Covered by `supabase/tests/otp_login_rate_limit_test.sql` (9 properties, including the shared budget in **both** directions and a genuine second session over dblink for the concurrency case — removing the advisory lock makes it fail with `NOT_SERIALISED`). Behaviour was proven on the disposable local cluster, **not** against Production: exercising it live would mean writing reservation rows, which the apply approval does not cover (§10). **Version NOT aligned** — live carries the apply-time stamp `20260901124615` (§9-D). **Was the latest live version until 2026-09-02**, when row 78 superseded it |
 | 78 | 20260902120000 | orders_index_cleanup | `fd3072ed0cec` | 20260902123737 | 20260902120000_orders_index_cleanup | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-02 12:37:37 UTC** on explicit owner approval ("apply 20260902120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #313 as `fc3d76a`; the file was hashed from the **default branch** before sending (sha256 `34211d128b21d80294fa03077a7779e2ca1db0ddb65d35e32bf9613965c299ee`, 90 lines / 4 999 bytes) and confirmed identical to the copy CI replayed. **What it does:** two `drop index if exists` statements and nothing else — 88 of the 90 lines are the header. `orders_lazywait_deadline_queue_idx` was a byte-identical DUPLICATE of `orders_lazywait_queue_idx` (same column, same predicate, different name, so `create index if not exists` could not dedupe them); `orders_sync_queue_idx` was DEAD, its `where sync_status` predicate being the only such filter anywhere in the repository. **Verified after the apply:** both gone, the survivor present and `indisvalid`, and `orders` index count **18 → 16** — exactly two, nothing else. **The decisive check is a plan, not a count:** the live queue predicate (`lazywait_sync_state in ('pending','failed') and sync_next_attempt_at <= now()`) still plans as `Index Scan using orders_lazywait_queue_idx`, so every query the dropped duplicate used to split traffic with is still served, with the same plan. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after, and identical to the figures recorded on 2026-08-27. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Supabase security advisors afterwards: **0 ERROR**, and no finding names either dropped index. No row was read or written; `orders` still holds 66 rows. **Version NOT aligned** — live carries the apply-time stamp `20260902123737` (§9-D). Live history **122 → 123**. **Current latest live version** |
-| 79 | 20260903120000 | operations_alert_email_dispatch | `f6fc27eb01a4` | 20260907064638 | operations_alert_email_dispatch | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-07 06:46:38 UTC** on explicit owner approval ("apply 20260903120000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. At apply time **three** repository files were outstanding, and one of them is the frozen Moyasar file, which sorts ahead of both — so a bulk apply would have taken the payment file first. Naming the version is what made the count irrelevant. Merged first in PR #328 as squash `5d39c64`; the file was hashed **from the merged default branch** immediately before sending (sha256 `87030c05fcc6be474e417fb2ab8f26b7700dd3526c66fd077e5a6e404dee4a45`, 805 lines / 37 166 bytes) and confirmed byte-identical to the copy CI and the local harness had tested. **What it does:** operations alerts v2, the email dispatch path for X3. Adds `dispatch_language` and `dispatch_min_severity` to the settings singleton; adds `claim_token`, `claimed_at` and `last_error_safe` to the outbox; widens the status vocabulary with `processing`; replaces the `operations_alert_outbox_v1_dormancy` CHECK with `operations_alert_outbox_v2_dispatch`; redefines three functions (the two producers and the settings RPC) and creates four (`operations_alerts_dispatch_recipients`, `claim_operations_alert_emails`, `finalize_operations_alert_email`, `release_operations_alert_email`); adds one partial index on the claim path. **Why:** the alert engine has run since 2026-07-23 and had never reached a human. All 136 outbox rows are `('in_app','recorded')` and stop in the database; the one critical incident on record (2026-08-10, stranded orders + platform health) was seen by nobody until somebody opened the console. **It widens ONE channel.** `whatsapp` and `push` keep the v1 prohibition under the v2 CHECK, which was read back from `pg_constraint` after the apply rather than assumed. **The `=` is earned rather than assumed, and the transform is written down here because §4 names it without defining it:** strip `--` comments, collapse all whitespace runs to a single space, trim, sha256, first 12 hex. That gives `d3ea9fce042f` over the merged repository file and `d3ea9fce042f` over the live row's joined statements (1 statement, 37 156 stored chars) — identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **The riskiest statement was proven safe against real data BEFORE sending, not after:** the v2 CHECK constrains `in_app` rows to `status in ('recorded','cancelled') and blocked_reason is null`, and adding a CHECK to a populated table fails if any row violates it. All **136** live rows were counted through both new predicates read-only first — **0** would violate `operations_alert_outbox_v2_dispatch` and **0** the widened status check. They are uniformly `in_app`/`recorded`/null-reason. **The second abort risk was also cleared first:** `create or replace function` fails if a replaced function's signature or return type changed, so all three were compared against live `pg_get_function_identity_arguments` and `pg_get_function_result` before the apply — `operations_alerts_outbox_for_event(uuid,text,text,text,text) returns integer` (not SECURITY DEFINER), `operations_digest_generate(timestamptz) returns jsonb` and `operations_alert_settings_update(jsonb) returns jsonb` (both SECURITY DEFINER) — all three matching the file exactly. Confirmed after: **7** function names, **7** overloads, so nothing forked into a second signature. **Independently audited before the write.** Nineteen agents across six dimensions (money path, preconditions vs. measured live state, inertness, atomicity, self-verification, privilege/RLS) raised **13** findings; every one was refuted under adversarial verification, leaving **zero** standing. The money-path dimension returned nothing at all. The two that reproduced but did not matter are recorded rather than dropped: two `comment on function` descriptions from `20260723090000` survive `create or replace` and now understate what the settings RPC permits (nothing reads `pg_description` — grep returns no consumer outside migrations), and the file's own header calls it a "KNOWN LIMITATION" that `operations_alert_settings_safe()` will not return the two new columns, which is wrong: that function is `select to_jsonb(p) - 'updated_by'`, a whole-row projection, so they surface immediately. Neither changes behaviour; both are follow-up housekeeping. **Inertness verified after the apply, not merely claimed:** `external_dispatch_enabled` still **false**; outbox still **136** rows with **0** on the `email` channel; both producers carry the `coalesce(..., false)` flag gate in their live bodies; the v1 refusal string is **absent** from the live settings RPC and the persistence step now writes the variable rather than a hard-coded false; and the claim predicate admits `'failed'` (the bounded-retry fix review caught on #328). Settings defaults landed as `en` / `critical`. **Exposure verified, which matters because the recipients function returns administrator email addresses:** `anon` and `authenticated` have **no** execute on any of the four new functions; `service_role` has execute on all four. Supabase security advisors afterwards: **0 ERROR**, and **no finding names any of the four**. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the figures carried since 2026-08-27. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. No order was read or written; `orders` still holds 71 rows. Live history **123 → 124**. Covered by `supabase/tests/operations_alert_email_dispatch_test.sql`, whose sections were run against a real PostgreSQL 16 + PostGIS from a cold template (120 migrations, 62 suites, 60 passed, 2 pre-existing quarantined, 0 new failures). **Applied is not delivered, which is row 77's lesson and applies here too:** this was **step 1 of four** at the time of the apply. Nothing reaches a mailbox until `operations-alert-dispatch` is deployed, `20260903130000` is applied with its two Vault secrets, and the flag is enabled. **UPDATE, same day: step 2 is done** — `operations-alert-dispatch` deployed as version 1 at 07:18:43 UTC on its own separate approval, `verify_jwt = false`, five bundle files read back and matching the merged branch. It is inert and that was probed, not assumed: `GET` 405, unauthenticated `POST` 401, and a scheduler-header `POST` **fails closed at 500** because the signature RPC ships in the still-unapplied `20260903130000` — which is precisely why the deploy goes first, since applying the scheduler first would point a five-minute cron job at a function that does not exist. **Two §5 actions remain.** Until then `docs/INCIDENT_RESPONSE.md` §1b's named watcher remains the actual answer to X3. **One consequence for the CI harness, already documented in the applied file's own header:** replaying `20260723120000_activate_operations_alerts_digest_cron` against a database where this has applied raises `activation blocked: outbox dormancy constraint ... is missing`, because that migration checks the v1 constraint by name. The harness's idempotency pass is report-only and five migrations already fail it for their own reasons, so this is a tolerated property of the chain rather than a new defect. Production is unaffected — those are anonymous `do $$ ... end $$;` blocks that ran once and are not stored. **Version NOT aligned** — live carries the apply-time stamp `20260907064638` (§9-D). **Current latest live version** |
-| 80 | 20260903130000 | operations_alert_dispatch_scheduler | `f6bdec587ec8` | 20260907082317 | operations_alert_dispatch_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-07 08:23:17 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #329 as squash `640d8d3`; the file was hashed **from the merged default branch** immediately before sending (sha256 `c5dbc10e78fe005cf218766d34ad8d4606977f2b32fd4e465315705ff223623a`, 267 lines / 12 367 bytes) and confirmed identical to the copy CI and the local harness had tested. **What it adds:** the invocation path X3 lacked. `verify_operations_alert_dispatch_signature(text,text,text)`, `invoke_operations_alert_dispatch()`, and a `pg_cron` job `operations-alert-dispatch` on `*/5 * * * *` — the evaluator's own cadence, so an alert cannot sit undelivered longer than it took to notice. **Why it is a separate file from row 79:** the dispatcher shipped with **no caller at all**, which review caught on #328. Enabling the flag filled the outbox and left it full while the documentation claimed enabling was the only step that sent mail. **The `=` is earned rather than assumed**, by the transform row 79 wrote down (strip `--` comments, collapse whitespace, trim, sha256, first 12 hex): `3109efb9c96a` over the merged repository file and `3109efb9c96a` over the live row's joined statements (1 statement, 12 364 stored chars). **THE TWO VAULT SECRETS WERE CREATED FIRST, AND THE TRIGGER SECRET WAS NEVER EXPOSED TO ANYBODY.** This is the part worth copying next time. `operations_alert_dispatch_project_url` holds the project base URL, which is not secret — it is in every client. `operations_alert_dispatch_secret` was generated **inside Postgres** and passed straight into `vault.create_secret` in the same statement: `encode(extensions.gen_random_bytes(32), 'hex')`. The value was never selected, never returned, and never crossed the wire, so it does not exist in the owner's terminal, in an agent transcript, or in this public repository — only the row UUID came back. It was verified by **length** (64 hex characters) rather than by reading it. That is the whole point of the HMAC design #329 forced: Postgres signs with it and Postgres verifies it, so no human or process outside the database ever needs the value. **Preconditions were checked against live state before sending, not after:** 0 existing `operations-alert-dispatch` cron jobs, 0 `verify_operations_alert_dispatch_signature`, 0 `invoke_operations_alert_dispatch` (all three fresh creates rather than replacements); `pg_net` and `pg_cron` both present; flag false and 0 `email` outbox rows, so all four of the file's own self-verification assertions were predicted to pass. The file has **zero** money-path or payment contact — grep for `place_order|compute_order_snapshot|payment|refund|moyasar|charge` across all 267 lines returns nothing. **Verified after applying:** exactly **one** cron job, schedule `*/5 * * * *`, `active`, command exactly `select public.invoke_operations_alert_dispatch();` — and the command matched against `http|bearer|secret|key|://` returns **false**, so no URL or credential sits in the schedule, which is the entire reason the driver reads Vault instead of the job carrying its own configuration. `verify_operations_alert_dispatch_secret` — the plaintext oracle the file drops — confirmed **absent**. **Inertness proven BEHAVIOURALLY, and then proven again by the scheduler itself:** `select public.invoke_operations_alert_dispatch();` returns **null**, the early-return branch taken before any Vault read or `net.http_post`. A successful apply would not have shown that; calling the function does. Better still, **the first real cron tick was observed** — run **218621** at **08:25:00 UTC**, `succeeded`, **11 ms**. Eleven milliseconds is by itself decisive: an HTTP round trip cannot happen in that time. It was confirmed anyway rather than argued: `net._http_response` holds exactly **two** rows in that window and neither is ours — one is `lazywait-sync` (`{"status":"ok","claimed":0,"synced":0,…}`) and the other `account-delete-process` (`{"ok":true,"processed":0,…}`), both of which run on their own schedules. So the job is scheduled, running, and making no outbound request at all. **Money path untouched and measured:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Outbox unchanged at 136 rows with 0 on `email`; the flag is still false. Live history **124 → 125**. **This leaves EXACTLY ONE unapplied repository file, and it is Moyasar.** The "never apply the two together" rule that guarded several pairings has run out of second files, which makes a bulk apply MORE dangerous rather than less: it would now apply the frozen payment file and nothing else. **X3 is one step from closed** — only `external_dispatch_enabled` remains, and that is the step that actually starts mail. **Version NOT aligned** — live carries the apply-time stamp `20260907082317` (§9-D). **Current latest live version** |
-| 81 | 20260911120000 | otp_retention_sweep | n/a | 20260908123116 | otp_retention_sweep | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-08 12:31:16 UTC** on explicit owner approval ("apply 20260911120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. **The merge was verified BEFORE the apply, because the instruction arrived while PR #341 was still open and CI still running.** That is §15's worked example repeating itself: nothing was sent until #341 merged as squash `81f4a72`, and the file was then hashed **from the merged default branch** (sha256 `fad9b47c0f7eec94a8f644b1c5d4b76ee09027a0576624fdb0bb3ec5f47a66cd`, 138 lines / 6 561 bytes) and confirmed byte-identical to the reviewed branch copy. **Why it exists:** the live Privacy Policy said "Verification codes: a short period, then deleted" and nothing performed it. `otp_challenges` retained every row it had written — oldest **2026-07-10** — carrying `phone_e164` and `ip_hash`; the only deleter was `anonymize_account_data`, on account deletion. Found by reading the whole live document against the code (`docs/LEGAL_DOCUMENTS_AUDIT.md`). **The wording was deliberately not softened to match the code**, because lowering a retention promise to fit the implementation is the wrong direction. **What it adds:** `purge_expired_otp_records()` and a `pg_cron` job `otp-retention-sweep` on `40 0 * * *` (03:40 Riyadh, after the loyalty expiry job at 00:20). **The two bounds are the safety-critical part**, since an over-eager sweep breaks login two ways: challenges go 24 h past their own expiry (every reader selects by id or `expires_at > now()`, so an expired row can never become a successful verification), and reservations at two days — **identical to the rule `otp_reserve_send` already applies per phone**, which is what makes it impossible to change the rate limiter's behaviour. Both are asserted by the file's own closing `DO` block and were mutation-tested locally, each mutant dying on the count assertion for its own table. It also closes a quieter gap: the existing reservation purge only ever ran **for the phone currently asking**, so a number that requested a code once and never returned kept its row forever. **Preconditions checked live before sending:** 0 existing `otp-retention-sweep` jobs and 0 `purge_expired_otp_records` functions, so both were fresh creates rather than replacements. **Verified after applying:** exactly one cron job, `otp-retention-sweep | 40 0 * * * | select public.purge_expired_otp_records();`; ACL `postgres=X | service_role=X`, so **`anon` and `authenticated` cannot call it**; `otp_challenges` still **3** rows, because applying schedules the sweep and does not run it. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the pair carried since 2026-08-27. **A hashing trap worth recording:** the first pre-apply read used `md5(prosrc)` and produced `b3d00f38…` / `e98d309a…`, which look like a money-path change and are not — this ledger records `md5(pg_get_functiondef(oid))`. Same functions, different basis. Check the basis before reporting an anomaly. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **125 → 126**. Covered by `supabase/tests/otp_retention_sweep_test.sql` (7 cases, weighted toward what the sweep must NOT delete), run cold at 125 migrations / 67 suites / 65 passed / 0 new failures. **No deploy implied** — nothing outside the database calls it. **Five repository files remain unapplied:** Moyasar (frozen) and the four loyalty files. **Version NOT aligned** — live carries the apply-time stamp `20260908123116` (§9-D). **Current latest live version** |
+| 79 | 20260903120000 | operations_alert_email_dispatch | `f6fc27eb01a4` | 20260907064638 | operations_alert_email_dispatch | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-07 06:46:38 UTC** on explicit owner approval ("apply 20260903120000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. At apply time **three** repository files were outstanding, and one of them is the frozen Moyasar file, which sorts ahead of both — so a bulk apply would have taken the payment file first. Naming the version is what made the count irrelevant. Merged first in PR #328 as squash `5d39c64`; the file was hashed **from the merged default branch** immediately before sending (sha256 `87030c05fcc6be474e417fb2ab8f26b7700dd3526c66fd077e5a6e404dee4a45`, 805 lines / 37 166 bytes) and confirmed byte-identical to the copy CI and the local harness had tested. **What it does:** operations alerts v2, the email dispatch path for X3. Adds `dispatch_language` and `dispatch_min_severity` to the settings singleton; adds `claim_token`, `claimed_at` and `last_error_safe` to the outbox; widens the status vocabulary with `processing`; replaces the `operations_alert_outbox_v1_dormancy` CHECK with `operations_alert_outbox_v2_dispatch`; redefines three functions (the two producers and the settings RPC) and creates four (`operations_alerts_dispatch_recipients`, `claim_operations_alert_emails`, `finalize_operations_alert_email`, `release_operations_alert_email`); adds one partial index on the claim path. **Why:** the alert engine has run since 2026-07-23 and had never reached a human. All 136 outbox rows are `('in_app','recorded')` and stop in the database; the one critical incident on record (2026-08-10, stranded orders + platform health) was seen by nobody until somebody opened the console. **It widens ONE channel.** `whatsapp` and `push` keep the v1 prohibition under the v2 CHECK, which was read back from `pg_constraint` after the apply rather than assumed. **The `=` is earned rather than assumed, and the transform is written down here because §4 names it without defining it:** *(corrected 2026-11-26: §4 does define `repo skel`, as a different transform — the md5 skeleton — and the cell above now holds that value; the transform written here is a sha256 over comment-stripped, whitespace-collapsed text)* strip `--` comments, collapse all whitespace runs to a single space, trim, sha256, first 12 hex. That gives `d3ea9fce042f` over the merged repository file and `d3ea9fce042f` over the live row's joined statements (1 statement, 37 156 stored chars) — identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **The riskiest statement was proven safe against real data BEFORE sending, not after:** the v2 CHECK constrains `in_app` rows to `status in ('recorded','cancelled') and blocked_reason is null`, and adding a CHECK to a populated table fails if any row violates it. All **136** live rows were counted through both new predicates read-only first — **0** would violate `operations_alert_outbox_v2_dispatch` and **0** the widened status check. They are uniformly `in_app`/`recorded`/null-reason. **The second abort risk was also cleared first:** `create or replace function` fails if a replaced function's signature or return type changed, so all three were compared against live `pg_get_function_identity_arguments` and `pg_get_function_result` before the apply — `operations_alerts_outbox_for_event(uuid,text,text,text,text) returns integer` (not SECURITY DEFINER), `operations_digest_generate(timestamptz) returns jsonb` and `operations_alert_settings_update(jsonb) returns jsonb` (both SECURITY DEFINER) — all three matching the file exactly. Confirmed after: **7** function names, **7** overloads, so nothing forked into a second signature. **Independently audited before the write.** Nineteen agents across six dimensions (money path, preconditions vs. measured live state, inertness, atomicity, self-verification, privilege/RLS) raised **13** findings; every one was refuted under adversarial verification, leaving **zero** standing. The money-path dimension returned nothing at all. The two that reproduced but did not matter are recorded rather than dropped: two `comment on function` descriptions from `20260723090000` survive `create or replace` and now understate what the settings RPC permits (nothing reads `pg_description` — grep returns no consumer outside migrations), and the file's own header calls it a "KNOWN LIMITATION" that `operations_alert_settings_safe()` will not return the two new columns, which is wrong: that function is `select to_jsonb(p) - 'updated_by'`, a whole-row projection, so they surface immediately. Neither changes behaviour; both are follow-up housekeeping. **Inertness verified after the apply, not merely claimed:** `external_dispatch_enabled` still **false**; outbox still **136** rows with **0** on the `email` channel; both producers carry the `coalesce(..., false)` flag gate in their live bodies; the v1 refusal string is **absent** from the live settings RPC and the persistence step now writes the variable rather than a hard-coded false; and the claim predicate admits `'failed'` (the bounded-retry fix review caught on #328). Settings defaults landed as `en` / `critical`. **Exposure verified, which matters because the recipients function returns administrator email addresses:** `anon` and `authenticated` have **no** execute on any of the four new functions; `service_role` has execute on all four. Supabase security advisors afterwards: **0 ERROR**, and **no finding names any of the four**. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the figures carried since 2026-08-27. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. No order was read or written; `orders` still holds 71 rows. Live history **123 → 124**. Covered by `supabase/tests/operations_alert_email_dispatch_test.sql`, whose sections were run against a real PostgreSQL 16 + PostGIS from a cold template (120 migrations, 62 suites, 60 passed, 2 pre-existing quarantined, 0 new failures). **Applied is not delivered, which is row 77's lesson and applies here too:** this was **step 1 of four** at the time of the apply. Nothing reaches a mailbox until `operations-alert-dispatch` is deployed, `20260903130000` is applied with its two Vault secrets, and the flag is enabled. **UPDATE, same day: step 2 is done** — `operations-alert-dispatch` deployed as version 1 at 07:18:43 UTC on its own separate approval, `verify_jwt = false`, five bundle files read back and matching the merged branch. It is inert and that was probed, not assumed: `GET` 405, unauthenticated `POST` 401, and a scheduler-header `POST` **fails closed at 500** because the signature RPC ships in the still-unapplied `20260903130000` — which is precisely why the deploy goes first, since applying the scheduler first would point a five-minute cron job at a function that does not exist. **Two §5 actions remain.** Until then `docs/INCIDENT_RESPONSE.md` §1b's named watcher remains the actual answer to X3. **One consequence for the CI harness, already documented in the applied file's own header:** replaying `20260723120000_activate_operations_alerts_digest_cron` against a database where this has applied raises `activation blocked: outbox dormancy constraint ... is missing`, because that migration checks the v1 constraint by name. The harness's idempotency pass is report-only and five migrations already fail it for their own reasons, so this is a tolerated property of the chain rather than a new defect. Production is unaffected — those are anonymous `do $$ ... end $$;` blocks that ran once and are not stored. **Version NOT aligned** — live carries the apply-time stamp `20260907064638` (§9-D). **Current latest live version** |
+| 80 | 20260903130000 | operations_alert_dispatch_scheduler | `f6bdec587ec8` | 20260907082317 | operations_alert_dispatch_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-07 08:23:17 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #329 as squash `640d8d3`; the file was hashed **from the merged default branch** immediately before sending (sha256 `c5dbc10e78fe005cf218766d34ad8d4606977f2b32fd4e465315705ff223623a`, 267 lines / 12 367 bytes) and confirmed identical to the copy CI and the local harness had tested. **What it adds:** the invocation path X3 lacked. `verify_operations_alert_dispatch_signature(text,text,text)`, `invoke_operations_alert_dispatch()`, and a `pg_cron` job `operations-alert-dispatch` on `*/5 * * * *` — the evaluator's own cadence, so an alert cannot sit undelivered longer than it took to notice. **Why it is a separate file from row 79:** the dispatcher shipped with **no caller at all**, which review caught on #328. Enabling the flag filled the outbox and left it full while the documentation claimed enabling was the only step that sent mail. **The `=` is earned rather than assumed**, by the transform row 79 wrote down (strip `--` comments, collapse whitespace, trim, sha256, first 12 hex): `3109efb9c96a` over the merged repository file and `3109efb9c96a` over the live row's joined statements (1 statement, 12 364 stored chars). *(Added 2026-11-26: `3109efb9c96a` is that comment-stripped sha256, reproduced again today from the merged file; it is not the value in this row's fingerprint cell, which holds the skeleton `f6bdec587ec8` under the column's own definition, per the recompute note under §4.)* **THE TWO VAULT SECRETS WERE CREATED FIRST, AND THE TRIGGER SECRET WAS NEVER EXPOSED TO ANYBODY.** This is the part worth copying next time. `operations_alert_dispatch_project_url` holds the project base URL, which is not secret — it is in every client. `operations_alert_dispatch_secret` was generated **inside Postgres** and passed straight into `vault.create_secret` in the same statement: `encode(extensions.gen_random_bytes(32), 'hex')`. The value was never selected, never returned, and never crossed the wire, so it does not exist in the owner's terminal, in an agent transcript, or in this public repository — only the row UUID came back. It was verified by **length** (64 hex characters) rather than by reading it. That is the whole point of the HMAC design #329 forced: Postgres signs with it and Postgres verifies it, so no human or process outside the database ever needs the value. **Preconditions were checked against live state before sending, not after:** 0 existing `operations-alert-dispatch` cron jobs, 0 `verify_operations_alert_dispatch_signature`, 0 `invoke_operations_alert_dispatch` (all three fresh creates rather than replacements); `pg_net` and `pg_cron` both present; flag false and 0 `email` outbox rows, so all four of the file's own self-verification assertions were predicted to pass. The file has **zero** money-path or payment contact — grep for `place_order|compute_order_snapshot|payment|refund|moyasar|charge` across all 267 lines returns nothing. **Verified after applying:** exactly **one** cron job, schedule `*/5 * * * *`, `active`, command exactly `select public.invoke_operations_alert_dispatch();` — and the command matched against `http|bearer|secret|key|://` returns **false**, so no URL or credential sits in the schedule, which is the entire reason the driver reads Vault instead of the job carrying its own configuration. `verify_operations_alert_dispatch_secret` — the plaintext oracle the file drops — confirmed **absent**. **Inertness proven BEHAVIOURALLY, and then proven again by the scheduler itself:** `select public.invoke_operations_alert_dispatch();` returns **null**, the early-return branch taken before any Vault read or `net.http_post`. A successful apply would not have shown that; calling the function does. Better still, **the first real cron tick was observed** — run **218621** at **08:25:00 UTC**, `succeeded`, **11 ms**. Eleven milliseconds is by itself decisive: an HTTP round trip cannot happen in that time. It was confirmed anyway rather than argued: `net._http_response` holds exactly **two** rows in that window and neither is ours — one is `lazywait-sync` (`{"status":"ok","claimed":0,"synced":0,…}`) and the other `account-delete-process` (`{"ok":true,"processed":0,…}`), both of which run on their own schedules. So the job is scheduled, running, and making no outbound request at all. **Money path untouched and measured:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Outbox unchanged at 136 rows with 0 on `email`; the flag is still false. Live history **124 → 125**. **This leaves EXACTLY ONE unapplied repository file, and it is Moyasar.** The "never apply the two together" rule that guarded several pairings has run out of second files, which makes a bulk apply MORE dangerous rather than less: it would now apply the frozen payment file and nothing else. **X3 is one step from closed** — only `external_dispatch_enabled` remains, and that is the step that actually starts mail. **Version NOT aligned** — live carries the apply-time stamp `20260907082317` (§9-D). *(A dangling "Current latest live version" fragment that ended this row was removed 2026-11-26.)* |
+| 81 | 20260911120000 | otp_retention_sweep | n/a | 20260908123116 | otp_retention_sweep | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-08 12:31:16 UTC** on explicit owner approval ("apply 20260911120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. **The merge was verified BEFORE the apply, because the instruction arrived while PR #341 was still open and CI still running.** That is §15's worked example repeating itself: nothing was sent until #341 merged as squash `81f4a72`, and the file was then hashed **from the merged default branch** (sha256 `fad9b47c0f7eec94a8f644b1c5d4b76ee09027a0576624fdb0bb3ec5f47a66cd`, 138 lines / 6 561 bytes) and confirmed byte-identical to the reviewed branch copy. **Why it exists:** the live Privacy Policy said "Verification codes: a short period, then deleted" and nothing performed it. `otp_challenges` retained every row it had written — oldest **2026-07-10** — carrying `phone_e164` and `ip_hash`; the only deleter was `anonymize_account_data`, on account deletion. Found by reading the whole live document against the code (`docs/LEGAL_DOCUMENTS_AUDIT.md`). **The wording was deliberately not softened to match the code**, because lowering a retention promise to fit the implementation is the wrong direction. **What it adds:** `purge_expired_otp_records()` and a `pg_cron` job `otp-retention-sweep` on `40 0 * * *` (03:40 Riyadh, after the loyalty expiry job at 00:20). **The two bounds are the safety-critical part**, since an over-eager sweep breaks login two ways: challenges go 24 h past their own expiry (every reader selects by id or `expires_at > now()`, so an expired row can never become a successful verification), and reservations at two days — **identical to the rule `otp_reserve_send` already applies per phone**, which is what makes it impossible to change the rate limiter's behaviour. Both are asserted by the file's own closing `DO` block and were mutation-tested locally, each mutant dying on the count assertion for its own table. It also closes a quieter gap: the existing reservation purge only ever ran **for the phone currently asking**, so a number that requested a code once and never returned kept its row forever. **Preconditions checked live before sending:** 0 existing `otp-retention-sweep` jobs and 0 `purge_expired_otp_records` functions, so both were fresh creates rather than replacements. **Verified after applying:** exactly one cron job, `otp-retention-sweep | 40 0 * * * | select public.purge_expired_otp_records();`; ACL `postgres=X | service_role=X`, so **`anon` and `authenticated` cannot call it**; `otp_challenges` still **3** rows, because applying schedules the sweep and does not run it. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the pair carried since 2026-08-27. **A hashing trap worth recording:** the first pre-apply read used `md5(prosrc)` and produced `b3d00f38…` / `e98d309a…`, which look like a money-path change and are not — this ledger records `md5(pg_get_functiondef(oid))`. Same functions, different basis. Check the basis before reporting an anomaly. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **125 → 126**. Covered by `supabase/tests/otp_retention_sweep_test.sql` (7 cases, weighted toward what the sweep must NOT delete), run cold at 125 migrations / 67 suites / 65 passed / 0 new failures. **No deploy implied** — nothing outside the database calls it. **Five repository files remain unapplied:** Moyasar (frozen) and the four loyalty files. **Version NOT aligned** — live carries the apply-time stamp `20260908123116` (§9-D). *(A dangling "Current latest live version" fragment that ended this row was removed 2026-11-26.)* |
 | 82 | 20260907120000 | loyalty_pickup_only | n/a | 20260909055016 | loyalty_pickup_only | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 05:50:16 UTC** on explicit owner approval ("apply 20260907120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Loyalty v2 step 1: while `app_settings.loyalty_pickup_only` is on, a delivery order neither earns nor may redeem. **§9-B.7 was exercised for the first time** — the merged file was re-hashed from the default branch at `07a444c` (sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`, 833 lines / 39 052 bytes) and matched the recorded value; `scripts/check-recorded-hashes.mjs` agreed the whole record set was current. **THE MONEY-PATH HASHES CHANGED, AND THAT IS THE INTENDED EFFECT, NOT AN ANOMALY.** The pair carried unchanged in every row since 2026-08-27 is retired here: `place_order` `8bd7183832108abb25bcca6942dccd70` → **`fab9f299507e68d0f368cc6acc35c198`**, `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` → **`a134547c938734538bbb4420fd63378f`** (`md5(pg_get_functiondef)`). Steps 2 and 4 will each move them again. **Body fidelity was PROVEN rather than assumed, and here that mattered more than usual**: the MCP tool takes the SQL inline, so the file could not be streamed and a transcription error would have been silent. Both bodies were extracted from the repository file by `$$` span and hashed against live `prosrc`: `place_order` `8351e2641b1cb45ab5dcbc52d8c8194f` (20 625 chars) and `compute_order_snapshot` `3d042e691ad933b121552dde146ce06d` (11 811 chars), **byte-identical on both sides**. **Preconditions checked live before sending:** the column absent, the gate absent from both functions, exactly one overload of each. The file's own closing `DO` block then asserted the column exists, defaults **true**, that `v_loyalty_channel_ok` appears exactly **4 times in each** body — the mirror-parity guard, so it cannot land in only one — and that neither function forked into a second overload. **Grants survived the redefinition, verified not assumed:** `place_order` and `compute_order_snapshot` are both still `postgres=X | service_role=X` — **`compute_order_snapshot` is NOT exposed to `authenticated`**, which is what keeps another customer's name, phone and address snapshot unreadable — and `place_customer_order` keeps its `authenticated` grant. Security advisors after the apply carry **no new finding**, and neither money-path function appears in the authenticated-executable list. **Behaviour verified live on the PICKUP half only, deliberately.** A 74.00 pickup cart previews 74 points earned; requesting 500 redeems 500 for a 50.00 discount, total 24.00, earning 24 on the reduced total. The DELIVERY half was proven on the local harness instead — `loyalty_pickup_only_test.sql` case 3 **places a real delivery order** and asserts 0 earned, 0 redeemed, 0 discount, no `loyalty_awarded_at` stamp, the balance unmoved and no ledger row — because doing that in Production would mean a real kitchen ticket. Cold run: 126 migrations, 68 suites, 66 passed, 2 quarantined, 0 new failures. **A TEST TRAP WORTH MORE THAN THE RESULT.** The first live both-channel check returned 0 points on *both* channels and looked like proof the gate worked. It was worthless: the customer picked was **comped**, and a comp zeroes `v_total` before the earning line, so `floor(0 × rate)` is 0 whatever the gate does. A passing assertion that would pass with the feature removed is not evidence. Re-run against a non-comped customer. **Nothing existing moved, measured after:** 71 orders with **0** touched in the hour, 111 loyalty ledger rows with **0** new, 5 409 points across 5 customers identical to the pre-apply read, and `loyalty_enabled`, `points_per_riyal`, `discount_per_point` and `min_points_to_redeem` all unchanged. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **126 → 127**. **No deploy implied** — the clients read the setting through `app_settings`, which they already select in full. **Version NOT aligned** — live carries the apply-time stamp `20260909055016` (§9-D, separate approval). **A LIVE CUSTOMER DOCUMENT IS NOW BEHIND THE CODE, and it is an owner action rather than an oversight to fix quietly.** `legal_documents.offers_loyalty_terms` v2.1 mentions neither pickup nor delivery. Earning survives on a hedge — it promises points on "eligible orders" and never defines eligible — but **redemption does not**: "You choose whether to use your points on an order" carries no channel caveat and is now misleading on delivery. See `docs/OWNER_ACTIONS.md` §32. **Five repository files remain unapplied:** Moyasar (frozen), the three later loyalty files (`20260908120000`, `20260909120000`, `20260910120000`) and `20260912120000_export_my_data` |
 | 83 | 20260908120000 | loyalty_item_exclusion | n/a | 20260909062000 | loyalty_item_exclusion | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 06:20:00 UTC** on explicit owner approval ("apply 20260908120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Loyalty v2 step 2: per-item exclusion (`products.earns_loyalty_points`), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points`. Merged file re-hashed from `7243db1` (sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes) — matched. **THE ORDER PRECONDITION WAS CHECKED BEFORE SENDING, not merely enforced by the file.** Step 1's `v_loyalty_channel_ok` was confirmed present in both live bodies first; the migration's own check (c) then asserts it survived at exactly 4 occurrences each, which is a regression guard on the previous step given this file rewrites the same two bodies. **The money-path hashes moved a SECOND time**, as step 1's row said they would: `place_order` `fab9f299507e68d0f368cc6acc35c198` → **`ed2ced01871eb08403130b4eaba1bc16`**, `compute_order_snapshot` `a134547c938734538bbb4420fd63378f` → **`6c667b4b83016c54461ee9a3cb051988`**. Step 4 moves them once more. **Fidelity proven on THREE bodies this time**, by the method step 1 established for an inline apply: each extracted from the repository file by `$$` span and hashed against live `prosrc` — `place_order` `5ea2f60ec87472f532f54a3e43f77d73` (22 727 chars), `compute_order_snapshot` `adfbf151b178d24ed2e05e1cc90a06bb` (13 913), `preview_loyalty_points` `bc9f91350c2604b2b809f3b45f20bd99` (852) — **all byte-identical**. **Applying excluded NOTHING**, which is the design: the column defaults `true` and **0 of 61** products carry `false`. No existing order changed — 71 orders with **0** touched, 111 ledger rows with **0** new, 5 409 points across 5 customers unchanged, and `loyalty_enabled` / `loyalty_pickup_only` both still on. **THIS ROW ADDS A NEW CUSTOMER-REACHABLE SECURITY SURFACE, and that is what most deserved checking.** `preview_loyalty_points` is `SECURITY DEFINER` and granted to `authenticated` — the same shape as the campaign-enumeration oracle review caught in step 4's file. It is safe for three reasons, each verified rather than assumed: it takes the customer from `auth.uid()` and has **no id parameter to forge**; it returns a **four-field allowlist built key-by-key**, so a future snapshot field must be opted IN rather than leaked; and the function it wraps stayed shut. Measured after the apply: `preview_loyalty_points` anon **NO** / authenticated **YES**; `compute_order_snapshot` anon **NO** / authenticated **NO**; `place_order` authenticated **NO**. The count of `SECURITY DEFINER` functions reachable by `authenticated` went **71 → 72**, exactly the one intended, and the anon-reachable set is unchanged at exactly one (`whatsapp_login_enabled`, pre-existing). The file's own check (f) refuses to pass if the wrapper were ever made to work by opening `compute_order_snapshot` instead. **The auth guard was proven live**: called over the service-role connection, where `auth.uid()` is null, it raises `28000` as intended. **No earning regression, and the equivalence was checked rather than eyeballed.** The same pickup cart returns the same figures as before the apply — 74.00 earning 74, and redeeming 500 giving a 50.00 discount, 24.00 payable, 24 earned. Identical numbers by a different route: the old rule was `floor(24.00 × 1)`; the new one is `74.00 − round(50.00 × 74/74) = 24.00`, clamped to `v_total`, then floored. Agreement here is what "nothing is excluded yet" should look like. **The exclusion behaviour itself was proven on the LOCAL harness**, because switching a product off is a live write nobody approved: `loyalty_item_exclusion_test.sql`, 8 cases — the excluded line is charged for and earns nothing, excluded items remain **spendable-on**, the coupon is split pro-rata rather than dumped on one side, a free order earns nothing *and no longer does so by accident*, preview matches the order and carries no personal data, the courier fee earns nothing, and a catalog re-import leaves the exclusion alone. Cold run: 126 migrations, 68 suites, 66 passed, 2 quarantined, 0 new failures. **APPLIED IS NOT DELIVERED, and this row is the clean example.** The client half is already merged and wired — `services/api.ts` calls the RPC, `CheckoutScreen` fetches it, `TotalsCard` renders "You'll earn N points" — but it reaches customers only in the next **EAS build (X2)**. Until then the RPC is live and nothing in a customer's hands calls it. Contrast row 82, where the apply *was* the whole change. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Live history **127 → 128**. **Version NOT aligned** — live carries `20260909062000` (§9-D, separate approval). **Four repository files remain unapplied:** Moyasar (frozen), `20260909120000_loyalty_expiry`, `20260910120000_loyalty_multipliers` and `20260912120000_export_my_data` |
 | 84 | 20260909120000 | loyalty_expiry | n/a | 20260909065334 | loyalty_expiry | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 06:53:34 UTC** on explicit owner approval ("apply 20260909120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Loyalty v2 step 3: points expiry on a fixed calendar reset. sha256 `7606d27a05e77ac887c47dc833bf0fd03a373664ac300cd989fe59f49c1fbedd`, 384 lines / 18 546 bytes — **recorded here for the first time**, because CLAUDE.md carried no fingerprint for this file, so §9-B.7 had nothing to compare against and the hash is now the record rather than a check of one. **THE FIRST MIGRATION IN THIS SERIES THAT CAN DESTROY CUSTOMER VALUE**, and the only one whose safety rests on what it does *not* do. Steps 1 and 2 changed how points are EARNED; `run_loyalty_expiry()` takes points a customer already holds and sets them to zero. **Applying it expired nothing, measured rather than asserted:** 5 409 points across 5 customers unchanged, 111 ledger rows, and **0** rows of type `expire`. `loyalty_expiry_enabled` is **false** and `loyalty_expiry_next_run_on` is **null** — which the file's own check (c) asserts against the LIVE row, on the stated grounds that "defaults false in a DDL statement is not the same as false on the live row". **ROW 79'S CONSTRAINT LESSON WAS APPLIED, and this is the second worked example.** The migration drops and re-adds `loyalty_transactions_type_check` to admit `expire`, and a CHECK re-added to a populated table fails on any violating row. All **111** existing rows were counted through the new predicate read-only *before* sending: **0 violations**, distinct types `adjustment, earn, redeem`, all admitted by the widened list. A successful apply would not have distinguished "the data fits" from "we were lucky". **THE MONEY-PATH HASHES ARE UNCHANGED, and that is the point of this row.** `place_order` `ed2ced01871eb08403130b4eaba1bc16` and `compute_order_snapshot` `6c667b4b83016c54461ee9a3cb051988` are identical before and after — this is the one loyalty step that redefines neither, so the pair that moved at rows 82 and 83 holds still here and moves once more at step 4. **Fidelity on three bodies** by the inline-apply method rows 82-83 established: `loyalty_next_expiry_on` `6e50b5603a76fab7fbea44855e8e5a26` (1 049 chars), `set_loyalty_expiry_next_run` `d337cf9ee2d39eb549058e99d4497b81` (1 316), `run_loyalty_expiry` `473da6651bda5db9679c56576573dccc` (3 111) — **all byte-identical**. **The cron job is live and does nothing, WATCHED rather than assumed** — the same standard row 80 set. `loyalty-expiry` at `20 0 * * *` (03:20 Riyadh, after the kitchen closes) brings the job count 9 → 10, is `active`, and is callable by neither `anon` nor `authenticated`. Its next real tick is tomorrow, so the driver was invoked directly instead — provably safe, since the row had just been read as disabled and the function returns on that branch before it reads a single profile. It returned `{"ran": false, "reason": "disabled"}`, and **nothing moved afterwards**: still 5 409 points, 111 ledger rows, 0 `expire` rows, `next_run_on` still null. **The retroactivity guarantee was proven on today's date, not just in the file's own assertions.** From **2026-09-09**, a 1-January annual anchor resolves to **2027-01-01** and a monthly one to **2026-10-01** — both **strictly in the future**. That is what stops enabling expiry in September with a January anchor from wiping every balance on the spot. The trigger `set_app_settings_loyalty_expiry_next_run` is present, and it is what owns the date: review found on #337 that the first version left the STEADY STATE open — while expiry was already enabled, writing a past date directly satisfied no recompute condition and the next nightly tick would have zeroed every positive balance. Case 3d pins it. **Coverage is 13 cases** (`loyalty_expiry_test.sql`), weighted toward what must NOT happen: a past anchor schedules forward rather than firing, disable/re-enable cannot resurrect a past due date, the scheduler-owned date cannot be written directly, the trigger and driver converge on the same date, a missed day is caught up rather than skipped, and only the scheduler reaches the driver. Cold run: 126 migrations, 68 suites, 66 passed, 2 quarantined, 0 new failures. **ENABLING IT IS A SEPARATE DECISION AND IS NOT LAWFUL YET.** The mechanism exists; the terms do not. `offers_loyalty_terms` says a change reducing the value of points already held will be announced in advance with a reasonable period to use them — and it is already behind on the pickup-only rule (`OWNER_ACTIONS.md` §32). Expiry is the second item queued behind that same correction. **Moyasar re-verified absent:** 0 `%moyasar%` functions. Live history **128 → 129**. **No deploy implied.** **Version NOT aligned** — live carries `20260909065334` (§9-D). **Three repository files remain unapplied:** Moyasar (frozen), `20260910120000_loyalty_multipliers` and `20260912120000_export_my_data` |
 | 85 | 20260910120000 | loyalty_multipliers | n/a | 20260909071429 | loyalty_multipliers | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 07:14:29 UTC** on explicit owner approval ("apply 20260910120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Loyalty v2 step 4, and the LAST of the series: points-earning campaigns (x2, +50%) in a new `loyalty_multipliers` table. **§9-B.7 PAID FOR ITSELF HERE, and this row is the reason that step exists.** The recorded fingerprint `90bbc364bac3ed5824561d8ad7fe66defd400074555c7be75121036338649487` (1 115 lines / 54 587 bytes) matched the merged file exactly — but it only matched because **PR #345 corrected it three hours earlier**. Until then CLAUDE.md carried `4a5a174d…` from the pre-review draft, so this apply would have produced a mismatch at the worst possible moment: on a money-path file, with no way to tell a stale record from a tampered one. The guard that fix installed (`scripts/check-recorded-hashes.mjs`) confirmed the whole record set current beforehand. **Both order preconditions were checked live before sending**, not left to the file: step 1's `v_loyalty_channel_ok` and step 2's `v_earn_base` were each confirmed present in both bodies. The file's own block (b) then re-asserts them after the rewrite, which is the point — this migration rewrites the same two functions a third time, so their earlier guarantees are exactly what a careless rewrite loses. **The money-path hashes moved a THIRD and final time:** `place_order` `ed2ced01871eb08403130b4eaba1bc16` → **`e54caa332404755b733590a673d12c27`**, `compute_order_snapshot` `6c667b4b83016c54461ee9a3cb051988` → **`ca276a84424e403a98d34860817f815c`**. The loyalty series is complete; the next row to move this pair will be doing something new. **Fidelity on three bodies, and this was the largest inline apply yet** — `place_order` alone is 24 212 characters. Each extracted from the repository file by delimiter span and hashed against live `prosrc`: `d2889fc85f2e50d145910a507fd67655` (24 212), `52490fe4d9b692c4b8631a28977c3d73` (15 398), and the resolver `0ab63807031788a16c4d8ad72c7bb907` (1 073) — **all byte-identical**. Note the resolver is `language sql`, so its body ends at `$$;` rather than `end $$;`; the extraction has to know that. **NOTHING IS LIVE, and the arithmetic proves it rather than the row count alone.** The table is created EMPTY (0 rows), `loyalty_multiplier_for(null,null,null,now())` returns exactly **1**, and the same pickup cart returns figures **identical to step 2** — 74.00 earning 74, and redeeming 500 giving 24.00 payable earning 24. That identity is the file's own stated most-important property: with no campaign the weighted sum equals the eligible sum, the ratio is 1, and earning is arithmetically unchanged. **THE ENUMERATION ORACLE IS CLOSED, and I verified the half the file does not.** `loyalty_multiplier_for` is `SECURITY DEFINER` and takes `p_at`, so granting it to `authenticated` would let a customer probe "what is the multiplier on this product next month" and enumerate targeted and not-yet-started campaigns the table's `is_staff()` policy hides — the defect review caught on #338. The DDL revokes from `public, anon, authenticated` and grants to `service_role` alone, and the live ACL is `postgres=X | service_role=X`. **But the migration's own check (e) asserts only that `anon` cannot call it**, not `authenticated` — which is the role the oracle actually involved. The DDL is right and suite case 11b covers it, so nothing is wrong; the file's self-verification is simply weaker than the fix it protects. Both roles were therefore checked live here: **anon NO, authenticated NO**. The generalisable point: a self-verification block should assert the exact regression its own history records, not a neighbouring one. **Nothing existing moved:** 71 orders, 111 ledger rows, 5 409 points across 5 customers, all unchanged. One overload of each pricing function. **Moyasar re-verified absent.** Live history **129 → 130**. **No deploy implied — and that is step 2 paying off.** The "You'll earn N points" line is computed by `preview_loyalty_points` through `compute_order_snapshot`, so it shows the campaign figure automatically; had the client been given its own copy of the earning rule, this step would have needed a fourth mirror. Coverage: `loyalty_multipliers_test.sql`, 12 cases including a x2 campaign that legitimately out-earns the order total (the clamp-ordering property), specificity resolution, window and branch gating, and the channel gate and comp still winning over any campaign. Cold run: 126 migrations, 68 suites, 66 passed, 0 new failures. **Version NOT aligned** — live carries `20260909071429` (§9-D). **Two repository files remain unapplied:** Moyasar (frozen) and `20260912120000_export_my_data` |
 | 86 | 20260912120000 | export_my_data | n/a | 20260909073209 | export_my_data | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 07:32:09 UTC** on explicit owner approval ("apply 20260912120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. PDPL access and portability: `export_my_data()` returns the calling customer's own personal data as JSON. sha256 `a5214226bc6d6dbef022d8fe55fc3d1f6876e1281bc42f54d498468ab342bf3d`, 221 lines / 9 939 bytes — **recorded here for the first time**, as on row 84: CLAUDE.md carried no fingerprint for this file, so §9-B.7 had nothing to compare against and this hash is the record rather than a check of one. **THE MONEY-PATH HASHES ARE UNCHANGED, and after four consecutive rows that is worth stating plainly:** `place_order` `e54caa332404755b733590a673d12c27` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after. Row 85 predicted that the next row to move this pair would be doing something new; this one does not move it, which is the correct outcome for a read-only portability endpoint. **Fidelity on one body**, by the inline-apply method rows 82–85 established: extracted from the repository file by `$$` span and hashed against live `prosrc` — `0edc9f733aa5756df86ee3a2505bc717`, 4 973 chars, **byte-identical**. **APPLYING IT PROVED NOTHING ABOUT WHETHER IT WORKS, AND THAT IS THE LESSON OF THIS ROW.** A `plpgsql` body is **not name-resolved at creation** — a wrong column reference applies cleanly and fails at the first call. This function reads **65 distinct columns across SEVEN tables** — `profiles`, `addresses`, `orders`, `order_items`, `order_item_modifiers`, `loyalty_transactions`, `push_devices` — so a single renamed column would have shipped a portability endpoint that raises for every customer who ever presses the button, and the apply output would have looked identical. All **65 are present in live `information_schema`, 0 missing**, and the function was then **called** afterwards — which resolves every name at execution and is the stronger of the two checks. **This row first recorded "38 columns across six tables"; review corrected it on #350 and the correction is left visible.** Both figures were wrong, the property they were cited for still holds, and that is luck rather than diligence: **a count quoted as evidence must be recomputed from the artifact rather than carried forward from a working note** — §9-B.7's stale fingerprint in a different costume, in a record whose entire purpose is to describe the file accurately. Contrast the `language sql` case in row 58, where PostgreSQL validates the body at creation and the same mistake aborts loudly. **Called live, and the assertions were written to be falsifiable.** `auth.uid()` reads `request.jwt.claim.sub`, which is settable transaction-locally, so the function was invoked as a real customer inside a read-only transaction. It returns the **7** intended top-level keys; it returned **1** order out of **71** in the table and that order is one the customer actually owns; **1** loyalty row, also theirs; 0 saved addresses; 1 notification device. **The scoping assertion is the one that had to be able to fail** — "1 of 71" is evidence, "it returned some orders" is not. **The withheld set was asserted by absence, not by reading the header:** the JSON contains no `expo_push_token`, no `idempotency_key`, no `sync_*`/`pos_*`/`lazywait_*` operational state and no `refund_*` field. **None of the customer's data was printed** while checking any of this (§9) — every assertion is a count, a boolean or a key name. **The anonymous path was proven to refuse rather than to return an empty document**, which is the failure mode a `SECURITY DEFINER` function invites: with no `auth.uid()` it would otherwise run as owner with a null filter and look successful. Called with the claim cleared, it raises **`42501`**, `export_my_data requires an authenticated session`. **The boundary was measured, by row 83's rule.** ACL is `postgres=X | authenticated=X | service_role=X` — anon **NO**, authenticated **YES**. `SECURITY DEFINER` functions reachable by `authenticated` moved **72 → 73**, exactly the one intended, and `compute_order_snapshot` is still reachable by **neither** `anon` nor `authenticated`. Shape verified live: exactly **1** overload, **`pronargs = 0`**, `stable`, `security definer`, `search_path=public`. **Zero arguments IS the security model**, and the file's own block asserts it rather than trusting it: an overload taking a customer id would turn a portability endpoint into an enumeration oracle for every customer's name, phone, address history and order history. **Its self-verification is the strongest in this series** — it asserts one overload, zero arguments, and that `anon` cannot execute. Compare row 85, whose file checks only the `anon` half of a defect that involved `authenticated`. **APPLIED IS NOT DELIVERED**, as on row 83. The client half is merged and wired — `services/api.ts`, `dataExport.ts`, Profile → Account & privacy → *Get a copy of my data* — but it reaches customers only in the next **EAS build (X2)**. `docs/GO_LIVE_READINESS.md` A6 is **not closed by this apply**. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. Live history **130 → 131**. **No deploy implied** — the RPC is called by the mobile client through PostgREST, which resolves the new function without a redeploy. **Version NOT aligned** — live carries the apply-time stamp `20260909073209` (§9-D). **EXACTLY ONE repository file now remains unapplied, and it is Moyasar.** That is the shape CLAUDE.md §8 warns about: with a single file left, "apply the outstanding migrations" reads like a no-op and is the one instruction that would break the §6 freeze. Name the target by version. |
 | 87 | 20260913120000 | alert_recovery_email_pairing | n/a | 20260909102949 | alert_recovery_email_pairing | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 10:29:49 UTC** on explicit owner approval ("apply 20260913120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Redefines `operations_alerts_outbox_for_event` so a `recovered` event emits an EMAIL row only if the same episode (`alert_id`) already emitted one. §9-B.7: the merged copy was re-hashed from the default branch at `e08f0fc` (sha256 `495c8ccbe46ebb7476195b8d1faa2f88846ac62a435e5c44cd44e48f2b146bd5`, 299 lines / 15 647 bytes) and matched the recorded value; `scripts/check-recorded-hashes.mjs` agreed the whole record set was current. **THE MONEY PATH IS UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after. **Fidelity on one body**, by the inline-apply method rows 82-86 established: extracted from the merged file by `$$` span and hashed against live `prosrc` — `7ca79c947a0906266a418fdc5fc2c88b`, 7 218 chars, **byte-identical**, replacing `1fd900808f589736ee3a9b825c97e59f` (3 250 chars). One overload before and after; ACL still `postgres=X | service_role=X`, so neither `anon` nor `authenticated` can reach it. **ALL THREE OF THE FILE'S OWN ASSERTIONS WERE CHECKED LIVE BEFORE SENDING, not left to the apply to discover** — the flag false, the producer present at one overload, and `claim_operations_alert_emails` still declaring `p_max_attempts integer DEFAULT 5`. That last one is the mirrored constant the predicate depends on, and it is the reason this file can assert rather than hope: raising the cap in the claim function alone would silently stop pairing recoveries for openings the dispatcher is still retrying. **APPLYING IT SENT NOTHING AND CHANGED NOTHING, measured rather than asserted:** the outbox still holds its same **156** rows with **zero** on the `email` channel, `external_dispatch_enabled` is still false, and the file's own final assertion refuses to land if that flag is true. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`. Live history **131 → 132**. **ROW 86'S LESSON WAS APPLIED, AND IT IS THE WHOLE POINT OF THIS ROW'S VERIFICATION.** A `plpgsql` body is not name-resolved at creation, so a clean apply proves only that the text was stored. Two things were therefore done afterwards. **First**, the new episode sub-query was run **verbatim and read-only against real data** — 14 real `recovered` events probed, **0 would pair and 14 would not**, which is exactly right because the outbox holds no email rows at all: every historical recovery is correctly suppressed under the new rule. **Second**, the function itself was **called**, inside a transaction deliberately aborted by a `RAISE` so nothing persisted: a synthetic episode's opening and recovery both returned **2** rows (the bilingual `in_app` pair), **0** email rows on either — correct, since dispatch is off — and the recovery kept its `in_app` pair, which is the half this migration deliberately does not touch. Rollback was then verified rather than trusted: outbox back at 156, and **0** probe rows in `operations_alert_state`, `operations_alert_events` or the outbox. **The pairing behaviour itself could NOT be proven in Production, and saying so is the honest reading.** With `external_dispatch_enabled` false the email branch is unreachable, so paired and unpaired recoveries are indistinguishable live — which is precisely why the migration is safe to apply now. That behaviour is proven on the LOCAL harness instead: `alert_recovery_email_pairing_test.sql`, 10 cases weighted toward what must NOT happen, cold at 127 migrations / 69 suites / 67 passed / 2 quarantined / 0 new failures, and mutation-tested nine ways across two rounds with **eight killed**. The survivor is documented rather than hidden (the self-exclusion is insurance against a caller that does not exist). **Two failures of the authoring session are recorded because they generalise.** The fingerprint-scoped mutant SURVIVED the first suite — the episode-leak case ran before any email existed on that fingerprint, so it could not fail; an assertion that cannot fail is not a test, which is row 82's trap in a new costume. And the first mutation run was reported wrong: the manual chain was dying on a missing `auth` schema from a skipped `bootstrap.sql`, not on the mutants. **Review found a P1 and the fix is not what it proposed** — requiring `status = 'sent'` would drop the ordinary case, since the evaluator and dispatcher share a 5-minute cadence; mutated to that rule the suite dies on case 2b. **No deploy implied** — the evaluator calls this function through an unchanged signature, so the existing binding resolves to the new body (row 77's lesson). **Version NOT aligned** — live carries the apply-time stamp `20260909102949` (§9-D). **EXACTLY ONE repository file now remains unapplied, and it is Moyasar** — the dangerous shape again: name the target by version. |
-| 88 | 20260914120000 | platform_rollup_suppression | n/a | 20260909121702 | platform_rollup_suppression | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 12:17:02 UTC** on explicit owner approval ("apply 20260914120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Stops `platform:health` duplicating the subsystem that caused it. §9-B.7: the merged copy was re-hashed from `823d1b8` (sha256 `3959dcec3257ca2207b5fa217b10ba326d12c523031aaf30275c5ba2bbc7c793`, 388 lines / 19 197 bytes) and matched. **MONEY PATH UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` / `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after. **Nothing moved:** outbox still **156** rows, **0** on `email`, `external_dispatch_enabled` still false, and **0 open alerts** at apply time, so no alert identity could churn. **`operations_alerts_derive_pre_stranded` is BYTE-IDENTICAL before and after** (`19177f263090d96500a571a4bf6a1dd4`) — this migration deliberately does not touch it, and that is asserted rather than assumed. Both new bodies verified byte-identical against the merged file: the helper `470bbab286a6503ec1a853113ca67079` (2 975 chars) and the wrapper `93d31e14c707856000c128edd7e32229` (2 993). Both `service_role`-only; one overload of the wrapper. **A HASHING TRAP, AND IT IS THE SECOND OF ITS KIND IN THIS LEDGER.** The pre-computed expectations were each exactly ONE BYTE short, which reads exactly like a transcription error on an inline apply — the one thing the check exists to catch. It was not: `prosrc` includes the newline **before** the closing `$$`, and the extraction span had cut at `'\n$$;'` rather than `'$$;'`, excluding it. Re-hashing with that byte included matched both bodies exactly. Row 81 recorded the `md5(prosrc)` vs `md5(pg_get_functiondef)` basis trap; this is the same lesson at the boundary rather than the basis. **Check the span before reporting a mismatch.** **THE BEHAVIOUR IS FULLY PROVABLE IN PRODUCTION, and that is the contrast with row 87.** `operations_alerts_derive` is `stable` and pure over its arguments, so it was called live, read-only, with four synthetic snapshots: (A) `order_flow` failing alone → only `order_flow:health`, rollup **suppressed**; (B) the #354 P1 case, a MUTED `lazywait=configuration_error` beside an unmuted `order_flow=failing` → rollup **survives** and names `lazywait` in `driver_subsystems`; (C) the #354 P2 case, `open_warning_count=1` with `stranded_order_count=3` → the wrapper's critical `order_integrity:stranded_orders` appears and the rollup is **suppressed**; (D) two failing drivers with one muted → rollup **survives**, naming both. Row 87's behaviour could not be checked live because dispatch is off; this one needs no such caveat. **REVIEW FOUND TWO DEFECTS IN THE FIRST DRAFT AND BOTH GENERALISE (#354).** **P1** — `overall_state` ranks `configuration_error` above `failing`, so suppressing on *any* rollup critical let an alert about a DIFFERENT state silence a muted higher-precedence driver, leaving it reported by nothing at all. The predicate is now stated over the subsystems whose state EQUALS `overall_state`, and requires **every** driver explained, not any. **P2** — the decision ran inside `_pre_stranded`, but the wrapper appends a critical AFTER it returns and the `order_integrity` arm is an if/ELSIF that emits only a warning when incidents exist, so the duplicate came straight back. The correlation now runs in the wrapper on **all five** return paths, which the file asserts by refusing to land if a bare `return v_out;` survives or the count is not exactly 5. **Correlate an aggregate with the specific thing that drove it, and judge a set only once the set is complete.** Coverage: `platform_rollup_suppression_test.sql`, 14 cases, calling the **wrapper** rather than the internal builder — testing the builder would have passed while the function the evaluator calls still emitted the duplicate. Mutation-tested five ways, all killed, including both findings reintroduced deliberately. Cold: 128 migrations, 70 suites, 68 passed, 2 quarantined, 0 new failures. **Moyasar re-verified absent:** 0 functions, `provider_name` still `tap`. Live history **132 → 133**. **No deploy implied** — the evaluator calls the wrapper through an unchanged signature (row 77's lesson). **Version NOT aligned** — live carries `20260909121702` (§9-D). **EXACTLY ONE repository file now remains unapplied, and it is Moyasar.** |
+| 88 | 20260914120000 | platform_rollup_suppression | n/a | 20260909121702 | platform_rollup_suppression | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-09 12:17:02 UTC** on explicit owner approval ("apply 20260914120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Stops `platform:health` duplicating the subsystem that caused it. §9-B.7: the merged copy was re-hashed from `823d1b8` (sha256 `3959dcec3257ca2207b5fa217b10ba326d12c523031aaf30275c5ba2bbc7c793`, 388 lines / 19 197 bytes) and matched. **MONEY PATH UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` / `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after. **Nothing moved:** outbox still **156** rows, **0** on `email`, `external_dispatch_enabled` still false, and **0 open alerts** at apply time, so no alert identity could churn. **`operations_alerts_derive_pre_stranded` is BYTE-IDENTICAL before and after** (`19177f263090d96500a571a4bf6a1dd4`) — this migration deliberately does not touch it, and that is asserted rather than assumed. Both new bodies verified byte-identical against the merged file: the helper `470bbab286a6503ec1a853113ca67079` (2 975 chars) and the wrapper `93d31e14c707856000c128edd7e32229` (2 993). Both `service_role`-only; one overload of the wrapper. **A HASHING TRAP, AND IT IS THE SECOND OF ITS KIND IN THIS LEDGER.** The pre-computed expectations were each exactly ONE BYTE short, which reads exactly like a transcription error on an inline apply — the one thing the check exists to catch. It was not: `prosrc` includes the newline **before** the closing `$$`, and the extraction span had cut at `'\n$$;'` rather than `'$$;'`, excluding it. Re-hashing with that byte included matched both bodies exactly. Row 81 recorded the `md5(prosrc)` vs `md5(pg_get_functiondef)` basis trap; this is the same lesson at the boundary rather than the basis. **Check the span before reporting a mismatch.** **THE BEHAVIOUR IS FULLY PROVABLE IN PRODUCTION, and that is the contrast with row 87.** `operations_alerts_derive` is `stable` and pure over its arguments, so it was called live, read-only, with four synthetic snapshots: (A) `order_flow` failing alone → only `order_flow:health`, rollup **suppressed**; (B) the #354 P1 case, a MUTED `lazywait=configuration_error` beside an unmuted `order_flow=failing` → rollup **survives** and names `lazywait` in `driver_subsystems`; (C) the #354 P2 case, `open_warning_count=1` with `stranded_order_count=3` → the wrapper's critical `order_integrity:stranded_orders` appears and the rollup is **suppressed**; (D) two failing drivers with one muted → rollup **survives**, naming both. Row 87's behaviour could not be checked live because dispatch is off; this one needs no such caveat. **REVIEW FOUND TWO DEFECTS IN THE FIRST DRAFT AND BOTH GENERALISE (#354).** **P1** — `overall_state` ranks `configuration_error` above `failing`, so suppressing on *any* rollup critical let an alert about a DIFFERENT state silence a muted higher-precedence driver, leaving it reported by nothing at all. The predicate is now stated over the subsystems whose state EQUALS `overall_state`, and requires **every** driver explained, not any. **P2** — the decision ran inside `_pre_stranded`, but the wrapper appends a critical AFTER it returns and the `order_integrity` arm is an if/ELSIF that emits only a warning when incidents exist, so the duplicate came straight back. The correlation now runs in the wrapper on **all five** return paths, which the file asserts by refusing to land if a bare `return v_out;` survives or the count is not exactly 5. **Correlate an aggregate with the specific thing that drove it, and judge a set only once the set is complete.** Coverage: `platform_rollup_suppression_test.sql`, **14 cases** *(noted 2026-11-26: no way of counting the suite gives 14 — it has 11 numbered cases, 13 calls to `operations_alerts_derive` and 21 `raise exception 'case …'` assertions; the figure is carried unchanged because it was recorded at apply time, and `docs/OPERATIONS_ALERTS_DIGEST.md` repeats it)*, calling the **wrapper** rather than the internal builder — testing the builder would have passed while the function the evaluator calls still emitted the duplicate. Mutation-tested five ways, all killed, including both findings reintroduced deliberately. Cold: 128 migrations, 70 suites, 68 passed, 2 quarantined, 0 new failures. **Moyasar re-verified absent:** 0 functions, `provider_name` still `tap`. Live history **132 → 133**. **No deploy implied** — the evaluator calls the wrapper through an unchanged signature (row 77's lesson). **Version NOT aligned** — live carries `20260909121702` (§9-D). **EXACTLY ONE repository file now remains unapplied, and it is Moyasar.** |
 | 89 | 20260915120000 | digest_external_delivery_line | n/a | 20260913054610 | digest_external_delivery_line | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-13 05:46:10 UTC** on explicit owner approval ("apply 20260915120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Redefines `operations_digest_build` so the line closing every digest is derived from `external_dispatch_enabled` instead of asserting, unconditionally and in both languages, that external delivery is disabled "in this version" — a claim that becomes false the instant the flag is turned on, inside an artifact that is **stored** and read afterwards. §9-B.7: the merged copy was re-hashed from the default branch at `7d160bb` (sha256 `2707a17f7797e498fcf46c88ea310ed1b953ba3e400120867e493b3901be1576`, 423 lines / 20 247 bytes) and matched the value recorded in CLAUDE.md §8 before anything was sent. **MONEY PATH UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after. **Fidelity on one body:** live `prosrc` md5 `96bd50d399c8f47a0a50bb62f050ceae`, 11 689 chars, **byte-identical** to the merged file, replacing `6d49a73fd5076b88a408e62703d6de13` (10 999 chars). One overload before and after; still reachable by neither `anon` nor `authenticated` (0 client grants). **A HASHING TRAP, AND IT IS THE THIRD OF ITS KIND IN THIS LEDGER — this time at the OPENING delimiter.** The pre-computed expectation came out exactly ONE BYTE short (11 688 vs 11 689), which reads exactly like the transcription slip an inline apply exists to catch. It was not: `prosrc` includes the newline **immediately after** `as $$`, and the extraction had started at `'as $$\n'` rather than `'as $$'`. Row 81 recorded the `md5(prosrc)` vs `md5(pg_get_functiondef)` **basis** trap; row 88 recorded the same lesson at the **closing** delimiter; this is the opening one. **Check the span before reporting a mismatch** — all three times the file was fine and the measurement was not. **APPLYING IT CHANGED NOTHING, and the strongest evidence is a timestamp rather than a count.** `operations_alert_settings.updated_at` is still **2026-07-22 16:55:57.003975+00**, unmoved — which proves the migration performed no write at all. That is by design: the file deliberately does **not** flip the flag to exercise both branches, because doing so would bump that column on a change meant to move nothing, so the both-states proof lives in the paired suite, which rolls back. `external_dispatch_enabled` still **false**; outbox still **272** rows with **0** on `email`; **108** stored digests unchanged — applying it rewrites no digest already written, only what future renders say. **IT RUNS, AND THAT WAS CHECKED INDEPENDENTLY OF THE FILE'S OWN BLOCK.** A `plpgsql` body is not name-resolved at creation, so the function was **called** live, read-only, in both languages: EN final line `External delivery is disabled.`, AR final line `الإرسال الخارجي معطل.`, and the retracted sentence unreachable in both rendered outputs. With the flag false that is the same claim the old footer made, minus the false version clause. **THREE AUTHORING FAILURES ARE RECORDED ON THIS ROW BECAUSE THEY GENERALISE FAR PAST THIS FILE.** **(1) A negative search is not evidence of absence.** The note that motivated the work — merged in `db614a9` — claimed the Arabic digest had no equivalent line. It does, and always did (`20260723090000…:2054`). The claim came from querying the live body for a **guessed** Arabic phrase, getting nothing, and reading that as absence; the term was never validated against a case it should have matched. Both languages were affected, and the fix covers both. **(2) A verification block passed while proving nothing.** Its first draft read `->> 'body'`; the key is `rendered_body`, so it got NULL — and `NULL <> 'x'` is NULL rather than true, so **every** assertion was skipped and the block reported success. It now reads the right key, uses `is distinct from`, and fails explicitly when `rendered_body` is NULL. **A check that cannot fail is worse than no check, because it is counted as evidence** — row 82's trap in a third costume. **(3) Proving the current state is not proving both.** Mutation testing then showed it *still* passing when the **enabled** branch was corrupted, because the live flag is false so that branch never executes. Both branches are now asserted at source level, and both states exercised in the paired suite. Its own block asserts one overload; **five** `v_external_on` references enumerated by site (an earlier draft asserted four and the apply failed on it — the exception handler was forgotten; left at five **with the list**, not loosened); both retracted literals absent; all four replacement literals present; then it calls the function in both languages. **No new Arabic copy was drafted** — both replacement phrasings are lifted from copy already shipping in the admin console (`OperationsAlertsPanel.tsx:256-257`). **Derived, not retyped:** extracted from `20260723090000_smart_operations_alerts_digest.sql` lines 1889-2141 under four anchored substitutions, each asserted to match exactly once; a diff of old body against new shows only those four regions, 253 → 271 lines. Coverage: `operations_digest_external_delivery_line_test.sql`, two flag states × two languages, plus a stored-mode render asserting the footer is the **last** line rather than merely present. Cold: 129 migrations, 71 suites, 69 passed, 2 quarantined, 0 new failures. Mutation-tested five ways — all five killed by the migration's check, four of five by the suite (the fifth mutates the checker itself). **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **133 → 134**. **No deploy implied** — the signature is unchanged, so `operations_digest_generate` and `operations_digest_preview` bind to the new body (row 77's lesson). **Version NOT aligned** — live carries the apply-time stamp `20260913054610` (§9-D). **EXACTLY ONE repository file now remains unapplied, and it is Moyasar** — the dangerous shape again: name the target by version. |
 | 90 | 20260916120000 | branch_delivery_requests | n/a | 20260913124039 | branch_delivery_requests | = | A | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-13 12:40:39 UTC** on explicit owner approval ("apply 20260916120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Lets a BRANCH ask the CALL CENTRE to close delivery, and lets the call centre accept or decline — request only. §9-B.7: the merged copy was re-hashed from the default branch at `0abfcdd` (sha256 `7fc226e10646369c841ec2d1ff6c76f0bd2f54b970e5a4119141e475ac066ba6`, 452 lines / 21 079 bytes) and matched the recorded value before anything was sent. **MONEY PATH UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — this is a NEW-OBJECTS-ONLY migration and redefines nothing that existed. **THE PRE-APPLY MONEY-PATH READ RETURNED NULL AND WAS NOT RECORDED AS “UNCHANGED”.** The first baseline query addressed `place_order` through a guessed `to_regprocedure` signature; the signature was wrong, so `md5(pg_get_functiondef(…))` came back **null** — and a null compared against the ledger value would have looked like a clean check while proving nothing. It was re-read by joining `pg_proc` and matching on name, which cannot silently miss. **Row 89's lesson in a new costume: a check that cannot fail is worse than no check, and NULL is how it usually cannot fail.** **Fidelity on three bodies**, by the inline-apply method rows 82-89 established — extracted from the merged file by `$$` span and hashed against live `prosrc`, all three **byte-identical**: `request_branch_delivery_pause` `20300cd722b30d48cdea1666b68de67a` (2 902 chars), `cancel_branch_delivery_request` `7694b0a5b1fd80e69c18cd7c3fcd73f0` (992), `resolve_branch_delivery_request` `177c42fbabe7fac06910014e02a7ecd4` (3 359). The span was taken with both delimiter newlines included from the start, per rows 88 and 89, and **no discrepancy arose** — the first apply in this ledger where the hashing trap was avoided rather than diagnosed. One overload each; all three `security definer` with `search_path=public`; `authenticated` may execute and **`anon` may not**. **APPLYING IT CLOSED NOTHING, measured rather than asserted:** the request table was created **empty** (0 rows), **0 of 40** branches have `delivery_temporarily_closed` set, 72 orders and 40 branches unchanged, and **0** `ops_change_events` rows of the new `delivery_request` kind exist. The `ops_change_events` kind CHECK went from 3 values to 4, keeping all three originals — widening a CHECK cannot invalidate an existing row. RLS is enabled with **exactly one policy, a SELECT**, and **zero** write policies, so the three definer RPCs are the only write path. **THE 2026-08-20 DELIVERY BOUNDARY DID NOT MOVE, and that is asserted as properties rather than assumed:** live `set_branch_delivery_pause` still contains `is_call_center()` and still contains **no** reference to `is_branch_operator`, and a scan of every `public` function finds **zero** that write `branches.delivery_temporarily_closed` while mentioning `is_branch_operator`. **IT RUNS, AND THAT WAS CHECKED INDEPENDENTLY OF THE FILE'S OWN BLOCK — but only as far as Production honestly allows.** A `plpgsql` body is not name-resolved at creation (row 86), so all three were **called** live and their outcomes read back as VALUES, not notices. `cancel_branch_delivery_request` runs its `select … for update` **before** its authorization check, so a random id resolved the table and every column it names and raised `P0002 :: Request not found` — genuine name-resolution evidence, writing nothing. The other two gate first, so as a service-role connection (`auth.uid()` null, `is_admin()` false) they are proven **only as far as their gate**: `42501 :: Not authorized to request a delivery closure for this branch` and `42501 :: Only the call centre may answer a delivery request`. Saying so is the honest reading — driving the deeper path live would file a real request against a real branch, and accepting one would close delivery to real customers. **0 rows in the table after the probes.** **A FIRST PROBE ATTEMPT PROVED NOTHING AND WAS DISCARDED RATHER THAN COUNTED.** It was a `DO` block reporting through `raise notice`; the MCP SQL tool surfaces no notices, so it returned an empty result that is indistinguishable from every branch having silently taken the `UNEXPECTED` path. Rewritten to return the observed `SQLSTATE` and message as a row. **If an assertion's outcome is not a value you can read, it is not evidence.** **THE ONE DEEPER RISK WAS CHECKED BY SIGNATURE INSTEAD.** `resolve`'s accept path calls `set_branch_delivery_pause(uuid, integer, text, text)` returning `jsonb` and `emit_ops_change_event(uuid, text)` returning `void`; a mismatch there would raise the first time a real operator accepted a real request — the worst possible moment, and outside what the gate probe reaches. All six helpers the new bodies call (`is_admin`, `is_call_center`, `is_branch_operator`, `is_staff`, plus those two) exist live with exactly the identity arguments and return types the bodies assume, and `branches.delivery_temporarily_closed` — the only column outside the new table that `request` reads — is present. **An observation, recorded rather than changed:** `cancel_branch_delivery_request` takes its row lock and reads the row **before** checking authorization, so an unauthorized caller can distinguish “not found” from “not authorized”. The table is already SELECT-readable by staff, call centre and the owning branch, so this leaks nothing those roles cannot read — but the ordering is worth knowing and would be worth reversing if the read surface ever narrows. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **134 → 135**. **No deploy implied** — new objects only, no existing signature changed. **Version NOT aligned** — live carries the apply-time stamp `20260913124039` (§9-D). **TWO repository files now remain unapplied: Moyasar (frozen on purpose) and `20260917120000_branch_reference_entries`.** Moyasar still sorts ahead of everything, so name the target by version. |
 | 91 | 20260917120000 | branch_reference_entries | n/a | 20260914070238 | branch_reference_entries | = | A | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 07:02:38 UTC** on explicit owner approval ("apply 20260917120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Gives a cashier a branch reference sheet — links, numbers, notes and **credentials** — where a `branch_staff` account previously could not see its own branch's telephone number. Merged in PR #365 as squash `d65d9ea`; §9-B.7: the merged copy was re-hashed from the default branch (sha256 `df8c205cbd78c4f43be7b59088f9f0128c38ce43cd7f23eeb557377fc7db26e6`, 379 lines / 18 297 bytes) and matched the recorded value before anything was sent. **MONEY PATH UNTOUCHED:** `place_order` `e54caa332404755b733590a673d12c27` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — new objects only, nothing existing redefined. **THE VAULT SIGNATURES WERE READ BEFORE THE FILE WAS SENT, NOT ASSUMED FROM THE HEADER — and the header was wrong.** It described `vault.update_secret` as taking four arguments; live it takes **five, four of them defaulted**. The call site passes named arguments so it binds either way, but the discrepancy was resolved against `pg_get_function_arguments` rather than left as a plausible-looking claim. **Row 86's lesson applied: a clean apply proves the text was stored, not that it runs.** All three new `plpgsql` bodies were **called** live afterwards and their outcomes read back as VALUES rather than notices (row 90's rule): `branch_reference_reveal` on a random id raised `P0002 :: Reference entry not found`, which resolves the table and every column the body names before any gate; the two admin RPCs gate first and so are proven as far as their gate, `42501` each, as a service-role connection where `is_admin()` is false. Saying so is the honest reading. **Fidelity on three bodies**, extracted by `$$` span from the merged file and hashed against live `prosrc`, all three **byte-identical**: `branch_reference_reveal` `8c239cbc6e909f117e5c99763c4b318e` (1 825 chars), `admin_upsert_branch_reference` `cc08a866a8a8513c0ff6f18606edb607` (3 495), `admin_delete_branch_reference` `1ffebeb44fce6fc6b35f32522f962e64` (882). **APPLYING IT REVEALED AND STORED NOTHING, measured:** `branch_reference_entries` and `branch_reference_reveals` were both created **empty** (0 rows, re-read again while writing this row). **THE CREDENTIAL BOUNDARY WAS MEASURED, NOT REASONED:** `vault.decrypted_secrets` is unreadable by `authenticated` and by `anon`, so the only route to a secret value is `branch_reference_reveal`, which is `security definer`, gated on `is_admin() or is_branch_operator(branch)` — **the call centre is deliberately outside that gate**, may read the entry rows for every branch, and may reveal none — and writes a `branch_reference_reveals` audit row on every successful reveal. Both tables have RLS enabled and are revoked from `public, anon, authenticated`; `anon` may execute none of the three functions. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **135 → 136**. **No deploy implied** — new objects only. **Version NOT aligned** — live carries the apply-time stamp `20260914070238` (§9-D). |
 | 92 | 20260918120000 | loyalty_earn_on_settlement | n/a | 20260914071044 | loyalty_earn_on_settlement | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 07:10:44 UTC** on explicit owner approval ("apply 20260918120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Security audit finding 1.1: loyalty points stop being spendable at order CREATION. `place_order` now records `earn_pending`, and `admin_set_order_status` promotes it to a real `earn` on DELIVERY — for a cash order, or an online order already marked paid. Merged in PR #372 as squash `5d2cb83`; the merged copy was re-hashed (sha256 `19a2fb4978c5488e235653275200188260d6dfe98f99d791500d2470e0a7b38a`, 906 lines / 43 355 bytes) and matched before sending. **THE MONEY-PATH PAIR MOVED, BUT ONLY HALF OF IT, AND THE OTHER HALF IS THE STORY OF ROW 93.** `place_order` `e54caa332404755b733590a673d12c27` → **`bfd3f1f423e61c850ab6101e37431799`**; `compute_order_snapshot` **UNCHANGED** at `ca276a84424e403a98d34860817f815c`. This file's own header, and the status block that announced it, both said it redefined "BOTH money-path functions". It does not: it redefines `place_order` and **`admin_set_order_status`**. The correction is recorded at the status block rather than silently fixed, because the wrong word covered a real gap — **`insert_order_from_snapshot`, the OTHER function that creates an order and moves a loyalty balance, was never touched and still credited spendable points at creation.** `20260921120000` closes it. **THE PRE-IMAGE DID NOT MATCH THE REPOSITORY, AND THAT WAS CHECKED RATHER THAN ASSUMED.** Live `admin_set_order_status` carries the same logic as `20260810100000` with **every comment stripped** (103 lines vs 124), so the two hash differently while being functionally identical. Both were normalized by removing comment lines and hashed again — `dc5ef031…` on both sides — before the derivation was trusted. Deriving without that check would have been deriving from a picture rather than the artifact (§15). **Fidelity on two bodies**, extracted by `$$` span from the merged file and hashed against live `prosrc`, both **byte-identical** — `place_order` `1c854febfa239dc93ee594e704fa18f1` (24 827 chars), `admin_set_order_status` `4d8b428ae290f00eb1155b3617f48c81` (8 326). **APPLYING IT CREDITED NOBODY AND DESTROYED NOTHING, measured rather than asserted:** **5 409** points across **5** customers unchanged, **111** ledger rows unchanged, **0** rows of the new `earn_pending` type created (an order has to be placed for one to exist), and no existing row rewritten — retroactively voiding the 8 654 points already granted would take points real accounts hold. The `loyalty_transactions` type CHECK went from four values to five, keeping all four originals; widening a CHECK cannot invalidate an existing row, and all 111 were validated by `add constraint` as it ran. **THE ONLINE GATE IS THE REVIEW CORRECTION AND IT IS WHY THIS ROW MATTERS.** The first version promoted ANY delivered order, justified by "an unpaid online order never reaches `delivered`" — false, because `LiveOrdersPanel` lets staff advance one past a `window.confirm()`, a warning rather than a block. Verified live at apply time and again while writing this row: **3 online orders, all `pending`, 0 ever paid.** #372. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows. Live history **136 → 137**. **No deploy implied** — both signatures unchanged, so existing callers bind to the new bodies. **Version NOT aligned** — live carries the apply-time stamp `20260914071044` (§9-D). |
-| 93 | 20260921120000 | loyalty_earn_snapshot_path | `ee53f298fd0c` | 20260914103208 | loyalty_earn_snapshot_path | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:32:08 UTC** on explicit owner approval ("apply 20260921120000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. Extends `20260918120000`'s rule to the SECOND order-creation path: `insert_order_from_snapshot` now records `earn_pending` at creation instead of crediting the spendable balance and writing a real `earn` row. Merged in PR #376 as squash `00f0458`; §9-B.7: the merged copy was re-hashed from the default branch and matched the recorded value exactly (sha256 `ee53f298fd0cc34e7759720767065ff67e19af5f19683810387f90bdfa1c0577`, 296 lines / 14 407 bytes) before anything was sent. **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — this migration redefines exactly ONE function and it is neither of them. **THE THREE ORDER PRECONDITIONS WERE VERIFIED LIVE BEFORE SENDING, not merely left to the file's own guard** (row 83's method): the `loyalty_transactions` type CHECK admits `earn_pending`, live `place_order` carries `, 'earn_pending', v_points_earned,`, and live `admin_set_order_status` carries `type = 'earn_pending'`. **THE DEFECT WAS CONFIRMED STILL PRESENT IN THE LIVE BODY IMMEDIATELY BEFORE THE APPLY**, so this was not a no-op dressed as one: `prosrc` matched `%v_bal_start - v_redeemed + v_earned%` **and** `%, 'earn', v_earned,%`, and hashed `da8c457bade050e0a0280a88061d0304` / 4 911 chars — byte-identical to `20260826100000_comp_order_totals.sql`, the pre-image the derivation started from. **Body fidelity: byte-identical**, `0a3dcc0c6c6ee61642a439b128d630de` / 5 555 chars, matching a hash **pre-computed from the merged file before the apply** rather than read back and rationalised afterwards. **No hashing trap arose** — the span was taken with both delimiter newlines included from the start (rows 88, 89), the second apply in this ledger to avoid it rather than diagnose it. **APPLYING IT CHANGED NOTHING, measured rather than asserted:** 111 ledger rows, **65** `earn`, **0** `earn_pending`, **5 409** points across **5** customers, **72** orders — every figure identical before and after. Nothing existing was rewritten, and nothing new was created, because a row appears here only when an order is placed through the checkout-session path. **IT IS NOT CALLED LIVE, AND THAT IS STATED RATHER THAN GLOSSED.** Row 86 established that a `plpgsql` body is not name-resolved at creation, so a clean apply proves only that the text was stored. This function INSERTS A REAL ORDER: `public.orders` carries **12 non-internal triggers** on that path — `set_orders_number`, `set_orders_lazywait_initial_sync`, `set_pos_sync_deadline`, `emit_orders_change_event`, `open_orders_refund_record` among them — so calling it, even inside a transaction aborted by a `RAISE`, fires POS-sync enrolment and change-event emission for food nobody ordered. **The name-resolution risk is instead excluded structurally, which is stronger than a single call would have been:** the identifier sets of the old and new bodies are **identical in both directions — zero identifiers added, zero removed** (comments and string literals stripped, qualified names included). Every table, column, function and variable the new body references was already referenced by the body Production has been executing. The only differences are **three string literals**: `'earn'` → `'earn_pending'` and the reason text. The one literal that reaches a constrained column, `'earn_pending'` into `loyalty_transactions.type`, was checked against the live CHECK **before** the apply. Full execution proof exists on the local chain harness, where `loyalty_earn_snapshot_path_test.sql` drives the real function six times. **Containment unchanged and re-measured:** one overload; `anon` **cannot** execute, `authenticated` **cannot**, `service_role` can — the property the whole design rests on, since this function takes a caller-supplied `p_customer` and has no `auth.uid()` check of its own. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `integration_settings` still `tap` and still disabled; `app_settings` still online **false** / cash **true**. Live history **137 → 138**. **No deploy implied** — the signature is unchanged, so existing callers bind to the new body (row 77's lesson). **Version NOT aligned** — live carries the apply-time stamp `20260914103208` (§9-D). **THREE repository files remain unapplied: Moyasar (frozen on purpose), `20260919120000_security_audit_db_hardening` and `20260920120000_promo_disclosure_hardening`.** Moyasar still sorts ahead of everything, so name the target by version. |
+| 93 | 20260921120000 | loyalty_earn_snapshot_path | `ee53f298fd0c` | 20260914103208 | loyalty_earn_snapshot_path | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:32:08 UTC** on explicit owner approval ("apply 20260921120000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. Extends `20260918120000`'s rule to the SECOND order-creation path: `insert_order_from_snapshot` now records `earn_pending` at creation instead of crediting the spendable balance and writing a real `earn` row. Merged in PR #376 as squash `00f0458`; §9-B.7: the merged copy was re-hashed from the default branch and matched the recorded value exactly (sha256 `ee53f298fd0cc34e7759720767065ff67e19af5f19683810387f90bdfa1c0577`, 296 lines / 14 407 bytes) before anything was sent. **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — this migration redefines exactly ONE function and it is neither of them. **THE THREE ORDER PRECONDITIONS WERE VERIFIED LIVE BEFORE SENDING, not merely left to the file's own guard** (row 83's method): the `loyalty_transactions` type CHECK admits `earn_pending`, live `place_order` carries `, 'earn_pending', v_points_earned,`, and live `admin_set_order_status` carries `type = 'earn_pending'`. **THE DEFECT WAS CONFIRMED STILL PRESENT IN THE LIVE BODY IMMEDIATELY BEFORE THE APPLY**, so this was not a no-op dressed as one: `prosrc` matched `%v_bal_start - v_redeemed + v_earned%` **and** `%, 'earn', v_earned,%`, and hashed `da8c457bade050e0a0280a88061d0304` / 4 911 chars — byte-identical to `20260826100000_comp_order_totals.sql`, the pre-image the derivation started from. **Body fidelity: byte-identical**, `0a3dcc0c6c6ee61642a439b128d630de` / 5 555 chars, matching a hash **pre-computed from the merged file before the apply** rather than read back and rationalised afterwards. **No hashing trap arose** — the span was taken with both delimiter newlines included from the start (rows 88, 89), the second apply in this ledger to avoid it rather than diagnose it. **APPLYING IT CHANGED NOTHING, measured rather than asserted:** 111 ledger rows, **65** `earn`, **0** `earn_pending`, **5 409** points across **5** customers, **72** orders — every figure identical before and after. Nothing existing was rewritten, and nothing new was created, because a row appears here only when an order is placed through the checkout-session path. **IT IS NOT CALLED LIVE, AND THAT IS STATED RATHER THAN GLOSSED.** Row 86 established that a `plpgsql` body is not name-resolved at creation, so a clean apply proves only that the text was stored. This function INSERTS A REAL ORDER: `public.orders` carries **12 non-internal triggers** on that path — `set_orders_number`, `set_orders_lazywait_initial_sync`, `set_pos_sync_deadline`, `emit_orders_change_event`, `open_orders_refund_record` among them — so calling it would burn an `SM-2026-…` sequence number (`nextval` is not transactional). *Corrected 2026-11-26: this sentence used to say that even a call inside a transaction aborted by a `RAISE` fires POS-sync enrolment and change-event emission for food nobody ordered; the status block for `20260921120000`, above, retracts that — 11 of the 12 triggers are transactional, so an abort enrols nothing, and the sequence gap is the one residue.* **The name-resolution risk is instead excluded structurally, which is stronger than a single call would have been:** the identifier sets of the old and new bodies are **identical in both directions — zero identifiers added, zero removed** (comments and string literals stripped, qualified names included). Every table, column, function and variable the new body references was already referenced by the body Production has been executing. The differences are `'earn'` → `'earn_pending'` and the reason text, **and also** the removal of `+ v_earned` from the profile balance update and `- v_earned` from the redemption row's `balance_after` (*corrected 2026-11-26: this said "The only differences are three string literals", which the status block for `20260921120000`, above, retracts; an identifier-set diff proves name resolution only, and those arithmetic edits are covered by the paired suite*). The one literal that reaches a constrained column, `'earn_pending'` into `loyalty_transactions.type`, was checked against the live CHECK **before** the apply. Full execution proof exists on the local chain harness, where `loyalty_earn_snapshot_path_test.sql` drives the real function six times. **Containment unchanged and re-measured:** one overload; `anon` **cannot** execute, `authenticated` **cannot**, `service_role` can — the property the whole design rests on, since this function takes a caller-supplied `p_customer` and has no `auth.uid()` check of its own. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `integration_settings` still `tap` and still disabled; `app_settings` still online **false** / cash **true**. Live history **137 → 138**. **No deploy implied** — the signature is unchanged, so existing callers bind to the new body (row 77's lesson). **Version NOT aligned** — live carries the apply-time stamp `20260914103208` (§9-D). **THREE repository files remain unapplied: Moyasar (frozen on purpose), `20260919120000_security_audit_db_hardening` and `20260920120000_promo_disclosure_hardening`.** Moyasar still sorts ahead of everything, so name the target by version. |
 | 94 | 20260919120000 | security_audit_db_hardening | `4c030fa13924` | 20260914104107 | security_audit_db_hardening | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:41:07 UTC** on explicit owner approval ("apply 20260919120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Five independent items from the 2026-09-13 audit. Merged in PR #373 as squash `87b785e`; §9-B.7: the merged copy was re-hashed from the default branch and matched the recorded value exactly (sha256 `4c030fa139248766c60bd7a6828656166a36e208e32a475a0566749f19ff5d1e`, 364 lines / 17 642 bytes). **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — neither is read nor redefined here. **Fidelity on three bodies**, each against a hash **pre-computed from the merged file before sending**, all three byte-identical: `anonymize_account_data` `c44b5c79be74a548bc756d0d9789ce22` (4 504 chars), `deactivate_push_device` `1836af394523e92de49f3d8273b9eb71` (450), `admin_coupon_usage_counts` `dcc0e74f83fec0ec46fe8ca261e6f20f` (459). **`register_push_device` is BYTE-IDENTICAL before and after** (`e6d370b56521959ba20ad6c80543571a`, 1 310 chars) — the deliberate asymmetry survived: silencing is now owner-scoped, reassignment is not, because a shared handset changing hands is a real flow and silencing another customer's device is not. **THE PRE-IMAGE MATCHED LIVE EXACTLY BEFORE THE DERIVATION WAS TRUSTED:** live `anonymize_account_data` hashed `4ea045732529d4cd242a4191e15e8af5` / 4 105 chars, identical to the body extracted from `20260827110000_comp_erasure.sql`. **THE ONE REAL RISK HERE WAS NAME RESOLUTION ON THE ACCOUNT-DELETION PATH, and it was checked rather than assumed — twice.** This file's own header records that an earlier draft referenced `whatsapp_message_logs.to_phone`, a column that does not exist. So: an identifier-set diff of old vs new erasure body named **exactly** the new references (`public.order_items`, `oi.note`, `oi.order_id`, `o.id`, `o.customer_id`), `information_schema` confirmed both `order_items` columns present, and then **the new statement itself was run live as a read-only SELECT with the identical predicate** against a nonexistent customer id — 0 rows, nothing written. A `plpgsql` body is not name-resolved at creation, and this function erases real customer data, so it cannot simply be called. **The other two WERE called**, and their outcomes read back as VALUES rather than notices (row 90): `admin_coupon_usage_counts()` refused this non-admin connection with **`42501 :: Only admins may read coupon usage`**, and `deactivate_push_device` refused with **`P0001 :: not authenticated`** before touching any row. The coupon RPC's inner aggregate was additionally run verbatim read-only and returns `{}` — **no order in Production carries a coupon code**, so the Promo Codes panel will render an empty map, correctly. **APPLYING IT CHANGED NO DATA, measured:** the erasure function was REDEFINED, not run — the **2** `order_items` rows carrying a note still carry it, 4 push devices still active, 72 orders, 2 addresses, all unchanged. **Grants moved exactly as intended:** `anon` INSERT/UPDATE/DELETE on the eleven catalog tables went **33 → 0**, while `anon` SELECT is untouched at **9** tables — the signed-out menu still reads. Revoking those could not break push registration, verified first: both `register_push_device` and `deactivate_push_device` are `SECURITY DEFINER` and **neither is executable by `anon`**, so a table-level grant was never on that path. Mutable `search_path` functions **0 → 2** pinned. **THE CUSTOMER COLUMN CONTRACT DID NOT MOVE, which is the regression review caught in this file's first version:** `authenticated` still **cannot** select `orders.coupon_code` (nor `customer_name`, `customer_phone`, `customer_id`). The admin aggregate is reachable by `authenticated` and **not** by `anon`, and is gated on `is_admin()` — role **and** AAL2. **Moyasar re-verified absent:** 0 `%moyasar%` functions. Live history **138 → 139**. **No deploy implied** — two bodies changed under unchanged signatures, one function is new. **Version NOT aligned** — live carries the apply-time stamp `20260914104107` (§9-D). **TWO repository files remain unapplied: Moyasar (frozen on purpose) and `20260920120000_promo_disclosure_hardening`.** |
 | 95 | 20260920120000 | promo_disclosure_hardening | `45f8ee28461f` | 20260914105232 | promo_disclosure_hardening | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-14 10:52:32 UTC** on explicit owner approval ("apply 20260920120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Audit finding 2.9: `validate_coupon` and `compute_campaign_discount` described a promotion the caller cannot use. Merged in PR #375 as squash `d6eb639`; §9-B.7: the merged copy was re-hashed and matched `45f8ee28461f3dbe490109e9657efff630bf5df8b67cc315b66c53a7281fa966` exactly (365 lines / 18 898 bytes). **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — and this is the apply where that needed proving rather than asserting, because **both money-path functions CALL `validate_coupon`**. **THE CONSUMPTION CONTRACT WAS MEASURED, NOT TAKEN FROM THE HEADER.** Both call it as `select * into v_coupon from public.validate_coupon(...)`, binding the whole row — so the RETURN SIGNATURE is load-bearing. A regex over both live bodies enumerated every `v_coupon.<field>` reference and found exactly **`discount_amount`, `message`, `valid`** in each, and **neither reads `type` nor `value`** — the two fields this migration nulls on refusal. The signature is unchanged after the apply (`TABLE(valid boolean, code text, type coupon_type, value numeric, discount_amount numeric, message text)`), so the `select *` binding still resolves. **Both pre-images matched live BEFORE the derivation was trusted:** `validate_coupon` `51d3805e52ddf0bda03cce4b980db4bf` / 1 764 chars and `compute_campaign_discount` `4d8a5cf3ff954653baf1ae51847c4b9c` / 4 411 chars, each identical to the body extracted from the only migration that has ever defined it. **Fidelity on both bodies**, against hashes **pre-computed from the merged file before sending**, both byte-identical: `validate_coupon` `0e9c1d0f364ff93a58f062d664e83ce9` (2 196 chars), `compute_campaign_discount` `ae56104124a9670c238febe5d9502e0d` (4 670). **THE SECURITY PROPERTY WAS PROVEN LIVE AGAINST THE REAL CODES, which is better evidence than the migration's own fixture probe.** `validate_coupon` is `stable`, so it was simply called read-only. Production holds exactly two coupons, **`SPICY15` and `RIYADH10`, both `is_active = false`, both `usage_count = 0`** — so both are precisely the "exists but switched off" case the change is about. All three of `SPICY15`, `RIYADH10` and a code that has never existed now return **byte-identical** answers: `valid=false`, `type=null`, `value=null`, `discount_amount=0`, `message='Coupon not found'`. Lowercase input normalises to the same answer; an empty string still answers `'No code supplied'`. The `code` field echoes the caller's own normalised input, which is not a disclosure. **THIS IS A REAL, CUSTOMER-VISIBLE COPY CHANGE, and it is stated rather than buried:** a customer typing `SPICY15` today was told *"Coupon is inactive"* and is now told *"Coupon not found"*. Both are refusals; the new one simply stops confirming that an unlaunched code exists. **The migration's own fixture probe rolled back, verified independently:** 0 rows matching `ZZPROMO%` survive in `coupons`. `compute_campaign_discount` could only be driven as far as its `auth.uid()` gate from a migration, and that limitation is recorded in the file itself rather than glossed; its refusal branches are covered by `supabase/tests/promo_disclosure_test.sql`. **Grants preserved exactly:** `anon` **cannot** execute either function, `authenticated` can — the boundary the whole design rests on, re-measured after the apply. **Data untouched:** 2 coupons, 0 campaigns, 72 orders. Moyasar re-verified absent. Live history **139 → 140**. **No deploy implied** — both signatures unchanged, and both clients type the coupon result without `type` or `value`. **Version NOT aligned** — live carries the apply-time stamp `20260914105232` (§9-D). **ONE repository file now remains unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — "apply the outstanding migrations" now reads like a no-op and is the one instruction that would break the payment freeze, because there is no other file it could mean. |
 | 96 | 20260922120000 | orders_comp_columns_customer_grant | `05878e9c1944` | 20260916114130 | orders_comp_columns_customer_grant | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-16 11:41:30 UTC** on explicit owner approval ("apply 20260922120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. **IT FIXED A LIVE CUSTOMER-FACING OUTAGE**: every "My Orders" list and every post-order receipt had been failing since 2026-08-26 on every channel whose client was built after that date, because `authenticated` holds COLUMN-LEVEL select grants on `public.orders` and `20260826100000_comp_order_totals.sql` added `is_comped` and `comp_discount_amount` without granting them, while #269 added both to the client read contract the same day — and PostgREST refuses the WHOLE query when one column is unreadable. Merged in PR #391 as squash `ad52d22`; §9-B.7: the merged copy was re-hashed from the default branch and matched exactly (sha256 `05878e9c194490a414ce93801241a4b0a301292267bf44983c865ddedb303988`, 125 lines / 6 004 bytes) before anything was sent. **THE DEFECT WAS CONFIRMED STILL PRESENT IN THE LIVE GRANT IMMEDIATELY BEFORE THE APPLY**, so this was not a no-op dressed as one: `authenticated` could select neither comp column and held **25** select grants on `orders`. **MONEY PATH UNTOUCHED:** `place_order` `bfd3f1f423e61c850ab6101e37431799`, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after — this migration redefines no function at all. **Grants moved exactly as intended: 25 → 27**, the two comp columns and nothing else. **EVERY BOUNDARY HELD, re-measured after the apply:** `anon` still refused on both columns; `authenticated` still refused `coupon_code`, `customer_phone` and `order_number`; **no table-wide SELECT** for `authenticated` (the privilege whose absence is what makes the column allowlist meaningful); RLS still enabled on `orders`, so a column grant cannot bypass `orders_select_own_or_staff`. **ROW 86'S LESSON APPLIED — a clean apply proves the text was stored, not that the query runs.** The **exact 27-column list the client sends** (`CUSTOMER_ORDER_SELECT`) was executed as `authenticated` and **succeeds**; so do the nested `order_items` and `order_item_modifiers` embeds. Both leak checks ran in the SAME probe and still refuse — `coupon_code` as `authenticated` → **42501**, `is_comped` as `anon` → **42501** — with outcomes read back as VALUES rather than notices (row 90). **APPLYING IT CHANGED NO DATA:** 73 orders, 5 comped, 12 profiles, identical before and after. **§15 WAS HONOURED RATHER THAN ASSUMED:** the apply instruction arrived while #391 was still open and blocked on an unresolved review thread, and nothing was sent until the merge actually landed and the file was confirmed present on the default branch. **A CONVENTION DEVIATION WAS TESTED RATHER THAN GAMBLED ON:** this file carries explicit `begin;`/`commit;`, which no previously-applied migration here does, so the nested-transaction behaviour was probed harmlessly first — both execute cleanly — allowing the **exact merged bytes** to be sent without editing them for transport, which is what keeps the applied text equal to the repository text. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Live history **140 → 141**. **No deploy implied** — no function was redefined, and the fix reaches every channel (web and both binaries) the moment it applies. **Version NOT aligned** — live carries the apply-time stamp `20260916114130` (§9-D). **ONE repository file remains unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6. THAT IS THE DANGEROUS SHAPE** — name the target by version. |
 | 97 | 20260923120000 | branch_variant_availability | `a3440839b78c` | 20260917122329 | branch_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:23:29 UTC** on explicit owner approval ("apply 20260923120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Per-branch price-tier availability: the `branch_variant_availability` table, `set_variant_snooze` / `clear_variant_snooze`, the audit-event emitter, and the sweeper arm that reopens a tier whose restore timer has run out. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `a3440839b78c34fb4e309a32c4da842e2e3615d8fdc6dfc21789279ddca8d967`, 622 lines / 27 922 bytes) and matched the recorded value before anything was sent. **MONEY PATH UNTOUCHED AT THIS STEP** — `place_order` `bfd3f1f423e61c850ab6101e37431799` and `compute_order_snapshot` `ca276a84424e403a98d34860817f815c`, identical before and after; row 98 is the one that moves them. **APPLYING IT CLOSED NOTHING:** the table was created EMPTY and still holds 0 rows, and 76 orders, 61 products, 147 variants (144 active), 40 branches, 3 product closures, 0 option closures, 10 audit events and 10 cron jobs are all unchanged. **All six function bodies byte-identical** against hashes pre-computed from the merged file: `normalize_variant_availability` `317e2bdd…`, `emit_variant_availability_event` `5c45017e…`, `signal_variant_availability_change` `dd7f73e7…`, `set_variant_snooze` `4fbd4518…`, `clear_variant_snooze` `c14ba219…`, `branch_availability_sweep` `0872a568…`. Grants as designed: `anon` SELECT only, `authenticated` SELECT/INSERT/UPDATE/DELETE with RLS deciding; 12/12 audit columns present, 5/5 helper signatures resolve. **Both RPCs were CALLED** (row 86's lesson) and refused at their gate — `42501 :: Not authorized to change availability for this branch` — with the outcome read back as a VALUE rather than a notice. **That proves them only as far as the gate, and it is stated rather than glossed:** driving deeper would close a real tier at a real branch. **The redefined sweeper has since RUN in Production** — 2 scheduled runs after the apply, both `success`, 0 variants reopened, 45 ms slowest — which is execution evidence the apply itself could not give. **The 14-day retention prune survived the sweeper's redefinition, corroborated arithmetically rather than by reading:** `branch_availability_runs` holds exactly 20 160 rows = 14 days × 1440 minutes. Moyasar re-verified absent (0 functions, 0 history rows). |
-| 98 | 20260924120000 | place_order_variant_availability | `53c433d9cf82` | 20260917123545 | place_order_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:35:45 UTC** on explicit owner approval ("do the required migrations", given against a list naming each file by version), via MCP `apply_migration`, **one call, target named explicitly**. **THIS IS THE MONEY-PATH STEP**: `place_order` and `compute_order_snapshot` now refuse a closed price tier, so the server is the authority and no client can talk its way past it. §9-B.7: merged copy re-hashed (sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`, 1 110 lines / 55 033 bytes) and matched before sending. **THE PRE-IMAGES WERE PROVEN AGAINST LIVE BEFORE THE DERIVATION WAS TRUSTED** (rows 92 and 95's lesson): the file derives both bodies from the running ones, so the pre-image was reconstructed by removing the 1 461-character guard block and hashed against live — `place_order` `1c854febfa239dc93ee594e704fa18f1` / 24 827 chars and `compute_order_snapshot` `52490fe4d9b692c4b8631a28977c3d73` / 15 398 chars, **both matching exactly**, which bounds the change to precisely the intended region. Both resulting bodies **byte-identical** to the merged file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288 chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859 chars. **THE MONEY-PATH LEDGER PAIR MOVED, AND THAT IS THE INTENDED EFFECT OF THE WORK RATHER THAN AN ANOMALY** — record the new pair: `place_order` `bfd3f1f423e61c850ab6101e37431799` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c` → **`22e2d42935459e7bf93abb2941b56325`**. **APPLYING IT REFUSED NOTHING:** `branch_variant_availability` is empty, so no tier is closed and the new guard cannot fire; orders unchanged at 76. **NOT CALLED live** — `place_order` writes a real order and `orders` carries 12 triggers including POS-sync enrolment, so a probe would create a kitchen ticket and burn an `SM-2026-…` sequence number (row 93's correction). The paths are proven on the local chain harness instead. Moyasar re-verified absent. |
+| 98 | 20260924120000 | place_order_variant_availability | `53c433d9cf82` | 20260917123545 | place_order_variant_availability | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:35:45 UTC** on explicit owner approval ("do the required migrations", given against a list naming each file by version), via MCP `apply_migration`, **one call, target named explicitly**. **THIS IS THE MONEY-PATH STEP**: `place_order` and `compute_order_snapshot` now refuse a closed price tier, so the server is the authority and no client can talk its way past it. §9-B.7: merged copy re-hashed (sha256 `53c433d9cf82687e9f592630f44f17bc30663cae86cd99d5feb96e02c9ba2f48`, 1 110 lines / 55 033 bytes) and matched before sending. **THE PRE-IMAGES WERE PROVEN AGAINST LIVE BEFORE THE DERIVATION WAS TRUSTED** (rows 92 and 95's lesson): the file derives both bodies from the running ones, so the pre-image was reconstructed by removing the 1 461-character guard block and hashed against live — `place_order` `1c854febfa239dc93ee594e704fa18f1` / 24 827 chars and `compute_order_snapshot` `52490fe4d9b692c4b8631a28977c3d73` / 15 398 chars, **both matching exactly**, which bounds the change to precisely the intended region. Both resulting bodies **byte-identical** to the merged file: `place_order` `33468a7638e052d37970db54b4b1ec79` / 26 288 chars, `compute_order_snapshot` `ca2c2a1c3a24809d16c45eb95aaa9aa1` / 16 859 chars. **THE MONEY-PATH LEDGER PAIR MOVED, AND THAT IS THE INTENDED EFFECT OF THE WORK RATHER THAN AN ANOMALY** — record the new pair: `place_order` `bfd3f1f423e61c850ab6101e37431799` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot` `ca276a84424e403a98d34860817f815c` → **`22e2d42935459e7bf93abb2941b56325`**. **APPLYING IT REFUSED NOTHING:** `branch_variant_availability` is empty, so no tier is closed and the new guard cannot fire; orders unchanged at 76. **NOT CALLED live** — `place_order` writes a real order and `orders` carries 12 triggers including POS-sync enrolment, so a probe would create a kitchen ticket and burn an `SM-2026-…` sequence number (the correction in the status block for `20260921120000`, above, which row 93 now also quotes). The paths are proven on the local chain harness instead. Moyasar re-verified absent. |
 | 99 | 20260925120000 | health_card_variant_coverage | `65dabf4f5096` | 20260917124256 | health_card_variant_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:42:56 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. **A MONITOR THAT ENUMERATES ITS SUBJECTS BY NAME IS CORRECT UNTIL A SUBJECT IS ADDED, AND THEN SILENTLY WRONG** — `operations_health_snapshot_internal` named the availability tables in three places, so a tier whose restore timer ran out and was never honoured would have read `idle`, the fail-quiet warm-up, with no alert at all. Same defect class as row 72. §9-B.7: merged copy re-hashed (sha256 `65dabf4f5096b985b2c0130589e39eabfcce54e1cf364d348fbc2850f5a7ca3a`, 1 735 lines / 82 365 bytes) and matched before sending. Both pre-images verified against live first, each with exactly one overload (cardinality checked BEFORE the body was read): `operations_health_snapshot_internal` `3f2f145ca1283e5ff8040a0b2b01ce81` / 46 688 chars, `operations_alerts_derive_pre_stranded` `19177f263090d96500a571a4bf6a1dd4` / 18 002 chars. Both new bodies **byte-identical** to hashes pre-computed from the merged file: `10265270ab70597cadc5e84134384051` / 47 919 chars and `dabd46192e37eaa69c5cfd2a765f6cbf` / 18 094 chars. **New ledger-basis pair for these two functions:** `operations_health_snapshot_internal` `aefe82538f13bc2d6fbf04d3f620506b` → **`47c7553a3acaf437f6d0dd30d8a760c6`**, `operations_alerts_derive_pre_stranded` `662ee646ea4ea9e89ff64203bcb542ee` → **`bc00fff87658de5f6d5321c6745744d9`**. **A HASH THAT LOOKED LIKE A MISMATCH WAS A MISREAD OF THE FILE'S OWN HEADER, WHICH IS WORTH RECORDING BECAUSE THE PREVIOUS THREE TRAPS OF THIS SHAPE WERE MEASUREMENT ERRORS AND THIS ONE IS NOT.** The header lists `aefe8253…` / `662ee646…` under "Ledger basis … which WILL move on apply" — those are the **pre-apply** values, not predictions of the post-apply ones, and reading them as predictions makes a correct apply look wrong. It was settled by reconstruction rather than by argument: both bodies were extracted from `20260820160000` and from the merged file, combined with the live prologue, and hashed — reproducing `662ee646…` / `aefe8253…` for the pre-images and `bc00fff8…` / `47c7553a…` for the posts, with `pg_get_functiondef` lengths 18 296 and 48 102 matching live exactly. **Read a header's hashes for WHICH SIDE OF THE APPLY they describe before calling a mismatch.** **MONEY PATH UNCHANGED** at `12b6816d…` / `22e2d429…`. **It was CALLED afterwards, independently of its own verification block** (row 86's lesson, and the specific reason mutation 12 exists): the `branch_availability` system reads **`healthy`** with `closed_sizes: 0`, `overdue_restores: 0` and **`safe_error_code: null`** — so the availability block's `exception when others` did not fire, which is the quiet failure a source-level assertion cannot see, because a `plpgsql` body is not name-resolved at creation. The sweeper then ran at 12:48 UTC and succeeded against the new definition. Moyasar re-verified absent. |
 | 100 | 20260926120000 | variant_closing_flag | `01a4c9ac95cf` | 20260917124937 | variant_closing_flag | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-17 12:49:37 UTC** on explicit owner approval, via MCP `apply_migration`, **one call, target named explicitly**. Adds `app_settings.variant_closing_enabled`, defaulting FALSE, which hides the branch console's per-size controls. It exists because the console deploys on merge while the customer app reaches a customer only in the next EAS build, and a build that does not understand a closed tier shows a **generic error at the payment step** — `failureMessage` returns a translated KEY rather than the server's sentence. §9-B.7: merged copy re-hashed (sha256 `01a4c9ac95cf5b88dc3c70738feb2c02e15b3dc56fbb127fdc271d9f51d585f0`, 135 lines / 7 622 bytes) and matched before sending. **APPLYING IT CHANGED NOTHING, WHICH IS THE WHOLE POINT** — contrast row 82, where the default was TRUE and applying the migration WAS the behaviour change. Live value **false**, column NOT NULL, default `false`, `app_settings` 34 → 35 columns, still 1 row; money path unchanged at `12b6816d…` / `22e2d429…`; **0 functions anywhere in `public` mention the flag**, so server-side refusal stays unconditional; orders 76; `branch_variant_availability` still 0 rows. **THE COLUMN-GRANT TRAP WAS CHECKED BY OUTCOME, NOT BY PREDICATE, BECAUSE THAT IS THE DISTINCTION ROW 96 TURNED ON.** `orders.is_comped` broke every My Orders list for three weeks because a new column landed on a table whose client grants are COLUMN-scoped. `app_settings` grants are TABLE-level — measured live before the apply in `information_schema.table_privileges` (SELECT for `anon` and `authenticated`, UPDATE for `authenticated`) — so a new column is covered automatically. Afterwards, rather than trusting `has_column_privilege`, the client-shaped read was actually performed under both roles: `set local role anon; select * from public.app_settings` **returns its row** instead of raising, and `anon` reads the new column directly as `false`; same under `authenticated`. **APPLIED IS NOT ENABLED.** Turning the flag on is a separate §5 decision that must follow the EAS build carrying the customer half — `docs/OWNER_ACTIONS.md` §40. Moyasar re-verified absent. |
 | 101 | 20260927120000 | admin_push_subscriptions | `26046da81644` | 20260920050434 | admin_push_subscriptions | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-20 05:04:34 UTC** on explicit owner approval ("apply 20260927120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Step 2 of the admin closure-notification work: `admin_push_subscriptions`, the nullable `app_settings.admin_push_vapid_public_key` column, and three `is_admin()`-gated RPCs. §9-B.7: the merged copy was re-hashed from the default branch (sha256 `26046da81644271606438f814e18f56fe8bf02f9f25a318f4df926b0774e2b73`, 400 lines / 18 474 bytes) and matched the recorded value before anything was sent. **THIS IS THE SECOND ATTEMPT, AND THE FIRST ONE FAILING IS THE MOST USEFUL THING IN THIS ROW.** On 2026-09-19 the same file — then `9861df21…` / 365 lines — was approved, hashed correctly, had every live precondition verified, and was **REFUSED BY ITS OWN ASSERTION 5.5**: `anon can execute save_admin_push_subscription(text,text,text,text,text), which must never be true`. Nothing landed (the apply is transactional; history stayed at 145 / `20260917124937`, verified immediately afterwards rather than assumed). The cause: `revoke all on function … from public` does **not** remove `anon`'s grant, because this project's `pg_default_acl` grants EXECUTE on new functions in `public` to `anon`, `authenticated` and `service_role` **directly**. 85 of the 89 `revoke all on function` statements in this tree already said `public, anon`; these three were the outlier, and `20260729091000_caller_can_read_order_anon_revoke` exists solely because the identical mistake was made once before. Corrected in PR #400 as squash `182f670`. **A HARNESS THAT IS STRICTER THAN PRODUCTION IS NOT THE SAFE DIRECTION.** `.github/sql-ci/bootstrap.sql` modelled default privileges for TABLES only, so on the local chain `from public` and `from public, anon` were indistinguishable and every CI check was green on a file that could not apply. It now models functions and sequences too, read live from `pg_default_acl` — proven rather than asserted: with the original `from public` restored the chain fails at file 141 with the exact Production message, and was green before the change. Widening it required correcting 8 of the 13 `"svc"` expectations in `operations_alerts_digest_test.sql`, which had never described Production (measured live: all 13 are `svc=true`) and passed only because the harness was stricter. **THE GRANT FIX WAS VERIFIED ON BOTH HALVES, because removing `authenticated` as well would apply cleanly and ship a feature that cannot work:** all three RPCs now read `anon` **NO**, `authenticated` **YES**, `service_role` **YES**. **MONEY PATH UNTOUCHED** — `place_order` `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` `22e2d42935459e7bf93abb2941b56325`, identical before and after, each with exactly one overload (cardinality checked BEFORE the body was read); the file itself refuses to apply unless both still hash those values. **All three bodies byte-identical** against hashes pre-computed from the merged file: `save_admin_push_subscription` `7484f213f168257d40d773a1d1134836` / 1 376 chars, `delete_admin_push_subscription` `9240758de77959fc3e73955bb244e5ec` / 343, `admin_push_state` `37ae19fdb910ac8e804faf98b00e6b44` / 910. **APPLYING IT SUBSCRIBED NOBODY:** `admin_push_subscriptions` 0 rows, the VAPID column present and **NULL**, so no key pair exists and even a subscribed admin could not be sent to; `admin_push_outbox` absent, which is correct — it belongs to `20260928120000`. **The table is CLOSED, re-measured as an outcome rather than trusted to the `revoke`:** RLS enabled, **zero** policies, **zero** privileges for `anon` or `authenticated`. **ROW 86’S LESSON APPLIED — a clean apply proves storage, not execution.** All three were **called** and their outcomes read back as VALUES rather than notices (row 90): `42501 :: Only admins may subscribe to closure notifications`, `42501 :: Only admins may manage closure notifications`, `42501 :: Only admins may read closure notification state`. The probe ran inside a transaction aborted by a `RAISE` and the table was confirmed still empty afterwards. That proves them only as far as their gate, which is stated rather than glossed — driving deeper needs an admin session at AAL2. **THE TWO PUSH CHANNELS STAYED APART, measured on both sides:** `push_devices` unchanged at 5 rows / 5 active, and **0** functions mentioning `admin_push` reference `push_devices` — the property assertion 5.9 exists to enforce. Moyasar re-verified absent (0 functions, 0 history rows, `provider_name` still `tap`, still disabled). Live history **145 → 146**. **No deploy implied.** **Version NOT aligned** — live carries the apply-time stamp `20260920050434` (§9-D). **TWO repository files remain unapplied: `20260824100000_moyasar_payment_provider.sql`, frozen under §6, and `20260928120000_admin_push_closure_notifications.sql`, written and awaiting approval. Moyasar still sorts ahead of everything, so a bulk apply takes the frozen payment file FIRST — name the target by version.** |
@@ -1904,7 +2047,7 @@ totals moved to **77/78** at the time — see row 78 for where they stand now.
 Row **78** is `orders_index_cleanup`, applied 2026-09-02 12:37:37 UTC, and it is
 the first row here that **implies no deploy at all**: it drops two indexes and
 redefines nothing, so there is no code to ship behind it and no half-live state to
-track. Class B again, so the totals move to **78/79** above.
+track. Class B again, so the totals moved to **78/79** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 It is also the first row whose safety rests on a **query plan** rather than a
 count. Dropping `orders_lazywait_deadline_queue_idx` is only safe if
@@ -1920,8 +2063,8 @@ all** — a further step on from row 77's half-live state. Row 77 was applied an
 partly working; this one is applied and, by design, does nothing. Three separate
 owner actions stand between it and a single email: deploying
 `operations-alert-dispatch`, applying `20260903130000` with its two Vault
-secrets, and enabling `external_dispatch_enabled`. Class B, so the totals move to
-**79/80** above.
+secrets, and enabling `external_dispatch_enabled`. Class B, so the totals moved to
+**79/80** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 Row 79 is also the first row whose safety rested on **checking existing rows
 against a constraint before adding it**. That migration replaces the outbox
@@ -1936,7 +2079,7 @@ Row **80** is `operations_alert_dispatch_scheduler`, applied the same day at
 nothing called, and this one calls it. It touches no constraint at all — the
 CHECK evidence above belongs to row 79, and this sentence exists because
 inserting row 80 above that paragraph once made it read as though it did. Class B
-again, so the totals move to **80/81** above.
+again, so the totals moved to **80/81** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 It is the first row here whose prerequisite was **a secret that nobody was
 allowed to see**, and the method generalises. The trigger secret was generated
@@ -1959,7 +2102,7 @@ next tick — `otp_challenges` still held its three July rows immediately
 afterwards. The policy sentence became true when the sweep was executed once on
 separate approval the same day. Review caught the item being closed on the apply
 alone (#342), which is why the distinction is spelled out. Class B, so the totals
-move to **81/82** above.
+moved to **81/82** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 Row **82** is `loyalty_pickup_only`, applied 2026-09-09 05:50:16 UTC, and it
 inverts row 81's lesson: here **applying it WAS the behaviour change**, with no
@@ -1968,7 +2111,7 @@ orders stopped earning points and stopped being redeemable against at the moment
 the migration landed. A row that needs a follow-up action and a row that needs
 none look identical in this table; the difference is the default on the setting
 it ships, and it is worth reading before approving rather than after. Class B, so
-the totals move to **82/83** above.
+the totals moved to **82/83** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 It is the first row since 2026-08-27 to **change the money-path hashes**, which
 retires a signal every row between had recorded as unchanged: `place_order`
@@ -1989,7 +2132,9 @@ valid, not that it was the SQL you reviewed.
 
 And it is the first row to leave a **live customer document behind the code**.
 `offers_loyalty_terms` v2.1 describes neither channel, and its redemption
-sentence is now misleading on delivery. That is recorded as an owner action
+sentence is now misleading on delivery *(closed the same day: v2.2 was
+published 2026-09-09 07:56:15 UTC, stating pickup-only for both earning and
+redeeming; `OWNER_ACTIONS.md` §32 is headed CLOSED — noted 2026-11-26)*. That is recorded as an owner action
 (`OWNER_ACTIONS.md` §32) rather than fixed in passing, because editing
 `legal_documents` is a §5 live write and the wording is a commercial choice. The
 generalisable question: when a migration changes what a customer is entitled to,
@@ -1997,7 +2142,7 @@ ask which live document already told them otherwise.
 
 Row **83** is `loyalty_item_exclusion`, applied 2026-09-09 06:20:00 UTC, step 2 of
 the same series and the second of the three hash movements row 82 predicted
-(`ed2ced01…` / `6c667b4b…`). Class B, so the totals move to **83/84** above. The
+(`ed2ced01…` / `6c667b4b…`). Class B, so the totals moved to **83/84** in an early-count pair that the reconciliation check retracts (nothing above carries it). The
 inline-apply fidelity method row 82 established was re-run here on **three**
 bodies rather than two — the two money-path functions plus the new preview RPC —
 and all three matched byte-for-byte.
@@ -2031,7 +2176,7 @@ a customer's hands calls it yet.
 Row **84** is `loyalty_expiry`, applied 2026-09-09 06:53:34 UTC, and it breaks the
 pattern of the two before it in the way that matters: **it redefines neither
 money-path function**, so the pair that moved at rows 82 and 83 holds still here
-and moves once more at step 4. Class B, so the totals move to **84/85** above.
+and moves once more at step 4. Class B, so the totals moved to **84/85** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 
 It is the first row here whose subject **can destroy customer value**.
 `run_loyalty_expiry()` takes points a customer already holds and sets them to
@@ -2070,11 +2215,14 @@ everybody.
 **Applying it did not make it lawful to enable.** The mechanism exists; the terms
 do not. `offers_loyalty_terms` promises advance notice before a change that
 reduces the value of points already held, and it is already behind on
-pickup-only. Expiry is the second item queued behind that one correction
+pickup-only *(that correction was made the same day by v2.2 — see row 82's
+note; as of 2026-09-09 expiry was not terms-ready, because publishing the
+mechanism started the advance-notice clock but gave no notice, and whether that
+has since changed is not known from the repository)*. Expiry is the second item queued behind that one correction
 (`OWNER_ACTIONS.md` §32).
 
 Row **85** is `loyalty_multipliers`, applied 2026-09-09 07:14:29 UTC, and it
-**completes the loyalty series**. Class B, so the totals move to **85/86** above.
+**completes the loyalty series**. Class B, so the totals moved to **85/86** in an early-count pair that the reconciliation check retracts (nothing above carries it).
 It is the third and final movement of the money-path pair, which now stands at
 `e54caa332404755b733590a673d12c27` / `ca276a84424e403a98d34860817f815c` — the
 next row to move it will be doing something new.
@@ -2109,14 +2257,14 @@ this arithmetic.
 
 Row **86** is `export_my_data`, applied 2026-09-09 07:32:09 UTC, and it is the
 first row since 78 whose subject is neither loyalty nor operations. Class B, so
-the totals move to **86/87** above. **It does not move the money-path pair** —
+the totals moved to **86/87** in an early-count pair that the reconciliation check retracts (nothing above carries it). **It does not move the money-path pair** —
 `e54caa332404755b733590a673d12c27` / `ca276a84424e403a98d34860817f815c` stand
 where row 85 left them, which is what a read-only portability endpoint should do.
 
 **The lesson of this row is that a successful apply is not evidence the function
 runs.** A `plpgsql` body is not name-resolved at creation time: a wrong column
-reference applies cleanly and fails at the first call. This function reads 38
-distinct columns across seven tables, so one renamed column would have shipped a data-rights
+reference applies cleanly and fails at the first call. This function reads 65
+distinct columns across seven tables (*corrected 2026-11-26 from "38", which row 86 itself retracts*), so one renamed column would have shipped a data-rights
 endpoint that raises for every customer who presses the button — with an apply
 output indistinguishable from a good one. All 65 are present in live
 `information_schema` (0 missing) and the function was **called** afterwards,
@@ -2152,7 +2300,7 @@ Row 85's file checks only the `anon` half of a defect that involved
 screen ships with the next EAS build. `GO_LIVE_READINESS.md` A6 stays ⚠️.
 
 Row **87** is `alert_recovery_email_pairing`, applied 2026-09-09 10:29:49 UTC.
-Class B, so the totals move to **87/88** above. It does not move the money-path
+Class B, so the totals moved to **87/88** in an early-count pair that the reconciliation check retracts (nothing above carries it). It does not move the money-path
 pair, and it sends nothing: `external_dispatch_enabled` is false, so the branch
 it guards is unreachable and the file's own final assertion refuses to land if
 that flag is true.
@@ -2180,7 +2328,7 @@ sending, not left for the apply to discover. When a constant has to be duplicate
 assert the duplication.
 
 Row **88** is `platform_rollup_suppression`, applied 2026-09-09 12:17:02 UTC.
-Class B, so the totals move to **88/89** above. It does not move the money-path
+Class B, so the totals moved to **88/89** in an early-count pair that the reconciliation check retracts (nothing above carries it). It does not move the money-path
 pair, `_pre_stranded` is byte-identical before and after, and nothing moved —
 outbox still 156 rows, 0 on `email`, dispatch still false, and **0 open alerts**
 at apply time so no identity could churn.
@@ -2253,14 +2401,16 @@ warns about existed on the default branch for under five minutes.
 exactly **as of 2026-08-07**: `A 8 + B 54 + C 3 + H 3 = 68` repository files,
 `A 8 + B 54 + C 3 + F 5 = 70` live rows. It has not been recomputed from live
 data since; §1's own paragraph carries a 2026-08-22 snapshot (97 files / 103 rows),
-superseded by the note directly beneath it — the current totals are **107 files
-/ 112 rows**. The rows
+superseded by the note directly beneath it, which gave **107 files / 112 rows**
+as of 2026-08-26 (not the current totals; see the block at the top of §1). The rows
 between 2026-07-29 and 2026-08-22 have deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §1 and §4.
 
-**There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
-F-class rows carry no repository file. This is a history divergence, not drift.
+**There is no repository-only/UNAPPLIED file** (class E is empty — *as of
+2026-08-22 when this was written; it is true again at 2026-11-26, but only
+because rows 122 and 123 are now class B, and no row of the table below is
+class E*). The live-only F-class rows carry no repository file. This is a history divergence, not drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -2282,6 +2432,11 @@ unsafe regardless.
 > each one stamps a fresh apply-time version. It was 53 against 61 files, then
 > 58 against 66; it is now **60 against 68**. `db push` gets *more* dangerous
 > over time, not less.
+>
+> *Dated 2026-08-07: "68" is that day's file count. The repository holds 169
+> migration files at 2026-11-26, so the same arithmetic would give 161 (169 − 8)
+> if the eight shared versions are still the only aligned ones, which has not
+> been re-derived. The conclusion is unchanged.*
 
 Risks:
 
@@ -2293,8 +2448,13 @@ Risks:
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly;
-- **re-running the refund scheduler migration would re-create and re-activate
-  the `payment-refund-worker` cron**, defeating the deliberate disable in §21.
+- **re-running the refund scheduler migration would abort at its own guard**:
+  `20260729090000_payment_refund_scheduler.sql` raises when a cron job named
+  `payment-refund-worker` already exists, and the job row exists on Production
+  (§21 records that it was disabled, not removed). The apply is one
+  transaction, so nothing changes, but the abort lands mid-batch (see the
+  partial-failure bullet above). *Corrected 2026-11-26: this bullet used to
+  say the replay would re-create and re-activate the job.*
 
 ## 7. Why `migration repair` is not recommended
 
@@ -2410,7 +2570,11 @@ meaningful, though a file should still re-run cleanly where it can (§72 is an e
 4. Capture rollback SQL for every change the migration makes. It is valid only
    against the schema it was captured from: before it is ever run, re-derive it
    and check its callers in the live function bodies (`ROLLBACK.md` §5). Two
-   documented rollbacks are already unsafe (§25, §27).
+   documented rollbacks are marked UNSAFE (§25, §27); *corrected 2026-11-26:
+   those are not the only ones.* The rollbacks recorded in §17, §18, §19, §22
+   and §23 carry the same defect and are each now marked as valid only against
+   the schema of their apply date. A recorded rollback is never a safe thing to
+   run; re-derive it.
 5. Verify the migration has not already been applied **semantically** (object
    state, not just history rows).
 6. Record before-state fingerprints for everything the migration touches.
@@ -2517,7 +2681,11 @@ diff never shows.
 - A new environment built this way **will** schedule `payment-refund-worker`
   as active, because the scheduler migration schedules it. While the payment
   postponement (§21) stands, disable that job immediately after building the
-  environment.
+  environment. *Superseded 2026-11-26: the postponement no longer stands (see
+  the note under §21's heading), so this is not a standing instruction.
+  Whether a rebuilt environment should run the refund worker is an owner
+  decision the repository does not record; what still holds is that a rebuild
+  schedules the job as active, so check its state after building one.*
 
 ## 12. Historical audit reference
 
@@ -2546,8 +2714,11 @@ diff never shows.
   document also corrects §1, §4, §5, §6, §17, §18 and §19, which had continued
   to describe migrations as pending or repository-only after they were applied.
   The five account-deletion migrations remain to be itemized in §4/§5
-  (documentation gap; see §1).
-- This ledger records the state as of the **2026-07-29** update. It **must be
+  (documentation gap; see §1). *(Superseded: §4 itemizes them, "A is 8, not 3";
+  §5 still has no row for them — noted 2026-11-26.)*
+- This ledger records the state as of the **2026-07-29** update *(and has been
+  extended by dated entries since; its current position is the block at the top
+  of §1, not this sentence — noted 2026-11-26)*. It **must be
   updated after every approved live migration application** (new §5 row +
   fingerprints recorded), and re-validated if any tooling other than the §9
   workflow ever touches `schema_migrations`.
@@ -2563,7 +2734,9 @@ diff never shows.
   version to match. Applying a migration **never** requires, implies, or
   pressures maintainers to perform a version-alignment write; version alignment
   is optional, separate, and needs its own explicit owner approval. **No
-  version-alignment action is authorized by this documentation PR.**
+  version-alignment action is authorized by this documentation PR** *(the PR of
+  2026-07-29 that wrote this bullet; the rule is that no document authorizes
+  one, and a version alignment needs its own explicit owner approval)*.
 
 ## 13. Completed migration: Lazywait POS sync scheduler (2026-07-20)
 
@@ -2913,6 +3086,12 @@ allowlist, so disabling it (§21) does not register as a health regression — w
 is correct, but means the Operations Health card is **not** the place to confirm
 the refund worker's state. Query `cron.job` directly.
 
+*Dated 2026-07-29 (note added 2026-11-26): the allowlist now holds six jobs, not
+five — `branch-availability-sweep` was added by
+`20260820150000_sweeper_operations_health` — and the refund worker is no longer
+disabled (see the note under §21's heading). The refund worker is still not in
+the allowlist, so the advice to query `cron.job` directly still holds.*
+
 **Validation performed (repository / throwaway PG16 harness, not Production).**
 `supabase/tests/operations_automation_cron_health_test.sql` (allowlist shape,
 per-cadence boundaries, non-critical isolation of overall state, degraded/no-success
@@ -2924,6 +3103,14 @@ Frontend gates: `tsc --noEmit`, vitest, `vite build`, mobile web build, mobile `
 **Rollback.** The feature is isolated and read-only. Re-apply the prior definitions
 of the two functions from `20260723090000_smart_operations_alerts_digest.sql` in a
 separate owner-approved follow-up migration (never an edit of an applied file).
+
+*Valid only against the schema of 2026-07-29, and UNSAFE today (note added
+2026-11-26; `docs/ROLLBACK.md` §5): both functions have been redefined since —
+`operations_health_snapshot_internal` by six later migrations (see §25's
+rollback note) and `operations_alerts_derive` by five (`20260807170000`,
+`20260810113500`, `20260820160000`, `20260914120000`, `20260925120000`).
+Re-applying the July bodies silently removes every later change. Derive from
+the current bodies instead.*
 
 ---
 
@@ -2947,6 +3134,11 @@ recorded as *repository-only / UNAPPLIED* from 2026-07-24 until 2026-07-29.
 > postponed all payment/refund work pending gateway selection (§21). The objects
 > below remain live and intact, but **no automated refund processing runs** — the
 > `payment-refund-worker` cron is `active = false`, and zero orders are enrolled.
+>
+> *Dated 2026-07-29 (note added 2026-11-26): the postponement ended on
+> 2026-11-11 and the worker was switched on 2026-11-19; it was read active live
+> on 2026-11-24 (see the note under §21's heading). "No automated refund
+> processing runs" is no longer true.*
 
 ### What it adds (all additive; no applied migration is edited)
 
@@ -3039,6 +3231,9 @@ historical order, exactly as the harness predicted.
 
 ### The refund worker is NOT running
 
+*As of 2026-07-29; superseded. The cron job was switched on 2026-11-19 and read
+active live on 2026-11-24 (note added 2026-11-26; see §21's note).*
+
 - The migration itself **creates no cron job**. Scheduling arrived separately in
   `20260729090000_payment_refund_scheduler` (§5 row 55).
 - That scheduler's cron `payment-refund-worker` is **`active = false`** (§21).
@@ -3048,7 +3243,8 @@ historical order, exactly as the harness predicted.
 - `payment-refund` additionally returns `503` without its trigger secret — a
   second, independent stop.
 - **Re-enabling refund processing requires explicit owner approval** and is
-  blocked by the payment postponement (§21).
+  blocked by the payment postponement (§21). *(Superseded: the postponement
+  ended on 2026-11-11 and the owner-approved switch-on followed on 2026-11-19.)*
 
 ### Rollback
 
@@ -3057,6 +3253,13 @@ follow-up migration dropping the new triggers, functions and `order_refunds`
 table (never an edit of an applied file); the added `orders` columns are
 nullable/defaulted and may be left in place. Disable the `payment-refund-worker`
 cron first if it has been re-enabled.
+
+*Valid only against the schema of 2026-07-29 (note added 2026-11-26;
+`docs/ROLLBACK.md` §5): later migrations redefine and call these objects —
+`order_refund_due` is redefined by `20261012120000` and `20261018120000`, and
+twelve migration files mention `order_refunds` — and the refund worker has been
+re-enabled (see the note under §21's heading). Dropping them now would break
+those callers without a dependency error. Re-derive before any rollback.*
 
 ---
 
@@ -3132,6 +3335,12 @@ historical loyalty row, exactly as designed.
 Additive and isolated. A separate owner-approved follow-up migration drops the
 trigger, the constraint and the three functions (never an edit of an applied
 file).
+
+*Valid only against the schema of 2026-07-29 (note added 2026-11-26;
+`docs/ROLLBACK.md` §5): PostgreSQL records no dependency for a call made inside
+a function body, so a drop succeeds while a later function still calls the
+dropped one. `place_order` and `insert_order_from_snapshot` have been redefined
+many times since (§27, §31, §32 and later). Re-derive before any rollback.*
 
 ---
 
@@ -3234,6 +3443,19 @@ service-role call to prove an admin RPC is broken.
 
 ## 21. Payment & refund work — POSTPONED (2026-07-29)
 
+> **Superseded 2026-11-11 (note added 2026-11-26) — this section is a dated
+> record of 2026-07-29, not a standing rule.** The owner decided on 2026-11-11
+> that Moyasar is the payment provider (`CLAUDE.md` §6), and
+> `docs/PAYMENT_POSTPONEMENT.md` now opens "SUPERSEDED 2026-11-11. This
+> document is now history." Payment migrations have since been created and
+> applied (§§55, 56, 64, 65, 66, 68 and 70; ledger rows 114-123), so "No
+> payment migration may be created, edited or applied" is no longer true. The
+> refund job this section disabled was switched on 2026-11-19 04:47 UTC
+> (`docs/PAYMENTS.md` §6) and was read active live on 2026-11-24 (`CLAUDE.md`
+> §6, which also records `online_payment_enabled` true that day). For how
+> payment works now, read `docs/PAYMENTS.md`. Everything below is kept as
+> written.
+
 The owner has postponed all payment, payment-processing and refund work until a
 payment gateway provider is officially selected. **The authoritative record is
 `docs/PAYMENT_POSTPONEMENT.md`**; this section states only what the postponement
@@ -3267,7 +3489,10 @@ means for migrations.
   environment while the postponement stands.
 - **Consequence for `db push` (§6):** replaying the chain against Production
   would re-create and re-activate the worker. One more reason the prohibition is
-  permanent.
+  permanent. *Corrected 2026-11-26: the replay would in fact abort at the
+  scheduler migration's guard, which raises while a `payment-refund-worker` job
+  exists (see §6's last bullet); the prohibition stands for the other reasons
+  given there.*
 
 The five operational crons — `account-deletion-processor`, `lazywait-sync`,
 `order-integrity-watchdog`, `operations-alerts-evaluator`,
@@ -3354,7 +3579,7 @@ could not be replayed. Validated instead against a local PostgreSQL 16 cluster
 with the minimum schema stubbed:
 
 - migration applied cleanly (exit 0);
-- `supabase/tests/erasure_phone_normalization_test.sql` — 6 cases plus 15
+- `supabase/tests/erasure_phone_normalization_test.sql` — 6 cases plus 12
   normalizer assertions — reported `ALL CASES PASSED`;
 - the original `anonymize_account_data` body was then restored and the same
   suite re-run, which **failed** with
@@ -3379,6 +3604,13 @@ grant update (phone_number) on public.profiles to authenticated;
 …and restore the previous `anonymize_account_data` body from
 `20260715120000_account_deletion.sql:228-295`. Doing so reinstates the silent
 skip and the false `phone_purged` claim, so prefer fixing forward.
+
+*UNSAFE as written (note added 2026-11-26; `docs/ROLLBACK.md` §5):
+`anonymize_account_data` has been redefined three times since this migration —
+by `20260827110000_comp_erasure`, `20260919120000_security_audit_db_hardening`
+and `20261023120000_payment_records_retention_and_limits` — so restoring the
+July body silently removes comped-customer erasure, item-note erasure and
+payment-record handling. Derive from the newest definition.*
 
 ---
 
@@ -3525,6 +3757,12 @@ drop function if exists public.admin_order_stats();
 …and restore `admin_list_orders_with_items` from `20260724200000:179-232`. Note
 that doing so reinstates the hidden-outstanding-order problem whenever a caller
 passes a limit, so prefer fixing forward.
+
+*UNSAFE as written (note added 2026-11-26; `docs/ROLLBACK.md` §5):
+`admin_list_orders_with_items` was redefined after this migration by
+`20260821170000_order_item_notes`, `20260824130000_place_order_variants` and
+`20261006120000_rls_initplan_live_board_order_year`, so restoring the
+`20260724200000` body silently removes their changes.*
 
 The two added functions are additive and unreferenced by anything else in the
 schema. The console would have to be reverted in the same step, since it is
@@ -3901,15 +4139,20 @@ a separate live history write needing its own explicit owner approval, and class
 
 The file's footer says to re-apply the `operations_health_snapshot_internal` body
 from `20260723140000_operations_automation_cron_health.sql:59-863`, then drop the
-five-argument `operations_health_overall_state`. **Do not follow it.** Three later
-migrations redefined that function, each deriving its body from the one before:
+five-argument `operations_health_overall_state`. **Do not follow it.** Six later
+migrations redefined that function, each deriving its body from the one before
+(*corrected 2026-11-26: this said "Three"; the last three bullets below were
+missing*):
 
 - `20260820150000_sweeper_operations_health` puts `branch-availability-sweep` on the
   jobs board;
 - `20260820160000_branch_availability_health_card` adds the branch-availability
   card;
 - `20260925120000_health_card_variant_coverage` extends that card to per-size
-  closures.
+  closures;
+- `20261003120000_moyasar_only_payments`, `20261013120000_payment_refund_visibility`
+  and `20261016120000_refund_retry_backoff` each redefine it again for the
+  payment-configuration and refund cards.
 
 The July body predates all three, so re-applying it removes them along with the
 order-flow card, and says nothing. Measured on a disposable copy of the full chain
@@ -3925,8 +4168,12 @@ callers: `operations_alerts_evaluate` (the five-minute alerts evaluator),
 Health Center).
 
 To remove the order-flow card today, derive a corrective migration from the current
-body (`20260925120000`), the way that file was derived from its predecessor, and
-check its dependents per `ROLLBACK.md` §5. The footer stays as written: applied
+body, the way that file was derived from its predecessor, and check its
+dependents per `ROLLBACK.md` §5. *Corrected 2026-11-26: this named
+`20260925120000` as the current body; it is not. The newest definition is the
+last file listed by `grep -li 'create or replace function public.operations_health_snapshot_internal' supabase/migrations/*.sql`
+(`20261016120000_refund_retry_backoff` at 2026-11-26); re-run the search rather
+than trusting a file name, which goes stale.* The footer stays as written: applied
 files are never edited.
 
 ## 26. Applied migration: order-flow alert condition (applied 2026-08-07, class B)
@@ -4185,12 +4432,17 @@ volume that does not exist yet. §25's closing note applies unchanged.
 >   `payment_status = 'pending'`** and **none ever `delivered`**. There was never
 >   an order flow to stop, so the quiet period is not a regression — this is
 >   pre-launch test traffic. The real finding is the stronger one: **the order
->   lifecycle has never completed once in production.** See `PROJECT_STATUS.md`
->   → "Production reality check".
+>   lifecycle has never completed once in production.** *(Corrected 2026-11-26: this
+>   used to point at a `PROJECT_STATUS.md` heading, "Production reality check",
+>   which does not exist in that file; the figures above are the 2026-08-07
+>   reading and nothing here is current.)*
 > * **`open_branches` counts `branches.is_active`**, a configuration flag rather
 >   than a trading-hours state. Checked against the live schema on 2026-08-07:
 >   `public.branches` has `is_active`, `delivery_enabled`, `pickup_enabled` and
->   `delivery_temporarily_closed` — and **no opening-hours data of any kind**.
+>   `delivery_temporarily_closed` — and **no opening-hours data of any kind**
+>   *(true on 2026-08-07; superseded 2026-08-20, when
+>   `20260820…_branch_delivery_control` created `branch_working_hours` — see §28.
+>   The card still counts `is_active` and does not read that table)*.
 >   So the card cannot know trading hours, and its "no branch open → idle" arm
 >   fires only if every branch is deactivated, which is a config action rather
 >   than a nightly event.
@@ -4273,8 +4525,12 @@ than merely that the file executed.
 say "drop the two triggers and the three functions; the commands are in the
 migration footer". Do not run that footer. Since `20260821170000_order_item_notes`
 (§31), five later functions call `public.order_note_normalized(text)`:
-`place_order` and `compute_order_snapshot` (last defined in `20260924120000`),
-`insert_order_from_snapshot` (last defined in `20260921120000`), and
+`place_order` and `compute_order_snapshot` (last defined in `20260924120000` *as
+this note was written; `20261019120000_loyalty_points_reservation` has since
+redefined `place_order` and `insert_order_from_snapshot` and still calls the
+function, so find the newest definition with a search rather than trusting a
+file name — corrected 2026-11-26*), `insert_order_from_snapshot` (last defined in
+`20260921120000`, same caveat), and
 `enforce_order_item_note` (the trigger function behind every `order_items`
 insert) with `order_item_note_is_acceptable` (both in `20260821170000`).
 PostgreSQL records no dependency for a call made inside a function body, so every
@@ -4357,7 +4613,11 @@ alike (CLAUDE.md §8).
   (`order_change_events`, `ops_change_events`). Both were named in the approval.
 
 `#8`, `#12` and `#13` deliberately re-emit function bodies **without**
-re-scheduling the cron job or re-granting anything.
+re-scheduling the cron job and without widening any grant. *(Corrected
+2026-11-26: this said "or re-granting anything"; each ends its function with
+`revoke all … from public, anon, authenticated` and `grant execute … to
+service_role`, restating the existing ACL, and #13 does so for three
+functions.)*
 
 ### Verification (§9-E), after applying
 
@@ -4407,7 +4667,8 @@ was introduced.**
 ### A later migration re-emits `place_order` again
 
 `20260821170000_order_item_notes.sql` (#231, merged after this application and
-**not** applied to Production) is the 9th revision of `place_order`. It was
+**not** applied to Production at that time — *superseded: applied
+2026-08-22, §31, ledger row 58*) is the 9th revision of `place_order`. It was
 written on top of the 8th, so it carries both additions this work made — the
 `branch_modifier_availability` check and the `bpa.snoozed_until > now()` lazy
 expiry. Applying it will not silently revert the modifier guard.
@@ -4421,7 +4682,8 @@ body. Confirm the same before applying any future `place_order` revision.
 
 Applying the schema did **not** make the feature reachable. It stays dark until
 an account holding `branch_staff` or `call_center` exists, and none does — see
-[`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16 for the three actions that remain.
+[`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16 for the three actions that remained
+*(its heading now reads "four actions taken, two still gated")*.
 
 
 **Do not recompute the §4 classification counts from this list.** Those are a
@@ -4514,7 +4776,9 @@ repository file, so the **live function now carries all seven comment lines**
 history row whose text is byte-identical to its repository file.
 
 What remains, permanently: the historical row `20260709151718` still holds the
-283-line text that actually ran in July 2026. That is correct — it is a record of
+283-line text that actually ran in July 2026 *(sic: §29's own definition above
+gives this same row as 304 lines; the two figures are not reconciled, and the
+repository cannot say which is the stored line count — noted 2026-11-26)*. That is correct — it is a record of
 what happened, not a copy of the file, and it must not be rewritten. Anyone
 diffing that row against
 `20260710120100_place_order_delivery_zone.sql` will find the seven comment lines
@@ -4615,7 +4879,8 @@ sessions, and the difference between them is the point of this section.
 | 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
 | 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
 
-Order matters and was respected: #3 calls `order_note_normalized` seven times, so
+Order matters and was respected: #3 calls `order_note_normalized` five times
+(six mentions, one in a comment; *corrected 2026-11-26 from "seven times"*), so
 it depends on #2. Filename order gives the right sequence.
 
 ### The evidence, and where it differs
@@ -4865,7 +5130,8 @@ landed inactive as the orphan-category case the migration names by example.
 `current_app_role() = 'admin'` **and** `jwt_has_aal2()`. The session held
 `postgres` credentials and no JWT, so the call was made after setting
 `request.jwt.claims` to a **real admin who holds a verified TOTP factor**
-(`b05de808-0666-4d2f-9184-6d3baa07174d`) with `aal: aal2`.
+(the sole administrator account; its profile id was printed in full here until
+2026-11-26 and is deliberately no longer recorded) with `aal: aal2`.
 
 The entitlement is genuine; the session assertion is synthesised. This bypassed
 the AAL2 requirement added on 2026-08-23, on the owner's explicit instruction,
@@ -4917,7 +5183,9 @@ error; the customer-facing symptom was `حدث خطأ ما` with nothing else.
   unshipped, and nothing models that gap.
 - **The SQL suite asserted the refusal**, so CI was green on a function that
   could not serve any real client.
-- **§8 warns about exactly this trap in the other direction** — redeploying
+- **`CLAUDE.md` §8 warns about exactly this trap in the other direction** —
+  (*corrected 2026-11-26: this said "§8", which in this file is "Approved
+  strategy" and has no such warning*) redeploying
   `lazywait-sync` before `…120000` was applied. That direction was checked
   before the deploy; this one was not.
 
@@ -5220,6 +5488,11 @@ a no-op and is in fact the one instruction that would break the §6 freeze.
 
 ### Verification status
 
+*As written before the apply (note added 2026-11-26): the "could not be run" and
+"nothing was applied" statements below describe the author's container at
+authoring time. CI ran the suites, and the owner-approved applies recorded
+above followed; both are the record of what happened.*
+
 The SQL suites are the gate and they run in CI (`Migration chain + SQL suites`,
 path-gated, which a migration change triggers). `place_order_variants_test.sql`
 §8 previously asserted that the snapshot path **refuses** a tiered product with
@@ -5335,7 +5608,12 @@ Two owner actions remain before the feature is fully visible:
    `comp_discount_amount`. Those columns exist as of row 65, so the build is
    safe to ship *now*; shipping it *before* row 65 would have made order history
    fail entirely, because PostgREST rejects the whole select when one column is
-   missing;
+   missing; **superseded, see §43 (corrected 2026-11-26): "exists" was not the
+   test.** `authenticated` holds column-level SELECT grants on `orders`, and
+   this migration granted neither new column, so PostgREST refused the whole
+   select with a permission error once a build carrying it ran, and every order
+   list and receipt failed for about three weeks until row 96 granted them. The
+   test is "exists **and is granted to `authenticated`**";
 2. **the `lazywait-sync` redeploy** — comped tickets are unlabelled at the
    branch until it happens. Order-independent: the worker reads orders through
    `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
@@ -5367,12 +5645,16 @@ of the three files present. Applying then would have put schema into Production
 that was absent from the default branch. The owner merged (`47f18f2`), the
 branch was re-fetched, and each file was hashed against its merged copy —
 `18958be51618e252`, `59a534d72224990d`, `ab22ecc4807cb6ad` — before being sent.
+*(Added 2026-11-26: the first two files were edited afterwards, in a comment
+only, by commit `e43dfe8` (#370, 2026-09-14), so those two fingerprints describe
+the files as applied, not as they stand. Current sha256 prefixes: `3c20c8182964cb12`,
+`c3e17be5afe43ab8` and, unchanged, `ab22ecc4807cb6ad`.)*
 This is §15 doing exactly what it exists for.
 
 | Order | File | What it changes |
 | --- | --- | --- |
 | 1 | `20260827090000_admin_search_phone_normalization.sql` | `admin_search_role_candidates` — normalizes phone on both sides through `normalize_ksa_e164` |
-| 2 | `20260827100000_comp_members_by_phone.sql` | `comp_members.phone_e164`, nullable `profile_id`, surrogate PK, `claim_comp_membership`, **three** ownership-proving hooks (`handle_new_user`, `handle_auth_user_phone_confirmed`, `mark_phone_verified`), four admin RPCs, `comp_member_audit.target_phone` |
+| 2 | `20260827100000_comp_members_by_phone.sql` | `comp_members.phone_e164`, nullable `profile_id`, surrogate PK, `claim_comp_membership`, **three** ownership-proving hooks (`handle_new_user`, `handle_auth_user_phone_confirmed`, `mark_phone_verified`), three admin RPCs *(corrected 2026-11-26 from "four"; the file defines `admin_set_comp_member`, `admin_list_comp_members` and `admin_list_comp_member_audit`)*, `comp_member_audit.target_phone` |
 | 3 | `20260827110000_comp_erasure.sql` | `anonymize_account_data` — deletes the membership and scrubs the number from the audit |
 
 **The order is load-bearing between 2 and 3 only.** `…110000` references
@@ -5597,7 +5879,10 @@ leaves, so `syncing` + marker is the normal in-flight window of *every* order,
 not an anomaly. Testing the marker before the in-flight state therefore
 classified healthy orders as ambiguous. It only became reachable when
 `order-intake`'s `SYNC_TIMEOUT_MS` was cut from 11 s to 5 s, making checkout
-return mid-send; at 11 s a 7.30 s order had already reached `synced`.
+return mid-send; at 11 s a 7.30 s order had already reached `synced`. *(Added
+2026-11-26: the cut was reverted because it shipped without its client half; the
+constant is `11_000` in `order-intake/index.ts` and stays there until a build
+carrying both client changes is out. Production is at 11 s, not 5 s.)*
 
 **The second divergence, older and quieter.** For `failed` with a future
 `sync_next_attempt_at`, the SQL returned `sending_to_branch` — a leftover
@@ -5660,7 +5945,12 @@ replacement had two more holes found in review — and is mutation-tested agains
 13 cases, 11 of which must go red and 2 of which must stay green. The green ones
 matter: a tripwire that fails on a reformat gets deleted.
 
-## 40. Cash-order watchdog coverage — WRITTEN, NOT APPLIED (2026-08-31)
+## 40. Cash-order watchdog coverage — APPLIED 2026-09-01 (row 76); WRITTEN, NOT APPLIED on 2026-08-31
+
+> **Retitled 2026-11-26.** This section was written on 2026-08-31 and its
+> status was never updated: ledger row 76 records
+> `20260831120000_watchdog_cash_order_coverage` applied 2026-09-01 11:54:57 UTC
+> (live `20260901115457`). The text below is kept as written on 2026-08-31.
 
 `20260831120000_watchdog_cash_order_coverage.sql`. **Not applied. Applying it is a
 separate §5 owner action and the target must be named explicitly** — see the
@@ -5670,7 +5960,9 @@ otherwise mean the frozen Moyasar file.
 **What it fixes.** R1 `PAID_ORDER_NOT_SYNCED` and R7 `PAID_ORDER_DEAD_LETTER` are
 the rules that answer *"the order exists and the kitchen never got it"*. Both
 require `payment_status = 'paid'`. Read live on 2026-08-31: **63 of 65 orders are
-`payment_method='cash'`**, therefore `payment_status='pending'` with `paid_at`
+`payment_method='cash'`** *(wrong column; corrected in row 76: `payment_status =
+'pending'` is 63, `payment_method = 'cash'` is 61, and both paid orders are
+cash-method comped orders, so cash does not imply pending)*, therefore `payment_status='pending'` with `paid_at`
 NULL for their whole life; the only two `paid` orders are comped, total 0.00, and
 already synced. So on a cash-only launch those rules had no population to match —
 and SM-2026-000057 died silently while SM-2026-000027/-000028/-000029 sat
@@ -5728,7 +6020,17 @@ Each lists exactly **one** document on purpose: `scripts/docs-check-ownership.mj
 satisfies a rule when **any** listed doc is touched, so a second entry would let
 the ledger be skipped by editing something else.
 
-## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
+## 41. Login-path OTP rate limit — APPLIED 2026-09-01 (row 77); WRITTEN, NOT APPLIED on 2026-08-31
+
+> **Retitled 2026-11-26.** Ledger row 77 records
+> `20260831130000_otp_login_rate_limit` applied 2026-09-01 12:46:15 UTC (live
+> `20260901124615`), with `auth-send-sms-whatsapp` deployed as version 2 on
+> 2026-09-02. The paragraph below is kept as written on 2026-08-31, **including
+> a claim that row 77 retracts: it implied one function deploy, not two.**
+> `otp_begin_send` was replaced body-only under an unchanged signature, so the
+> already-deployed `whatsapp-send-otp` bound to the new body without a redeploy,
+> and redeploying it would have changed nothing; see row 77 and
+> `docs/WHATSAPP_LOGIN.md`.
 
 `20260831130000_otp_login_rate_limit.sql`. **Not applied.** It now implies **two**
 separate function deploys as well — `auth-send-sms-whatsapp` and
@@ -5949,8 +6251,12 @@ allowlist, which is the whole reason `order_number`, `customer_name`,
 `customer_phone`, `coupon_code` and the operational sync columns are withheld
 from customers. **A column-level grant does not extend to columns added later.**
 
-`20260826100000_comp_order_totals.sql` added `orders.is_comped` and
-`orders.comp_discount_amount` and granted neither. The same day, PR #269 added
+`20260826090000_comp_members.sql` added `orders.is_comped` and
+`orders.comp_discount_amount` (`20260826100000_comp_order_totals.sql` only reads,
+stamps and returns them) and neither file granted them. *(Corrected 2026-11-26:
+this named `comp_order_totals` as the file that added the columns; the applied
+grant migration's own header carries the same slip and was left unedited on
+purpose, since applied files are never edited.)* The same day, PR #269 added
 both to the customer read contract in `apps/mobile/src/lib/orderSelect.ts`. Since
 PostgREST refuses the **whole** query when one column is unreadable, the client
 has been asking for something it cannot have ever since.
@@ -6034,8 +6340,9 @@ sha256 that matches no file in the tree.
 
 **Why the level exists.** Availability is enforced at the product and the
 modifier today. Neither expresses "we are out of the Large". Measured against
-the live catalog: **59 of 61 active products carry price tiers, 144
-`product_variants` rows**, against **one** product with a modifier group. A
+the live catalog: **59 of 61 active products carry price tiers, 144 active
+`product_variants` rows (of 147; corrected 2026-11-26 from "144 rows", the active
+count, per §48 and §52)**, against **one** product with a modifier group. A
 cashier who runs out of one size has to close the whole item.
 
 **What it does.** Creates `public.branch_variant_availability` on the
@@ -6077,7 +6384,9 @@ no check" trap in its purest form.
 **A SEPARATE FINDING, RECORDED RATHER THAN FIXED HERE.** Modelling the
 **function** default privileges as well makes
 `supabase/tests/operations_alerts_digest_test.sql` fail, and the failure is
-real: **8 of its 11 `service_role` expectations do not describe Production**,
+real: **8 of its 13 `service_role` expectations do not describe Production**
+(*corrected 2026-11-26 from "11": the suite's matrix holds 13 entries, as §49
+says*),
 because those migrations write `revoke all ... from public, anon` and never name
 `service_role`. It is not a hole — the `anon` column is correct throughout, and
 `operations_alert_settings_update` is gated inside its body on `is_admin()`
@@ -6110,7 +6419,9 @@ ledger row 98. **The money-path pair moved, as intended:** `place_order`
 `bfd3f1f4…` → **`12b6816d256c29b76edf947ae1a7ea77`**, `compute_order_snapshot`
 `ca276a84…` → **`22e2d42935459e7bf93abb2941b56325`**. Both pre-images were proven
 identical to live before the derivation was trusted. Applying it refused nothing,
-because no tier is closed. The description below is kept as written. The second of what became four files. It is the one
+because no tier is closed. The description below is kept as written.
+
+**Written before the apply:** the second of what became four files. It is the one
 that makes §44 mean anything, and it is a **MONEY-PATH CHANGE**: it redefines
 both `place_order` and `compute_order_snapshot`.
 
@@ -6994,11 +7305,6 @@ bilingual copy composers, an enqueue trigger on each of the two closure audit
 tables, claim/finalize RPCs, an HMAC signature verifier, a pg_cron driver and
 the job that runs it.
 
-It adds `app_settings.admin_push_enabled`, an `admin_push_outbox` queue, two
-bilingual copy composers, an enqueue trigger on each of the two closure audit
-tables, claim/finalize RPCs, an HMAC signature verifier, a pg_cron driver and
-the job that runs it.
-
 **MONEY PATH UNTOUCHED, and the file asserts it rather than claiming it.** Its
 closing block refuses to apply unless `place_order` still hashes
 `12b6816d256c29b76edf947ae1a7ea77` and `compute_order_snapshot` still hashes
@@ -7126,6 +7432,12 @@ grants in `public` measured 0 afterwards, and a guest still reads the menu.
 The advisor counts predicted below were not re-read. Ledger row 109 has the
 evidence.
 
+> *Note added 2026-11-26: everything after this paragraph is as written before
+> the apply, between 2026-11-09 and 2026-11-11. "Written 2026-11-09, validated,
+> awaiting owner approval" and "Applying it is a §5 action, named by version"
+> were true then and are history now; the apply is ledger row 109. The advisor
+> counts in its tables are predictions and were not re-read afterwards.*
+
 `20260929120000_db_advisor_hardening.sql`. **Written 2026-11-09, validated,
 awaiting owner approval.** Workstream S2 of the 2026-11-09 compliance plan.
 
@@ -7231,7 +7543,8 @@ advisors: expect 0011 at 0, 0028 at 1 and 0029 at 85.
 MCP `apply_migration`, one call that landed. Live history **147 → 148**. Ledger
 row 103. This is the one database change that guest browsing (App Store
 guideline 5.1.1(v), plan item A4) needs. (§51 is the advisor-hardening file from
-#422. The two are independent, and §51's file is **still unapplied**.)
+#422. The two are independent, and §51's file is **still unapplied** *as of
+2026-11-11; it was applied on 2026-11-13, ledger row 109*.)
 
 **The approval named its target and nothing else.** The owner chose the option
 "Apply 20260930120000 first", which stated that it approved that single apply,
@@ -7647,6 +7960,8 @@ over about three days.
 
 ## 54. Staff accounts can be deleted after ordinary work — APPLIED 2026-11-13 (ledger row 110)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 
 **APPLIED 2026-11-13 12:58:10 UTC**, live version `20261113125810`, on the
 owner's approval naming it by version. No key in `public` blocks deleting a
@@ -7720,6 +8035,8 @@ in the console succeeds for an account that has history.
 
 ## 55. Moyasar-only payment objects — APPLIED 2026-11-13 (ledger row 115)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **APPLIED 2026-11-13 17:26:09 UTC**, live version `20261113172609`, on the
 owner's approval naming it by version, after `20260824100000` (row 114). Every
 assertion in the file passed. **Two of the expected hashes in the table below
@@ -7751,7 +8068,10 @@ before and after: `place_order` `12b6816d…` and `compute_order_snapshot`
 
 ### What it fixes, measured live 2026-11-11
 
-Read-only, with the payment row at provider `moyasar`, enabled, mode `test`:
+Read-only, with the payment row at provider `moyasar`, enabled, mode `test`
+*(corrected 2026-11-26: "enabled" was wrong when written. The row's last write,
+which disabled it, is 2026-11-11 10:55:54 UTC and this read came after, as
+`CLAUDE.md` §6 records; card payments were off)*:
 
 | Object | Before | After |
 | --- | --- | --- |
@@ -7882,7 +8202,10 @@ The new predicate spells the 25 code points `String.prototype.trim()` removes as
 - the email card of the same snapshot, for `host` and `from_email`;
 - `address_description_is_usable` (`20260802120000`). It trims a lowercase v
   from either end of a delivery landmark, so `villa` measures 4 and is refused
-  (measured on the local chain).
+  (measured on the local chain). *Corrected 2026-11-26: this second place was
+  fixed by `20261005120000` (§57, ledger row 111), applied 2026-11-13 16:43:01
+  UTC, 43 minutes before this file; `villa` is accepted live. Only the email
+  card still uses the set.*
 
 Fixing those is a separate change.
 
@@ -7991,6 +8314,8 @@ A timed-out apply is unknown until a read settles it (§52).
 
 ## 56. Tap payment RPCs dropped — APPLIED 2026-11-13 (ledger row 116)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **APPLIED 2026-11-13 17:45:00 UTC**, live version `20261113174500`, on the
 owner's approval naming it by version, after all seven payment functions were
 deployed and read back byte-identical. `tap_begin_%` functions: 0. The first
@@ -8074,6 +8399,8 @@ is never dropped with its last copy.
 
 ## 57. Server input bounds and customer order limits — APPLIED 2026-11-13 (ledger row 111)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 
 **APPLIED 2026-11-13 16:43:01 UTC**, live version `20261113164301`, on the
 owner's approval naming it by version, with 50 / 5 / 10. Customers whose phone
@@ -8150,8 +8477,14 @@ matches it. An administrator still cannot list either bucket.
 
 ### What it does not cover
 
-- **The online checkout-session path** is frozen under CLAUDE.md §6, and this
-  file leaves it exactly as it is. That is why the line cap is a guard in the
+- **The online checkout-session path** was "frozen under CLAUDE.md §6" when
+  this was written (2026-11-12). *Corrected 2026-11-26: §6 lifted that freeze
+  on 2026-11-11 for work that keeps Moyasar the only provider, so the freeze is
+  no longer the reason; the reason that still holds is the table-CHECK
+  hazard described next. The payment-side line cap this paragraph calls future
+  work was added in §55 (`begin_session_attempt`, 23514
+  `order_items_quantity_max`, ledger row 115).* This file leaves the online path
+  exactly as it is. That is why the line cap is a guard in the
   cash wrapper and not a `CHECK` on `order_items`. The first version of this
   file added the CHECK; Codex review on #445 pointed out that it also binds
   `insert_order_from_snapshot`, which writes a paid order's lines after the
@@ -8232,6 +8565,8 @@ that applies SELECT policies.
    reads 5 and 10, the money-path pair is unchanged, and Moyasar is still absent.
 
 ## 58. RLS init-plans, the live board's id set and the order-number year — APPLIED 2026-11-13 (ledger row 113)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **APPLIED 2026-11-13 16:59:39 UTC**, live version `20261113165939`, on the
 owner's approval naming it by version. A customer still sees only their own
@@ -8371,6 +8706,8 @@ order either way.
 
 ## 59. Admin loyalty stats — APPLIED 2026-11-13 (ledger row 105)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 `20261008120000_admin_loyalty_stats.sql`. **APPLIED 2026-11-13 06:38:43 UTC**,
 live version `20261113063843`, on explicit owner approval naming it by version.
 The merged copy matched the sha256 below; the stored statement and body were
@@ -8472,6 +8809,8 @@ nothing to refuse.
    unapplied unless it was applied on its own approval.
 
 ## 60. Audit trail — APPLIED 2026-11-13 (ledger row 112)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 
 **APPLIED 2026-11-13 16:46:26 UTC**, live version `20261113164626`, on the
@@ -8641,6 +8980,8 @@ The residue is a few identity values on the two audit tables.
 
 ## 61. Lazywait sync monitor without customer data — APPLIED 2026-11-13 (ledger row 106)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 `20261009120000_admin_lazywait_sync_monitor.sql`. **APPLIED 2026-11-13 09:02:36
 UTC**, live version `20261113090236`; the stored statement and body match
 hashes computed from the merged file. Written 2026-11-13. Follow-up to checklist gap P04#1.
@@ -8720,6 +9061,8 @@ granted to `authenticated`.
 
 ## 62. Customer push device counts for Push Tools — APPLIED 2026-11-13 (ledger row 107)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 `20261010120000_customer_push_device_counts.sql`. **APPLIED 2026-11-13 09:03:20
 UTC**, live version `20261113090320`; the stored statement and body match
 hashes computed from the merged file. Written 2026-11-13. Follow-up to checklist gap S03#1
@@ -8794,6 +9137,8 @@ devices in between.
 
 ## 63. `push_devices_admin_select` dropped — APPLIED 2026-11-13 (ledger row 108)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 
 **APPLIED 2026-11-13 12:54:40 UTC**, live version `20261113125440`, on the
 owner's approval naming it by version, after #462's console was confirmed
@@ -8849,6 +9194,14 @@ change (CLAUDE.md §7). **MONEY PATH UNTOUCHED, and the file asserts it.**
    counts. Rollback is the one-line `create policy` at the foot of the file.
 
 ## 64. A cancelled order is never resent, sent, refunded automatically or paid — APPLIED 2026-11-14 (ledger row 117)
+
+> **Partly superseded 2026-11-19 (note added 2026-11-26): "refunded
+> automatically" is no longer true.** §70 (`20261018120000`, ledger row 123)
+> enrols a paid card order for an automatic refund when it is cancelled, on the
+> owner's decision of 2026-11-19 ("do the auto refund"), and §70 records that it
+> changed this section's suite case (CASE 13) on purpose. The claim and
+> enrolment guards this section describes stand; its title and its PG-13
+> paragraph, which leaves the refund question to the owner, are history.
 
 **Applied 2026-11-14 17:27:37 UTC**, live version `20261114172737`, ledger row 117, on the owner's approval ("Apply
 20261012120000", named by version), via MCP `apply_migration`, one call. What
@@ -9475,8 +9828,10 @@ delivery addresses, several tries), so read these as estimates.
 - **Fail-before:** the extended suite against the chain built from `52a3976`
   stops at `FAIL 8: <NULL> payment records exported, 3 are hers`; against this
   file's first version it stops at `FAIL 16` (the reason was our code).
-- **Full private chain:** see the pull request for the final run. The file
-  re-applies cleanly.
+- **Full private chain:** the final run's figures were not copied into this
+  section when it was written and are not recorded in the repository (*noted
+  2026-11-26; the section says only "see the pull request for the final run"*).
+  The file re-applies cleanly.
 - **Mutation testing, 14 mutants, all killed by the suite; 5 also refused by
   the file's own block** (the raw payload exported, the typed coupon exported,
   the address ids kept, EXECUTE granted to `anon`, the null-subject guard
@@ -9795,9 +10150,10 @@ approval.** It implements the owner's decisions of 2026-11-17 on gap PG-01 in
 number 68 follows §67, `20261015120000`, applied 2026-11-18 (ledger row 120).
 
 sha256 `96a17fd96dd75f87dd0a49443417575ad80b25abc0957f09e37d2d9c9d4a8663`, 2 718 lines / 140 815 bytes.
-**Re-hash the MERGED copy before applying**, per §15. It carries the same six
-`\u` escapes as `20261013120000`, all inside the health snapshot's payment
-configuration read (see the post-image table).
+**Re-hash the MERGED copy before applying**, per §15. It carries the same
+**25** `\u` escapes as `20261013120000` (20 at or above U+0020 and five control
+characters; *corrected 2026-11-26 from "six", per §65's count*), all inside the
+health snapshot's payment configuration read (see the post-image table).
 
 **What it changes, database only.**
 
@@ -9970,6 +10326,8 @@ Steps: `docs/OWNER_ACTIONS.md` §58.
 
 ## 69. Advisor fixes: one RLS init-plan and 21 covering indexes — APPLIED (found live 2026-11-22; ledger row 122)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **Applied; live version `20261118120101`. Found by a live read on 2026-11-22; the apply was not recorded here when it happened.** All 21 indexes exist and the policy uses the init-plan form (ledger row 122). The sections below are the original write-up and its apply steps, kept as written.
 
 `20261017120000_advisor_fixes.sql`. **Written 2026-11-18 on branch
@@ -10123,6 +10481,8 @@ Steps: `docs/OWNER_ACTIONS.md` §59.
 
 ## 70. A cancelled paid card order is refunded automatically — APPLIED (found live 2026-11-22; ledger row 123)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **Applied; live version `20261119051739`. Found by a live read on 2026-11-22; the apply was not recorded here when it happened.** The enrolment function carries the markers this file writes (ledger row 123). The state of the refund worker's cron job was not re-read. The sections below are the original write-up and its apply steps, kept as written.
 
 `20261018120000_refund_cancelled_paid_orders.sql`. **Written 2026-11-19 on
@@ -10274,6 +10634,8 @@ UPDATE `orders`, which is what lets an invoker-rights trigger read
 Steps: `docs/OWNER_ACTIONS.md` §61.
 
 ## 71. A menu item cannot be hard-deleted while a customer is paying for it — APPLIED 2026-11-22 (ledger row 124)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **Applied 2026-11-22 07:18:17 UTC, live version `20261122071817`, on the owner's approval ("apply 20261021120000"), one call.** Every stored body matched the hash pre-computed from the merged file; the three triggers are enabled; nothing else moved (ledger row 124). The sections below are the original write-up and its apply steps, kept as written.
 
@@ -10441,6 +10803,8 @@ pre-image hashes.
 4. Rollback, if ever wanted: drop the three triggers and the three functions.
    Nothing else depends on them.
 ## 72. Loyalty points held by an open card checkout are reserved — APPLIED 2026-11-22 (ledger row 125)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **Applied 2026-11-22 07:06:59 UTC, live version `20261122070659`, on the owner's approval ("apply 20261019120000"), one call. `place_order` moved to `7078c7ddc36eb5eb0f7b0fc86b26dc8d` by intent; `compute_order_snapshot` did not.** Every stored body matched the post-image; 0 orders disagreed with their ledger before it; no customer holds reserved points today (ledger row 125). The sections below are the original write-up and its apply steps, kept as written.
 
@@ -10632,6 +10996,8 @@ asserted, because a sibling change may move it.
   exclusion); the others are behavioural and only a call can see them.
 
 ## 73. Payment records survive erasure; order numbers grow; item notes bounded before payment — APPLIED 2026-11-22 (ledger row 126)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **Applied 2026-11-22 07:23:01 UTC, live version `20261122072301`, on the owner's approval ("apply 20261023120000"), one call.** The foreign key is `ON DELETE SET NULL`, validated; every stored body matched the hash pre-computed from the merged file; no row and no order number moved (ledger row 126). The sections below are the original write-up and its apply steps, kept as written.
 
@@ -10847,6 +11213,8 @@ because calling it draws an order number.
 
 ## 74. A card checkout session is reused only for the inputs it was priced on — APPLIED 2026-11-22 (ledger row 127)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **Applied 2026-11-22 07:15:47 UTC, live version `20261122071547`, on the owner's approval ("apply 20261020120000"), one call.** The stored body matched the post-image pre-computed from the merged file; the new column is nullable and empty; nothing else moved (ledger row 127). **The app half still ships only with the next EAS build.** The sections below are the original write-up and its apply steps, kept as written.
 
 _Renumbered from §71 / ledger row 124 when #512 merged first and took those numbers. Comments inside this file\'s migration and suite that say "MIGRATIONS.md §71" mean this section._
@@ -11010,6 +11378,8 @@ row. Last, the five pre-images.
    can stay; nothing else reads it.
 
 ## 75. The POS and refunds stop contradicting each other — APPLIED 2026-11-22 (ledger row 128)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **Applied 2026-11-22 06:49:37 UTC, live version `20261122064937`, on the owner's approval ("apply 20261022120000"), one call.** All five stored bodies matched the hashes pre-computed from the merged file; the guard trigger is enabled; no refund was pending on any order, so nothing was held back (ledger row 128). The sections below are the original write-up and its apply steps, kept as written.
 
@@ -11287,6 +11657,8 @@ and the money path.
 
 ## 76. A cash retry is answered only for its own inputs; a card retry waits for an open payment — APPLIED 2026-11-24 (ledger row 129)
 
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
+
 **Applied 2026-11-24 06:11:10 UTC, live version `20261124061110`, on the owner's approval ("apply 20261024120000"), one call.** Merged first in #528 as `860418f` (tree identical to the reviewed head `f123f1b`); the apply waited for the merge, because the instruction arrived while the required checks were still running. The merged file was re-hashed (`27b7e98e…`, 62 268 bytes) and the live pre-images read before anything was sent: `begin_checkout_session` `5e274a8d…` and `place_customer_order` `971aa034…`, both exactly what the file expects. Afterwards the three stored bodies hash to `6bbcfb65…`, `4a0a4acc…` and `f3639416…` (the local-chain values below), the money-path functions are unmoved (`place_order` `7078c7dd…`, `compute_order_snapshot` `22e2d429…`, `insert_order_from_snapshot` `da9e57fe…`), the new table is closed to client roles and empty, and orders (104) and the Moyasar payment row are unchanged. Live history **173 → 174**. No function, app or deploy change follows from it. Full record: ledger row 129. The rest of this section is the pre-apply description, kept as written.
 
 `20261024120000_cash_order_input_match_expired_session_lookup.sql`. **(Pre-apply description.) Written
@@ -11401,6 +11773,8 @@ changed comparison in each function) only by the reverse-edit hash.
    (provider `moyasar`) are unchanged.
 
 ## 77. Image and banner-action values are checked at the database; the POS import never replaces an image — APPLIED 2026-11-24 (ledger row 130)
+
+> *Note added 2026-11-26: the status lines and "Applying it" steps below ("written, validated, awaiting owner approval", "still unapplied", "frozen") are as written before the apply and are history; the apply is recorded in the ledger row named in the heading. The position today is the block at the top of §1.*
 
 **Applied 2026-11-24 10:21:05 UTC, live version `20261124102105`, on the owner's approval ("apply 20261124130000"), one call.** Merged first in #536 as `780e5bc` (tree identical to the reviewed head `d891f3e`). The merged file was re-hashed (`eee2bdf0…`, 658 lines / 34 340 bytes) and the live state read before anything was sent: the importer was exactly the pre-image the file expects (`8ccdc8cf…` / 14 816 characters, old overwrite literal present, new one absent), the helper and the three constraints did not exist, and **all three offender counts were zero** (61 products, 2 banners), so the file's own guard had nothing to refuse. Afterwards the stored bodies hash to the values computed from the merged file before sending (helper `bd60fcad…`, importer `fdd36473…`), the three constraints are validated, the grants are as the file states, the money-path pair is unmoved, and no row changed (104 orders, 61 products, 2 banners). Live history **174 → 175**. The SQL sent omitted the header comments outside the function bodies, so those cannot be verified after the fact. No function deploy follows; the app half ships in the next EAS build. Full record: ledger row 130. The rest of this section is the pre-apply description, kept as written.
 

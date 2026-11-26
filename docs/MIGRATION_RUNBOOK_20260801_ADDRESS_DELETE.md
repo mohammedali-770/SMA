@@ -84,6 +84,14 @@ work around this — every narrowing reopens the captured-payment hole above.
 These suites were written and reviewed but **have never been executed**. This is
 the single most important step in this document.
 
+> **Corrected 2026-11-26.** "Never been executed" and the loop below are
+> stale. The loop cannot run as written on a bare `createdb` database: file 2,
+> `20260707120100_profiles.sql`, fails with `schema "auth" does not exist`,
+> because the chain assumes a Supabase database. The supported route is
+> `.github/sql-ci/run.sh`, which loads `.github/sql-ci/bootstrap.sql` first and
+> then runs every suite; it runs in CI on every push. `supabase/tests` holds 106
+> files at 2026-11-26, not 26.
+
 ```bash
 # From a clean checkout of the default branch, against a scratch PG16.
 createdb sma_migration_check
@@ -333,6 +341,9 @@ select count(*)                                   as sessions,
 
 `sessions` and `snapshot_fingerprint` **must equal** the values from 1.4. Only
 `with_address_pointer` may drift later, and only as customers delete addresses.
+*(Added 2026-11-26: a checkout session created between step 1.4 and this step
+also changes both values without any defect; restrict both queries to rows
+created before the apply, or expect that false alarm on a live system.)*
 If the fingerprint moved, something wrote to a session row — investigate before
 going further.
 
@@ -372,6 +383,12 @@ Both migrations carry their rollback in a trailing comment block. Reproduced
 here so it is in one place.
 
 ### Migration 2
+
+**Order matters, and this block is in the wrong order for it:** restore the FK
+first (the paragraph after the block), then run these drops, all in one
+transaction. Run top to bottom as printed, the block drops the guard before the
+FK is back, which opens the window the paragraph below warns about.
+*(Added 2026-11-26.)*
 
 ```sql
 drop index  if exists public.checkout_sessions_address_idx;
