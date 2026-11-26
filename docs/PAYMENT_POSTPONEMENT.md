@@ -75,8 +75,9 @@ top of it until the decision is made.
 > `IntegrationCard.tsx` — **`TapPaymentPanel.tsx` and `tapAdminTest.ts` were
 > deleted**; the app's `TapWebView*.tsx` became `PaymentWebView*.tsx` and
 > `features/checkout/paymentFlow*` was deleted; `tap-admin-test-return` became
-> `payment-admin-test-return`. The current file list is the `payments` rule in
-> [`ownership.json`](ownership.json).
+> `payment-admin-test-return`. `tap-diag-temp` and `tap-return-probe` were
+> deleted too (neither exists in `supabase/functions`). The current file list
+> is the `payments` rule in [`ownership.json`](ownership.json).
 
 No change of any kind — repository, Production, or configuration — may be made
 to:
@@ -129,9 +130,20 @@ call site. If a payment behaviour changes, that test fails — so the next chang
 here cannot ride in under an auth fix, which is exactly the failure mode the
 mobile row below was added for.
 
+> **History, 2026-11-26.** The Tap code is gone, so the test no longer pins
+> Tap: it pins the Moyasar calls that replaced it, and asserts that
+> `resolveTapConfig` is absent from `payment-test-config`
+> (`supabase/functions/_shared/adminAuthWiring.test.ts`).
+
 **Deployment is NOT covered.** `payment-test-config` remains at the deployed
 version it had before this change until a separate §5 approval, so Production
 still runs the role-only gate for it.
+
+> **History, 2026-11-26.** That was true on 2026-08-24 and stopped being true
+> on 2026-11-13, when the seven payment functions were deployed as one set;
+> `OWNER_ACTIONS.md` §47.4 records that deploy as making the AAL2 admin gate
+> live, and `GO_LIVE_READINESS.md` D3 records the exception closed on
+> 2026-11-13. Live state read since: not known from the repository.
 
 ### Deployment was ATTEMPTED on 2026-08-24 and DELIBERATELY ABANDONED
 
@@ -193,8 +205,9 @@ which is what caught the payment divergence here and what was not done for those
 two. The payment helpers remain the only case where a divergence was actually
 found.
 
-**Current state:** `payment-test-config` is fixed in the repository and still
-runs the role-only gate in Production. Reopening this needs the freeze lifted, or
+**Current state (as of 2026-08-24; superseded 2026-11-13, see the note under
+"Deployment is NOT covered" above):** `payment-test-config` is fixed in the
+repository and still runs the role-only gate in Production. Reopening this needs the freeze lifted, or
 an explicit decision to ship the current payment helpers with it — a
 payment-behaviour decision, not an authorization one.
 
@@ -245,6 +258,12 @@ applied, no secret was rotated or removed, no repository file was edited.
 
 ## 4. The five operational crons stay ACTIVE
 
+> **History, 2026-11-26.** The five jobs and ids below are the list of
+> 2026-07-29. The migrations in the repository now schedule twelve distinct
+> jobs (recomputed from `cron.schedule` calls in `supabase/migrations`),
+> `payment-refund-worker` among them, which was switched on 2026-11-19 and read
+> active on 2026-11-24 (`PAYMENTS.md` §6).
+
 Disabling the refund worker must not be confused with pausing operations.
 These remain active and are **not** part of the payment freeze:
 
@@ -282,6 +301,9 @@ Recorded so the state can be compared when the area is reopened.
   > `OWNER_ACTIONS.md` §47.16). No migration creates it and no console field
   > sets it. See
   > [`PAYMENTS.md`](PAYMENTS.md) §6.
+  >
+  > **Settled 2026-11-13:** present on the payment row, length 64
+  > ([`PAYMENTS.md`](PAYMENTS.md) §1 and §6), so nothing needs generating.
 - **Data**: 23 orders, **0 paid**, **0** orders enrolled for refund
   (`refund_state` all `none`), **0** rows in `order_refunds`,
   9 `payment_records`.
@@ -356,14 +378,15 @@ Two things follow, and they pull in opposite directions:
 **This section therefore stands.** The worker stays disabled. What has changed is
 that the remaining work is now specific rather than open-ended: either confirm
 `GET /v2/refunds/{id}` can resolve an ambiguous attempt (Q3 in the Tap
-reference), or make the claim/release path refuse to retry past the idempotency
+reference, deleted 2026-11-11), or make the claim/release path refuse to retry past the idempotency
 window and route those refunds to human review instead.
 
 **A related defect was found and fixed in the same pass.** The CHARGE payload had
 `idempotent` at the top level, where Tap's schema does not define it, so charge
 idempotency had never been active at all — a retried `payment-initiate` could
 have created a second charge. Nothing was affected in practice because online
-payment has never been enabled. See the Tap reference §2.
+payment has never been enabled. See the Tap reference §2 (deleted
+2026-11-11).
 
 **Before any automated refund processing is re-enabled**, the chosen provider
 must supply either a true idempotency key on the refund endpoint, or a
@@ -477,7 +500,10 @@ by this document.
 > codebase that no longer exists. "Four things keep it inert" in §9.1 was true
 > on 2026-08-24; on 2026-11-11 the payment row named `moyasar` with a test key
 > saved, and what kept it inert was the unapplied migration and the July
-> deployed bundles (`PAYMENTS.md` §1).
+> deployed bundles (`PAYMENTS.md` §1). **Updated 2026-11-26:** that too ended on
+> 2026-11-13, when the migrations were applied and the seven functions deployed;
+> read live 2026-11-24, `online_payment_enabled` is `true` (`PAYMENTS.md` §1).
+> The "four things" at the end of this section are history.
 
 **Status: BUILT, INERT, NOT CHOSEN.** The owner said "maybe we will go with
 MOYASAR" and supplied `https://docs.moyasar.com/api/api-introduction`. That is an
@@ -494,7 +520,7 @@ deliberately turns it on.
 | `supabase/functions/_shared/moyasarRefund.ts` | Refund body, response classification, resolve-before-retry |
 | `supabase/migrations/20260824100000_moyasar_payment_provider.sql` | `payment_records.provider_checkout_ref`, provider-generic `begin_payment_attempt` / `begin_session_attempt` |
 | `src/components/admin/MoyasarPaymentPanel.tsx`, `src/lib/moyasarAdminTest.ts` | Admin readiness + sandbox test |
-| `supabase/tests/moyasar_begin_attempt_test.sql` | Ten cases against a fresh 98-migration database: the double-charge guard, provider scoping, expiry, fail-closed preconditions, service-role-only grants |
+| `supabase/tests/moyasar_begin_attempt_test.sql` | Ten cases against a fresh 98-migration database (as of 2026-08-24; the file now has 13 numbered cases and covers `20261003120000` too): the double-charge guard, provider scoping, expiry, fail-closed preconditions, service-role-only grants |
 | `docs/integrations/Moyasar_API_Reference.md` | The researched API reference |
 | Moyasar branches in `payment-initiate`, `payment-verify`, `payment-webhook`, `payment-refund`, `payment-test-config` | Dispatch only |
 
@@ -690,6 +716,14 @@ Paying in cash is an errand: having the money at the door, or having it at the
 counter. A preselected radio makes that commitment on the customer's behalf and
 lets them discover it at the door. The picker now starts empty and the Place
 Order button stays dead, with its own message, until they choose.
+
+> **Updated 2026-11-19 (owner decision; `PAYMENTS.md` §4, "A returning
+> customer's last method").** The app now preselects a returning customer's
+> **own** last choice, and only when it was **online**
+> (`rememberedPreselection` in `apps/mobile/src/lib/payment.ts`). Cash is still
+> never preselected, so the reason above stands, and the helper still cannot
+> invent a method: it returns the customer's earlier pick or nothing. The
+> "starts empty" statements in §11.1 and here describe a first-time customer.
 
 This also removes a quiet asymmetry that only worked while exactly one method
 was enabled. With both enabled, the preselection was the **administrator's**

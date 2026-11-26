@@ -1,6 +1,6 @@
 # Staff Manual — دليل الموظفين
 
-> **Updated 2026-08-12.** For branch staff/managers using the Spicy Meal staff console. English first, then Arabic.
+> **Updated 2026-08-12; sections carry their own later dates where they changed (corrected 2026-11-26: Reopen all, the staff-account path, console languages).** For branch staff/managers using the Spicy Meal staff console. English first, then Arabic. The escalation table in section 10 is still blank: the owner supplies the contacts.
 
 ## 1. Live Orders — الطلبات المباشرة
 
@@ -103,10 +103,13 @@ that takes you straight to the close dialog: pick how long and why, confirm. If
 it has several sizes or an options group, tapping opens the item's sheet first —
 see below.
 
-**One tap puts everything back.** When anything is closed the top strip carries
-a **Reopen all** button. It asks you to confirm, then reopens every closed item
-**at your branch only** — it cannot touch another branch, and it never touches
-delivery. Individual items still reopen on their own when their timer runs out.
+**One tap puts every closed item back.** When any item is closed the top strip
+carries a **Reopen all** button. It asks you to confirm, then reopens every closed
+item **at your branch only** — it cannot touch another branch, and it never touches
+delivery. **It reopens closed items only, not closed sizes or closed options:**
+if only a size or an option is closed there is no Reopen all button, and the
+strip says so; reopen those from their own lists below the grid, each with its
+own Reopen. Individual items still reopen on their own when their timer runs out.
 
 **There is no Refresh button any more, and nothing is missing.** The screen
 watches for changes and updates itself, including after the tablet has been
@@ -154,10 +157,12 @@ for something checkout will refuse.
 Options you have closed are listed below the grid with their own countdowns and
 a one-tap Reopen, the same as closed items.
 
-**The console is in Arabic unless you change it.** It always was meant to be;
-until 2026-09-16 merely opening the sign-in page saved English as if you had
-chosen it, so everybody got English. Use the language toggle if you want
-English — that choice is remembered on that device.
+**The branch and call-centre consoles are in Arabic unless you change them.** They
+always were meant to be; until 2026-09-16 merely opening the sign-in page saved
+English as if you had chosen it, so everybody got English. Use the language toggle
+if you want English — that choice is remembered on that device. The sign-in screen
+itself, the "not a staff account" notices and the administrator console start in
+English.
 
 ### Pausing delivery
 
@@ -411,12 +416,14 @@ Do not assume those internal alerts page a human. Independent external monitorin
 The console sign-in screen offers **sign-in only**. Until 2026-11-12 it also had
 a **Create Account** tab, and anyone could make an email/password account there.
 Nobody needed it: staff accounts are created by an administrator in
-**Settings → Staff accounts**, and customers sign in to the app with their
+**Integrations → Staff Access → Accounts**, and customers sign in to the app with their
 WhatsApp number. Such an account also shares the browser session with the
 customer web app, so it could place cash orders with no phone number behind them.
 
 - **A new staff member needs an account:** ask an administrator to create it.
-  Do not make one yourself.
+  Do not make one yourself. That screen creates branch and call-centre accounts;
+  an administrator or accountant role is granted only to an account that already
+  exists.
 - **A customer says the website asked them to sign in with WhatsApp before
   ordering:** that is expected. An order now needs a verified phone number.
 
@@ -424,7 +431,7 @@ customer web app, so it could place cash orders with no phone number behind them
 
 شاشة الدخول إلى لوحة التحكم **للدخول فقط**. حتى 2026-11-12 كان فيها أيضاً تبويب
 **إنشاء حساب** يسمح لأي شخص بإنشاء حساب ببريد وكلمة مرور. لم يكن أحد يحتاجه: حسابات
-الموظفين ينشئها المسؤول من **الإعدادات ← حسابات الموظفين**، والعملاء يدخلون التطبيق
+الموظفين ينشئها المسؤول من **الربط والتكاملات ← صلاحيات الموظفين** (قسم الحسابات)، والعملاء يدخلون التطبيق
 برقم واتساب. وكان هذا الحساب يشارك جلسة المتصفح مع تطبيق العملاء على الويب، فيستطيع
 تقديم طلبات دفع نقدي دون رقم جوال.
 
