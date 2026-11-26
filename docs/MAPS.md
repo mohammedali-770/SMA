@@ -79,6 +79,14 @@ Applies to the **existing** dashboard key — reuse it, don't create one.
    - **Places API (New)** — the address search box
      ([`MapSearchBox.tsx`](../src/components/MapSearchBox.tsx) posts this same
      key to `places.googleapis.com/v1/places:searchText`)
+   - **Geocoding API** *(added 2026-11-26)* — the web picker
+     (`LocationPickerMap.web.tsx`) reverse-geocodes the pin with
+     `new google.maps.Geocoder()`, which Google serves through the Geocoding
+     API. A key restricted to only the two APIs above is likely to answer
+     `REQUEST_DENIED`; the code treats any status but `OK` as "no address" and
+     returns silently, so the only symptom is that the location description is
+     never prefilled on `/app`. Not tested against the live key (dashboard
+     state). The native app uses the OS geocoder and needs no key for this.
 
    Restricting to Maps JavaScript API alone **breaks the dashboard's delivery
    zone and branch address search**.
@@ -193,9 +201,12 @@ appears — a failure that looks exactly like the feature not having shipped. It
 is an installed-app probe, so it is a privacy-adjacent declaration worth
 knowing about; it reveals only whether that one scheme can be opened.
 
-**No pull-request job reads `app.json`** — the EAS workflow is
-`workflow_dispatch` plus tag-push — so this key is first exercised at build
-time. A missing or misspelt entry will not be caught by CI.
+**No test asserts this key** *(corrected 2026-11-26: this said "No pull-request
+job reads `app.json`", which is false — `iosPurposeStrings.test.ts` and
+`webExportConfig.test.ts` read `app.json` on every pull request, and the EAS
+workflow is `workflow_dispatch` plus tag-push, but none of them checks
+`ios.infoPlist.LSApplicationQueriesSchemes`)*, so this key is first exercised at
+build time. A missing or misspelt entry will not be caught by CI.
 
 ### Guards, and one dead branch
 
@@ -212,6 +223,16 @@ it. It is harmless, but do not read it as the Android path — Android's chooser
 is the OS app picker, not this alert.
 
 ## Diagnosing a blank or missing map
+
+**This table describes the NATIVE picker only** *(corrected 2026-11-26)*. The
+web picker, `LocationPickerMap.web.tsx`, has no `gm_authFailure` hook and no
+`captureMessage`: a failed script load shows the "setup required" hint with no
+report, and a key rejected for referrer or billing still resolves the script, so
+`/app` draws a grey map and sends no event. Look for the problem in the browser
+console, not in Sentry. The two variants are therefore **not** in lockstep on
+failure handling. The native code also emits `script_error: …` (from
+`window.onerror`) and `mapbox_error: …` (Mapbox provider), which the table
+omits.
 
 `LocationPickerMap` reports failures to Sentry as `MAP_LOAD_FAILED`
 (`subsystem: app`, `op: map_load`) with a reason:

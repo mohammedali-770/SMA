@@ -118,8 +118,10 @@ which the pre-2026-08-24 transport did not: `'  https://host  '` used to be
 passed into the request URL verbatim and fail, and now resolves cleanly and
 sends. That is the desirable behaviour for a hand-edited config field, but it is
 a live-path change and is recorded rather than glossed.
-- `lazywait-sync` resolves it **before** the stale reaper and **before**
-  `claim_lazywait_sync_batch`, and returns `500 lazywait_base_url_not_configured`
+- `lazywait-sync` resolves it **before** `claim_lazywait_sync_batch` and
+  `claim_lazywait_sync_one` (since 2026-11-24 the stale reaper runs ahead of the
+  resolve — see *The sweeps run when the integration is off or misconfigured*
+  below), and returns `500 lazywait_base_url_not_configured`
   without claiming anything. No order is claimed, no order changes state, and no
   HTTP request is attempted; the queue simply waits for the config to be fixed.
 - `lazywait-catalog` refuses the same way (`400`).
@@ -240,6 +242,11 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    time, `YYYY-MM-DD HH:mm:ss` (since 2026-11-12). It used the device's zone and
    locale, so an administrator outside Saudi Arabia read a different clock from
    the rest of the console.
+
+   *History, 2026-08-24; superseded 2026-08-26 — add-on groups did import, ten
+   add-ons in two groups, and the shape of `/menu/addons-groups` was captured (see
+   "Add-ons went live 2026-08-26" below). The paragraphs through "suspect the
+   envelope key before the vendor" are kept as the record of the diagnosis.*
 
    **Add-on groups have never imported a single record.** Every
    `lazywait_catalog_pulls` row in Production records `addon_groups: 0` with
@@ -467,9 +474,16 @@ instead of the live config row.) Field-by-field state:
   The decomposition **assumes the POS sums** item price and add-on prices, which
   is the reading the contract's own example shows. If the POS instead treats
   `order_items[].price` as final, a decomposed line **undercharges** by the
-  add-on total. This is inert while zero modifiers are mapped — `addons[]` is
-  never emitted and nothing is subtracted — and activates the first time one is.
-  Open question **Q10**; settle it before mapping the first add-on.
+  add-on total. *Written 2026-08-24 as "inert while zero modifiers are mapped";
+  that stopped being true on 2026-08-26.* The importer maps every modifier it
+  creates (`import_lazywait_addon_groups` sets `lazywait_addon_id`), and ten
+  mapped add-ons have existed since that import — at price 0.00, so the
+  subtraction was zero and no ticket moved. The current number of mapped
+  modifiers is not known from the repository. The decomposition **is live**:
+  it takes effect on the first mapped add-on whose price is above zero. Open
+  question **Q10** is still open (`integrations/Lazywait_API_Reference.md`), so
+  settle it before the first priced add-on is mapped or imported, not before the
+  first add-on.
 - `price_id` is the **ordered tier's** id — `product_variants.lazywait_price_id`
   reached through `order_items.variant_id`, falling back to
   `products.lazywait_price_id` for a line with no tier (an untiered product, or
@@ -687,8 +701,9 @@ byte-for-byte. No money field and no provider behaviour changed.
 
 **The money on a ticket did not move.** Only a modifier carrying a real
 `modifiers.lazywait_addon_id` becomes an `addons[]` entry and is subtracted back
-out of `price`; all **three** live modifiers are unmapped, so nothing is
-subtracted and every line is charged exactly what it was under the July build.
+out of `price`; *(at 2026-08-24; since 2026-08-26 ten imported add-ons are
+mapped, all priced 0.00, see below)* all **three** live modifiers were unmapped,
+so nothing was subtracted and every line is charged exactly what it was under the July build.
 What changed is that the customer's heat-level choice now reaches the kitchen as
 `details` text instead of being silently dropped.
 
@@ -959,11 +974,15 @@ recompute). `is_paid` left this list on 2026-11-19 (above).
 by a printed ticket rather than by the vendor.
 
 ## Retry / backoff / dead-letter
-- **Correction 2026-11-24: there is no automatic retry.** The worker still
-  classifies a failure as retryable (429, 5xx, network/timeout) and writes
-  `sync_attempt_count++`, state `failed` and a `sync_next_attempt_at`
-  (30s→60s→…→1h, ±20% jitter; 429 honors `Retry-After`) — **but the database
-  discards it.** A BEFORE trigger (`20260813143000_manual_only_pos_resend`)
+- **Correction 2026-11-24: there is no automatic retry.** For a Create Order
+  failure the worker still classifies `safe_retry` (HTTP 429, or a connection
+  provably never established) and writes `sync_attempt_count++`, state `failed`
+  and a `sync_next_attempt_at` from `computePosNextAttempt` (minute offsets
+  0/1/3/6/9 from first eligibility, at most `MAX_POS_ATTEMPTS` = 5 attempts, all
+  inside the 10-minute `POS_DEADLINE_MINUTES` window) — **but the database
+  discards it.** Other failures never reach that schedule: a 5xx, a timeout or a
+  dropped connection is *ambiguous* and goes to `confirmation_required`, and a
+  terminal 4xx goes to `blocked`. A BEFORE trigger (`20260813143000_manual_only_pos_resend`)
   sets `sync_next_attempt_at` to null for `failed`, `dead_letter` and `blocked`,
   and `claim_lazywait_sync_batch` selects only `pending` rows (restated in
   `20261012120000`), so nothing ever claims a `failed` order again. It stays
@@ -971,20 +990,31 @@ by a printed ticket rather than by the vendor.
   resets it to `pending`. A `pos_retrying` event the worker writes for it is
   rewritten to `pos_failed`, so the customer is told "we could not send your
   order" with a resend button, not that the restaurant is confirming it.
-  `MAX_SYNC_ATTEMPTS` (8, `_shared/lazywait.ts`) is therefore not an automatic
-  retry budget; each manual requeue clears the count. Read the rest of this
-  bullet list, and the 30s→1h schedule, as the worker's code, not the system's
-  behaviour.
+  The 30s→1h `computeBackoffMs` function (with ±20% jitter) and
+  `MAX_SYNC_ATTEMPTS` (8) in `_shared/lazywait.ts` are exported but called by no
+  non-test code, and `parseRetryAfterMs`'s result is not read by the worker, so
+  none of them is a retry budget. Read the
+  rest of this bullet list as the worker's code, not the system's behaviour:
+  the schedule above is what the worker writes, and the trigger discards it.
 - Terminal (401 INVALID_KEY, 403 LICENSE_EXPIRED, other 4xx, missing mapping) →
   `blocked` (no auto-retry; admin fixes config/mapping then **Retry**).
 - **Ambiguous 2xx** (HTTP success but no usable `order_ref`, or `success` not
-  `true`) → `blocked` (`unexpected_response` / `created_without_ref`), NOT
-  retried: the POS may have created the order and Create Order has no idempotency
-  key, so a blind re-send would duplicate the ticket. Admin confirms in Lazywait,
-  then **Retry** or resolves manually.
+  `true`) → `confirmation_required` (`sync_last_error` =
+  `ambiguous_create_order (unexpected_response)` or
+  `ambiguous_create_order (created_without_ref)`; customer message
+  `pos_confirmation_required`), NOT `blocked` and NOT retried: the POS may have
+  created the order and Create Order has no idempotency key, so a blind re-send
+  would duplicate the ticket. The same state takes a 5xx, a timeout and a dropped
+  connection. Verify in Lazywait first: `requeue_lazywait_order` refuses a
+  `confirmation_required` order (P0001 `confirmation_required: …`), so the admin
+  **Retry** does not move it (see `ORDER_CONFIRMATION_FLOW.md`).
 - The queue index `orders_lazywait_queue_idx` serves the claim, which pulls due
-  `pending` rows oldest-first (a `failed` row is never due: see the correction above). `requeue_lazywait_order(id)` (admin-only) resets to `pending`
-  **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
+  `pending` rows oldest-first (a `failed` row is never due: see the correction above).
+  `requeue_lazywait_order(id)` (admin-only) resets to `pending` but does **not**
+  clear `sync_attempt_count` or move the deadline (the first version, `20260708140000`,
+  did, and `20260721120000` removed that because it produced a false success):
+  `lazywait_requeue_eligibility` refuses with `attempt_limit_reached` at 5
+  attempts and `deadline_expired` once `pos_sync_deadline_at` has passed.
 - **A cancelled order is never claimed, and never resent by the customer**
   (`20261012120000`, gap PG-03; applied 2026-11-14, ledger row 117). Both
   claims skip it and `request_customer_pos_resend` refuses it with reason
@@ -1030,12 +1060,12 @@ by a printed ticket rather than by the vendor.
     `order_cancelled`. A `preparing` order is still sent, because an unpaid card
     order an administrator advanced reaches its first send only when the payment
     lands.
-- **There are currently TWO of that index, and this line named only one.** The
+- **There were TWO of that index until 2026-09-02, and this line named only one.** The
   2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
   (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition
   **identical** to `orders_lazywait_queue_idx` — same column, same predicate,
-  different name, so `create index if not exists` could not dedupe them. Both are
-  live and both are being scanned (45,808 and 34,622), which is what
+  different name, so `create index if not exists` could not dedupe them. Both were
+  live and both were being scanned (45,808 and 34,622), which is what
   interchangeable indexes look like. Every insert and every sync-state update on
   `orders` maintains both for one query's benefit.
   `20260902120000_orders_index_cleanup.sql` drops the duplicate; it was **applied
@@ -1045,21 +1075,31 @@ by a printed ticket rather than by the vendor.
 `claim_lazywait_sync_batch` flips a whole batch to `syncing` up front, then the
 worker processes orders one at a time. If the worker crashes / times out / is
 redeployed mid-batch, a row can be left in `syncing` — which is **outside** the
-queue predicate (`pending`/`failed`), the admin requeue guard, and the UI retry
+queue predicate (`pending` — the claim selects only that), the admin requeue guard, and the UI retry
 set — so nothing would ever recover it.
 
-`reap_stale_lazywait_syncs(p_timeout_minutes default 10, p_max_attempts default 8)`
+`reap_stale_lazywait_syncs(p_timeout_minutes default 10, p_max_attempts default 5)`
 (service-role) is called by the worker at the **start of every run** (before
 claiming) to recover rows stuck in `syncing` past the lease timeout:
 - **With a `lazywait_ref`** → `synced`. The Create Order already succeeded; we
   **never** re-POST (no idempotency key). `synced_at` is preserved/backfilled.
-- **Without a ref** → `failed` with `sync_attempt_count++` and a backoff delay
-  (safe to resend — no POS ticket was created), or `dead_letter` at the ceiling.
+- **Without a ref, and `pos_create_attempted_at` set** (the Create Order may
+  have been sent) → `confirmation_required` (`stale_syncing_after_send_unverified`),
+  and the customer gets `pos_confirmation_required`. **A stale row with no ref
+  and a set `pos_create_attempted_at` is NEVER resent**: the request may have
+  reached the POS, so it waits for a human to verify it there.
+- **Without a ref, and `pos_create_attempted_at` null** (proven not sent) →
+  `failed` with `sync_attempt_count++` and the next slot on the fixed schedule
+  (safe to resend — no POS ticket was created), or `dead_letter` at the ceiling
+  or past the deadline. The ceiling is the function default of 5, and the worker
+  passes `MAX_POS_ATTEMPTS` (5) explicitly (`20260721120000`; the first version,
+  `20260708140000`, defaulted to 8, and that default is gone).
 
 Each reaped row writes an `integration_sync_logs` row
-(`recovered_stale_syncing_with_ref` / `stale_syncing_no_ref_requeued` /
-`stale_syncing_no_ref_dead_letter`) so Admin sees the recovery, and the worker
-returns a `reaped: {recovered_synced, requeued, dead_lettered}` summary. The
+(`recovered_stale_syncing_with_ref` / `stale_syncing_after_send_confirmation_required` /
+`stale_syncing_no_ref_requeued` / `stale_syncing_no_ref_dead_letter`) so Admin
+sees the recovery, and the worker returns a `reaped: {recovered_synced, requeued,
+dead_lettered}` summary (plus a confirmation-required count). The
 10-minute lease is comfortably longer than the worker's per-order network budget
 (8s CRM + 15s Create Order), so an in-flight attempt is never reaped early. A
 partial index `orders_lazywait_syncing_idx (updated_at) where lazywait_sync_state
@@ -1071,17 +1111,27 @@ a `lazywait_ref` (`shouldResendCreateOrder` → false), it finalizes as `synced`
 
 > **Residual duplicate risk (unavoidable without an idempotency key):** a network
 > timeout that happens *after* Lazywait created the order but *before* the response
-> is received leaves us with no ref, so the retry re-creates it. Mitigations above
-> cover crash-after-success and ambiguous-2xx; a true lost-response-after-create
-> can still duplicate until Lazywait exposes an idempotency key or a
-> reconcile-by-reference lookup. Tracked in *Known limitations*.
+> is received leaves us with no ref. The worker records that as ambiguous
+> (`confirmation_required`) and never resends it, and the admin Retry and the
+> customer's Resend refuse an order whose may-have-sent marker is set; so since
+> there is no automatic retry (see the 2026-11-24 correction above) the duplicate
+> can only come from a person re-creating the order by hand without checking the
+> POS first. Mitigations above cover crash-after-success and ambiguous-2xx; a true
+> lost-response-after-create stays unreconciled until Lazywait exposes an
+> idempotency key or a reconcile-by-reference lookup. Tracked in *Known
+> limitations*.
 
 ## CRM matching
 Before create, if the order has a phone, `GET /crm/customers/search` with a
 normalized (E.164) phone; on match save `profiles.lazywait_customer_id`. Never
 blocks the order (no match → continue). No Create-Customer endpoint is confirmed
-— we don't create Lazywait customers, and `customer_id`/`customer_cell` are NOT
-sent to Create Order.
+— we don't create Lazywait customers. **`customer_id` (the stored CRM link, when
+one is matched) and `customer_cell` + `country_code` (the customer's phone, split
+into the local number and the dialling prefix) ARE sent to Create Order**, on
+every order that carries them (`buildCreateOrderPayload`,
+`_shared/lazywait.ts`; the earlier "not sent" statement is superseded in the
+*Known limitations* below). The customer's phone number therefore reaches
+the POS vendor on every such order.
 
 **DEFERRED off the checkout kick entirely (2026-08-27, second revision).**
 Capping it at 1.5 s was not enough: on SM-2026-000067 the search spent the
@@ -1145,9 +1195,12 @@ the cron and the checkout kick are also its only two reaping drivers, and they d
 without invoking anything when the vault secret `lazywait_sync_project_url` is
 missing, whereas the kick builds its URL from `SUPABASE_URL`. Skipping the reaper
 on the kick path would save the same ~0.9 s and leave one missing secret able to
-stop all reaping — and a **cash** order stranded in `syncing` with no ref is
-invisible to the watchdog as well, since R1 and R7 both require
-`payment_status = 'paid'`.
+stop all reaping — and R1 and R7 both require `payment_status = 'paid'`, so for a
+**cash** order stranded in `syncing` the reaper is the first line of recovery.
+(`20260831120000_watchdog_cash_order_coverage`, applied 2026-09-01, added R12 and
+R13 for the unpaid population, so a cash order that stays `syncing` or
+`dead_letter` does raise a critical alert — after the fact; the reaper is what
+recovers it.)
 
 Deferring is safe because everything the reaper decides is time-thresholded
 (`STALE_SYNC_TIMEOUT_MINUTES` = 10), so nothing it would act on can have become
@@ -1208,7 +1261,9 @@ unchanged and the code is identical once comments are removed. It was not
 redeployed for a comment. This supersedes the line numbers in the v26 paragraph
 above.
 
-## Online payment (prepared, not live)
+## Online payment (the separate POS call: history, removed 2026-11-19)
+
+*Correction 2026-11-26: the old heading said "prepared, not live". Online payment was read live 2026-11-24 as enabled (`app_settings.online_payment_enabled` true, 19 online orders paid), and the call described first below no longer exists.*
 *Changed 2026-11-12: this said "the Geidea webhook". The provider is Moyasar
 (owner decision, 2026-11-11), and online payment was off on that date.*
 
@@ -1330,17 +1385,19 @@ fetches the `raw` snapshot column, which it never displayed.
                                        #     + 20260708140000_lazywait_stale_reap
                                        #     + 20260708150000_lazywait_catalog_mapping
 
-# 2) Edge Functions
+# 2) Edge Functions. Every deploy is a §5 owner-approved action, and
+#    payment-webhook is a payment function (CLAUDE.md §6): see docs/DEPLOY.md.
 supabase functions deploy lazywait-sync lazywait-catalog lazywait-webhook payment-webhook
 
 # 3) Secrets (server-side; NOT committed) — via admin card or the upsert SQL above.
 
-# 4) Schedule the worker (pg_cron example — every minute):
---   select cron.schedule('lazywait-sync','* * * * *', $$
---     select net.http_post(
---       url := 'https://<ref>.supabase.co/functions/v1/lazywait-sync',
---       headers := '{"Content-Type":"application/json","x-sync-secret":"<sync_trigger_secret>"}'::jsonb,
---       body := '{"limit":5}'::jsonb) $$);
+# 4) The worker is ALREADY scheduled; do not re-run cron.schedule. The job
+#    'lazywait-sync' is installed by 20260720120000_lazywait_sync_scheduler and its
+#    whole command is `select public.invoke_lazywait_sync_processor();`, which
+#    reads the project URL and trigger secret from Vault
+#    (lazywait_sync_project_url, ...). A cron.schedule with the same name would
+#    overwrite it with one that stores the secret in plain text in cron.job and
+#    drops the per-tick health row.
 
 # 5) Trigger one sync run manually:
 curl -sX POST https://<ref>.supabase.co/functions/v1/lazywait-sync \
@@ -1483,15 +1540,16 @@ The single-branch pilot is **done**: catalog mapping, pickup, add-ons, variant
 
 Next, in order:
 
-1. **Close Q8 by looking at a printed delivery ticket.** If `delivery_address`
-   renders, drop the duplicate line from `order_details` — on evidence. No API
-   response can answer this.
+1. ~~**Close Q8 by looking at a printed delivery ticket.**~~ **Done, and the
+   answer is negative** (see *Known limitations*): the POS does not render
+   `delivery_address`, so the duplicate line in `order_details` stays.
 2. **Decide what to do with the four parked delivery orders**
    (SM-2026-000032, -000049, -000057, -000058). All carry the retired
    `delivery_schema_unconfirmed` reason, are `not_retryable` by design, and
    would create real kitchen tickets for food nobody is waiting for if
    re-driven. Leaving them parked is the current decision.
-3. **Widen to all branches** once Q8 is closed.
+3. **Widen to all branches.** The Q8 gate is satisfied; whether and when to
+   widen is an owner decision, not recorded in the repository.
 
 ## The POS base URL is allowlisted (2026-09-14)
 
@@ -1571,6 +1629,8 @@ once-a-minute cron picks the paid order up on its next run
 
 ## Gate refusals that write no row now log the order id (2026-11-11)
 
+*Correction 2026-11-26: the title is true of `rpc_error` and `invalid_state`/`not_found` only. The gate refusals that park the order (`order_cancelled`, `refund_started`, `order_progressed`) write one `skipped` sync-log row from inside the gate function itself, not through `record_lazywait_sync`.*
+
 `begin_lazywait_create_attempt` is the fenced gate just before the Create Order
 POST. Two of its outcomes write nothing: the RPC itself failing, and a status
 the worker does not handle (`invalid_state`, `not_found`). Both skip the order,
@@ -1590,10 +1650,12 @@ sync-log row (`order_cancelled_before_send`). The worker logs the line below
 with `"gate_status":"order_cancelled"`, counts the order skipped and writes
 nothing, so it cannot overwrite the park. The reaper never touches `blocked`.
 `_shared/lazywaitCancelledGate.test.ts` drives the real handler to pin this,
-with a control case that does POST. Neither calls
-`record_lazywait_sync`, so no `integration_sync_logs` row exists for that
-attempt. Until this change the log line was free text without the order id, so
-a responder chasing a stuck order could not find the attempt.
+with a control case that does POST. The worker calls no
+`record_lazywait_sync` on this branch; for `order_cancelled` the gate wrote its
+single `skipped` `integration_sync_logs` row itself, inside the same statement
+(above), so that row does exist, whereas the two outcomes in the first paragraph
+(`rpc_error`, `invalid_state`/`not_found`) leave no row at all. Until this change the log line was free text without the
+order id, so a responder chasing a stuck order could not find the attempt.
 
 Each branch now writes one JSON line, in the shape of `order-intake`'s timing
 line. These two were emitted by the real handler against a stub database
@@ -1617,13 +1679,19 @@ no `record_lazywait_sync`, no outbound request.
 
 **Live only after `lazywait-sync` is redeployed**, a §5 action with its own
 approval. The bundle is the whole current source, so the deploy also ships the
-2026-11-09 key handling above, and the 2026-09-14 base-URL allowlist, whose
-deploy is not recorded here. If `push-dispatch` is deployed in the same session,
+2026-11-09 key handling above, and the 2026-09-14 base-URL allowlist (whose
+deploy is recorded under *The POS base URL is allowlisted*: 2026-11-18, v15). If `push-dispatch` is deployed in the same session,
 deploy it first (`docs/OWNER_ACTIONS.md` §42: receivers before senders).
 
 **Live since 2026-11-18.** `lazywait-sync` was deployed as **v15** (from v14)
 from the default branch at `5c78d17`, on the owner's word ("deploy the 9
 key-switch functions"), after `push-dispatch` (v10, the same day). Every file
 read back byte-identical to the bundle, and `verify_jwt` stays `false`. So the
-gate lines above, the 2026-11-09 key handling and the base-URL allowlist are now
-the running code. Detail: `docs/SUPABASE_API_KEYS.md` §3 "Progress".
+gate lines above, the 2026-11-09 key handling and the base-URL allowlist were
+the running code **as of 2026-11-18**. Detail: `docs/SUPABASE_API_KEYS.md` §3 "Progress".
+
+*Correction 2026-11-26: v15 was built from `5c78d17`, before the step 9 cleanup
+above merged, so the legacy-key fallback the step 9 paragraph says is gone was
+still in v15; the version running now is later (`CLAUDE.md` records `lazywait-sync`
+v27, deployed 2026-11-24, read live 2026-11-24). The deploy ledger is
+`docs/OWNER_ACTIONS.md` and `CLAUDE.md` §8, not this file.*

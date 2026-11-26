@@ -101,7 +101,7 @@ Measured read-only on 2026-11-11:
 recorded), so the database has grown by about 1.7 MB a day. At that rate it
 reaches 500 MB in roughly five to six months.
 
-**The fix is applied, and its first run is 01:10 UTC on 2026-11-12.** PR #435
+**The fix is applied, and its first run was 01:10 UTC on 2026-11-12** *(the first and third nightly runs are recorded as done and the backlog cleared, `MIGRATIONS.md` row 104; corrected 2026-11-26 from "is")*. PR #435
 merged the migration `20261001120000_prune_operational_run_history`, which prunes
 those three logs, on 2026-11-11 (`8df5408`). It was applied the same day at
 12:30:50 UTC on the owner's approval (live version `20261111123050`,
@@ -210,7 +210,9 @@ Seven entries, read by name on 2026-11-11:
   anything. `account-deletion-processor` does it by raising, every minute, which
   fills `cron.job_run_details` with failures.
 - No `branch_ref:` entries existed on 2026-11-11. Once the branch reference sheet
-  holds credentials (`BRANCH_ONBOARDING.md`), they live in Vault too.
+  holds credentials, they live in Vault too (the feature is
+  `20260917120000_branch_reference_entries`, `MIGRATIONS.md` row 91; corrected
+  2026-11-26: this pointed at `BRANCH_ONBOARDING.md`, which does not describe it).
 
 ### 4.3 Provider credentials and push tokens are inside the database
 
@@ -222,13 +224,17 @@ backup and every data dump carries them. Key names on 2026-11-11; no value was r
 | `lazywait` | `api_token`, `sync_trigger_secret`, `webhook_secret` |
 | `whatsapp` (`meta_cloud`) | `access_token`, `otp_hmac_secret`, `send_sms_hook_secret`, `webhook_verify_token` |
 | `email` (`smtp`) | `password` |
-| `payment` (`tap`) | `live_secret_key`, `refund_trigger_secret`, `test_secret_key`. *2026-11-12: the provider is Moyasar (CLAUDE.md §6). The live read of 2026-11-11 recorded in CLAUDE.md §6 found this row named `moyasar`, so the two readings were taken at different times. Moyasar's keys and webhook tokens join these once entered (`OWNER_ACTIONS.md` §47)* |
+| `payment` (`moyasar`) | `moyasar_test_secret_key`, `moyasar_live_secret_key`, `moyasar_test_webhook_secret_token`, `moyasar_live_webhook_secret_token` (the names the code and the console card read: `_shared/moyasar.ts`, `IntegrationCard.tsx`), and `refund_trigger_secret`. *Corrected 2026-11-26: this row listed the retired Tap names (`live_secret_key`, `test_secret_key`) and a `tap` provider. The provider is Moyasar (owner decision 2026-11-11, CLAUDE.md §6); which keys are set live was not read. Note the "name only" caveat above: the values are in every backup.* |
 | `push` (`expo`), `sms` (`sandbox`) | none |
 
 `push_devices` holds the push token of every registered device: 5 rows on 2026-11-11.
-`push-dispatch` sends to Expo with no credential of its own
-(`supabase/functions/push-dispatch/index.ts:203-207`), so a token is all a sender
-needs.
+`push-dispatch` builds its Expo request headers from the Edge Function secret
+`EXPO_ACCESS_TOKEN` (`supabase/functions/push-dispatch/index.ts`, the
+`expoPushHeaders(Deno.env.get('EXPO_ACCESS_TOKEN'))` call; corrected 2026-11-26:
+this said it sends "with no credential of its own"). Whether Expo still delivers
+without it depends on the Expo account's Enhanced Security setting
+(`OWNER_ACTIONS.md` §52), which is not known from the repository, so a recovery
+must set the secret and then check a push.
 
 **So a restored copy is not "an environment with no live provider credentials".**
 The restore brings them back. For a drill:
@@ -251,10 +257,27 @@ For a real recovery these credentials are exactly what you need. Do not scrub th
   `SUPABASE_*` values the platform supplies, plus `ADMIN_PUSH_VAPID_PUBLIC_KEY`,
   `ADMIN_PUSH_VAPID_PRIVATE_KEY`, `ADMIN_PUSH_VAPID_SUBJECT`,
   `ADMIN_PUSH_ALLOWED_HOSTS`, `SEND_SMS_HOOK_SECRET`, `SMTP_ALLOWED_HOSTS` and
-  `WHATSAPP_OTP_HMAC_SECRET`. Which of them are set live was not read: no read-only
+  `WHATSAPP_OTP_HMAC_SECRET`; **and four that the generated list omits** (added
+  2026-11-26; the generator matches only a literal `Deno.env.get('NAME')`, and
+  these are read through a named constant or by another function):
+  `EXPO_ACCESS_TOKEN` (customer push headers; the generated list does include
+  it, the paragraph in §4.3 did not), `MOYASAR_PROXY_URL` (`_shared/moyasarHttp.ts`;
+  the static-IP proxy that satisfies Moyasar's Allowed IPs, `DEPLOY.md` §12,
+  `OWNER_ACTIONS.md` §47.11; an unusable value refuses every Moyasar call), and
+  `PAYMENT_ALLOW_TEST_CHECKOUT` (`_shared/paymentTestCheckout.ts`; it must stay
+  **unset** on any recovered project before card payments go live). Which of
+  them are set live was not read: no read-only
   tool here lists them. **`ADMIN_PUSH_VAPID_PRIVATE_KEY` exists only there.** Lose
   the project and every staff web-push subscription is unusable: a new key pair has
   to be made and the console subscribed again (`OWNER_ACTIONS.md` §41).
+- **Card payment (Moyasar), added 2026-11-26.** A new project has a new
+  functions URL, so the webhook registered in the Moyasar dashboard still points at
+  the old project: register it again and copy its one-time verification code
+  (`OWNER_ACTIONS.md` §47). The static-IP proxy and Moyasar's **Allowed IPs** list
+  are outside the database and outside the repository, and the proxy secret
+  `MOYASAR_PROXY_URL` is in no backup. The payment functions deploy only as the
+  seven-function set (§9). Which of this exists on the live project is not known
+  from the repository.
 - **Auth settings.** Phone sign-in, and the Send SMS hook pointed at the project's
   `auth-send-sms-whatsapp` (`WHATSAPP_LOGIN.md` §4); the store-review test number,
   if one is configured (`OWNER_ACTIONS.md` §27); redirect URLs. **A hook set up on a
@@ -306,10 +329,11 @@ restores no business data.
 - **Name every exclusion by version.** Never replay "whatever is in the
   directory". On 2026-11-11 two repository files are unapplied in Production:
   `20260824100000_moyasar_payment_provider` (frozen until 2026-11-11; now step 1 of the Moyasar apply order, CLAUDE.md §8) and
-  `20260929120000_db_advisor_hardening` (awaiting approval). Read the current set from
+  `20260929120000_db_advisor_hardening` (awaiting approval). *(Corrected 2026-11-26: both were applied on 2026-11-13 — `MIGRATIONS.md` rows 109 and 114 — and CLAUDE.md §8 reads zero unapplied files as of 2026-11-24; this paragraph is the 2026-11-11 position, kept for its reasoning.)* Read the current set from
   CLAUDE.md §8 and `MIGRATIONS.md` §1 on the day; do not copy this list forward. A
-  replay that includes the Moyasar file installs payment objects Production does
-  not have yet.
+  replay that included the Moyasar file would have installed payment objects
+  Production did not have yet (it has them since 2026-11-13). The rule that
+  matters still holds: name every file by version.
 - The two superseded July files, `20260707120700_place_order` and
   `20260707120800_loyalty`, replay as normal; later files replace what they define.
 - A rebuild schedules all twelve jobs, `payment-refund-worker` among them, as
@@ -320,7 +344,7 @@ restores no business data.
 
 ## 5. Critical restore safety: payment refund worker
 
-Automated refund processing stays disabled until the owner re-enables it as `OWNER_ACTIONS.md` §47.16. *Changed 2026-11-12: this said the payment area remains frozen.*
+Automated refund processing stays disabled until the owner re-enables it as `OWNER_ACTIONS.md` §47.16. *Changed 2026-11-12: this said the payment area remains frozen.* *Dated 2026-11-26: read live 2026-11-24, the `payment-refund-worker` cron job is ACTIVE and `app_settings.online_payment_enabled` is true, so "stays disabled" is the 2026-11-12 position. The restore rule below does not change: compare the restored state with the last live reading and do not let a rebuild switch it on by default.*
 
 A restore/rebuild must **not** assume that the manually disabled Production cron state is reproduced by the migration chain.
 
@@ -412,6 +436,7 @@ Before reopening customer traffic:
 - [ ] The switches in §4.5 match the last known Production values.
 - [ ] Required Edge Functions are deployed from a known reviewed commit, and their secrets are set (§4.4).
 - [ ] Lazywait/WhatsApp provider configuration is deliberately restored/verified before enabling live traffic.
+- [ ] Card payment (added 2026-11-26): the Moyasar webhook is re-registered at the new functions URL, `MOYASAR_PROXY_URL` is set and the Allowed IPs list matches, `PAYMENT_ALLOW_TEST_CHECKOUT` is **unset**, and `EXPO_ACCESS_TOKEN` is set for customer push (§4.4).
 - [ ] Sentry/monitoring points at the correct environment.
 - [ ] Vercel/EAS client env points at the restored Production project only after verification. A new project also needs new native builds (§2).
 

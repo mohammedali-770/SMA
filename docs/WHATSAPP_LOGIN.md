@@ -271,7 +271,10 @@ endpoint behind the WhatsApp card — the one that reads the provider's readines
 sends a test OTP.
 
 It used to authorize the way three sibling admin functions did — `staff-accounts`,
-`email-test-config` and the still-frozen `payment-test-config`:
+`email-test-config` and `payment-test-config` (*corrected 2026-11-26: it was
+"still-frozen" when this was written; its admin gate was fixed on 2026-08-24 under
+the narrow exception recorded in CLAUDE.md §6, and its deploy is a separate
+approval*):
 
 ```ts
 if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
@@ -315,11 +318,13 @@ Three details that are deliberate rather than incidental:
 **Who this affects.** The admin console already demands TOTP at sign-in
 (`StaffMfaGate`), so the normal UI path is unchanged. It bites an admin account
 with no enrolled TOTP factor calling the function directly. As of 2026-08-23 one of
-the two admin accounts has no verified factor.
+the two admin accounts has no verified factor *(a dated measurement; not re-read)*.
 
-**Not live yet.** The deployed `whatsapp-test-config` is v2 from 2026-07-09 and
-predates this change; redeploying it is a separate owner approval
-([`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §5, recorded in §16).
+**Not live yet** *(as written 2026-08-23; deployed since, corrected 2026-11-26)*.
+The deployed `whatsapp-test-config` was v2 from 2026-07-09 and predated this
+change; redeploying it was a separate owner approval. It was redeployed as v3 on
+2026-08-23 ([`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16, row 6) and again as v6 on
+2026-11-13 (the redeploy list below).
 
 `auth-send-sms-whatsapp`, `whatsapp-send-otp`, `whatsapp-verify-otp` and
 `whatsapp-webhook` are **untouched** — none of them is admin-gated, and the customer
@@ -434,7 +439,10 @@ On first apply the reservation table is empty, so per-phone limits reset once.
 `20260831130000_otp_login_rate_limit` was applied to Production on **2026-09-01 at
 12:46:15 UTC** (live version `20260901124615`, history 121 → 122; ledger row 77 in
 `docs/MIGRATIONS.md`), and **`auth-send-sms-whatsapp` was deployed as version 2 on
-2026-09-02**, both on explicit owner approval.
+2026-09-02**, both on explicit owner approval. *(Corrected 2026-11-26: "version 2"
+is the figure recorded when this section was written. The 2026-11-13 redeploy
+list below reads Production at v4, dated 2026-09-02, immediately before its v5;
+the versions in between are not recorded in this document.)*
 
 **The hole described in §7.2 is closed.** Every real customer login now reserves
 against the shared per-phone budget before the Meta send. The effective limits
@@ -446,7 +454,8 @@ directions.
 (`cooldown` / `hourly_limit` / `daily_limit`) is **not** echoed, because telling a
 caller which limit it hit reveals how much traffic a given number has already had.
 
-**It fails OPEN on an RPC error, by design.** If `otp_reserve_send` cannot be
+**It failed OPEN on an RPC error, by design (superseded: it fails CLOSED now, see
+the blockquote below).** If `otp_reserve_send` cannot be
 reached, the send proceeds. A limiter that is unreachable must not become an
 outage of the entire login system — the trade is a temporary loss of limiting, not
 a loss of login.
@@ -555,8 +564,8 @@ does not cover (§10).
 - **Measured live 2026-11-12:** 7 customer profiles are `phone_verified` (6 also
   phone-confirmed in Auth, 1 legacy email account with the flag set). 5 are not:
   2 email-confirmed (one placed a cash pickup order on 2026-09-26, still
-  `received`), 1 with an unconfirmed email, 2 with neither. Those 5 would be
-  refused. No staff profile is `phone_verified` and none has ever ordered.
+  `received`), 1 with an unconfirmed email, 2 with neither. Those 5 are
+  refused since the apply of 2026-11-13 (the counts are the 2026-11-12 read). No staff profile is `phone_verified` and none has ever ordered.
   Whether to keep the rule for those accounts is an owner decision
   (`docs/OWNER_ACTIONS.md` §48).
 - `handle_new_user` now cuts a metadata name to 80 clean characters instead of
@@ -621,8 +630,10 @@ the shape of the phone already on the profile.
 - Live DB guarantees (read-only): role default = `customer`; `authenticated`
   cannot update `role`; `otp_challenges` and `integration_settings` have **zero**
   anon/authenticated grants (OTP hashes + Meta token never client-readable).
-- Edge Functions deployed to prod: `auth-send-sms-whatsapp` (v1, verify_jwt=false),
-  `whatsapp-test-config` (v2). Provider + login stay disabled.
+- Edge Functions deployed to prod *(as of 2026-07-10; later versions are in the STATUS 2026-09-02 block
+  and the "Redeploy list")*: `auth-send-sms-whatsapp` (v1, verify_jwt=false),
+  `whatsapp-test-config` (v2). Provider + login stay disabled *(that was the
+  2026-07-10 state)*.
 
 ---
 
@@ -670,7 +681,9 @@ WABAs, or if the System User is rotated — all three invalidate it.
 
 ## 11. Remaining risks / notes
 
-- **No legacy accounts to migrate.** Confirmed by the owner: there are no
+- **No legacy accounts to migrate.** *(As decided at the July launch; not true
+  of later data: §8 measured 12 customer profiles on 2026-11-12, 5 of them not
+  phone-verified.)* Confirmed by the owner: there were no
   existing customer accounts to preserve. Any test/unused accounts left over are
   not required, so no email→phone linking or profile reconciliation is needed.
   Nothing is auto-merged and nothing is deleted by this change.
@@ -891,7 +904,9 @@ every login. `whatsapp-verify-otp` bundles the file but never reaches the send, 
 redeploying it would change nothing this fix is about.
 
 **A redeploy ships the whole current bundle, not only this line.** What each one
-carries, as far as this repository records:
+carries, as far as this repository records *(written before the 2026-11-13 deploy
+in the table above, which is why it speaks of a redeploy still to come; the
+2026-11-13 table is the record of what was then done)*:
 
 - `auth-send-sms-whatsapp`: last recorded deploy v2, 2026-09-02. Since then, the
   limiter's fail-closed change (2026-09-14, #371, which shipped as source only)

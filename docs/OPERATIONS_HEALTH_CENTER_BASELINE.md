@@ -1,6 +1,9 @@
 # Operations Health Center — Read-only Baseline
 
-Audit date: 2026-07-22
+Audit date: 2026-07-22 (a dated snapshot; read nothing here as current. Corrected
+2026-11-26: the payment provider shown below was Tap on that date and is Moyasar
+since 2026-11-11, and the critical systems listed are the four of that date — the
+platform rollup now also includes Order Flow, see `OPERATIONS_HEALTH_CENTER.md`.)
 
 Production project: `wxfmmnihidsdyemasstf`
 

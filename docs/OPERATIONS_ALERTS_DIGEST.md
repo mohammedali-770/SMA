@@ -20,23 +20,26 @@ is owned by Issue #76.
 >
 > | Was claimed | Live |
 > | --- | --- |
-> | no dispatcher exists | `operations-alert-dispatch` is **ACTIVE, version 1** (`verify_jwt = false`), deployed 2026-09-07 07:18:43 UTC |
+> | no dispatcher exists | `operations-alert-dispatch` is **ACTIVE, version 1** (`verify_jwt = false`), deployed 2026-09-07 07:18:43 UTC *(v1 is the 2026-09-13 reading; v4 before 2026-11-18 and **v5** after it per `OWNER_ACTIONS.md` §46, v9 per CLAUDE.md, read live 2026-11-24)* |
 > | nothing polls the outbox | `pg_cron` job `operations-alert-dispatch`, `*/5 * * * *`, **active** |
 > | `operations_alert_outbox_v1_dormancy` in force | **Dropped.** Replaced by `operations_alert_outbox_v2_dispatch`, which permits the full `pending`/`processing`/`sent`/`failed` lifecycle for `email` |
 > | settings RPC hard-rejects | **No longer.** The `P0001` reject is gone from the live body; the RPC accepts `external_dispatch_enabled` and knows the v2 columns |
 >
-> **What IS still true, and it is the only thing keeping mail off the wire:**
+> **What was true on 2026-09-13, and the only thing keeping mail off the wire
+> then (the flag state since is not known from the repository):**
 > `external_dispatch_enabled` is `false`. Everything downstream is built,
 > applied and deployed; the flag is the last interlock, and turning it on is
 > an owner action (`OWNER_ACTIONS.md` §28 step 4). `whatsapp` and `push`
 > remain structurally blocked by the v2 constraint — that part of the v1
 > story survives intact.
 >
-> **AMENDED 2026-11-11 — the flag is still the only thing keeping mail off the
-> wire, but it is no longer the only step left.** Two come before it: set
+> **AMENDED 2026-11-11 — the flag was still the only thing keeping mail off the
+> wire, but not the only step left. Both steps were done on 2026-11-18 (see the
+> "Both were done" paragraph in the runbook below), so the flag is again the last
+> step.** Two came before it: set
 > `SMTP_ALLOWED_HOSTS`, because the endpoint guard reads names without
-> resolving them; and redeploy `operations-alert-dispatch`, whose only recorded
-> deploy (v1, 2026-09-07) predates the guard itself. Both are explained under
+> resolving them; and redeploy `operations-alert-dispatch`, whose only deploy
+> recorded at that date (v1, 2026-09-07) predated the guard itself. Both are explained under
 > "What the SMTP guard cannot see" below, and listed in `OWNER_ACTIONS.md` §46.
 >
 > The lesson worth keeping: this document grew a v2 section at the top while
@@ -78,8 +81,8 @@ anticipated the migration that would lift it. That is what
 | --- | --- |
 | Channel | **`email` only.** `whatsapp` and `push` keep the v1 prohibition under the replacement constraint |
 | Volume | ONE email row per event, not one per language — the `in_app` pair stays bilingual, but a responder reads one mailbox |
-| Severity floor | `dispatch_min_severity`, default **`critical`** |
-| Language | `dispatch_language`, default `en` |
+| Severity floor | `dispatch_min_severity`, default **`critical`** *(RPC-only, corrected 2026-11-26: accepted by `operations_alert_settings_update` but not returned by `operations_alert_settings_get`, and no console code references it, so the console neither shows nor changes it)* |
+| Language | `dispatch_language`, default `en` *(RPC-only, same note)* |
 | Recipients | derived from admin profiles at send time by `operations_alerts_dispatch_recipients()`. **No address is stored**, which was v1's stated property |
 | Delivery | **exactly once in the normal case and at-least-once across a crash**, not at-most-once (corrected 2026-11-24, from `20260903120000_operations_alert_email_dispatch.sql` lines 78-88): a per-invocation fencing token on claim, and every completion write guarded by it, make concurrent dispatchers safe, but an email cannot be unsent, so a dispatcher that dies between SMTP accepting a message and `sent` being written has it re-sent when the lease expires. A duplicate after a crash is by design |
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
@@ -170,7 +173,7 @@ explicitly, turning an incidental expectation into a deliberate one. This is
 revisited when that behaviour is deliberately changed, or it becomes an argument
 against the change.
 
-Coverage: `platform_rollup_suppression_test.sql`, **14 cases**, calling
+Coverage: `platform_rollup_suppression_test.sql`, numbered cases 1 to 11 with 21 `raise exception` assertions (recounted 2026-11-26; this said "14 cases"), calling
 `operations_alerts_derive` (the public entry point) rather than the internal
 builder — testing the builder would have passed while the function the evaluator
 calls still emitted the duplicate. Mutation-tested five ways, **all killed**,
@@ -255,7 +258,8 @@ Measured, not assumed. `lazywait:sync_degraded` has opened and self-recovered
 inside the evaluator's own 5-minute interval on **all four** occasions it has
 fired. At a `warning` floor those four non-events would have produced eight
 emails. An alert mailbox that cries wolf is worse than no alert mailbox, so the
-floor starts high and is a settings change away from lower.
+floor starts high and is a settings change away from lower (for an administrator
+calling the settings RPC by hand: the console has no control for it).
 
 ### Why it stays inert on apply
 
@@ -318,7 +322,7 @@ and never impersonates a staff user or fakes JWT claims.
 | Table | Purpose |
 | --- | --- |
 | `operations_alert_settings` | Single-row switchboard (see defaults below). |
-| `operations_alert_runs` | Durable ledger of every evaluator/digest run (`running/success/skipped/failed`, skip reason, safe error code, counters). |
+| `operations_alert_runs` | Ledger of evaluator/digest runs (`running/success/skipped/failed`, skip reason, safe error code, counters). **Pruned since `20261001120000`:** `operational-history-prune` (daily 01:10 UTC) deletes rows older than 30 days, keeping the newest run and newest success per kind; alert state, events and digests are not pruned. *(Corrected 2026-11-26: this said "Durable ledger of every ... run".)* |
 | `operations_alert_state` | One row per condition generation; `open`/`recovered`; partial unique index on `(fingerprint) WHERE status='open'` guarantees at most one open alert per identity. |
 | `operations_alert_events` | Append-only timeline: `baseline_observed`, `opened`, `escalated`, `downgraded`, `reminder`, `recovered` (with `notification_suppressed`). |
 | `operations_digest_runs` | One stored digest per `(scope, digest_date, language)` with exact UTC period bounds and rendered subject/body. |
@@ -495,7 +499,7 @@ intents; for `email` a row is now a real delivery record.
 
 ~~"No dispatcher process exists anywhere in the codebase. Nothing polls the
 outbox. No provider credentials are read."~~ **All three are now false.**
-`operations-alert-dispatch` (Edge Function, ACTIVE v1) polls via the `pg_cron`
+`operations-alert-dispatch` (Edge Function, ACTIVE v1 on 2026-09-07; v5 since 2026-11-18) polls via the `pg_cron`
 job of the same name every five minutes and reads the configured SMTP
 credential. What stops mail leaving is `external_dispatch_enabled = false`,
 checked before any claim — a flag, not an absence.
@@ -594,7 +598,9 @@ select kind, status, skip_reason, safe_error_code, started_at, counts
 
 Or in the Admin Dashboard: Operations Alerts → header "Last evaluation" and
 Settings → last run details; the Operations Health tab's Scheduled Jobs
-card now covers all five crons — the three critical application crons plus
+card now covers all five crons *(corrected 2026-11-26: it covers six today — these
+five plus `branch-availability-sweep`; `OPERATIONS_HEALTH_CENTER.md` states the
+count once)* — the three critical application crons plus
 these two automation crons, the latter with per-cadence staleness windows
 (see the delivered follow-up below).
 
@@ -629,7 +635,11 @@ critical crons stay critical). The `operations_alert_runs` ledger queries
 above remain the way to see the evaluator/digest INTERNAL outcomes (skips,
 safe error codes). Note that an evaluator that is itself down can never
 self-report internally — that gap is inherent to v1's internal-only design
-and is what a future external-delivery version addresses; the digest cron's
+and *(corrected 2026-11-26)* the external-delivery version that has since shipped does
+**not** address it: mail only carries alerts the evaluator produced, so a dead
+evaluator still produces nothing to mail, and the health card's cron allowlist
+(six jobs) does not include `operations-alert-dispatch`, so a dead dispatcher job is
+not observed either; the digest cron's
 health, however, IS observed by the (separate) evaluator and by this card.
 
 **Safe disable / rollback (non-destructive, reviewed)**
@@ -645,8 +655,17 @@ update public.operations_alert_settings
 
 Keeps baseline, alert history, digest history, the three unrelated crons,
 and disabled external dispatch untouched. Never reset
-`baseline_completed_at`, never delete history rows, never edit
-migration-history tables.
+`baseline_completed_at`, never delete history rows by hand, never edit
+migration-history tables. *(2026-11-26: the daily `operational-history-prune`
+job does delete `operations_alert_runs` rows past 30 days, by design.)*
+
+**The block above is incomplete (corrected 2026-11-26).** It unschedules two
+crons and turns two flags off; it does **not** unschedule
+`operations-alert-dispatch` or set `external_dispatch_enabled = false`, so if
+dispatch is on, queued alerts are still mailed every five minutes. The sentence
+"disabled external dispatch untouched" holds only while the flag is already
+false. The "Rollback plan" section lists both steps, and unschedules the third
+job first.
 
 **Launch-day verification checklist**
 1. `cron.job` shows this subsystem's jobs active: `operations-alerts-evaluator`
@@ -684,7 +703,7 @@ would be needed; nobody came back and updated the section once it happened.
 | Step | State |
 | --- | --- |
 | Migration `20260903120000` (constraint + hard-reject) | APPLIED 06:46:38 UTC, live version `20260907064638` |
-| Edge Function `operations-alert-dispatch` | DEPLOYED 07:18:43 UTC, ACTIVE v1 |
+| Edge Function `operations-alert-dispatch` | DEPLOYED 07:18:43 UTC, ACTIVE v1 *(2026-09-07; v5 since 2026-11-18, `OWNER_ACTIONS.md` §46)* |
 | Scheduler `20260903130000` + two Vault secrets | APPLIED 08:23:17 UTC, live version `20260907082317`; `pg_cron` `*/5 * * * *`, active |
 | `external_dispatch_enabled` | **`false` — the only remaining interlock** |
 
@@ -767,7 +786,7 @@ administrator supplied, and duplicating forty lines of security-critical host
 parsing is how two copies of a rule drift apart. `smtpTarget.ts` keeps its own
 reason codes, its port handling and this function's behaviour unchanged; what it
 now imports is `isIpLiteral`, `isPrivateName`, `isValidHostname`,
-`isAllowedHost` and `normalizeHost`. The 34-case `smtpTarget.test.ts` suite
+`isAllowedHost` and `normalizeHost`. The `smtpTarget.test.ts` suite (34 cases when the extraction was made; recount before quoting, it has grown since)
 passes unchanged across the extraction, which is what makes it verified rather
 than assumed — and it is the reason a future change to those rules has to be
 read as touching **both** callers.
@@ -863,8 +882,14 @@ handler returns `disabled` before it reads the endpoint, and
 `alertDispatchWiring.test.ts` now pins that order. Measured 2026-11-11:
 `external_dispatch_enabled` is false.
 
+**Superseded 2026-11-18: the dispatcher was redeployed as v5 (v4 was live
+before it, not v1, per `OWNER_ACTIONS.md` §46), after `SMTP_ALLOWED_HOSTS` was
+set, so the "check before turning dispatch on" warning below is the 2026-11-11
+position, kept for its reasoning. A later deploy is not ruled out; read the live
+version before relying on this.**
+
 **The deployed dispatcher may predate its own guard. Check before turning
-dispatch on.** The only recorded deploy of `operations-alert-dispatch` is v1, at
+dispatch on.** The only recorded deploy of `operations-alert-dispatch` was v1, at
 2026-09-07 07:18:43 UTC. Its bundle was five files and `smtpTarget.ts` was not
 one of them, because the guard merged a week later, on 2026-09-14 (#374). No
 later deploy is recorded. If v1 is still what runs, the dispatcher connects to
@@ -872,7 +897,7 @@ the stored host with no validation and never reads `SMTP_ALLOWED_HOSTS`. The
 repository cannot show which bundle is live; the dashboard can. Either way,
 redeploy before turning dispatch on.
 
-### The digest footer — defect recorded 2026-09-13, FIXED 2026-09-15 (unapplied)
+### The digest footer — defect recorded 2026-09-13, fix applied 2026-09-13 (migration file dated 2026-09-15)
 
 `operations_digest_build` appended the literal line **"External delivery is
 disabled in this version."** to every digest, unconditionally. True only by
@@ -881,10 +906,13 @@ would assert something false — in an artifact that is *stored* and read after
 the fact.
 
 `20260915120000_digest_external_delivery_line.sql` replaces it with a line
-derived from the live flag, in both languages. **Written and validated, NOT
-YET APPLIED** — applying it is an owner action under CLAUDE.md §5, and it is
-the second outstanding migration alongside the frozen Moyasar file, so name
-the target by version.
+derived from the live flag, in both languages. **APPLIED 2026-09-13 05:46:10
+UTC**, live version `20260913054610`, on the owner's approval naming it by
+version (`MIGRATIONS.md` row 89; corrected 2026-11-26 from "Written and
+validated, NOT YET APPLIED ... the second outstanding migration alongside the
+frozen Moyasar file"). The file carries a later date than the apply because the
+version prefix is a label chosen when it was written, not an apply time. The
+flag-derived footer is the behaviour described under "Daily digest" above.
 
 **A CORRECTION THAT IS WORTH MORE THAN THE FIX.** The 2026-09-13 revision of
 this section said *"the Arabic digest has no equivalent line at all"*. **That
@@ -935,6 +963,16 @@ functions, producing recurring pg_cron failures:
    body from `20260722100000_operations_health_center.sql` and drops
    `operations_health_snapshot_internal()`.
 
+**Corrected 2026-11-26 — steps 2 and 3 no longer work as written.** (a) A fourth
+job, `operational-history-prune` (`20261001120000`, `10 1 * * *`), deletes from
+`operations_alert_runs`; it must be unscheduled too, or dropping the table makes
+it fail every night (a plpgsql body is not dependency-tracked). (b) Step 3's
+"original body" would remove every health card added since; a rollback must be
+derived from the current snapshot (`OPERATIONS_HEALTH_CENTER_ROLLBACK.md`, which
+carries the same correction). (c) The staff-console web-push sender reads the
+Vault secret `operations_alert_dispatch_project_url`, so dropping the
+dispatcher's Vault secrets also breaks that channel.
+
 Because the wrapper preserves the public contract, the Health Center UI and
 tests are unaffected in either direction. The admin tab hides itself
 automatically once the probe RPC is gone.
@@ -975,7 +1013,9 @@ now read the right key, use `is distinct from`, and fail explicitly if
 the migration's check, four of five by this suite (the fifth mutates the
 checker itself, so only the checker can catch it).
 
-Frontend: 35 vitest cases across the capability classifier, the defensive
+Frontend: 35 vitest cases *(as first written; the suites have grown and a fourth,
+`OperationsAlertsPanel.states.test.tsx`, was added, so recount before quoting)*
+across the capability classifier, the defensive
 normalizers, and the panel (inbox, filters, timelines, digest EN/AR + RTL,
 settings role split, **the enabled external toggle** (corrected 2026-09-13 —
 this said "disabled external toggle"; the test pinning that state was the #332

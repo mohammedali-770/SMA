@@ -42,7 +42,7 @@ Two terms used below:
 
 | | **QuotaGuard Shield** (Starter plan) | **Fixie** (Cruiser plan) | **QuotaGuard Static** (Starter plan) | **Our own small server** |
 |---|---|---|---|---|
-| Cost a month | **$29**: 20,000 requests and 10 GB of data. 3-day free trial (card details needed) | **$19**: 25,000 requests and 10 GB. A free plan covers 500 requests and 100 MB | **$19**: 20,000 requests and 10 GB | **$4 to $8** per server (DigitalOcean $4, AWS Lightsail $5, AWS EC2 about $8), about double with a standby |
+| Cost a month | **$29**: 20,000 requests and 10 GB of data. 3-day free trial (card details needed) | **$19**: 25,000 requests and 10 GB. A free plan covers 500 requests and 100 MB | **$19**: 20,000 requests and 10 GB | **$4 to $7** per server (DigitalOcean $4 or $6, AWS Lightsail $5 or $7; corrected 2026-11-26 to match the companion `Saudi_Apps_Static_Egress_20261113.md`, whose review log A-N5 found "$4 to $8" unsupported), about double with a standby |
 | Fixed addresses | 2, used in turn | 2, used in turn | 2, used in turn | 1 per server |
 | Addresses ours alone? | **No.** The price page says "Shared static IP pair". A private pair needs Enterprise ($269) | **Unclear.** Fixie says "a dedicated static IP"; QuotaGuard, a competitor, says Fixie's are shared. Ask | **No**, as for Shield | Yes |
 | Over the monthly limit | Calls keep working through a brief spike ("soft limits"). Sustained use above the plan means an upgrade, and QuotaGuard gets in touch | **Every call fails** until you upgrade or the month resets | As for Shield | No request limit |
@@ -53,7 +53,7 @@ Two terms used below:
 | Setup effort | Low. QuotaGuard publishes a Supabase guide whose code has the same shape as ours | Low. Fixie also publishes a Supabase guide | Low | Medium: about half a day to build (a domain name, a certificate, and proxy software built with encryption support), then 1 to 2 hours a month |
 | Main risk | Shared addresses, and no uptime guarantee at this price. Connection records are kept about 60 days | The hard monthly limit. Location and sharing not confirmed | The proxy's password, and the name of the service we call, cross the internet unencrypted on every call | One server is a single point of failure. Updates and certificate renewals fall on us |
 
-**Sizing: the app has not launched, so there is no customer volume yet.** The
+**Sizing: the app has not launched, so there is no customer volume yet.** *(As read 2026-11-13. Dated 2026-11-26: a read-only query on 2026-11-24 found `app_settings.online_payment_enabled` true and 19 online orders with `payment_status` paid, so volume now exists; the counts in the next sentence are the 2026-11-13 ones.)* The
 Production `orders` table holds only development test orders: 82 since 8 July,
 from 7 team accounts, none paid with real money (the three in the last 30 days
 are 0.00 SAR test orders from one account). So size the plan from the volume
@@ -72,8 +72,9 @@ because Fixie says calls fail once its limit is reached (§2). The 10 GB of data
 is not a constraint: each call moves a few kilobytes, so even 20,000 calls come
 to well under 1 GB (an estimate).
 
-**Until gap PG-01 is fixed, one stuck refund can use more than the whole plan.**
-A refund that gets no clear answer from Moyasar (Moyasar refusing our address,
+**History, superseded 2026-11-18 (read "2026-11-18: bounded" below first): until
+gap PG-01 was fixed, one stuck refund could use more than the whole plan.** The
+paragraph is kept for its arithmetic. A refund that gets no clear answer from Moyasar (Moyasar refusing our address,
 a proxy or network error, or an error on Moyasar's side) stays pending and is
 tried again 5 times in every run of the refund job. The job runs every 5
 minutes once §47.16 turns it on. Each try is at least one call to Moyasar: at
@@ -113,7 +114,10 @@ call is allowed 12 to 15 seconds, and the detour should add about a second at
 most (an estimate). If that ever matters, Supabase lets a caller ask for a
 region (an `x-region` header, or a `forceFunctionRegion` setting in the
 address), so engineering could run the payment functions in Frankfurt, next to
-the proxy. The cost is that Supabase does not re-route a pinned call when that
+the proxy *(done in code since 2026-11-18, corrected 2026-11-26: calls are pinned
+to `eu-central-1` with `forceFunctionRegion`, `apps/mobile/src/lib/functionRegion.ts`,
+`docs/PAYMENTS.md`, reaching each surface with its next build or redeploy)*. The
+cost is that Supabase does not re-route a pinned call when that
 region has an outage. It is not needed to start.
 
 **Whatever you choose:** if the proxy is down, card checkout cannot start, and
@@ -153,7 +157,7 @@ until its checkout session expires. Other phones can still order in cash.
 
 ## 2. Recommendation
 
-**Take QuotaGuard Shield, Starter plan, in Frankfurt, for $29 a month.**
+**Take QuotaGuard Shield, Starter plan, in Frankfurt, for $29 a month.** *(Conditional, as the companion egress document says: take the plan QuotaGuard's written answer to question 1 allows, and budget $59 a month for Shield Production if Starter is not acceptable for live payments; §7.)*
 
 Why:
 
@@ -177,7 +181,7 @@ Why:
    troubleshooting heading, and the same page warns that local runs "do not
    confirm behavior on the hosted runtime" (§4). Fixie publishes a Supabase
    guide too, without a version claim.
-4. **Its 20,000 requests a month cover roughly 2,000 to 3,300 card orders a month** (see Sizing in §1), as long as no refund is stuck (gap PG-01); check that against the volume you expect at launch.
+4. **Its 20,000 requests a month cover roughly 2,000 to 3,300 card orders a month** (see Sizing in §1), as long as no refund is stuck (gap PG-01; since 2026-11-18 a stuck refund makes at most 10 claims over about a day, so this is no longer a sizing risk); check that against the volume you expect at launch.
 5. **You can prove it before you pay**, during the 3-day free trial (§4). Sign-up
    asks for card details before the trial starts, and QuotaGuard's support will
    extend the trial if you ask.
@@ -381,8 +385,11 @@ sandbox problem. Then:
 Then carry on at §47.14. No customer can start a card payment in the app during
 these steps, because the Online Payment switch is turned on only at §47.18. From
 §47.13 step 1, though, TEST mode no longer blocks the older order-first path,
-which a direct API call can still use for three cancelled July orders
-(`OWNER_ACTIONS.md` §47.13).
+which a direct API call could use for three cancelled July orders
+(`OWNER_ACTIONS.md` §47.13). *(Closed 2026-11-14, corrected 2026-11-26: the code
+fix `20261012120000_cancelled_orders_guard` is applied, so `begin_payment_attempt`
+now refuses a cancelled order and this warning no longer blocks step 1;
+`OWNER_ACTIONS.md` §47.13 "CLOSED 2026-11-14", ledger row 117.)*
 
 ---
 
@@ -461,7 +468,11 @@ does not say whether that is possible (Not verified #6).
 
 ## 5. Moyasar's Allowed IPs rules
 
-These come from Moyasar's page, which was last updated on 11 November 2026.
+These come from Moyasar's page, which was last updated on 11 November 2026
+*(re-read 2026-11-25 by the document audit: the page then said "Last updated on
+Nov 24, 2026" and every rule in this section still matched; it also now says some
+old live accounts accept any address and that serverless addresses change; re-read
+it again when step 3 or 4 is reached)*.
 
 - **Only the secret key is restricted.** The publishable key is not.
 - **LIVE and TEST have separate lists.** Adding an address to one does not add it
@@ -718,14 +729,15 @@ now redirects, the address given is where it lands.
   "Connection OK" (lines 162-168). Which address a refusal names depends only on
   whether `MOYASAR_PROXY_URL` is set (lines 101-106). The sandbox checkout
   reports success only with a created invoice (lines 256-274).
-- `supabase/functions/_shared/moyasarVerify.ts`, line 75: a failed payment check
-  logs only the error's type.
+- `supabase/functions/_shared/moyasarVerify.ts`, the `moyasar_request_failed`
+  log line: a failed payment check logs only the error's type (line numbers in
+  this list were wrong and are replaced by names, 2026-11-26).
 - A read-only read of the payment settings on 2026-11-13, yes-or-no values only,
   with no secret read out: Moyasar enabled in TEST mode, with an `sk_test_` key
   and a TEST webhook token, no live key, and online payment off. That is the
   working TEST setup that §3 leaves untouched until step 3.
 - A read-only count of `public.orders` on 2026-11-13: 82 test orders from 7 team accounts, none paid with real money.
-- The calls per card order, counted from `payment-initiate/index.ts:272` (create), `_shared/moyasarVerify.ts:534-560` (one invoice GET per check), `payment-webhook/index.ts:194` (one payment GET per notification) and `payment-refund/index.ts:180,235` (lookup and refund).
+- The calls per card order, counted from the invoice create in `payment-initiate/index.ts` (the `moyasarFetch(MOYASAR_INVOICES, ...)` call), the one invoice GET per check in `_shared/moyasarVerify.ts`, the one payment GET per notification in `payment-webhook/index.ts` and the lookup and refund in `payment-refund/index.ts` (line numbers corrected to names 2026-11-26). **Not in that count, added 2026-11-26:** `payment-verify` also reads the invoice and cancels it when a customer abandons a checkout, `payment-initiate` runs an invoice lookup by reference when an attempt is reused or a create had no answer, and a retried refund whose lookup works but whose POST gets no clear answer makes three calls, not "one or two"; each is an extra request in the cases where the customer or the network misbehaves, and the 10-calls-an-order figure is meant to cover them.
 
 **Ruled-out options**
 
@@ -1011,7 +1023,7 @@ this file, and a second reader checked each one. None was refuted.
 |---|---|
 | **R1** (blocking). §5 said to list the pair "in both lists", which restricts TEST with no condition. | **Applied.** §5 now says the LIVE list (§47.12), and the TEST list only through §3 step 3: optional, after the proxy is proven, after deciding to keep the service and after Moyasar's written answers to questions 1 and 3, and possibly permanent. Moyasar's page, re-read 2026-11-14 and still dated 11 November, says a TEST change needs no code. |
 | **C3.** "Cash orders are not affected" was false, and Sizing ignored the stuck-refund loop. | **Applied, together with R8, in the second reader's corrected form.** The cash sentence names both locked cases (gap PG-04). A new paragraph after Sizing counts the loop: 5 tries a run, a run every 5 minutes once §47.16 turns the job on (live schedule `*/5 * * * *`, inactive today), so at least 1,440 Moyasar calls a day. It says the vendor may count calls sharing a connection as one, and to send usage alerts to an inbox someone reads (PG-19). It says "at least", not "up to": a try whose lookup works but whose refund call gets no clear answer makes three calls (`payment-refund/index.ts:210-261`). §2 reason 4 now holds only while no refund is stuck. |
-| **R8.** The same sentence missed a phone that tries card during an outage. | **Applied** in the same rewrite. Re-checked: the app saves the checkout session before asking for an invoice (`CheckoutScreen.tsx:816`), and an attempt with no invoice reads pending while its session is open (`_shared/moyasar.ts:1065-1078`). The session lasts 30 minutes (live column default). |
+| **R8.** The same sentence missed a phone that tries card during an outage. | **Applied** in the same rewrite. Re-checked: the app saves the checkout session before asking for an invoice (`savePendingSession` in `CheckoutScreen.tsx`), and an attempt with no invoice reads pending while its session is open (`decideSessionVerify` in `_shared/moyasar.ts`) *(line numbers corrected to names 2026-11-26)*. The session lasts 30 minutes (live column default). |
 | **X1.** "A busy month" promised more than QuotaGuard's visible text. | **Applied** in §2 reason 2, the §1 table and the §6 quote, as the second reader corrected it: soft limits are "a courtesy for unexpected spikes, not a way to run sustained traffic above the paid plan". |
 | **R11.** Moyasar question 4 could be answered without meeting the drafts' gate. | **Applied, merged with X5.** Question 4 asks which methods and card schemes the page offers, and for written confirmation that every other one is off. The note after the emails names the gate (gap PG-11). The matching `OWNER_ACTIONS.md` §47.19 bullets were widened the same way. |
 | **X5.** Question 4 did not name American Express or Samsung Pay. | **Applied** in the same question, which now names SADAD, STC Pay, Samsung Pay and American Express as examples. |

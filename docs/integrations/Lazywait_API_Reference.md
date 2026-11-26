@@ -42,7 +42,7 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | GET | `/pos/orders/active-orders` | `getActiveOrders` | optional `branch_id`, `user_id`, `lookback` |
 | GET | `/pos/orders/search` | `searchOrders` | `query` (+ pagination when both) |
 | POST | `/pos/orders` | `fetchOrders` | body `order_refs: string[]` **[A]** |
-| POST | `/pos/orders/create` | `createOrder` | pickup body **C** (vendor contract 2026-08-24, dev host); delivery **[A]**, gated |
+| POST | `/pos/orders/create` | `createOrder` | pickup body **C** (vendor contract 2026-08-24, dev host); delivery sent since 2026-08-27 (the destination in `delivery_address` and the `DELIVER TO` line of `order_details`; corrected 2026-11-26 from "**[A]**, gated") |
 | PUT | `/pos/orders/:order_ref` | `updateOrder` | `order_items` = **full replacement** **[A]**; `order_ref` in path only |
 | POST | `/pos/orders/update-cash-payment` | `updateCashPayment` | `Trans_Amount` **C** — Tap-frozen, typed only |
 | POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | **Vendor contract confirmed 2026-11-19, see below.** **No caller since 2026-11-19**: `pushLazywaitOnlinePayment` was removed; the payment travels on the Create Order ticket (`order_payments`) |
@@ -91,7 +91,7 @@ fields below except names/driver_\* are required — a missing one returns 400
 `acquirer_key` and `softpos_key` optional as well, and that is what the call
 was measured against. Response: `{ "success": true }`.
 
-| Field | Type | Required | Vendor description | What we send (`paymentSync.ts`) |
+| Field | Type | Required | Vendor description | What we SENT (`paymentSync.ts`, until the call was removed on 2026-11-19) |
 |---|---|---|---|---|
 | `client_id` | string | yes | Your client ID | the integration's client id |
 | `branch_id` | string | yes | Branch ID | the branch's `lazywait_branch_id` |
@@ -110,6 +110,13 @@ was measured against. Response: `{ "success": true }`.
 | `softpos_key` | string | no | `nearpay`, `edfapay` or `neopaas` | not sent |
 | `names` | object | no | Localized payment-method label | `{ en: 'ONLINE CREDIT CARD', ar: 'بطاقة ائتمانية' }` |
 | `driver_name`, `driver_id` | string | no | Optional driver | not sent |
+
+*Corrected 2026-11-26: the column above is what `paymentSync.ts` sent until the
+call was removed on 2026-11-19; nothing sends it now. The typed builder
+`buildUpdateOnlinePaymentRequest` (`_shared/lazywaitApi.ts`) cannot produce the
+three terminal ids the vendor marks required (it builds `client_id`, `branch_id`,
+`order_ref`, `Trans_Amount`, `Approval_No` and optional card fields), so a call
+built with it would be refused with 400.*
 
 **Answered, then moot:** the call was accepted with `MOYASAR-APP` in all three
 terminal ids (SM-2026-000110), so they are not validated as real terminals. It
@@ -190,8 +197,8 @@ every other field is optional. What `buildCreateOrderPayload` sends today:
 | `order_details` | `orders.notes` (order-level note) |
 | `customer_id` | `profiles.lazywait_customer_id` |
 | `customer_cell` + `country_code` | `orders.customer_phone`, split |
-| `is_paid` | supported by the builder; **not wired** to the live worker (CLAUDE.md §6) |
-| `delivery_address` | **name only** — what a delivery order needs in it is still Q2 |
+| `is_paid` | **Sent since 2026-11-19, for a card order with a captured payment only** (corrected 2026-11-26; this row said "not wired to the live worker"; see the `is_paid` row in the money table below and `LAZYWAIT.md`) |
+| `delivery_address` | the confirmed top-level field, sent on a delivery order; **Q2 is closed** (corrected 2026-11-26 from "name only ... still Q2"), and the POS does not render it (Q8), so the destination is also repeated into `order_details` |
 
 ### Corrections — assumptions the contract proved WRONG
 | Was assumed | Actually | Where fixed |
@@ -218,7 +225,8 @@ example sums the add-on prices into the order (`25 + 5 = subtotal 30`). Emitting
 the modifier-inclusive price *and* the add-on lines would charge add-ons twice, so
 the serializer subtracts them back out. The invariant
 `price + Σ(addon.price × addon.quantity) === unit_price` is asserted in
-`lazywait.test.ts`. The Lazywait response total remains **untrusted**.
+`lazywait.test.ts` (the sum is over **mapped** add-ons only: an unmapped
+modifier is written into `details` as text and its money stays inside `price`). The Lazywait response total remains **untrusted**.
 
 ---
 
@@ -319,7 +327,7 @@ for the genuinely-assumed remainder.
 | `order_status_id` for a new delivery order | string | delivery create | Q1 — `"new-order"` is the documented *pickup* value |
 | `order_deliveries[]` element shape | unknown | delivery | Q2 — empty array in the example; almost certainly where delivery lives. **Not implemented** — we do not guess an element |
 | `delivery_address` contents | string | delivery | Q2 — field name confirmed, required contents are not |
-| `latitude`, `longitude` | number, top-level | delivery | Q3 — **the contract has no coordinate field anywhere**; ours is an invention and stays gated |
+| `latitude`, `longitude` | number, top-level | delivery | Q3 — **the contract has no coordinate field anywhere**; ours is an invention and is **not sent** (the live builder has no coordinate field; `allowAssumedFields` belongs to the unused typed client only) |
 | `order_delivery_fee` on a delivery order | number | delivery | Q6 — name confirmed. **Q9 is answered and money IS now sent**; this field is emitted only on a delivery order and only when the fee is > 0 (it is 0.00 at Nasserah today, so no live ticket has exercised it yet). |
 | (address/lat-long visibility) | n/a | delivery | **Q8 ANSWERED 2026-08-27, negatively.** A real ticket shows NO address row — `delivery_address` is not rendered. The destination reaches the kitchen only via the `order_details` note, which is why that duplication is permanent. |
 

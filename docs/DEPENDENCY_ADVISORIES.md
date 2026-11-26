@@ -42,6 +42,15 @@ Expo packages that have no non-breaking fix (§3.1). Gating at moderate would
 fail every PR on something this repository cannot fix, and a gate that is always
 red is a gate everybody learns to ignore.
 
+**Re-read 2026-11-26 (supersedes the next paragraph's count):** `npm audit --json`
+on copies of both lockfiles reports **0 high and 0 critical**: web 4 moderate,
+mobile 6 moderate (§3.1 below says 7 for the mobile tree). The picomatch advisory
+is no longer reported, and why (withdrawn or re-scoped) is not known from here.
+With zero highs the gate passes on its early branch and warns that the exception
+list is unused, so the §3.3 exception is dead weight until someone re-reads the
+advisory and retires it by the "To clear" steps. The date-stamped text below is
+the 2026-11-18 position.
+
 As of **2026-11-18**, both trees carry exactly one HIGH advisory, `picomatch`
 GHSA-fc5q-39xc-vjpf. It has no patched release, and it reached both trees when
 GitHub reviewed it on 2026-11-17. It is excepted in both gates, bounded and
@@ -123,7 +132,7 @@ audit, and remove this exception when the advisories disappear.
 | --- | --- |
 | **Packages** | `glob` 13.0.6 (GHSA-3g3m-2fjr-6pw4) and `minimatch` 10.2.5 (GHSA-g3hv-75wg-m249), the same two advisories §3.1 accepts. Here they are reached only through `@sentry/bundler-plugins` 10.67.0 under `@sentry/vite-plugin` 5.4.0. That is **4 moderate records, measured 2026-11-11** |
 | **Severity** | Moderate |
-| **Reachability** | Build time only. Every console build loads the plugin, but `vite.config.ts` runs it only when `SENTRY_AUTH_TOKEN` is set, which is CI and Vercel. It uploads the console's source maps, using glob patterns from the build config rather than from any user. Nothing from this chain ships in a bundle |
+| **Reachability** | Build time only. Every console build loads the plugin, but `vite.config.ts` runs it only when `SENTRY_AUTH_TOKEN` is set, which is Vercel if the variable is set there (corrected 2026-11-26: this said "CI and Vercel"; no CI workflow sets the token for the web build, only `eas-build.yml` references it, as a preflight on the EAS environment). It uploads the console's source maps, using glob patterns from the build config rather than from any user. Nothing from this chain ships in a bundle |
 | **Status** | Accepted. `npm audit` offers only `@sentry/vite-plugin` 11.12.0. That is a semver-major move, and the upload path it changes can only be exercised with the Vercel token |
 | **Reviewed** | 2026-11-11, for the app-hardening checklist (S08) |
 | **Next review** | On the next `@sentry/vite-plugin` major upgrade, or 2027-03-31, whichever comes first |
@@ -523,7 +532,8 @@ families**: `0.84.5`, which `@expo/metro` pins exactly and which Expo's own buil
 runs on, and a duplicate `0.84.4` pulled in by
 `@react-native/community-cli-plugin`, which still depended on `image-size`.
 `apps/mobile/package.json` now pins the fourteen Metro packages to `0.84.5`,
-exactly matching Expo's pin. The plugin declares `metro: ^0.84.3`, which `0.84.5`
+exactly matching Expo's pin *(as of 2026-10-08; recomputed 2026-11-26: the same
+fourteen overrides now read `0.87.1`, and the lockfile resolves `metro` 0.87.1)*. The plugin declares `metro: ^0.84.3`, which `0.84.5`
 satisfies, so this stays inside the declared contract. Lockfile: **19 packages
 removed, 0 added**; outside the Metro family nothing moved.
 
@@ -1008,4 +1018,12 @@ config. Both results below were checked rather than assumed:
   is a Production change (CLAUDE.md §13).
 - The CI build job, which exists to mirror that command.
 
-Neither holds a credential while it installs.
+The CI build job (`production-gates.yml` `build`) sets no `env:` and so holds no
+credential while it installs. **Corrected 2026-11-26: the sentence used to say
+that of both.** Vercel's build environment is not shown by source: the root
+`build` script runs `npm --prefix apps/mobile ci` without `--ignore-scripts`, the
+trees carry install scripts (`@sentry/cli`, `esbuild`, `fsevents`), and
+§3.2 says the Sentry token may be set on Vercel, in which case the project's
+environment variables are present while it installs. Whether `SENTRY_AUTH_TOKEN`
+is set there is Vercel dashboard state, not known from the repository; any change
+to how Vercel installs is a Production change (CLAUDE.md §13).

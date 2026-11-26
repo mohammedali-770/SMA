@@ -4,6 +4,19 @@ Baseline build branch: `claude/project-build-ie4b56`
 Baseline build commit: `e01c8b5ad5ac48c69d0163a875792f7ef5a4e582`
 Next-build integration branch: `release/mobile-next-build`
 
+> **Dated, and partly superseded (2026-11-26).** This audit is undated in its
+> body and describes the position at baseline commit `e01c8b5` (Build 4 / the
+> next-build integration branch). Two things in it are no longer current:
+> (1) the three "Confirmed retention gaps to port before Build 5" below are
+> closed in the tree: a mobile `ThemeProvider` and an Appearance control exist and
+> `apps/mobile/app.json` has `userInterfaceStyle: "automatic"`; the order-type
+> screen (`apps/mobile/src/app/select.tsx`) has an AR/EN toggle; and
+> `features/orders/view/OrderCard.tsx` prefixes the order number with `#`;
+> (2) rows that call the payment/provider area "frozen" or "intentionally
+> inactive" describe the position before 2026-11-11, when the owner chose Moyasar
+> and the freeze was lifted for repository work (CLAUDE.md §6, `docs/PAYMENTS.md`).
+> Whether any listed historical branch is safe to delete is not re-decided here.
+
 ## Non-negotiable rule
 
 A historical branch is not considered preserved merely because it was merged, is an ancestor, or produces `git cherry -`. Later work can remove or replace the behavior. Before any branch is deleted we must identify what that branch actually delivered and prove the intended behavior or operational control still exists in the next-build tree. Missing behavior is reimplemented on top of the stable Build 4 baseline; stale branches are never merged wholesale.

@@ -25,7 +25,10 @@ Where a component mixed logic and presentation, the logic is extracted first.
 `scripts/check-design-system-hygiene.mjs` holds a `MIGRATED_SURFACES` list. A
 file on that list may not import the legacy `theme` module or the legacy
 `components/Button`, and CI fails if it does. Add files as each surface lands;
-never remove them.
+never remove them. *(Corrected 2026-11-26: that was the first design of the
+guard. It is now a global ban over `apps/mobile/src` (Surface 6 below), and the
+script describes `MIGRATED_SURFACES` as "kept as a record, and as a guard that
+these files continue to exist"; a deleted surface moves to `RETIRED_SURFACES`.)*
 
 ---
 
@@ -42,7 +45,7 @@ never remove them.
 | 2 | Customer App — Order Tracking / Receipt | ✅ **Done** — this PR |
 | 2 | Customer App — Profile | ✅ **Done** — this PR |
 | 2 | Customer App — Order Type Selection | ✅ **Done** — this PR |
-| 3 | Admin — Dashboard | ⬜ |
+| 3 | Admin — Dashboard | ⬜ *(the Progress rows for surface 3 were not kept up to date: `src/design-system/ui/Button.tsx` and `Field.tsx` exist and 23 files under `src/components/admin` import `design-system/ui/Button`, so the web side has begun; which surfaces count as done is not recorded here)* |
 | 3 | Admin — Live Orders | ⬜ |
 | 3 | Admin — Menu Management | ⬜ |
 | 3 | Admin — Branches | ⬜ |
@@ -203,9 +206,11 @@ invisible, so its spinner and label are now white.
 | Surface | Legacy usage |
 | --- | ---: |
 | Mobile legacy theme / Button / Notice | **ZERO — deleted** |
-| Web raw `<button>` | 129 (24 `glass-btn-*`) |
-| Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) |
+| Web raw `<button>` | 129 (24 `glass-btn-*`) *(2026-09; recomputed 2026-11-26: 116 in non-test `src/**/*.tsx`, and 0 uses of `glass-btn`)* |
+| Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) *(2026-09; recomputed 2026-11-26: 57 in non-test `src/**/*.tsx`)* |
 
 The legacy `Button` and `Notice` are deleted once Order Tracking and Profile
-land. The web side has no shared Button or Field at all; admin panels use raw
-elements with `.glass-*` utilities, deleted once the last panel is migrated.
+land. *(Corrected 2026-11-26: "The web side has no shared Button or Field at all;
+admin panels use raw elements with `.glass-*` utilities" was true in September.
+`src/design-system/ui/Button.tsx` and `Field.tsx` now exist, 23 admin files
+import the Button, and no `.glass-*` class is used.)*

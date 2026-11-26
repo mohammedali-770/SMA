@@ -37,7 +37,12 @@ It never performs provider test calls in v1.
 
 ### Critical monitored systems
 
-The overall platform state is derived only from these critical systems:
+The overall platform state is derived only from these critical systems.
+*(Corrected 2026-11-26: the list is the original four. `20260807150000` added a
+fifth critical system, **Order Flow** (`order_flow`: orders failing to arrive),
+which the snapshot marks critical and passes to the five-argument
+`operations_health_overall_state`, so Order Flow can turn the platform
+`failing`. `OPERATIONS_ALERTS_DIGEST.md` lists all five.)*
 
 1. **Lazywait Sync** — `public.lazywait_sync_health_summary()` remains the
    authoritative state source.
@@ -166,10 +171,13 @@ configuration error has the highest precedence.
   *Changed 2026-11-12.* The card was **Payment / Tap**. On the branch
   `feat/moyasar-only-20261111` the console labels it **Payment / Moyasar**
   (**الدفع / Moyasar**), and that reaches the console on merge. The database half
-  waits for `20261003120000` to be applied (`OWNER_ACTIONS.md` §47.3). Until then:
-  - the card's **configured** test is still Tap's, so against the Moyasar row it
-    reads `not_configured`;
-  - alert emails rendered by the database still say **Payment / Tap**.
+  was waiting for `20261003120000` (`OWNER_ACTIONS.md` §47.3), which was **applied
+  2026-11-13 17:26:09 UTC** (`MIGRATIONS.md` row 115; corrected 2026-11-26 from
+  "waits for ... to be applied"). The two bullets are the state **before** the apply
+  and are history; rows already rendered keep "Payment / Tap". Before it:
+  - the card's **configured** test was Tap's, so against the Moyasar row it
+    read `not_configured`;
+  - alert emails rendered by the database said **Payment / Tap**.
 
   After the apply, "configured" follows Moyasar's own rule: provider `moyasar`,
   the selected mode's secret key with the matching `sk_test_` / `sk_live_` prefix,

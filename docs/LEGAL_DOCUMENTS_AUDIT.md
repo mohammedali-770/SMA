@@ -13,8 +13,21 @@ than the passages the loyalty work had touched. That generalised immediately:
 the errors you find are bounded by the passages you actually check. So every
 other document got the same treatment.
 
-> **Updated 2026-09-09 — `offers_loyalty_terms` is now version 2.2.** The other
-> eight rows are unchanged at 2.1. v2.2 was not a further correction of a false
+> **Read this file as dated, not current (2026-11-26).** Every verdict below is
+> as of the date beside it, 2026-09-08 unless stated. Three of them have since
+> been overtaken, and each is flagged where it stands: card payment is on, so
+> the cash-only verdicts in "Verified accurate" no longer hold; points are
+> recorded as pending and credited on delivery, so the "added when the order is
+> placed" correction no longer holds; and the "unchanged at 2.1" claim below was
+> already imprecise. The live text of every row is **not known from the
+> repository** — the owner-side list is `OWNER_ACTIONS.md` §47.15 and gaps PG-08,
+> PG-15 and PG-22 in `readiness/20261113-card-payments-gaps.md`.
+>
+> **Updated 2026-09-09 — `offers_loyalty_terms` is now version 2.2.** On
+> 2026-09-09 the other eight rows were recorded as unchanged at 2.1 (a version
+> label that was not re-checked per row: `OWNER_ACTIONS.md` reads live
+> `terms_conditions` as v2.0, and `privacy_policy` has since moved to v2.2 and
+> v2.3, see Method 6). v2.2 was not a further correction of a false
 > statement: it brought the document level with four loyalty features that
 > shipped on 2026-09-09, of which **pickup-only was live and had made the
 > redemption clause misleading**. Detail, the wording decisions and the
@@ -31,12 +44,28 @@ other document got the same treatment.
 
 ## Corrected, live, 2026-09-08 (all now version 2.1)
 
+*(Dated 2026-09-08; the loyalty row is superseded on one point, 2026-09-14, in
+the note after this table. "All now version 2.1" describes these four rows on
+that date; it is not a statement about the other documents.)*
+
 | Document | What it said | What is true |
 | --- | --- | --- |
 | `offers_loyalty_terms` | points added "when the order is completed"; "cancelled **or refunded** are reversed"; "you choose **how many** points to use" | added when the order is **placed**; cancellation only, clamped to the surviving balance; the toggle is **all-or-nothing**. Detail in [`LOYALTY.md`](LOYALTY.md) §7 |
 | `privacy_policy` | sub-processor list omitted **Vercel** | `vercel.json` serves `/app` (the Expo customer web export) and `/legal`, so customer traffic is processed by Vercel. Now named |
 | `delivery_pickup_policy` | "tells you when your order is **received**, being prepared, ready…" | the `received` push was **deliberately removed** from `order-intake` on 2026-08-27 — its copy claimed the kitchen had the order, untrue for delivery. The first message is now the POS outcome, so the text says "confirmed with the branch" |
 | `allergen_food_notice` | "SPICE LEVEL … the level shown is a guide" | **there is no heat rating in either product model.** It caveated a UI element that does not exist; it now tells the customer to ask |
+
+**Superseded 2026-09-14 for the first row's "added when the order is placed".**
+Since `20260918120000_loyalty_earn_on_settlement` (applied 2026-09-14) `place_order`
+records an `earn_pending` ledger row and the balance moves only when an
+administrator marks the order delivered, and, for an online order, only when it
+is paid (`docs/LOYALTY.md` "Points are earned at DELIVERY, not at order
+creation"). The repository's own draft of the published v2.2 text still says
+points are added when the order is placed and the balance updates immediately
+(`docs/legal/OFFERS_LOYALTY_TERMS_DRAFT.md`), so the sentence this table calls
+the truth is no longer the behaviour. Whether the live row has been changed is
+not known from the repository; the gap is tracked as PG-22, and rewriting a live
+row is an owner decision and a §5 write.
 
 Applied with SQL `replace()` on the stored content rather than re-pasting, so
 every untouched clause is byte-identical by construction. Each anchor was
@@ -80,12 +109,24 @@ retention window**, which is §30's completion criterion answered directly. All
 six OTP functions are intact, and `profiles` (9), `orders` (71) and
 `loyalty_transactions` (111) were untouched.
 
+**Retention scope, noted 2026-11-26.** The sweep covers `otp_challenges` and
+`otp_send_reservations` only. `whatsapp_message_logs`, which stores the number
+each sign-in code was sent to, has no time limit (kept until the account is
+deleted): `RECORD_OF_PROCESSING.md` "Findings made while building this record",
+item 1. The policy sentence about verification codes is still honoured; this
+section simply did not look at the neighbouring table, so it is not a complete
+retention check.
+
 **What is proven, and what is not.** The function is proven to execute and delete
 correctly against real data; the job is registered, `active`, and pg_cron is
 demonstrably working (470 successful runs across seven other jobs in the two
 hours around the apply). **The sweep's own first scheduled tick has still not
 been observed** — that is 2026-09-09 00:40 UTC. The distinction is kept because
-this item was already closed once on weaker evidence.
+this item was already closed once on weaker evidence. *(2026-11-26: no later
+document in the repository records the first tick being watched, and
+`OWNER_ACTIONS.md` still says it has not been observed; reading
+`cron.job_run_details` for `otp-retention-sweep` would settle it, and has not
+been done.)*
 
 Review caught that on #342: §30's criteria had been written two commits before
 and then not met — the same declare-done-on-partial-evidence error this whole
@@ -101,6 +142,18 @@ phone, which is why it cannot change the rate limiter's behaviour.
 ## Verified accurate — no change needed
 
 Recorded because "we checked and it was fine" is worth as much as a finding.
+
+> **As of 2026-09-08, and no longer current for three of these (2026-11-26).**
+> The verdicts for `payment_policy`, `cancellation_refund_policy` and
+> `terms_conditions` rest on `online_payment_enabled` being false and on there
+> being no provider. Moyasar was chosen on 2026-11-11, and
+> `app_settings.online_payment_enabled` was read live as `true` on 2026-11-24
+> (`docs/PAYMENTS.md`). The owner-side record says all three documents must change
+> before customers can pay by card (`OWNER_ACTIONS.md` §47.15; gap PG-08 in
+> `readiness/20261113-card-payments-gaps.md`: live `terms_conditions` v2.0 still
+> said "Orders are paid in cash"). The live text now is not known from the
+> repository. The other bullets (VAT, account deletion, support contact) are
+> unaffected by this.
 
 - **`payment_policy`** — VAT 15% matches `app_settings.vat_percentage` (15.00);
   `online_payment_enabled` is false; the provider row is `tap`, disabled, and

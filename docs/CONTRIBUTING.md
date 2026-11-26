@@ -110,12 +110,13 @@ See [`decisions/README.md`](decisions/README.md). Copy [`decisions/0000-template
 
 ## What the automation does
 
-Four checks run as `npm run docs:check`. **Three of them run in CI; the fourth does
-not, and that is a defect rather than a design.** `.github/workflows/docs.yml` invokes
-the three scripts individually rather than the npm script, so
-`check-test-phone-numbers.mjs` was reachable only from a developer's own terminal —
-the same shape as `logo:check`, which existed while no workflow ran it (CLAUDE.md
-§11). It is wired in as of 2026-09-16.
+Four checks run as `npm run docs:check`, and **all four run in CI**.
+`.github/workflows/docs.yml` invokes the four scripts individually rather than the
+npm script. Until 2026-09-16 the fourth, `check-test-phone-numbers.mjs`, was
+reachable only from a developer's own terminal — the same shape as `logo:check`,
+which existed while no workflow ran it (CLAUDE.md §11) — and it has run in CI since
+that date. Sections 1 to 3 below are three of the four; the fourth is section 4.
+Section 5, source readability, is a separate check and is not part of `docs:check`.
 
 ### 1. Generated reference must not drift
 
@@ -188,7 +189,17 @@ The reason is required. It lands in history where a reviewer sees it.
 
 What this is not for: deferring documentation you intend to write later. An exemption used that way removes the only signal that the document is now wrong, which is worse than never having had the rule. If the change alters behaviour, write the sentence — it is usually one sentence.
 
-### 3. Source must stay readable (added 2026-09-02)
+### 4. No test phone numbers outside the allowlist
+
+`scripts/check-test-phone-numbers.mjs` (`npm run phones:check`) requires every Saudi
+mobile number anywhere in the tree to be on the explicit allowlist
+`scripts/test-phone-allowlist.json`. The repository is public, and a real
+customer's number once arrived as a realistic-looking fixture; no pattern can tell
+a real number from a fake one, so adding one is a reviewable edit to the allowlist
+rather than an invisible paste. Never write a real person's number into a document
+or a test.
+
+### 5. Source must stay readable (added 2026-09-02; run by `design-system.yml` via `npm run format:check`, not by `docs:check`)
 
 `scripts/format-check.mjs` runs in `design-system.yml` and enforces exactly two things on a pull request's own diff:
 

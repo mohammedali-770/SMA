@@ -1,8 +1,15 @@
 # Loyalty programme
 
-**Status: LIVE.** Points are being earned and spent by real customers today.
-This is not a dormant feature waiting to be switched on, and a change here
-changes what somebody is charged.
+**Status: LIVE.** The programme is on (`loyalty_enabled`). This is not a dormant
+feature waiting to be switched on, and a change here changes what somebody is
+charged. *(Corrected 2026-11-26: this said "Points are being earned and spent by
+real customers today". Since 2026-09-14 an order records pending points and the
+balance moves only when an administrator marks it **Delivered** (last section).
+The card-payments gap register records that the live terms text still says points
+are added when the order is placed (PG-22) and that nothing moves an order past
+Received (PG-21), `readiness/20261113-card-payments-gaps.md`. The five accounts
+holding points on 2026-09-09 were owner test accounts (§7). Whether any customer
+has been credited since 2026-09-14 is a live fact not known from the repository.)*
 
 **Owning document.** `docs/ownership.json` routes changes to loyalty earning,
 redemption and configuration to this file, so behaviour and prose move together
@@ -43,7 +50,10 @@ carries a test for it.
 
 **Where the balance lives.** `profiles.loyalty_points` is the balance;
 `loyalty_transactions` is the append-only ledger behind it (`earn`, `redeem`,
-`adjustment`), each row carrying `balance_after`. The order keeps its own record
+`adjustment`, `expire` and `earn_pending` — the type check admits all five;
+`earn_pending` is a recorded promise that is **not** in the balance, §"Points are
+earned at DELIVERY"; "append-only" is a grant-level property, customers hold
+`select` only, not a trigger), each row carrying `balance_after`. The order keeps its own record
 in `orders.loyalty_points_earned` / `_redeemed` / `loyalty_discount_amount` /
 `loyalty_awarded_at`.
 
@@ -74,9 +84,13 @@ minimum after any coupon and with any delivery fee, and while no points are
 used that is the Total line. Screen readers hear it too, because it is part of
 the switch's accessible name. The Arabic is engineering-drafted
 (`docs/OWNER_ACTIONS.md` §35). This is on branch
-`fix/checkout-points-preview-20261114`. App customers get it only with the
-`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
-branch is merged, because a merge deploys the web build (CLAUDE.md §13).
+`fix/checkout-points-preview-20261114` — **merged** (the code is on the default
+branch: `effectiveLoyaltyRedemption` and `previewParity.test.ts` in
+`apps/mobile/src/features/checkout/`, corrected 2026-11-26 from "This is on
+branch"). App customers get it only with the `OWNER_ACTIONS.md` §47.17 EAS build
+(whether that build has shipped is not known from the repository); the web
+checkout at `/app` got it on merge, because a merge deploys the web build
+(CLAUDE.md §13).
 Whether the minimum should apply to the balance held instead of the points used
 is an open owner decision (the payment draft's item 12); it is a server change,
 and this one does not make it.
@@ -101,7 +115,7 @@ back to the launch-time values exactly, and a row with a missing minimum or
 point value counts as a failed read, never as 0. Tests:
 `loyaltySettingsReread.test.ts`. The balance is not re-read at submission, so
 points spent on another device after the switch was turned on are still a
-narrow residual. On branch `fix/checkout-loyalty-settings-reread-20261117`; app customers get it with the
+narrow residual. Branch `fix/checkout-loyalty-settings-reread-20261117` is **merged** (`decideLoyaltyRedemptionChange` is in `checkoutGuards.ts`; corrected 2026-11-26); app customers get it with the
 `OWNER_ACTIONS.md` §47.17 EAS build, `/app` on merge (CLAUDE.md §13).
 
 **Effective rate.** Earning 1 point per riyal and redeeming each at 0.10 SAR is a
@@ -637,6 +651,7 @@ Production read-only and found 0 campaigns, so no live campaign was shown wrong.
 | `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
 | `src/lib/mappers.test.ts` · `productEditMapper.test.ts` | The admin mappers read and default both columns, and the generic edit contract carries neither |
 | `supabase/tests/loyalty_reason_history_safe_test.sql` · `loyalty_reason_no_order_number_test.sql` | Ledger-reason semantics (pre-existing) |
+| `supabase/tests/loyalty_earn_on_settlement_test.sql`, `supabase/tests/loyalty_earn_snapshot_path_test.sql` | The deferred-earning rule on both order-creation paths (last section): `earn_pending` at creation, the credit on delivery. Their frontend mirror is `loyaltyEarnState` (`apps/mobile/src/features/orders/`) |
 | `supabase/tests/loyalty_points_reservation_test.sql` | §3b: held points refused to cash, to a second card attempt and to a points-covered checkout, for exactly as long as the hold lasts; a card order that finds its points gone records the debit and the shortfall; cancellation refunds the ledger, netted |
 
 Two guards are worth knowing about because they caught real mistakes while this
@@ -661,6 +676,18 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ## 7. The customer-facing terms — v2.2, published 2026-09-09
 
+> **Superseded in part, 2026-11-26.** This block is the 2026-09-09 record. Its
+> claim that "the code and the document now agree" stopped being true on
+> 2026-09-14, when earning moved to delivery (`20260918120000`, applied that day;
+> `20260921120000` for the second order-creation path): v2.2 says points are
+> added when the order is placed and the balance updates immediately, and the
+> database now records `earn_pending` and credits on **Delivered** only — cash
+> always, online only when paid. The register tracks it as PG-22 (and PG-21: no
+> mechanism moves an order to Delivered but an administrator).
+> Rewriting the live terms is an owner decision and a CLAUDE.md §5 write; whether
+> the live text was changed is not known from the repository. The passages
+> below that say "placed" quote what the terms said when written.
+>
 > **v2.2 IS LIVE and the code and the document now agree.** Published
 > 2026-09-09 07:56:15 UTC on explicit owner approval ("update the loyalty terms
 > to v2.2"), effective 9 September 2026, active, `requires_acceptance` still
@@ -735,8 +762,10 @@ the live text against the code rather than assuming it was fine. They were
 corrected in place on the owner's approval — a live write, recorded here because
 the previous version of this section told a reader they were still wrong:
 
-1. **"Points are added when the order is completed."** They are added when the
-   order is **placed** — `place_order` writes the ledger row in the same
+1. **"Points are added when the order is completed."** *(As of 2026-09-09:
+   superseded 2026-09-14, they are now added when the order is **delivered**; the
+   text that follows is what was true when v2.2 was written.)* They were added when the
+   order was **placed** — `place_order` wrote the ledger row in the same
    transaction as the order. The whole cancellation-reversal mechanism
    (`20260810100000`) exists *because* points are granted early; a reader of the
    old terms would not expect a reversal to be needed at all.
@@ -869,8 +898,8 @@ of their points. Value and average are computed from those two and the
 configured value of a point, as before. They used to be summed in the browser
 over every profile, which each staff sign-in downloaded; past PostgREST's
 1 000-row cap that sum was silently wrong (196 136 points shown against
-1 000 079 at 5 000 customers). **The migration ships first:** #457 is merged
-and applied before this console change merges, because a merge deploys the
+1 000 079 at 5 000 customers). **The migration shipped first:** #457 was merged
+and applied (`20261008120000_admin_loyalty_stats`, 2026-11-13, `MIGRATIONS.md` row 105) before this console change merged, because a merge deploys the
 console (CLAUDE.md §13). If the function is ever missing anyway, the tiles show
 "—" and a notice naming it, never a number.
 

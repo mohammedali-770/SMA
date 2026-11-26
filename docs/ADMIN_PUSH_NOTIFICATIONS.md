@@ -12,7 +12,7 @@ all 7 `sent`** — real closure notices delivered to a real phone, not merely th
 confirmation tap.
 
 **The endpoint rule tightened on 2026-11-11, and it is LIVE since 2026-11-18.**
-The sender admits only the four browser push services and refuses an explicit
+The sender admits only the browser push services (four vendors, five hosts: see the table in §3c) and refuses an explicit
 port (§3c, "A public hostname was not enough"). `admin-push-dispatch` version 3,
 deployed 2026-11-18 from `0dd6a20` and read back byte-identical, carries it
 (§5, item 7). The version it replaced, v2, still accepted any public host.
@@ -85,7 +85,7 @@ Recorded so a future change can tell a decision from a default.
 | Reopens | **Silent.** Closing only, including the sweeper's automatic reopen |
 | The admin's own actions | **Notify.** They asked for the receipt that it landed |
 | Grouping | **None.** One notification per event, no batching or digest |
-| Language | **Arabic**, always |
+| Language | **Arabic**, always *(the decision as recorded; corrected 2026-11-26: what ships is bilingual by device — the queue stores both `title_en`/`body_en` and Arabic, and the sender picks per subscription from `admin_push_subscriptions.lang`, which the console sets from the administrator's UI language (`buildPayload`, `_shared/adminPush.ts`). Whether the owner accepted English for English-language consoles is not recorded; owner to confirm)* |
 | Recipients | Any admin who opts in, all branches. Never branch staff, never the call centre, never customers |
 | Branch count | 17 real branches (the 40 rows in Production are test data) |
 
@@ -98,11 +98,11 @@ every event.
 | File | Role |
 | --- | --- |
 | `public/manifest.webmanifest` | `display: standalone`, Arabic name, three icons. The thing iOS requires. |
-| `public/sw.js` | Service worker: `push` and `notificationclick` only. |
+| `public/sw.js` | Service worker: `push` and `notificationclick`, plus `install` (`skipWaiting`) and `activate` (`clients.claim`) handlers. No `fetch` handler, so it caches nothing. |
 | `src/lib/pwa/pushSupport.ts` | Pure readiness check: `ready` / `needs-install` / `needs-reinstall` / `unsupported`. |
 | `src/lib/pwa/registerServiceWorker.ts` | Fire-and-forget registration, memoised, never throws. |
 | `index.html` | Manifest link, `theme-color`, Apple web-app meta tags. |
-| `public/icon-{192,512}.png`, `icon-maskable-512.png` | Generated from `public/logo.png`. The maskable one sits inside the 80% safe zone on the brand cream so Android's circular crop never clips the art. |
+| `public/icon-{192,512}.png`, `icon-maskable-512.png` | Said to be generated from `public/logo.png` (no script in the repository reproduces them, so how is not recorded). The maskable one sits inside the 80% safe zone on the brand cream so Android's circular crop never clips the art. |
 
 ### The service worker caches nothing, on purpose
 
@@ -157,8 +157,8 @@ staff alert could navigate a customer's open tab away and discard its state.
 
 | File | Role |
 | --- | --- |
-| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — at apply time the table was empty and the VAPID column NULL, so nothing could be sent; both have since moved and the channel delivers (§1). Detail: `docs/MIGRATIONS.md` §49. |
-| `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases / 23 assertions pinning the closed table, the refusals and the endpoint-reassignment rule. |
+| `supabase/migrations/20260927120000_admin_push_subscriptions.sql` | `admin_push_subscriptions` (closed table), `app_settings.admin_push_vapid_public_key`, and three `is_admin()`-gated RPCs. **APPLIED 2026-09-20**, live version `20260920050434`, ledger row 101 — at apply time the table was empty and the VAPID column NULL, so nothing could be sent; both have since moved and the channel delivers (see the Status block at the top). Detail: `docs/MIGRATIONS.md` §49. |
+| `supabase/tests/admin_push_subscriptions_test.sql` | 8 cases (`-- CASE` blocks) pinning the closed table, the refusals and the endpoint-reassignment rule. |
 | `src/lib/adminPushApi.ts` | The console's side. Reads fail soft; writes throw, because the admin pressed a button and is owed a truthful answer. |
 | `src/lib/pwa/adminPushState.ts` | The seven-state resolver. |
 | `src/lib/pwa/pushSubscription.ts` | base64url → key bytes, and subscription serialisation that returns null rather than a half-record. |
@@ -167,7 +167,12 @@ staff alert could navigate a customer's open tab away and discard its state.
 
 **Seven states, and only two of them are a button.** `unsupported`,
 `needs-install`, `needs-reinstall`, `denied` and `not-configured` render as a
-static chip carrying the remedy, because none of them can be fixed by tapping.
+static chip, because none of them can be fixed by tapping. *(Corrected
+2026-11-26: the chip is a `BellOff` icon with no visible text; the remedy
+sentence is its `title` and `aria-label` only, so it appears on hover and to a
+screen reader and is not visible on a phone, where the two iPhone states
+`needs-install` and `needs-reinstall` are the cases it matters for. Showing the
+sentence as visible text is a console change, not made here.)*
 Offering a tappable bell to someone on an iPhone in Safari — where no amount of
 tapping can ever work — is how a feature earns a reputation for being broken.
 
@@ -186,9 +191,9 @@ silently never notifies.
 | `supabase/functions/_shared/webPush.ts` | VAPID signing (RFC 8292) and `aes128gcm` payload encryption (RFC 8291). Pure Web Crypto; no Deno APIs, so CI executes it. |
 | `supabase/functions/_shared/webPush.test.ts` | 54 cases, including the RFC's own encryption vector. |
 | `supabase/functions/_shared/adminPush.ts` | The decisions: who a send may reach, what the worker receives, what a status code means. |
-| `supabase/functions/_shared/adminPush.test.ts` | 47 cases over those decisions. |
+| `supabase/functions/_shared/adminPush.test.ts` | 105 cases over those decisions (recounted 2026-11-26 with `vitest run`; it was 47 when first written). |
 | `supabase/functions/_shared/adminPushWiring.test.ts` | Source-shape tripwires for the handler, plus the executed payload contract against `public/sw.js`. |
-| `supabase/functions/admin-push-dispatch/index.ts` | The handler. **Written, not deployed.** |
+| `supabase/functions/admin-push-dispatch/index.ts` | The handler. *("Written, not deployed" when step 3 was written; deployed 2026-09-20, version 3 since 2026-11-18, see the Status block.)* |
 | `scripts/generate-vapid-keys.mjs` | Produces the key pair and prints where each half goes. |
 | `src/lib/adminPushApi.ts` | Gained `sendAdminPushConfirmation()`. |
 
@@ -198,7 +203,7 @@ Every mature web-push library is a Node package that wants `node:crypto`,
 `node:http` and a bundler; the Deno ports are thin and unmaintained. Everything
 the protocol needs — ECDH on P-256, HKDF-SHA256, AES-128-GCM and ECDSA P-256 —
 is already in the Web Crypto API that Deno and Node both ship, so this is about
-150 lines of standard-library calls instead of a supply-chain edge for staff
+150 lines of standard-library calls *(when written; `webPush.ts` is 417 lines, about 250 of them code, on 2026-11-26)* instead of a supply-chain edge for staff
 notifications.
 
 That trade only holds if the implementation is checked against something other
@@ -297,15 +302,16 @@ Two halves, and neither implies the other:
 - **`refusePushEndpoint`** requires HTTPS, no credentials in the URL, no
   explicit port, and a public dotted hostname — refusing IP literals in all
   four spellings, IPv6, and the `.local` / `.internal` / `.localhost` /
-  `.home.arpa` suffixes. Since 2026-11-11 the host must also be one of the four
-  browser push services, and `ADMIN_PUSH_ALLOWED_HOSTS` replaces that list
+  `.home.arpa` suffixes. Since 2026-11-11 the host must also be one of the five
+  hosts of the four browser push vendors (§3c, table; corrected 2026-11-26 from
+  "one of the four browser push services"), and `ADMIN_PUSH_ALLOWED_HOSTS` replaces that list
   rather than narrowing "any public host".
 - **`redirect: 'manual'`** stops a *checked* host handing the request on. The
   guard is otherwise undone by one `Location` header.
 
 The host rules moved to `supabase/functions/_shared/publicHost.ts` rather than
 being copied: duplicating forty lines of security-critical host parsing is how
-two copies of a rule drift apart. The 34-case SMTP suite passes unchanged, which
+two copies of a rule drift apart. The SMTP suite (34 cases when the extraction was made; it has grown since, so recount before quoting) passed unchanged, which
 is what makes the extraction verified rather than assumed.
 
 ### A public hostname was not enough (2026-11-11)
@@ -414,7 +420,7 @@ database would have to write `sent` at the moment it posted, which is a claim it
 cannot support. Pulling means the process that actually talks to the push
 service is the one that records the outcome.
 
-### The deployed bundle is NOT byte-identical to this repository
+### The deployed bundle is NOT byte-identical to this repository *(version 1 only; superseded 2026-11-18, see the note below)*
 
 > **Superseded 2026-11-18 for the running version.** Version 3 was deployed
 > from `0dd6a20` as an 8-file bundle and read back from Supabase byte-identical
@@ -514,7 +520,7 @@ are already queued as well as new ones.
 
 ## 4. What is still to build
 
-Nothing. All four steps are written; what remains is configuration, in §5.
+Nothing to build. All four steps are written and deployed; what remained was configuration, in §5, and §5 items 1 to 7 are done.
 
 ## 5. Owner actions
 
@@ -525,15 +531,18 @@ Full steps, in order, with the commands: `docs/OWNER_ACTIONS.md` §41.
 
 1. ~~Apply `20260927120000_admin_push_subscriptions` (step 2).~~ **DONE
    2026-09-20**, live version `20260920050434`, ledger row 101.
-2. Generate a VAPID key pair — `node scripts/generate-vapid-keys.mjs`.
-3. Store both halves as Edge Function secrets, and the **public** half in
+2. ~~Generate a VAPID key pair — `node scripts/generate-vapid-keys.mjs`.~~
+   **DONE** (per the Status block: the public key is in `app_settings` and the
+   sender delivers).
+3. ~~Store both halves as Edge Function secrets, and the **public** half in
    `app_settings.admin_push_vapid_public_key` (a live write, so its own §5
-   action).
-4. Deploy `admin-push-dispatch`.
+   action).~~ **DONE** (same evidence).
+4. ~~Deploy `admin-push-dispatch`.~~ **DONE 2026-09-20** (version 1), version 3
+   since 2026-11-18 (item 7).
 5. ~~Apply `20260928120000_admin_push_closure_notifications` (step 4).~~ **DONE
    2026-09-20**, live version `20260920061858`, ledger row 102.
 6. ~~**Delete the Home Screen icon and re-add it**, last.~~ **DONE 2026-09-20 —
-   the bell was tapped and notifications arrive.** See §1 — iOS fixes an
+   the bell was tapped and notifications arrive.** See the Status block — iOS fixes an
    installed web app's capabilities at install time, which is why this was last.
 7. ~~**Redeploy `admin-push-dispatch`**~~ **DONE 2026-11-18**, on the owner's
    approval ("deploy admin-push-dispatch"): v2 → **v3**, ACTIVE, `verify_jwt`
@@ -588,7 +597,13 @@ accepted during the cut-over so deploys need not be atomic.
 only the `sb_secret_…` key on `apikey` is accepted. The legacy Bearer is refused,
 and a function with no `SUPABASE_SECRET_KEYS` refuses to build its service
 client. The bundle changes, so `admin-push-dispatch` needs its own redeploy
-(`docs/SUPABASE_API_KEYS.md` §3, step 9). Nothing about the
+(`docs/SUPABASE_API_KEYS.md` §3, step 9). **Dated 2026-11-26: the running v3 was
+built from `0dd6a20` (2026-11-17), which is before the step 9 merge `0b7d453`
+(2026-11-18), so v3 still accepts the legacy Bearer that the repository now
+refuses; `SUPABASE_API_KEYS.md` lists that redeploy as still to do. Whether a
+later deploy has happened is not known from the repository.** The Status block's
+"version 3 since 2026-11-18" and "matches the repository at that commit" mean
+that commit, not the current default branch. Nothing about the
 admin-only audience, the subscription store or the customer-channel separation
 changes. Steps: `docs/SUPABASE_API_KEYS.md`; pinned by
 `adminPushWiring.test.ts` ("accepts the service role only through the shared

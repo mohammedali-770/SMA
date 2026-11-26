@@ -9,9 +9,9 @@
 - Vault secrets:
   - `account_deletion_project_url`
   - `account_deletion_process_secret`
-- Scheduler SQL: three migrations, in this order: `supabase/migrations/20260716160000_account_deletion_scheduler_auth.sql` (verifies the scheduler secret against Vault), `20260716170000_account_deletion_scheduler_runtime.sql` (enables `pg_net` and `pg_cron`), and `20260716180000_account_deletion_scheduler_job.sql` (defines `invoke_account_deletion_processor()`; the Production cron job itself is environment configuration created separately). A file named `20260716170000_account_deletion_scheduler.sql` does not exist; this line named it until 2026-11-24.
+- Scheduler SQL: three migrations, in this order: `supabase/migrations/20260716160000_account_deletion_scheduler_auth.sql` (verifies the scheduler secret against Vault), `20260716170000_account_deletion_scheduler_runtime.sql` (enables `pg_net` and `pg_cron`), and `20260716180000_account_deletion_scheduler_job.sql` (defines `invoke_account_deletion_processor()` **and schedules the `account-deletion-processor` cron job**, `cron.schedule(..., '* * * * *', 'select public.invoke_account_deletion_processor();')`; only the two Vault entries are environment configuration created separately. Corrected 2026-11-26: this said the cron job was created separately, and the runtime migration's own header comment still says so, which is stale next to this file). A file named `20260716170000_account_deletion_scheduler.sql` does not exist; this line named it until 2026-11-24.
 
-The cron job stores only `select public.invoke_account_deletion_processor();`. The helper reads the endpoint and dedicated credential from Supabase Vault at runtime and invokes `account-delete-scheduler` through `pg_net`. The gateway verifies the Vault credential through the restricted database RPC and forwards the request to `account-delete-process` using its built-in service-role credential. The service-role key is never placed in Vault, Git, cron.job, or the request sent by Postgres.
+The cron job stores only `select public.invoke_account_deletion_processor();`. The helper reads the endpoint and dedicated credential from Supabase Vault at runtime and invokes `account-delete-scheduler` through `pg_net`. The gateway verifies the Vault credential through the restricted database RPC and forwards the request to `account-delete-process` with the opaque secret key (`secretKey()` from `_shared/apiKeys.ts`) on `apikey` alone (since the step 9 cleanup of 2026-11-18, below; before it, the built-in service-role credential). The service-role key is never placed in Vault, Git, cron.job, or the request sent by Postgres.
 
 ## Monitoring
 
@@ -58,7 +58,7 @@ untouched.
 fallback is gone. The scheduler answers 503 `scheduler_unavailable` when
 `SUPABASE_SECRET_KEYS` holds no `sb_secret_…` key, even if
 `SUPABASE_SERVICE_ROLE_KEY` is still set; the processor no longer accepts the
-legacy `Bearer <service_role>`. `handler_test.ts` pins both. All three
+legacy `Bearer <service_role>`. `handler_test.ts` pins the scheduler's 503 (a legacy-only environment is a 503 case there); the processor's refusal of the legacy bearer is pinned in `_shared/apiKeys.test.ts`. All three
 account-deletion functions need a redeploy for it (`docs/SUPABASE_API_KEYS.md`
 §3, step 9). Deploy order (processor before its callers) and rollback:
 `docs/SUPABASE_API_KEYS.md` §3.
@@ -85,8 +85,9 @@ stubbed and no `--allow-net`, and pins every branch: CORS preflight, 405 for
 any other method, 503 when `SUPABASE_URL` or the service key is missing, 403
 with no `x-process-secret`, 403 when the RPC refuses, errors or answers anything
 but `true` (the processor is never called), the forward to
-`account-delete-process` in both key formats (legacy: `apikey` and a bearer;
-opaque: `apikey` only, on the RPC call as well), the processor's status, body
+`account-delete-process` with the opaque key (`apikey` only, on the RPC call as
+well; a legacy-only environment is a 503 case, not a forward — corrected
+2026-11-26, this described the pre-step-9 "both key formats" state), the processor's status, body
 and content type relayed, and 502 when the processor is unreachable. The
 `Edge Function typecheck (Deno)` CI job runs it:
 
