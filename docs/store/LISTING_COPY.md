@@ -8,6 +8,8 @@ text and nothing else.
 
 > **Status: drafted 2026-09-16, NOT yet entered in Play Console.**
 >
+> **Flagged 2026-11-26: do not paste the "Payment" lines (full descriptions, both languages, and the release notes) while online payment is on.** The file's own reading (below) is that card payment is on, and read live 2026-11-24 `app_settings.online_payment_enabled` is `true`, so C-CASH is false. The text blocks are unchanged and are the owner's to rewrite; other claims the text makes that no longer match the app are listed, per sentence, in [`../legal/DRAFTS_STATE_REVIEW_20261126.md`](../legal/DRAFTS_STATE_REVIEW_20261126.md).
+>
 > **The Arabic is engineering-drafted and has not had a native read.** The default
 > listing language is Arabic, so it is the version most customers see. Read it
 > before pasting.
@@ -33,15 +35,15 @@ against the Data Safety form and the privacy policy it links.
 | **C-VAT** | full ar/en | displayed prices **include VAT** | prices are VAT-inclusive as rendered | `previewTotals.ts` · `TotalsCard.tsx` |
 | **C-REDEEM** | full ar/en · release notes | points are redeemed **as a discount at checkout** | checkout offers the points switch on pickup, and the server uses points once at least `min_points_to_redeem` whole points fit the order (100 at 0.10 on 2026-11-14, so SAR 10.00 or more before points) | `place_order` / `compute_order_snapshot`; `previewTotals.ts`; [`../LOYALTY.md`](../LOYALTY.md) §1 |
 | **C-DELIVERY** | short ar/en · full ar/en | delivery is offered | delivery orders reach the POS | [`../LAZYWAIT.md`](../LAZYWAIT.md); live since 2026-08-27 |
-| **C-EXPORT** | full ar/en | you can request a copy of your data | the export screen ships in the installed build | `export_my_data()` is applied; the **screen** needs the next EAS build |
+| **C-EXPORT** | full ar/en | you can request a copy of your data | the export screen ships in the installed build | `export_my_data()` is applied; the build you ship must contain the export screen (`GO_LIVE_READINESS.md` A6 records it in iOS 1.0.0 (27), 2026-09-21; check the build you ship) |
 | **C-NOPROMO** | *(absent by design)* | **no promo-code claim is made** | campaigns have no customer-facing UI | [`../DISCOUNTS_CAMPAIGNS.md`](../DISCOUNTS_CAMPAIGNS.md) · `GO_LIVE_READINESS.md` G6 |
 | **C-NOBRANCH** | *(absent by design)* | **no branch count is stated** | the marketing site says 16; Production has **1 active** of 40 | live `branches` |
 
 **C-CASH becomes false the day online payment is switched on.** On 2026-11-11 the
 owner chose Moyasar as the payment provider, and on the branch
 `feat/moyasar-only-20261111` the app can take a card through Moyasar's page. The
-switch was off on 2026-11-11 (read-only), so the copy below is still true and is
-**not changed here**. Before online payment is switched on
+switch was off on 2026-11-11 (read-only), so the copy below was still true then and was
+**not changed here**. *(That is a 2026-11-11 reading and is superseded by the next paragraph.)* Before online payment is switched on
 (`OWNER_ACTIONS.md` §47.15 and §47.18), rewrite the "Payment" lines in both
 languages and in the release notes, and publish the new listing.
 
@@ -62,9 +64,11 @@ give. The fix reaches customers with the `OWNER_ACTIONS.md` §47.17 build. If
 the minimum or the point value changes, re-read the "What must be true" column.
 
 **C-EXPORT is the one to watch before publishing.** `export_my_data()` is applied
-in Production, but the *Get a copy of my data* screen reaches customers only in
-the next EAS build. If the build you ship does not carry it, delete that bullet
-rather than shipping a listing that promises a screen the app does not have.
+in Production, and `docs/GO_LIVE_READINESS.md` A6 records the *Get a copy of my
+data* screen as already in the binaries (iOS 1.0.0 (27), 2026-09-21; corrected
+2026-11-26: this paragraph used to say it needed the next EAS build). If the build
+you ship does not carry it, delete that bullet rather than shipping a listing that
+promises a screen the app does not have.
 
 **The two absent claims are deliberate and are recorded so nobody "improves" the
 copy by adding them.** A promo-code line would advertise a feature with no UI; a
@@ -142,7 +146,7 @@ Order from Spicy Meal: branch pickup or delivery, with points on every pickup.
 
 للتواصل: info@spicymeal.com.sa
 ```
-*1195 characters.*
+*1183 characters.*
 
 ```en
 Spicy Meal — crispy chicken, sandwiches and meals, since 1997.
@@ -184,13 +188,13 @@ Your privacy
 
 Contact: info@spicymeal.com.sa
 ```
-*1361 characters.*
+*1349 characters.*
 
 ---
 
 ## Release notes — maximum 500 characters per language
 
-For the first release, `v1.0.0` versionCode 2.
+For the first release, `v1.0.0` versionCode 2. *(Dated 2026-09-16: Android versionCode 3 and 4 have been built since, `OWNER_ACTIONS.md`. Record which build these notes describe, and re-check every line, the payment line included, against the build actually submitted.)*
 
 ```ar
 الإصدار الأول من تطبيق سبايسي ميل.

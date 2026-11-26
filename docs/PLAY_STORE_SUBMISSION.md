@@ -57,7 +57,7 @@ to internal testing, and the declarations in §§6-10 answered.
 **What does not:** a completed store listing (§11), any closed test, and
 therefore any route to production.
 
-### The uploaded bundle is current, and that is measured
+### The uploaded bundle was current on 2026-09-16, and is not now
 
 `v1.0.0`, versionCode 2, built from commit `f82cecb`, `targetSdkVersion 36`.
 
@@ -72,6 +72,8 @@ So the bundle carries every mobile change on the branch, including #377's cash
 payment selector. The commits after it touch the web legal pages, the Play icon,
 store assets and documentation only. **Re-run that command before trusting this
 paragraph** — it is a one-line check and it is the whole evidence.
+
+**Corrected 2026-11-26: the paragraph above is a dated statement, not a present one.** At `7b101e0` the same command lists 210 files across 49 commits under `apps/mobile/` (Expo SDK 58, R8 minification, the consent screen, guest browsing, Moyasar), so the uploaded versionCode 2 bundle does NOT carry every mobile change on the branch. Counts recomputed with `git diff --name-only f82cecbe 7b101e0 -- apps/mobile/ | wc -l` and `git log --oneline f82cecbe..7b101e0 -- apps/mobile/ | wc -l`.
 
 ---
 
@@ -485,8 +487,8 @@ if anything changes.
 | Purchase history | Yes | POS | App functionality | `orders`, `order_items` |
 | User IDs | Yes | — | App functionality, Account management | `profiles.id` |
 | Other user-generated content | Yes, optional | POS | App functionality | `orders.notes`, `order_items.note` — free-text order notes are printed on the ticket |
-| Crash logs | Yes, **REQUIRED** | Sentry | Diagnostics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
-| Diagnostics | Yes, **REQUIRED** | Sentry | Diagnostics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
+| Crash logs | Yes, **REQUIRED** | Sentry | Analytics | `Sentry.init` at `apps/mobile/src/lib/observability/index.ts:94`. **Required, not optional: there is no user opt-out** — `config.ts`'s `isSentryEnabled` returns `true` for every non-development environment that has a DSN, and `eas.json` sets `EXPO_PUBLIC_SENTRY_ENV=production`, so it is on for every customer |
+| Diagnostics | Yes, **REQUIRED** | Sentry | Analytics | same, with `tracesSampleRate` sampled; same absence of an opt-out |
 | Device or other IDs | Yes, **REQUIRED** | Expo, then FCM/APNs | App functionality **and Advertising or marketing** | `push_devices.expo_push_token`. **The marketing purpose is still declared:** the same token carries offers to any device whose customer has them on. Since the owner's 2026-11-18 opt-in decision `DEFAULT_DEVICE_PREFS` sets `promosEnabled: false`, so a NEW registration joins the promotional audience only when the customer switches offers on in Profile (§7) — that reaches customers in the next build. Under the superseded 2026-08-20 opt-out decision (`promosEnabled: true`) every granting device was enrolled, and devices registered then keep their setting. Declaring only "App functionality" would understate it either way |
 | **Payment info** | **NO — conditional, and the condition now fails** | — | — | Launch is cash-only; no card number, expiry or CVV is ever collected or stored. `payment_method` records *how*, not an instrument. **The "NO" was true only while online payment was off. Read live 2026-11-24, `app_settings.online_payment_enabled` is `true`, so the condition no longer holds.** The replacement answer is the owner's decision and is not written here: see §6b and `OWNER_ACTIONS.md` §65 |
 | **Advertising ID** | **NO** | — | — | No `AD_ID` permission and no ads SDK in the AAB |
@@ -520,9 +522,9 @@ longer fires for it. Both take effect from the next build.
 
 **Sentry is configured not to send PII — but "no PII" is too strong, and the
 precise version matters for the form.** `sendDefaultPii: false` with a
-`beforeSend` scrubber, on native (`observability/index.ts:106,116`) and on web
+`beforeSend` scrubber, on native (`observability/index.ts`, `sendDefaultPii` and `beforeSend`) and on web
 (`webCore.ts:125,145`). **It would keep a pseudonymous user id, and nothing sets
-one; corrected 2026-11-11.** `sanitize.ts:228-233` reduces a user object to
+one; corrected 2026-11-11.** `sanitize.ts` (the `if (event.user)` block) reduces a user object to
 `{ id }`, but no code calls `Sentry.setUser` on any surface, so the app attaches no
 account id to a report. This paragraph used to conclude that crash reports are
 linkable to an account, and that rested on the id being set. "User IDs" stays
@@ -598,11 +600,11 @@ is the owner's call against Google's definitions on the day.
 
 | Console question | Answer | Why |
 | --- | --- | --- |
-| Does your app collect or share any of the required user data types? | **Yes** | The table above; eleven types are collected |
+| Does your app collect or share any of the required user data types? | **Yes** | The table above; twelve types are marked collected (recounted 2026-11-26; this said eleven) |
 | Is all of the user data collected by your app encrypted in transit? | **Yes** | Everything is HTTPS to Supabase; no cleartext path exists, and the AAB carries no `android:usesCleartextTraffic` |
 | Which methods of account creation does your app support? | **Phone number** only | There is no email/password and no social sign-in. Login is WhatsApp OTP to a Saudi mobile, enforced client and server side. From the build that carries guest browsing (2026-11-09), browsing the menu needs no account, but an account is still created only by phone number |
 | Do you provide a way for users to request that their account and data be deleted? | **Yes**, with the URL in §7 | Both routes exist: in-app (Profile → Account settings → Delete account) and the public URL Play requires |
-| Do you provide a way to request that *some* data be deleted without deleting the account? | **Yes** | `export_my_data()` and the account-deletion request path; see `GO_LIVE_READINESS.md` A6 |
+| Do you provide a way to request that *some* data be deleted without deleting the account? | **Yes** *(unverified 2026-11-26: `export_my_data()` is a read-only copy and the account-deletion path deletes the account, so neither deletes only some data; the owner should name the screen that does, or answer No)* | `export_my_data()` and the account-deletion request path; see `GO_LIVE_READINESS.md` A6 |
 
 **One correction is worth keeping because the mistake is easy to repeat.** The
 purposes list was first answered with **Diagnostics** for the Sentry rows.
@@ -762,7 +764,7 @@ for evidence.** A match is a place to look, never a finding.
 
 | Declaration | Answer | Why |
 | --- | --- | --- |
-| App access | **All or some functionality is restricted** | The whole app is behind the login wall; the test-number credentials go here. See §4 |
+| App access | **All or some functionality is restricted** | In the uploaded build the whole app is behind the login wall; from the build that carries guest browsing the menu, branch choice and cart need no account and checkout, orders and profile do, so "some functionality" is the accurate answer for that build. The test-number credentials go here. See §4 |
 | Ads | **No ads** | No advertising SDK, no `AD_ID` permission — checked by name in the AAB |
 | **Financial features** | **Rewards, points, frequent flier miles, and other incentives** | See below — this was answered wrongly first |
 | Health features | **None** | See below — this was answered wrongly first |
@@ -1173,7 +1175,7 @@ Each row was read from Google's own pages on 2026-11-10.
 | **27 Jan 2027** (a 30-day self-extension is available) | **Precise-location declaration:** *"All apps requesting precise location (ACCESS_FINE_LOCATION) must complete a declaration in the Play Console to demonstrate access needs and justify why the location button or coarse location is insufficient."* ([answer/17033915](https://support.google.com/googleplay/android-developer/answer/17033915)) | Yes. The app requests `ACCESS_FINE_LOCATION` | **Owner:** submit the declaration below |
 | **1 Feb 2027** | **16 KB page sizes:** *"Starting February 1, 2027, if your app updates don't support 16 KB memory page sizes, you won't be able to release these updates."* ([page sizes](https://developer.android.com/guide/practices/page-sizes)) | Yes. The app targets API 36 and ships native code | **Measure it** on the uploaded bundle (below) |
 | **Feb 2027** | **Memory thresholds:** *"Google Play has defined bad behavior thresholds for your app's core vitals. Memory usage is being introduced as new core vitals metrics"*: overall memory and bitmap memory, judged at the 90th percentile on the last 28 days ([answer/17492799](https://support.google.com/googleplay/android-developer/answer/17492799)) | **Yes, every app.** These have no size exemption. They are measured from real users' devices, so there is nothing to read until the app has users on Play | **Owner:** once the app is in production, check **Android vitals → Memory** |
-| **Feb 2027** | **DEX code optimisation:** *"a minimum of 25% optimization, obfuscation and shrinking for any app uploads to Play Console"*, which *"will only be enforced where you have non-negligible DEX sizes"*: more than 10 MB for an app (answer/17492799) | Only above 10 MB of DEX. **The app ships with no R8 shrinking today** | **Owner:** read the DEX size in App bundle explorer. R8 comes with the Expo SDK 58 upgrade (#430) |
+| **Feb 2027** | **DEX code optimisation:** *"a minimum of 25% optimization, obfuscation and shrinking for any app uploads to Play Console"*, which *"will only be enforced where you have non-negligible DEX sizes"*: more than 10 MB for an app (answer/17492799) | Only above 10 MB of DEX. **The uploaded bundle ships with no R8 shrinking** *(the source now sets `enableMinifyInReleaseBuilds: true`, in `apps/mobile/app.json`, so the next build is minified)* | **Owner:** read the DEX size in App bundle explorer. R8 comes with the Expo SDK 58 upgrade (#430) |
 | **Apr 2027** | **Zero-Tap Sign-In restoration** for apps with sign-in (answer/17492799) | Yes | A design document first, then the native work (2026-11-09 compliance plan, phase 5) |
 
 ### The precise-location declaration — proposed answers
@@ -1204,6 +1206,8 @@ button to the Android location button when it targets API level 37, where the
 button becomes the required method for this use.
 ```
 
+**Note, 2026-11-26 (the draft text above is unchanged):** "Location is requested only when the customer opens the pickup tab or taps that button" omits a third read. A delivery checkout reads the device position at balanced accuracy, without prompting, when permission was already granted, to show an advisory warning when it is far from the delivery pin (`CheckoutScreen.tsx`, `getForegroundPermissionsAsync`); the fix stays on the phone. Whether to add "or when a delivery checkout compares the pin with the device position, using an existing grant" before pasting is the owner's call.
+
 **The draft does not claim an ongoing need, because there isn't one.** The page
 is explicit that a one-time address pick is what the new location button is for:
 
@@ -1220,7 +1224,7 @@ exposing it, and belongs to whichever change raises the target API.
 
 ### 16 KB — expected, not yet measured
 
-The bundle is built by React Native 0.86 on Expo SDK 57, and no one has read the
+The UPLOADED bundle is built by React Native 0.86 on Expo SDK 57 (the source now has React Native 0.88.1 on Expo SDK 58, so the 16 KB check belongs on the next bundle), and no one has read the
 result. Android's [page-size guide](https://developer.android.com/guide/practices/page-sizes)
 treats compatibility as **two properties, and both must hold**:
 

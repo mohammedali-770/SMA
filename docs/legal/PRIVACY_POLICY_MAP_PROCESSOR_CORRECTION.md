@@ -1,5 +1,7 @@
 # Privacy policy — the map sub-processor is named wrongly
 
+> **State note, 2026-11-26 (added by a document review; the text below is unchanged). This draft is CLOSED and historical: do not publish either option.** The item it served is closed: `privacy_policy` v2.3 has been live since 2026-09-16 and names Google for the map and Apple for the iPhone reverse-geocode (`docs/OWNER_ACTIONS.md` §34, closed 2026-09-16; `docs/GO_LIVE_READINESS.md`). The status line below ("DRAFT, awaiting owner publication") and the instruction to publish Option A or B and bump to v2.2 are history, and v2.2's "the map and address search you use" was found to be wrong and replaced, because there is no address search in either customer channel (`MapSearchBox` is imported only by admin screens). The module path `apps/mobile/src/lib/googleMaps.ts` cited below is `src/lib/googleMaps.ts`. The "precise location" section competes with `docs/legal/PRIVACY_POLICY_LOCATION_USES_CORRECTION.md` for the same Device-location line. What the live row says today is not known from the repository.
+
 > **Status: DRAFT, awaiting owner publication.** Editing a live `legal_documents`
 > row is a CLAUDE.md §5 action and is not something an agent does. This file
 > holds the exact replacement text and the evidence behind it, so publishing is

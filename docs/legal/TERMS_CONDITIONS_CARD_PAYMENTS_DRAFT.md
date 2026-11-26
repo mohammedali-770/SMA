@@ -1,5 +1,13 @@
 # Terms & Conditions: online card payment (draft)
 
+> **State note, 2026-11-26 (added by a document review; the proposed text below is unchanged and nothing in this file has been published).** The proposed PAYMENT line is conditional ("where the app offers it") and is not contradicted by the current state. Several drafting notes are. Where a note below disagrees with this block, this block is newer.
+>
+> - **The premise (online payment still off) has been overtaken.** Read live 2026-11-24, `app_settings.online_payment_enabled` is TRUE, the `payment-refund-worker` cron job is ACTIVE (switched on 2026-11-19) and 19 online orders have `payment_status` paid (`CLAUDE.md` §6). Whether the live `privacy_policy`, `payment_policy`, `cancellation_refund_policy` and `terms_conditions` rows already name Moyasar is **not known from the repository**.
+> - **TC-1 (gap PG-13) is closed.** A paid card order that is cancelled is now refunded automatically, in full (owner decision 2026-11-19; `20261018120000_refund_cancelled_paid_orders`, applied, ledger row 123). "Refunded only by hand in the Moyasar dashboard" and "does not touch `order_refunds`" are the 2026-11-13 behaviour, and following them now would double-refund. Duplicate payments are still by hand. The two-sentence disagreement inside the refund draft that TC-1 records was answered there (D14).
+> - **TC-4 is superseded.** The receipt no longer ignores `orders.status`: `apps/mobile/src/features/orders/orderConfirmation.ts` has the states `order_cancelled`, `cancelled_refund_pending`, `cancelled_refunded` and `cancelled_refund_failed`.
+> - **TC-2, row 2 and the line near the end ("TEST mode refuses every customer checkout").** Not unconditional since 2026-11-18: `PAYMENT_ALLOW_TEST_CHECKOUT`, narrowed since 2026-11-22 to customers on `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`. Whether either secret is set is not known from the repository.
+> - **Citations.** The `path:line` citations (rows 2 and 3, "Left unchanged on purpose", TC-1 to TC-4, Open decision 3 and the Fix log) are line numbers at `04eb351` and many no longer land on the cited text; find the symbol. Two `lazywait-sync` anchors were re-anchored on 2026-11-24.
+
 > **Status: DRAFT, engineering-written 2026-11-13, against the live row and the
 > four fact-checks in `docs/readiness/20261113-card-payments-reviews/` that propose wording for this document
 > (see "Fix log" at the end). Not reviewed by counsel. Not published.** Editing a
