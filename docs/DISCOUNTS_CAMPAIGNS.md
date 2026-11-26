@@ -5,7 +5,7 @@ This document owns three separate mechanisms, at very different stages:
 | Mechanism | Status |
 | --- | --- |
 | **Campaigns** (#100) | Schema applied to Production, **inert** — no discount can affect a total. |
-| **Comped customers** (2026-08-26) | **APPLIED to Production 2026-08-26.** Live and automatic the moment an administrator adds a member; `comp_members` is currently empty. |
+| **Comped customers** (2026-08-26) | **APPLIED to Production 2026-08-26.** Live and automatic the moment an administrator adds a member. (`comp_members` was empty on 2026-08-26; read live 2026-11-12 it held 1 row, 0 active; its count today is not known from the repository.) |
 | **Coupons** (`public.coupons` + `validate_coupon`) | **DEACTIVATED 2026-09-10** — both codes `is_active = false` on owner approval; `validate_coupon` refuses them. See below. |
 
 Coupons are the third and oldest mechanism, and the status line above is
@@ -175,7 +175,9 @@ A campaign refusal echoes the code the **caller supplied**, never the row's — 
 a campaign addressed by id cannot have its secret promo code read back through a
 failure path.
 
-`20260920120000_promo_disclosure_hardening` (written, not applied). Money path
+`20260920120000_promo_disclosure_hardening` (**applied 2026-09-14 10:52:32 UTC**,
+live `20260914105232`, `MIGRATIONS.md` ledger row 95; it was "written, not applied"
+when this section was written). Money path
 untouched: live `place_order` and `compute_order_snapshot` read only `valid`,
 `message` and `discount_amount` from `validate_coupon`, which was checked against
 their stored bodies before the file was written. No deploy implied. Neither
@@ -209,16 +211,19 @@ engineering ones. Nothing else is deployed, and no campaign row exists.
 The 2026-09-02 dead-code audit established a fact this document did not state:
 **the campaigns feature has no user interface at all.**
 
-- `src/lib/campaigns.ts` — 148 lines: `campaignsApi` (list/create/update/delete
+- `src/lib/campaigns.ts` — 148 lines when written (160 on 2026-11-26): `campaignsApi` (list/create/update/delete
   plus a `compute_campaign_discount` preview), `selectLiveCampaigns`,
   `formatCampaignSummary`. Its **only importer in the whole repository is its own
   test file.**
 - There is **no Campaigns tab**. `ADMIN_NAV` has 14 entries and all 14 are routed;
   none of them is campaigns. The two `campaign` matches in `SettingsPanel.tsx` are
   the *loyalty* toggle ("Active Rewards Campaign"), a different feature.
-- `grep -il campaign apps/mobile/src` returns **nothing** — the customer app has
-  no campaign surface either, so no customer can enter a code.
-- `campaign_redemptions` is therefore written **only by `discounts_campaigns_test.sql`**,
+- `grep -il campaign apps/mobile/src` returned **nothing** when written (it now
+  returns one test file, `rpcContractParity.test.ts`, which only mentions
+  `compute_campaign_discount` in a comment) — the customer app has no campaign
+  surface either, so no customer can enter a code.
+- `campaign_redemptions` is therefore written **only by SQL test files**
+  (`discounts_campaigns_test.sql`, and since then `promo_disclosure_test.sql`),
   which is why `global_limit` and `per_user_limit` are unenforced in practice.
 
 **The module was deliberately kept rather than deleted.** It is finished,
@@ -235,7 +240,8 @@ a working feature and nobody deletes it as rot.
   - `public.campaigns` — bilingual name/description; `type` in
     `('percentage','fixed','free_delivery')`; `value`; optional uppercase `code`
     (unique when present); `starts_at`/`ends_at`; `min_order_amount`;
-    `max_discount_amount` (percentage cap); `per_user_limit`/`global_limit`;
+    `max_discount_amount` (cap on `percentage` and `fixed` discounts, see Q7);
+    `per_user_limit`/`global_limit`;
     optional `branch_id` scoping; `is_active`; timestamps + `updated_at` trigger.
   - `public.campaign_redemptions` — append-only ledger `(campaign_id, user_id,
     order_id, discount_amount, redeemed_at)`; the source of truth for usage
@@ -301,7 +307,9 @@ bake wrong pricing into a server-authoritative RPC. Items **1**, **3**, **4**,
 7. **Percentage vs. fixed caps.** `max_discount_amount` caps `percentage` and
    `fixed` discounts and both are additionally clamped to the subtotal;
    `free_delivery` is clamped only to the delivery fee. **Confirm** the cap should
-   also apply to `fixed`.
+   also apply to `fixed`. *(Answered by the code: `compute_campaign_discount` and
+   `validate_coupon` apply `max_discount_amount` to both types. The owner has
+   not confirmed that is the intent.)*
 8. **Branch scoping** uses `on delete cascade` (deleting a branch removes its
    scoped campaigns). **Confirm** that is the desired lifecycle vs. `set null`
    (campaign becomes all-branches) or `restrict`.
@@ -399,7 +407,7 @@ and not its twin is a bug:
    such property — the goods still have a value even when the customer pays
    nothing. Two guards replace the accident: an explicit `not v_is_comp`, and a
    `least(v_earn_base, v_total)` clamp that would hold the number at zero even if
-   the explicit guard were removed. `loyalty_item_exclusion_test.sql` case 7
+   the explicit guard were removed. `loyalty_item_exclusion_test.sql` case 5 (corrected 2026-11-26; this said case 7)
    pins both, and the mutation check for this migration is *delete the guard and
    the clamp together and watch a free order start earning*;
 4. the total is **zeroed before VAT is derived from it**, so VAT falls out at
@@ -490,11 +498,22 @@ suite covers the sequential retry and stops there rather than pretending.
 
 ## What the branch sees
 
-`buildCreateOrderPayload` sends **no order-level money at all** (see Q9 in
+> **Corrected 2026-11-26.** The next two paragraphs are the reasoning of
+> 2026-08-26, when the payload carried no order-level money. Q9 was answered on
+> 2026-08-27 (`docs/integrations/Lazywait_API_Reference.md`): `buildCreateOrderPayload`
+> now sends `subtotal` and `total` (and, when non-zero, `discount`, `tax` and the
+> delivery fee) from the order snapshot, so a comped ticket prints `Total 0.00`
+> beside the label, which is the intended ticket. The label is still sent and is
+> now belt and braces. The `is_paid` paragraph is superseded too: since the
+> owner's 2026-11-19 decision the worker sends `is_paid` for a card order with a
+> captured payment record (`posPaidFlag.ts`); a comped order has none, so it
+> still never gets the flag.
+
+`buildCreateOrderPayload` sent **no order-level money at all** (see Q9 in
 `docs/integrations/Lazywait_API_Reference.md`) and each line carries its
-undiscounted menu price. A comped ticket would therefore be
-**indistinguishable** from a full-price one — the cashier would have no way to
-know why nobody is paying.
+undiscounted menu price. A comped ticket would therefore have been
+**indistinguishable** from a full-price one — the cashier would have had no way
+to know why nobody is paying.
 
 So the order-level free-text note carries a label:
 
@@ -506,7 +525,7 @@ It is prefixed, so it survives a POS display that truncates a long note.
 
 It is deliberately **not** the contract's `is_paid` flag. That distinction is
 the point: `is_paid` changes the POS's own payment state, which is the financial
-signal CLAUDE.md §6 reserves for a separate owner decision; the label only
+signal CLAUDE.md §6 then reserved for a separate owner decision; the label only
 annotates the field that already carries the customer's instructions. For the
 same reason the text states what the order **is** rather than instructing the
 cashier what to collect.
@@ -748,12 +767,17 @@ whose POS sends exhaust the retry budget. For a comped order that is refund
 language for money nobody paid, and `order_refund_due` (which requires
 `total > 0`) will never enrol it. The defect pre-dates this work; comped orders
 make it reachable. Flagged rather than fixed, because changing refund language
-is payment-adjacent and §6 is active.
+was payment-adjacent and §6 was in force when this was written (the freeze ended
+2026-11-11; the gap is still open and unscheduled, and the customer copy for it
+is `oc_failed_refund_pending_body`: a comped customer whose POS sends fail is
+told their payment will be refunded, though nothing was paid and no refund can
+be enrolled).
 
 ## Comped orders and the customer order limits (2026-11-12)
 
-`20261005120000_server_input_bounds` (written, **NOT applied**) adds three
-refusals to `place_customer_order`: no verified phone, too many open orders,
+`20261005120000_server_input_bounds` (**applied 2026-11-13 16:43:01 UTC**,
+`MIGRATIONS.md` ledger row 111; it was "written, NOT applied" when this section
+was written) adds three refusals to `place_customer_order`: no verified phone, too many open orders,
 too many orders in the hour. A comped customer's cash order goes through that
 wrapper like any other — `SM-2026-000055` and `-000056` did — so the rules apply
 to comps too. That is intended: a comp is free food with no cap, which is where
@@ -770,8 +794,9 @@ What was checked, on the local chain (`server_input_bounds_test.sql` CASE 12):
   `comp_members` holds 1 row, 0 active.
 
 What does not go through the wrapper: the online zero-total path
-(`begin_checkout_session` → `insert_order_from_snapshot`) is frozen under
-CLAUDE.md §6 and is not covered by these rules. The call centre has no
+(`begin_checkout_session` → `insert_order_from_snapshot`) was frozen under
+CLAUDE.md §6 when this was written (the freeze ended 2026-11-11) and is not
+covered by these rules. The call centre has no
 order-creation path at all.
 
 The app-side change in `apps/mobile/src/services/api.ts` is that `placeAndSync`

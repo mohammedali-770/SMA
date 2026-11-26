@@ -39,6 +39,28 @@ The app's floor is iOS 16.4.
 
 **Step A1, owner, on a real iPhone, in TEST mode, no code:**
 
+> **Corrected 2026-11-26: A1 is not a five-minute check with no side effects, and
+> the "no code" framing hides owner-approved changes.** Written 2026-11-18, before
+> the state below was recorded. Before anyone runs it:
+>
+> - **Customer checkout is refused in TEST mode** (`payment-initiate` answers
+>   `test_mode`) unless the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT` is
+>   exactly `true` (`PAYMENTS.md` §3, "The testing-phase switch"). That secret
+>   must be unset again before card payments go live, and setting or unsetting it
+>   is an owner-approved Supabase secrets change. Whether it is set now is not
+>   known from the repository.
+> - **A test order is a real order**: it is created paid, goes to the branch POS
+>   as a real kitchen ticket, earns loyalty points on delivery and shows in
+>   reports. At 200.00 to 300.00 SAR that is a large phantom ticket to warn the
+>   branch about, and the refund is a separate step (`PAYMENTS.md` §3).
+> - **Read live 2026-11-24, `online_payment_enabled` is `true`** (19 online orders
+>   paid, `PAYMENTS.md` §1). The gateway's mode was not read. If it is LIVE,
+>   running A1 "in TEST mode" would mean switching the payment row back to TEST
+>   while customers can pay, which refuses them. Check the payment row's mode
+>   first; do not switch it for this check without the owner's approval.
+> - `PAYMENTS.md` §9 part B lists the Apple Pay sheet as a live-mode go-live
+>   check on a real iPhone, so this proposal and that list disagree on the mode.
+
 1. Place a **card** order whose total is **between 200.00 and 300.00 SAR**.
    Moyasar's Apple Pay sandbox succeeds only in that range (`PAYMENTS.md` §9.A).
 2. On the payment page, tap **Apple Pay**.
@@ -53,7 +75,8 @@ not code.
 
 **If A1 fails:** we build a native Apple Pay sheet, §4. That needs the Apple
 prerequisites in §6 and is best done with the company Apple account move
-(`iOS_Move_To_Company_Account` plan), because the Merchant ID and certificate
+(`iOS_Move_To_Company_Account` plan; no file of that name is in the repository
+as of 2026-11-26, so the dependency cannot be followed from here), because the Merchant ID and certificate
 belong to the account that ships the app.
 
 ## 3. Saved cards
@@ -111,7 +134,13 @@ invoice page.
 **A returning customer:**
 
 1. Checkout offers **"Pay with Visa •••• 1111"** next to "Card" and "Cash".
-   Nothing is preselected (owner decision, 2026-09-14).
+   Nothing is preselected for a first-time customer (owner decision,
+   2026-09-14). **Corrected 2026-11-26:** since 2026-11-19 the app remembers each
+   account's last method and preselects it when it was **online** and online is
+   offered; cash is never preselected (`rememberedPreselection` in
+   `apps/mobile/src/lib/payment.ts`, `PAYMENTS.md` §4, "A returning customer's
+   last method"). How a remembered "saved card" choice would be stored in and
+   restored from that memory is not designed here.
 2. On tap, the server charges the token with the **secret key**. A token never
    goes to the app.
 3. If Moyasar asks for 3-D Secure, the WebView opens the `transaction_url`.
@@ -152,7 +181,7 @@ invoice page.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
-| D1 | Run step A1 (Apple Pay in the current WebView) | Yes, now: no code, five minutes |
+| D1 | Run step A1 (Apple Pay in the current WebView) | Yes, no code, but not "five minutes, no side effects": read the corrected preconditions under A1 first (2026-11-26) |
 | D2 | Build saved cards (§3) | Yes, after Moyasar enables Tokenization and answers the SAQ question in §6 |
 | D3 | "Save this card" wording, EN and AR | I draft it; the Arabic gets a native read (`OWNER_ACTIONS.md` §35) |
 | D4 | Native Apple Pay (§4) | Only if A1 fails, and with the company Apple account |

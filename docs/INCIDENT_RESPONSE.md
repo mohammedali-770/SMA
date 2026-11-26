@@ -1,6 +1,6 @@
 # Incident Response
 
-> **Updated 2026-08-12.** Internal health/alerting exists, but source does not prove that an independent external service can page a human. Treat independent monitoring/contact readiness as unverified until `OWNER_ACTIONS.md` §7 is completed.
+> **Updated 2026-08-12; later sections carry their own dates (payment section corrected 2026-11-26).** Internal health/alerting exists, but source does not prove that an independent external service can page a human. Treat independent monitoring/contact readiness as unverified until `OWNER_ACTIONS.md` §7 is completed.
 
 ## 1. Detection reality
 
@@ -21,7 +21,7 @@ Therefore:
 - keep primary/secondary responder contacts documented;
 - record how an incident was actually detected.
 
-## 1b. The launch-week alert watch — until dispatch exists, this IS the pager
+## 1b. The launch-week alert watch — while alert mail is off, this IS the pager
 
 **Added 2026-09-03 for X3.** The alert engine works and, when this was written, had never once reached a
 human: every row it had ever produced was `('in_app','recorded')` and stopped in the
@@ -63,8 +63,9 @@ Judge on **status**, not on the presence of a row:
   warning is still open at the next check, escalate it.
 - **`recovered`** → history. Do not chase it.
 
-**The baseline, measured live 2026-09-03 so a watcher knows what normal looks
-like.** Six alert states exist in total and **all six are `recovered`; nothing is
+**The baseline, measured live 2026-09-03 (history: alert rules and operating
+time have been added since, so the counts below are not today's figures) so a
+watcher knows what one healthy shape looked like.** Six alert states exist in total and **all six are `recovered`; nothing is
 open.** Everything that has ever fired:
 
 | Fingerprint | Severity | Times | Shape |
@@ -122,7 +123,7 @@ Do not make a speculative Production database/provider change merely to “see i
 Prefer the least invasive supported control:
 
 1. **Supported admin setting/control** designed for the operation.
-2. **Revert/rollback to a known reviewed web artifact** if the release itself is clearly bad.
+2. **Revert/rollback to a known reviewed web artifact** if the release itself is clearly bad. A Vercel Production change is an owner-approval action (CLAUDE.md §5; `ROLLBACK.md`) unless the owner has pre-authorised it in section 2.
 3. **Disable an affected product/branch/integration through a supported admin control** only after understanding operational consequences.
 4. **Privileged Production write/deploy/migration** only with the required explicit approval and a precise, auditable plan.
 
@@ -151,9 +152,9 @@ The Lazywait lifecycle deliberately prevents ambiguous automatic resends because
 
 ## 7. Payment/refund incidents
 
-The payment provider is **Moyasar** (owner decision, 2026-11-11, CLAUDE.md §6). Online payment was **off** on 2026-11-11 (read-only), so until the owner turns it on, any reported card payment is unexpected. *Changed 2026-11-12: this section used to say no provider was selected and payment work was frozen.*
+The payment provider is **Moyasar** (owner decision, 2026-11-11, CLAUDE.md §6). Online payment was **off** on 2026-11-11 (read-only) and was read **on** on 2026-11-22 and 2026-11-24 (19 online orders paid), so a reported card payment is **not** unexpected: check `online_payment_enabled` and the order's payment state before deciding whether a card payment should exist, and do not rely on a date in this file. *Changed 2026-11-12: this section used to say no provider was selected and payment work was frozen.*
 
-**First, if online payments are misbehaving, switch online payment off:** console → Settings → Payment Methods → Online Payment off. Switching off is always allowed. The app then stops offering online payment at checkout; cash continues. The switch stops new checkout sessions only (`begin_checkout_session` is the one thing that reads it). A session opened before the switch can still be resumed, get a new invoice and be paid until it expires, and a payment already under way on Moyasar's page can still complete; the webhook still confirms both. Turning it back on is an owner action.
+**First, if online payments are misbehaving, switch online payment off:** console → Settings → Payment Methods → Online Payment off. Switching off is always allowed. The app then stops offering online payment at checkout; cash continues. The switch stops new checkout sessions only: the server refuses to start a new online checkout (`begin_checkout_session`, and `place_order` for an `online` method), and the clients hide the option. A session opened before the switch can still be resumed, get a new invoice and be paid until it expires, and a payment already under way on Moyasar's page can still complete; the webhook still confirms both. Turning it back on is an owner action.
 
 If a customer reports a money movement:
 
@@ -166,7 +167,7 @@ If a customer reports a money movement:
 
 **A second payment for an already-paid order** is recorded, not reported paid: a `failed` `payment_records` row with `failure_code = 'duplicate_payment'`, plus an `integration_sync_logs` row. **It raises the critical watchdog incident R15 `DUPLICATE_PAYMENT_RECORDED`** (live since 2026-11-17, `20261013120000`), which reaches the alert inbox and the "Refunds and payments needing attention" card, with the Moyasar payment id to search for. A duplicate is **not** refunded automatically, by decision (D2, 2026-11-17): it is refunded by hand in Moyasar's dashboard, as an owner action. How to find and refund one: `PAYMENTS.md` §10.
 
-**A paid card order that is cancelled is refunded automatically** (`20261018120000`, applied; `PAYMENTS.md` §6; `OWNER_ACTIONS.md` §47.20 and §61), by the refund worker, in full, on its next five-minute run. **Do not also refund it by hand in the Moyasar dashboard.** The automatic attempt that follows is expected to be refused, and that raises R14 `REFUND_FAILED`, a critical incident for a refund that was in fact made, which then stays open. Look at the order's refund status in the console first. An order cancelled before that file was applied was not enrolled (no backfill) and is the one case still refunded by hand.
+**A paid card order that is cancelled is refunded automatically** (`20261018120000`, applied; `PAYMENTS.md` §6; `OWNER_ACTIONS.md` §47.20 and §61), by the refund worker, in full, on its next five-minute run. **Do not also refund it by hand in the Moyasar dashboard.** What the automatic attempt does after a hand refund is unproven (`PAYMENTS.md` §6): on its first attempt it is expected to be refused, which raises R14 `REFUND_FAILED`, a critical incident for a refund that was in fact made, which then stays open; on a later attempt the worker reads the payment first and may record the refund as succeeded. Look at the order's refund status in the console first. An order cancelled before that file was applied was not enrolled (no backfill) and is the one case still refunded by hand.
 
 The refund worker (`payment-refund-worker`, cron job 6) was switched on 2026-11-19 at 04:47 UTC (`OWNER_ACTIONS.md` §47.16) and read active on 2026-11-24; stopping it is `active := false` there. After a restore/rebuild, re-verify it before traffic resumes (`BACKUP_RECOVERY.md`).
 
