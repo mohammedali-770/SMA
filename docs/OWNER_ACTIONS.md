@@ -4668,8 +4668,9 @@ refused while the row is in TEST mode: `payment-initiate` answers
 Since 2026-11-18 the refusal is conditional: it gives way when the Edge Function
 secret `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` and, in the code written
 2026-11-22, only for a customer listed in `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`
-(§60; whether that code is deployed and whether either secret is set is not
-known from the repository). Corrected 2026-11-26.*
+(§60; that code is recorded as deployed 2026-11-22 and redeployed 2026-11-24,
+`CLAUDE.md` §6; whether either secret is set is not known from the repository).
+Corrected 2026-11-26.*
 
 ### 47.5 Apply `20261004120000_drop_tap_payment_rpcs`, by version — after 47.4
 
@@ -5978,13 +5979,19 @@ it was set and Online Payment was on, anyone holding Moyasar's published test
 cards could pay a real order for nothing, and that order reached a branch POS as
 a real kitchen ticket. Turning Online Payment on is also one global setting: it
 offers card payment to every customer, not only to your test account (47.18).
-The amendment further down narrows the switch to listed customers, and it says
-that code is NOT deployed as written. **Whether the narrowed code is deployed,
-whether `PAYMENT_ALLOW_TEST_CHECKOUT` or `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` is
-set in Production, and what the payment row's mode is, are not known from the
-repository (online payment itself was read as on, 2026-11-24). The owner should
-confirm that `PAYMENT_ALLOW_TEST_CHECKOUT` is unset** (Supabase → Edge Functions
-→ Secrets, names only) unless a deliberate test is running.
+The amendment further down narrows the switch to listed customers. That
+amendment's "NOT deployed" was true on 2026-11-22 when it was written and is
+superseded: `CLAUDE.md` §6 records #513 (merged 2026-11-22, `4791e50`) as
+DEPLOYED 2026-11-22 (`payment-initiate` v20, `payment-verify` v16,
+`payment-webhook` v18, `payment-test-config` v17, `lazywait-sync` v25) and
+redeployed 2026-11-24 from `c1de1f9` (`payment-initiate` v21, `payment-verify`
+v17, `payment-webhook` v19, `payment-test-config` v18), so the narrowed
+behaviour is the live one. **What is still not known from the repository: whether
+`PAYMENT_ALLOW_TEST_CHECKOUT` or `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` is set in
+Production, and what the payment row's mode is** (online payment itself was read
+as on, 2026-11-24). **The owner should confirm that `PAYMENT_ALLOW_TEST_CHECKOUT`
+is unset** (Supabase → Edge Functions → Secrets, names only) unless a deliberate
+test is running.
 
 **Which deployed bundles change.** Computed from each function's import closure
 (`deno info`): the change is in `payment-initiate/index.ts`,
@@ -6032,10 +6039,11 @@ the order reads paid, and the function logs show
 from the confirmation.
 
 **Amended 2026-11-22 — the switch now needs a list of customers too (audit
-finding F-EFP-05-001). Written on `fix/payment-initiate-single-invoice-20261122`,
-NOT deployed.** As built on 2026-11-18 the switch admitted EVERY signed-in
+finding F-EFP-05-001). Written on `fix/payment-initiate-single-invoice-20261122`;
+"NOT deployed" was true when written and is superseded: deployed 2026-11-22 and
+redeployed 2026-11-24 (see the 2026-11-26 note above and `CLAUDE.md` §6).** As built on 2026-11-18 the switch admitted EVERY signed-in
 customer: while it was on, anyone with Moyasar's published test cards could pay
-a real order for nothing. Once the new code is deployed, a test card is accepted
+a real order for nothing. With the new code (deployed, see above), a test card is accepted
 only when `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` AND the customer who
 owns the order is listed in a second Edge Function secret,
 **`PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`**: a comma-separated list of customer
@@ -6337,9 +6345,10 @@ nothing was read live by this pass.
   policy, payment policy, cancellation and refund policy, terms and the store forms
   say so is not known from the repository (F-DOC-06-001, F-DOW-01-003).
 - **`PAYMENT_ALLOW_TEST_CHECKOUT` state.** Whether the secret (and
-  `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`) is set in Production, and whether the 2026-11-22
-  narrowed code is deployed, is not known from the repository; the owner should confirm
-  the first is unset (F-DOW-01-002, F-DOW-01-003, F-EFP-05-001).
+  `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`) is set in Production is not known from the
+  repository; the owner should confirm the first is unset. The narrowed code itself is
+  recorded as deployed 2026-11-22 and redeployed 2026-11-24 (`CLAUDE.md` §6)
+  (F-DOW-01-002, F-DOW-01-003, F-EFP-05-001).
 - **Google API key restriction.** `apps/mobile/google-services.json` carries a Google API
   key. Whether it is restricted to the app's package and the Firebase APIs in Google
   Cloud is not established by anything in the repository; checking it is an owner step
