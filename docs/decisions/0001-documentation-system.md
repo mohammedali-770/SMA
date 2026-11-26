@@ -1,6 +1,6 @@
 # 0001 — Three-layer documentation with CI-enforced freshness
 
-- **Status.** Accepted
+- **Status.** Accepted. *Status-line note, 2026-11-26: two sentences below describe 2026-08-18 and are no longer exact. `npm run docs:check` now chains four scripts (drift, ownership, recorded hashes and the test-phone-number allowlist), not two, and it is not a required status check on the default branch's ruleset, so a failing run is reported but does not by itself block a merge (`CLAUDE.md` §12 records the ruleset as read; GitHub settings can change without a commit). The scheduled run of `function-drift.yml` described below was removed on 2026-09-02. The ownership map has grown from ten rules to the number in `docs/ownership.json`. The decision itself stands.*
 - **Date.** 2026-08-18
 - **Deciders.** Repository owner
 

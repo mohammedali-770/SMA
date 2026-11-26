@@ -6,6 +6,8 @@
 > "Draft L234" refer to that earlier version, not to the file as merged. Every
 > finding is answered in the draft's Fix log: what was changed, and why where a
 > finding was not applied as written. Read the draft for the current text.
+>
+> **Added 2026-11-26.** Every code, migration and document line number in this review is relative to the default branch at `04eb351`, the commit it names below, and not to any later commit; most of them no longer land on the cited text in a current tree (the full audit's document pass, plan dated 2026-11-19, found 7 of 23 sampled citations resolving at the default-branch tip `50a2241`). Open them with `git show 04eb351:<path>`, or find the symbol. Where a suggested wording below was not used, the draft's Fix log says so; do not copy a "Correction" from here into a published text.
 
 FACT-CHECK: docs/legal/PRIVACY_POLICY_CARD_PAYMENTS_DRAFT.md ("Proposed text", EN and AR)
 

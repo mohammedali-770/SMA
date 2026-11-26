@@ -6,6 +6,8 @@
 > "Draft L234" refer to that earlier version, not to the file as merged. Every
 > finding is answered in the draft's Fix log: what was changed, and why where a
 > finding was not applied as written. Read the draft for the current text.
+>
+> **Added 2026-11-26.** Every code, migration and document line number in this review is relative to the default branch at `04eb351`, the commit it names below, and not to any later commit; most of them no longer land on the cited text in a current tree (the full audit's document pass, plan dated 2026-11-19, found 7 of 23 sampled citations resolving at the default-branch tip `50a2241`). Open them with `git show 04eb351:<path>`, or find the symbol. Where a suggested wording below was not used, the draft's Fix log says so; do not copy a "Correction" from here into a published text.
 
 FACT-CHECK: docs/legal/PAYMENT_POLICY_CARD_PAYMENTS_DRAFT.md ("Proposed text", EN and AR). I did not edit the draft.
 Evidence paths are relative to the default branch at `04eb351` . "Live" means read-only SQL on wxfmmnihidsdyemasstf, 2026-11-13. The draft line numbers are in [Lnnn].
@@ -30,6 +32,7 @@ B2. "use fewer points" cannot be done in the app and contradicts the live Loyalt
 - Correction:
   - EN: "Online payment needs an amount to pay of at least SAR 1.00. If redeeming your points leaves more than zero but less than that, turn off points for this order or pay in cash; the app always applies your whole points balance, not part of it. If your points cover the whole order, nothing is charged."
   - AR: «ويتطلب الدفع الإلكتروني ألا يقل المبلغ المستحق عن ١٫٠٠ ريال سعودي. فإذا ترك استبدال نقاطك مبلغاً مستحقاً أكبر من صفر وأقل من ذلك، فأوقف استخدام النقاط في هذا الطلب أو ادفع نقداً، إذ يطبّق التطبيق رصيد نقاطك كاملاً لا جزءاً منه. وإذا غطّت نقاطك قيمة الطلب كاملة، فلن يُحصَّل منك أي مبلغ.»
+  - **Retracted in the draft, 2026-11-14, and not to be used as a correction:** the EN and AR wording above that says the app "always applies your whole points balance, not part of it" is false whenever the balance is larger than the order. The server applies `least(requested, balance, the whole points that fit the order total)` (`compute_order_snapshot` and `place_order`, `floor(v_pre_loyalty / v_per_point)`); the app's switch only REQUESTS the whole balance or nothing. The draft's Fix log (entry B2) says so and uses the Loyalty Terms' own words instead.
   - The app message has the same defect: payBelowMinimum, strings.ts:208/:569. RELEASE_CHECKLIST.md:190-192 and PAYMENTS.md:275-277 expect that message, so they need the same change.
 
 B3. "or choose cash" is not true after the customer closes the payment page.
