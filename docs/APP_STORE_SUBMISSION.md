@@ -446,7 +446,7 @@ manifest.**
 
 **The reason this paragraph gave for Linked was wrong, corrected 2026-11-11.** It
 said `sanitize.ts` reduces `event.user` to `{ id }`, so a crash report carries the
-account id. That code (`sanitize.ts:228-233`) only trims a user object that
+account id. That code (`apps/mobile/src/lib/observability/sanitize.ts`, the `if (event.user)` block) only trims a user object that
 something else supplied, and nothing supplies one: no code calls `Sentry.setUser`
 on any surface, and `sendDefaultPii` is false on native and web. So the app
 attaches no account id to a report. Whether the native SDKs add an
@@ -573,7 +573,7 @@ processing.** External testing pulls in the reviewer sign-in problem below.
 
 *Both descriptions say no card is taken in the app. That is true while online
 payment is off, and must change before it is switched on (`OWNER_ACTIONS.md`
-§47.15).*
+§47.15).* **Flagged 2026-11-26: read live 2026-11-24, `online_payment_enabled` is `true` (19 online orders paid), so this condition fails and both descriptions are false as written. The pasted text is unchanged; what to give instead is the owner's decision (`OWNER_ACTIONS.md` §65), not decided here.**
 
 **Beta app description (AR)** *(engineering-drafted, no native read — §29)*
 
@@ -639,15 +639,29 @@ change. `RELEASE_CHECKLIST.md` §8 requires verifying the number is **unused**
 first —
 
 ```sql
-select count(*) from auth.users where phone = '+9665XXXXXXXX';  -- must be 0
+select count(*) from auth.users
+where regexp_replace(coalesce(phone,''),'\D','','g') = '9665XXXXXXXX';  -- must be 0
 ```
+
+Corrected 2026-11-26: this query used to compare `phone` with a leading `+`. GoTrue
+stores `auth.users.phone` WITHOUT a leading `+`
+(`supabase/migrations/20260806120000_erasure_phone_normalization.sql`, header), so
+that form could never match an enrolled customer and the check passed vacuously.
+The form above strips every non-digit from the stored value and compares digits
+only; use the number's digits (country code first, no `+`). **Any non-zero result
+means the number already belongs to a customer: do not use it.** Run a positive
+control once, against a customer number the owner knows is enrolled, and confirm it
+returns 1; a check that has never returned a non-zero result has not been shown to
+work. That hosted Auth stores the number without `+` was read from the repository's
+own migration and was **not run live**: confirm it with a read-only query, on the
+owner's approval. This document's author did not run it.
 
 — because a number already enrolled signs the reviewer into that person's real
 account, orders and saved addresses included: the profile trigger only fires for
-new users. It is a permanent reusable login until removed, which is why §11
-removes it.
+new users. It is a permanent reusable login until removed, which is why
+`RELEASE_CHECKLIST.md` §11 removes it (this document's §11 is the App Review notes and has no removal step).
 
-**Each store keeps its own copy of these credentials.** §11's removal step has to
+**Each store keeps its own copy of these credentials.** `RELEASE_CHECKLIST.md` §11's removal step ("Remove the App Review test-phone entry") has to
 update both, and Play in particular reuses them for every future review.
 
 ---
@@ -790,7 +804,7 @@ against `OWNER_ACTIONS` §40.2, caught here in a different document.
     the first submission if it falls after March 2027. Producing them needs the
     device in the simulator, which Xcode 27.1 adds.
 
-**Not gating TestFlight, but gating an App Store release:** the §1
+**Not gating TestFlight, but gating an App Store release:** the `OWNER_ACTIONS.md` §1
 physical-device validation gate, which has run on neither platform.
 
 ---
@@ -842,9 +856,9 @@ read in three places, all while the app is open, and none of them sends it
 anywhere:
 
 - **Pickup tab:** sorts branches by distance on the phone
-  (`OrderTypeSelectScreen.tsx:44`).
+  (`OrderTypeSelectScreen.tsx`, the `getCurrentPositionAsync` read at about line 78).
 - **Checkout:** compares the position with the delivery pin, on the phone, to warn
-  when they are far apart (`CheckoutScreen.tsx:260-266`, read only by
+  when they are far apart (`CheckoutScreen.tsx`, the `getForegroundPermissionsAsync` effect at about lines 277-296, read only by
   `mismatchWarning`).
 - **"Use my location" on the delivery map:** moves the pin to the device's
   position (`LocationPickerMap.tsx:217-226`).
@@ -897,9 +911,9 @@ they are switches precisely because they change.
 
 | Feature | Switch | Live value | What a customer sees when it is on |
 | --- | --- | --- | --- |
-| **Card payment at checkout** | `app_settings.online_payment_enabled` | **off** | A card option beside cash, through Moyasar. **Dormant.** *Changed 2026-11-11: this said turning it on was under the payment freeze.* The provider is now Moyasar; turning it on is the last of the ordered owner steps in `OWNER_ACTIONS.md` §47, each its own approval |
+| **Card payment at checkout** | `app_settings.online_payment_enabled` | **off** *(read 2026-11-10; read live 2026-11-24 it is `true`, so re-read it on the day)* | A card option beside cash, through Moyasar. **Dormant.** *Changed 2026-11-11: this said turning it on was under the payment freeze.* The provider is now Moyasar; turning it on is the last of the ordered owner steps in `OWNER_ACTIONS.md` §47, each its own approval |
 | Cash payment | `cash_payment_enabled`, `default_payment_method` | on, default `cash` | Pay when collecting, or on delivery |
-| Payment outage mode | `payment_outage_mode_enabled` | off | Nothing. The app reads it (`mappers.ts:410`) and no screen uses it |
+| Payment outage mode | `payment_outage_mode_enabled` | off | Nothing. The app reads it (`apps/mobile/src/lib/mappers.ts`, `outageMode`) and no screen uses it |
 | Loyalty points | `loyalty_enabled` | on | Earn and redeem points |
 | Loyalty on pickup only | `loyalty_pickup_only` | on | Delivery orders neither earn nor redeem |
 | Points expiry | `loyalty_expiry_enabled` | off | An expiry date on the loyalty card |
@@ -937,6 +951,8 @@ is described under Sign-In Information.
 Push notifications carry order updates and occasional offers. Offers can be
 turned off in Profile > Notifications.
 ```
+
+**Flagged 2026-11-26: the "Card payment" bullet above is false while `online_payment_enabled` is `true`, as it was when read live on 2026-11-24.** Its text is unchanged and must not be pasted as it stands unless the switch has been read again on the day; the replacement wording, and whether to switch card payment off first, are the owner's decision (`OWNER_ACTIONS.md` §65), not decided here.
 
 **When the build submitted carries guest browsing (#424), add one line** saying
 the menu can be browsed without an account and sign-in is asked for at checkout.

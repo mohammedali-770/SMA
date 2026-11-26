@@ -6,6 +6,8 @@
 > "Draft L234" refer to that earlier version, not to the file as merged. Every
 > finding is answered in the draft's Fix log: what was changed, and why where a
 > finding was not applied as written. Read the draft for the current text.
+>
+> **Added 2026-11-26.** Every code, migration and document line number in this review is relative to the default branch at `04eb351`, the commit it names below, and not to any later commit; most of them no longer land on the cited text in a current tree (the full audit's document pass, plan dated 2026-11-19, found 7 of 23 sampled citations resolving at the default-branch tip `50a2241`). Open them with `git show 04eb351:<path>`, or find the symbol. Where a suggested wording below was not used, the draft's Fix log says so; do not copy a "Correction" from here into a published text.
 
 FACT-CHECK: the Proposed text in the store answers draft (EN and AR)
 
@@ -15,7 +17,7 @@ BLOCKING
 
 B1. The live Terms & Conditions still say cash only, and no draft or runbook step updates them.
 - Draft text: the C-CARD row (DRAFT:369): "card payment in the app: mada, Visa or Mastercard …", with "all three:" as its conditions. Also the listing card lines (DRAFT:424, :471), the release notes, and the review notes "or pay by card in the app at checkout" (DRAFT:766).
-- Evidence (live `legal_documents`): `terms_conditions` v2.0, md5_en 0da66433…, says "PAYMENT — Orders are paid in cash at pickup or on delivery. See the Payment Policy." The Arabic says «تُدفع الطلبات نقداً عند الاستلام أو عند التوصيل». The listing itself points readers at the "terms" (LISTING_COPY.md:126, 165).
+- Evidence (live `legal_documents`): `terms_conditions` v2.0, md5_en 0da66433…, says "PAYMENT — Orders are paid in cash at pickup or on delivery. See the Payment Policy." The Arabic says «تُدفع الطلبات نقداً عند الاستلام أو عند التوصيل». The listing itself points readers at the "terms" (`LISTING_COPY.md` lines 124 and 166 at `04eb351`; this said 126 and 165, which were wrong even then).
   - No terms draft existed yet.
   - DB/docs/OWNER_ACTIONS.md:4173-4188 (§47.15) lists privacy, payment and cancellation, but not terms.
   - The draft's own "Read with" and Versioning sections name only privacy 2.4 and payment 2.1.
@@ -71,7 +73,7 @@ S3. The Apple form has no "optional" answer, and the draft's own 3.2 rules optio
 
 S4. The privacy-policy publish rule ignores that stores read a build-time snapshot.
 - Draft text: "Publish that version no later than the day these answers change." (DRAFT:702-703; decision 6).
-- Evidence: what Apple and Google read is the no-JavaScript snapshot, which changes only on a rebuild. OWNER_ACTIONS.md:2647-2675 says: "A legal correction is two steps, not one".
+- Evidence: what Apple and Google read is the no-JavaScript snapshot, which changes only on a rebuild. `OWNER_ACTIONS.md` line 2678 at `04eb351` (this said 2647-2675, which were wrong even then) says: "A legal correction is two steps, not one".
 - Fix: "Publish that version, rebuild the public legal page (merge to the default branch) and confirm https://app.spicymeal.com.sa/privacy serves it without JavaScript, no later than the day these answers change."
 
 S5. "Optional" for Play is not true for every user.

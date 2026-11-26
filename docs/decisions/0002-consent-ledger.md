@@ -1,6 +1,6 @@
 # 0002 — Record each customer's consent decisions in an append-only ledger
 
-- **Status.** Proposed
+- **Status.** Proposed. *Status-line note, 2026-11-26: this record contains both "since 2026-11-18 it is opt-in" (Context) and the opt-out versus opt-in question presented as open (Constraints, and "What would make us revisit this"). Both are in the text as written on 2026-11-10 and amended 2026-11-18. The repository's current records are: `CLAUDE.md` §7 records the owner decision of 2026-11-18 that marketing is opt-in (`DEFAULT_DEVICE_PREFS` has `promosEnabled: false`), superseding the opt-out decision of 2026-08-20 (amended 2026-11-10); `docs/OWNER_ACTIONS.md` §44 item 6 records that what stays open is counsel's reading of whether the Profile toggle alone is consent "documented with time and means" and the consent record this proposal would provide. Read the open-question passages as that remaining question. Not decided here. The article numbers in the Context ("IR Art 12" for withdrawal; `OWNER_ACTIONS.md` §44 cites "IR Arts 28-29") have not been checked against the published regulation.*
 - **Date.** 2026-11-10
 - **Deciders.** Repository owner, with counsel on the legal questions
 
