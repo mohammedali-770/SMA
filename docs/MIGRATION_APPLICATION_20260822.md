@@ -121,9 +121,17 @@ cannot be compared directly:
 - **unapplied repository files: exactly 2** — `20260819120000_order_note_length_limit`
   and `20260821170000_order_item_notes`
 
-Everything else was applied, including all fourteen migrations from PR #229
+Everything else was applied, including all thirteen migrations from PR #229
 (`ops_roles_enum` … `branch_availability_health_card`, applied 2026-08-21
 20:04–20:24) and `branch_availability_retention`.
+
+*(Corrected 2026-11-26: this said "fourteen"; `docs/MIGRATIONS.md` §28 says
+thirteen, and `ls supabase/migrations` counts 13 files dated 2026-08-20 from
+`20260820100000_ops_roles_enum` to `20260820160000_branch_availability_health_card`.
+Separately, the "97" above was counted on the default branch after
+`branch_availability_retention` landed: the named base `0eeb66d` holds 96 files
+and none dated 2026-08-22, so the count cannot be reproduced at that commit;
+the commit the 97 was read at is not recorded.)*
 
 ## 3. Pre-live gate (§9-B) — all read-only
 
@@ -218,7 +226,9 @@ to this change.
   per-item note, and reading it back on the receipt and in the staff console,
   requires a device and a signed-in account. **Not exercised.**
 - **`docs/MIGRATIONS.md` §1 has not been updated.** Its headline still reads
-  68 files / 70 rows dated 2026-08-07. See §8.
+  68 files / 70 rows dated 2026-08-07. See §8. *(Superseded 2026-11-26: §1 has
+  carried later dated position blocks since, and now opens with a current-position
+  block.)*
 
 ## 7. Rollback
 
@@ -260,4 +270,8 @@ branch-creating command, so a detached HEAD denies every file write with no way
 back. The replacement text is in the pull request that introduced this file.
 
 Worth fixing separately: §5b recovers a detached HEAD from *rebase* state but
-not from a plain detach, which is a reachable lockout.
+not from a plain detach, which is a reachable lockout. *(Fixed, noted
+2026-11-26: `.claude/hooks/protect-default-branch.sh` now has a section for an
+unrecoverable detached HEAD whose deny text allows `git checkout -b
+<new-branch>` and `git switch -c <new-branch>`. The lockout behaviour itself was
+not executed when this was checked.)*

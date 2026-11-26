@@ -1,5 +1,14 @@
 # Production Migration Reconciliation — 2026-08-12
 
+> **SUPERSEDED — historical record of 2026-08-12 (note added 2026-11-26).** The
+> counts below (79 repository files / 85 live rows) describe that day only, and
+> "there is still no known repository-only migration" was true for that day
+> only. The repository holds 169 migration files at 2026-11-26
+> (`ls supabase/migrations/*.sql | wc -l`). The current position is the block at
+> the top of `docs/MIGRATIONS.md` §1 and `CLAUDE.md` §8, which records live
+> history counts with their read dates. Pointers elsewhere that call this file
+> "latest" or "current" should be read as "historical".
+
 > **Read-only reconciliation.** No migration, history row, schema object, data row, cron job or Edge Function was changed while producing this record.
 
 This note updates the **current counts/status** that were last fully recorded in `docs/MIGRATIONS.md` on 2026-08-07. The long historical ledger remains useful for provenance and the approved workflow, but its Aug 7 headline counts are no longer the latest snapshot.
@@ -91,7 +100,7 @@ This reconciliation does not change the production migration policy:
 7. Every live migration application requires separate explicit owner approval.
 8. Production history writes require explicit owner approval.
 
-Use `docs/MIGRATIONS.md` for the historical workflow/evidence and this file for the latest dated count/name reconciliation until the large ledger receives its next full fingerprint refresh.
+Use `docs/MIGRATIONS.md` for the historical workflow/evidence and this file for the latest dated count/name reconciliation until the large ledger receives its next full fingerprint refresh. *(Superseded 2026-11-26: that refresh did not happen as a single event; the ledger carries later dated positions, and this file is the record of 2026-08-12 only.)*
 
 ## Read-only queries used
 
