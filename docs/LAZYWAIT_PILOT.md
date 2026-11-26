@@ -103,8 +103,11 @@ Run from the repo root with the Supabase CLI logged in and linked
 ### 2.1 Database migrations
 > **Corrected 2026-11-26.** This section used to say `supabase db push`.
 > **`supabase db push` and `supabase migration repair` are PERMANENTLY FORBIDDEN
-> against Production** (CLAUDE.md §8), and a bulk apply would take the frozen
-> Moyasar file first. Every Production migration is applied by version through
+> against Production** (CLAUDE.md §8), and an instruction that names no file is
+> not an instruction to apply anything. (While the Moyasar payment migration was
+> unapplied, a bulk apply would have taken it first; it was applied 2026-11-13,
+> `MIGRATIONS.md` ledger row 114, so that is history, not a current warning.)
+> Every Production migration is applied by version through
 > the owner-approved workflow in `docs/MIGRATIONS.md`; the three Lazywait files
 > named here were applied long ago. For a LOCAL database only, apply them from
 > `supabase/migrations/`; to read what is applied, use the live
