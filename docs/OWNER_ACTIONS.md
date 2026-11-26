@@ -1,8 +1,8 @@
 # Owner Actions — Current Decision Register
 
-> **Updated 2026-08-24.** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
+> **First written 2026-08-24; amended in place since, each section carrying its own date (latest edits 2026-11-26).** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
 
-Historical solved items remain available in Git/PR history; they are not repeated here as if they were still open.
+Historical solved items remain available in Git/PR history; they are not repeated here as if they were still open. *(Corrected 2026-11-26: many finished sections are in fact kept here as the apply and deploy record, marked DONE, CLOSED or superseded; read a section's own status line, and treat an undated present-tense statement in a finished section as the state on that section's date.)*
 
 ## How to read this file
 
@@ -294,7 +294,7 @@ Completed:
 
 - iOS APNs key registered in EAS, configured **Sandbox & Production**, team-scoped (`PVR7L55YFX`);
 - Android FCM V1 service-account key uploaded to EAS for application identifier `sa.com.spicymeal.app`;
-- `apps/mobile/google-services.json` committed (Firebase project `spicy-meal`; contains no secret);
+- `apps/mobile/google-services.json` committed (Firebase project `spicy-meal`; no private credential, but the file does hold a Google API key, a client key designed to ship in the app. Corrected 2026-11-26: this said "contains no secret". Whether that key is restricted to the app's package and the Firebase APIs in Google Cloud is NOT established by anything in the repository; see §66);
 - `PUSH_CLIENT_ENABLED = true` and the `expo-notifications` plugin in `apps/mobile/app.json`;
 - iOS production build shipped to TestFlight;
 - **master flag enabled** by the owner in Admin → Integrations → Push Notifications (provider resolves to `expo`);
@@ -310,7 +310,7 @@ Completed:
 
 ### Expo send timeout — written 2026-11-11, live only after a `push-dispatch` deploy
 
-**Status:** SOURCE CONFIRMED; not live until `push-dispatch` is redeployed.
+**Status:** SOURCE CONFIRMED; not live until `push-dispatch` is redeployed. *(Superseded 2026-11-26, F-DOW-01-012: §51 records `push-dispatch` v9 deployed 2026-11-13 from merged source and §57 records v10 on 2026-11-18 from a source that contains this timeout, so it is live from the first of those deploys; `CLAUDE.md` records v15 since. The behaviour description below stands.)*
 
 The request to Expo had no timeout. If Expo accepted the connection and then
 stalled, `push-dispatch` waited until the platform stopped it (150 s request
@@ -527,16 +527,22 @@ own change.
 *Still true on 2026-11-12, on the Moyasar-only branch:* the catches in
 `runOnlinePayment` and `verifyPaymentSession` still show `payment-initiate`'s
 English error text. The freeze no longer applies, so it is ordinary repository
-work now, still its own change.
+work now, still its own change. *(Superseded 2026-11-26, F-DOW-01-015: since
+2026-11-19 both catches build their message with `failureMessage(e, t, …)`, which
+returns a translated key, so the customer is shown a localised message, not the
+provider's English text.)*
 
 **Note for CI:** the `payments` ownership rule covers only
 `supabase/functions/payment-*`, `tap-*` and the shared payment helpers. A
 freeze-touching change in the **mobile** app fires no rule at all, so CI will not
-flag the next one. Worth widening the rule if these keep appearing.
+flag the next one. Worth widening the rule if these keep appearing. *(Superseded
+2026-11-26, F-DOW-01-016: the rule was widened on 2026-11-12 and now also lists
+`apps/mobile/src/app/payment/**`, `PaymentWebView*.tsx` and
+`apps/mobile/src/features/checkout/CheckoutScreen.tsx` (`docs/ownership.json`).)*
 
 **Known issue, cosmetic:** `test` and `broadcast` rows in `notification_log` stay at `send_status = 'processing'` after a successful send, because `push-dispatch` inserts them without a terminal status. Delivery counters on the row are correct and the operations health center already compensates by summing the `failed` device counter instead of trusting the lifecycle column, so nothing is mis-reported as failed. The dashboard's `send_status_counts_24h` will show completed broadcasts as `processing`. Fixing it touches an Edge Function and therefore needs a deployment.
 
-Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit.
+Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit, but it carries a Google API key (see §66 for whether that key is restricted, not established from the repository).
 
 ## 11. Sentry production source maps
 
@@ -559,7 +565,7 @@ Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. 
 
 A read-only Production reconciliation was completed against Supabase project `spicy-meal-ordering` on 2026-08-12. No migration/history/schema/data write was made.
 
-Current verified snapshot:
+Snapshot on 2026-08-12 (not current; the live counts are in `CLAUDE.md` §8):
 
 - repository migration files: **79**;
 - live `supabase_migrations.schema_migrations` rows: **85**;
@@ -571,7 +577,7 @@ Therefore there is **no known repository-only migration by source-name presence*
 
 The detailed evidence and live versions are recorded in [`MIGRATION_RECONCILIATION_20260812.md`](MIGRATION_RECONCILIATION_20260812.md).
 
-The 137 KB `MIGRATIONS.md` historical ledger remains the workflow/provenance record. Its full A/B/C/F/H content-fingerprint classification was last recomputed Aug 7; do not arithmetically extend that table without a dedicated fingerprint pass. This does **not** affect the current name-presence conclusion above.
+The `MIGRATIONS.md` historical ledger (137 KB when this was written, far larger now) remains the workflow/provenance record. Its full A/B/C/F/H content-fingerprint classification was last recomputed Aug 7; do not arithmetically extend that table without a dedicated fingerprint pass. This does **not** affect the current name-presence conclusion above.
 
 
 ## 13. In-app legal documents — replaced 2026-08-18
@@ -1409,7 +1415,7 @@ difference on the v4 deploy of this same function.
    ticket would have reached the kitchen with no destination. Detail:
    `docs/LAZYWAIT.md`.
 
-   That ticket surfaced three further items, below.
+   That ticket surfaced further items, lettered A to E below (corrected 2026-11-26; this said "three").
 2. ~~**Apply `20260827130000_watchdog_delivery_coverage`** (§5, not frozen).~~
    **DONE 2026-08-27 10:40:53 UTC**, live version `20260827104053`, history
    116 → 117. R1 and R7 now cover paid delivery orders; verified afterwards with
@@ -1469,6 +1475,9 @@ With the watchdog migration applied, **`20260824100000_moyasar_payment_provider`
 is now the only unapplied migration in the repository.** An instruction like
 "apply the outstanding migrations" therefore has exactly one possible target, and
 that target is the frozen one (§6). Name the file explicitly, always.
+*(As of 2026-08-27. Superseded 2026-11-26, F-DOW-01-027: the owner chose Moyasar on
+2026-11-11 and §47.2 is the step that applies that file; the freeze text in §6 is
+kept as history. The rule to name the file still stands.)*
 
 **D.** ~~Deploy `order-intake`.~~ **DONE 2026-08-27 — version 5**,
 `verify_jwt: true` unchanged (matching `config.toml`). The immediate POS sync
@@ -1631,7 +1640,7 @@ result, with its warning not to carry the constants onto the order path, lives i
 | database | **58 public base tables** scanned with each whole row cast to text — **zero** rows mention `latency` |
 | scheduled callers | 7 `cron.job` rows, none invoke it; no `pg_proc` body names it |
 | invocations | **0** in `function_edge_logs` across three consecutive 24-hour windows, 2026-08-31 → 2026-09-03 |
-| repository | no `supabase/functions/latency-probe/`, no `supabase/config.toml` stanza; across every ref and the whole object store the only mention is this section |
+| repository | no `supabase/functions/latency-probe/`, no `supabase/config.toml` stanza; across every ref and the whole object store the only mention was this section on 2026-09-03 (since then GO_LIVE_READINESS.md D8, BACKUP_RECOVERY.md and §37 mention it too, all pointing back here) |
 
 **Why the original argument for deleting no longer applies.** It rested on two
 things and both are discharged. The **security** reason is gone: the original
@@ -1770,7 +1779,11 @@ already being fetched: no extra round trip, and no new authorization surface
 (service-role client, RLS already bypassed).
 
 `ready` is the only status whose meaning differs by fulfilment, so it is the only
-one that branches. Pickup copy is **byte-identical** to what it was — this is
+one that branches. *(True on 2026-09-03 and kept as that day's record. Corrected
+2026-11-26, document audit F-DOW-01-020: the current `push-dispatch` also
+branches `delivered`, with its own pickup copy `DELIVERED_PICKUP_COPY`
+(`supabase/functions/push-dispatch/index.ts`), so `ready` is no longer the only
+one.)* Pickup copy is **byte-identical** to what it was — this is
 additive, not a rewrite of approved copy. Delivery now reads:
 
 | | after (delivery only) |
@@ -1919,12 +1932,38 @@ number, so this breadth is pinned by existing tests rather than assumed.
    read-only query, and the only way to be sure:
 
    ```sql
-   select count(*) from auth.users where phone = '+9665XXXXXXXX';
+   select count(*) from auth.users
+   where regexp_replace(coalesce(phone, ''), '\D', '', 'g') = '9665XXXXXXXX';
    ```
 
-   **Zero means safe to use. Anything else: pick a different number.** Do not
-   "clean up" an existing account to reuse its number — deleting a real customer to
-   make room for a test login is a worse outcome than picking another number.
+   **Corrected 2026-11-26 (document audit F-DOW-01-001).** This query used to
+   compare `phone = '+9665XXXXXXXX'`, with a leading plus. The repository's own
+   migration records that GoTrue stores `auth.users.phone` WITHOUT a leading plus
+   (`supabase/migrations/20260806120000_erasure_phone_normalization.sql`, lines
+   15-23: "0 of 1 `auth.users.phone` values carry a '+'", measured 2026-08-06), so an
+   already-enrolled number would not have matched, the count would have been 0, and
+   the check would have approved exactly the number it exists to reject. The query
+   above strips every non-digit from the stored value and compares digits only
+   (write the number in the query as digits, no plus, no spaces), so it holds
+   whichever shape the row has.
+
+   **What the result means.** Zero: no `auth.users` row carries this number in any
+   shape, so it is safe to use. **Any non-zero result means the number belongs to
+   an existing account: pick a different number.** Run the same query once with a
+   number you know is enrolled and confirm it returns 1; a check that has never been
+   seen to return anything but 0 is not yet a check.
+
+   **Not run live.** Whether hosted Auth really stores the number without the plus
+   was not run against Production by this correction. It rests on the 2026-08-06
+   measurement in the migration, one row. Confirm the shape with a read-only
+   aggregate (the count of `auth.users.phone` values that do and do not start with a
+   plus, no phone values read) on the owner's approval; the digits-only query above
+   does not depend on the answer. If a reviewer number was already mapped using the
+   old plus-prefixed query, re-run the new one for that number.
+
+   Do not "clean up" an existing account to reuse its number — deleting a real
+   customer to make room for a test login is a worse outcome than picking another
+   number.
 2. In the Supabase dashboard, **Authentication → Phone provider → test phone
    numbers**, map that number to a 6-digit code.
 3. Sign in once on a device to confirm the pair works **before** submitting.
@@ -2030,6 +2069,10 @@ That is the step that actually starts mail.
 
 **Amended 2026-11-11: that action now has two prerequisites**, §46 steps 3 and
 4. Set `SMTP_ALLOWED_HOSTS`, then redeploy the dispatcher.
+*Superseded 2026-11-26 (document audit F-DOW-01-009): both prerequisites are
+DONE. §46 records "all four steps DONE" on 2026-11-18, with
+`SMTP_ALLOWED_HOSTS` set and `operations-alert-dispatch` redeployed (v4 to v5);
+`CLAUDE.md` records it at v9 since. They are no longer outstanding.*
 
 **Nothing has been enabled and no alert has reached anyone.** The flag is still
 false and the outbox still holds its same 136 rows with zero on the `email`
@@ -2156,7 +2199,10 @@ act. There is **one** admin with an email address today.
    `operations-alert-dispatch`. The first is the only rule that refuses a
    relay name pointing into private space. The second matters because the
    only recorded deploy (v1, 2026-09-07) predates the SMTP guard, so the
-   running dispatcher may not check the endpoint at all.
+   running dispatcher may not check the endpoint at all. *Superseded
+   2026-11-26: both steps are DONE (§46, status 2026-11-18); the dispatcher was
+   v4 before that deploy, not v1, went to v5 then, and is recorded at v9 in
+   `CLAUDE.md`. Only the enable step is left.*
 
    **How:** admin console → **Alerts** tab → **Settings** → the **"External
    dispatch (email)"** checkbox. You must be signed in as an admin **with your
@@ -2617,7 +2663,10 @@ The line now reads:
 It follows the list's existing two-party pattern (`Expo, with Apple (APNs) and
 Google (FCM) — …`) rather than inventing a shape.
 
-**v2.2 lasted about half an hour and is recorded rather than erased.** It said
+**v2.2 lasted about half an hour and is recorded rather than erased.** *(Corrected
+2026-11-26, F-DOW-01-014: "about half an hour" is the figure from before review
+corrected this section; the timestamped figure given below is nine minutes, 07:40:34
+to 07:49:39 UTC. The row timestamps were not re-read by this correction.)* It said
 "the map **and address search** you use", which promised Google received
 something customers cannot send it — there is no address search in either
 customer channel. It also named only Google, missing Apple. v2.2 was live to the
@@ -2666,7 +2715,7 @@ afterwards and found two things the draft had wrong.
 **AN EARLIER VERSION OF THIS PARAGRAPH SAID "no customer has seen either
 sentence". THAT WAS FALSE, and review caught it on #386.** Only the
 **no-JavaScript snapshot** waits for a rebuild. Every other surface reads the
-table live: `src/legal/main.ts:122` fetches `legal_documents` on page load, and
+table live: `src/legal/main.ts` (the `legal_documents` fetch near its line 125, cited by line number as it stood in 2026-09) fetches `legal_documents` on page load, and
 `apps/mobile/src/services/api.ts:238` queries the same table from the app. So
 **v2.2 was customer-visible for the nine minutes it was the active row**
 (07:40:34 → 07:49:39 UTC), to anyone who opened the legal screen in the app or
@@ -2736,8 +2785,10 @@ is the one a store sees.
 
 ### What closing it exposed — the document now contradicts itself about its date
 
-**This is a new, live defect, and it is the direct residue of how the two
-publications were made safe.** See `GO_LIVE_READINESS.md` **A10**, and §39 below
+**This was a new, live defect when written, and it is the direct residue of how the two
+publications were made safe. Superseded 2026-11-26 (F-DOW-01-013): it is CLOSED —
+§39 is "CORRECTED 2026-09-16", opened and closed the same day, and
+`GO_LIVE_READINESS.md` A10 is marked corrected.** See `GO_LIVE_READINESS.md` **A10**, and §39 below
 for the action.
 
 The row's `effective_date` column is `2026-09-16`, and the page renders
@@ -2799,7 +2850,8 @@ not a typo fix), update `docs/GO_LIVE_READINESS.md` A9, and close this item.
 > The step this checklist did not anticipate was the rebuild, which is exactly
 > why it is now written at the head of this section. **The step it also did not
 > anticipate was the in-body effective date**, which a version bump moves and a
-> "nothing else changed" hash defends — that is §39, and it is still open.
+> "nothing else changed" hash defends — that is §39, and it was still open when this was written (it was corrected
+> the same day, 2026-09-16).
 
 ## 35. Native Arabic read of the corrected iOS location purpose string
 
@@ -3779,7 +3831,7 @@ console was fixed instead.
 
 ### 40.4 A native Arabic read — engineering-drafted copy, not reviewed
 
-Five new Arabic strings reached the branch console and the staff manual without a
+Five new Arabic strings reached the branch console, the staff manual and (one of them) the customer app without a
 native speaker reading them. They are stated here rather than assumed adequate,
 the same way `docs/OWNER_ACTIONS.md` §26 records the delivery `ready` push copy.
 
@@ -3792,7 +3844,7 @@ the same way `docs/OWNER_ACTIONS.md` §26 records the delivery `ready` push copy
 | customer app, blocked item | «جميع الأحجام غير متوفرة في هذا الفرع حالياً.» |
 
 `docs/STAFF_MANUAL.md` §4 also gained an Arabic paragraph describing the new
-buttons. None of this is customer-facing money copy, so it is not blocking — but
+buttons. None of the four console strings is customer-facing money copy, so they are not blocking (the fifth string is shown in the customer app, so read it before relying on that) — but
 it is the copy a cashier reads during a rush.
 
 ---
@@ -4306,7 +4358,7 @@ writing, with each answer reflected in `RECORD_OF_PROCESSING.md` and
 **Opened 2026-11-10.** These are answers you give in Play Console and App Store
 Connect; none of them is code. The answers are drafted in the store records, and
 each was checked against Google's or Apple's own page on 2026-11-10. (§43 and §44
-are taken by the PDPL work in an open pull request.)
+are the PDPL sections above; this note predates their merge.)
 
 | By | Step | Where the answers are |
 | --- | --- | --- |
@@ -4509,7 +4561,10 @@ What a merge does by itself, because the console and `/app` deploy on merge
   functions first."** It hides the July function's key readings, which describe
   Tap's keys, and disables Test connection. That is expected until 47.4;
 - Settings → Payment Methods lets Online Payment be switched **on** only while the
-  payment row is enabled, names Moyasar and is in live mode. Switching it off is
+  payment row is enabled, names Moyasar and is in live mode. *Corrected
+  2026-11-26: since 2026-11-18 the console accepts live OR test mode
+  (`src/lib/onlinePaymentGate.ts`, §60); "live mode" was the 2026-11-13
+  position.* Switching it off is
   always allowed. **This guards the console control, not the setting:**
   `set_payment_settings` checks `is_admin()` alone, so a direct call can still
   turn it on;
@@ -4609,7 +4664,12 @@ confirms, so deploy all seven in one run.
 This deploy also makes `payment-test-config`'s AAL2 admin gate live, which closes
 the exception recorded in `GO_LIVE_READINESS.md` D3. Customer checkout stays
 refused while the row is in TEST mode: `payment-initiate` answers
-`{status:'disabled', reason:'test_mode'}`.
+`{status:'disabled', reason:'test_mode'}`. *This is the 2026-11-13 position.
+Since 2026-11-18 the refusal is conditional: it gives way when the Edge Function
+secret `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true` and, in the code written
+2026-11-22, only for a customer listed in `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`
+(§60; whether that code is deployed and whether either secret is set is not
+known from the repository). Corrected 2026-11-26.*
 
 ### 47.5 Apply `20261004120000_drop_tap_payment_rpcs`, by version — after 47.4
 
@@ -4690,12 +4750,16 @@ It is short-lived and useful only with access to the Moyasar dashboard.
 
 The sandbox is the console's admin test, **not** a customer order. Customer
 checkout is refused in TEST mode by design, so a test card can never pay for a
-real order.
+real order. *(The 2026-11-13 position, qualified 2026-11-26: that holds only
+while the §60 secret `PAYMENT_ALLOW_TEST_CHECKOUT` is unset.)*
 
 **It needs the payment row ENABLED**, which this list otherwise reaches only at
 47.14: with the row disabled, Run answers "Enable Moyasar first." Enable it here,
 in TEST mode. That lets no customer pay, because the Online Payment switch stays
-off and `payment-initiate` refuses customer checkout in TEST mode. (Found
+off and `payment-initiate` refuses customer checkout in TEST mode (*as of
+2026-11-13; since 2026-11-18 only while `PAYMENT_ALLOW_TEST_CHECKOUT` is unset,
+§60, and the Online Payment switch has since been turned on, read live
+2026-11-24*). (Found
 2026-11-13, when the row had been disabled since 2026-11-11.)
 
 1. Moyasar panel → run the sandbox checkout. It opens an isolated **1.00 SAR**
@@ -4833,7 +4897,9 @@ by 47.13.
 ### 47.13 Switch to live and enter the LIVE keys and webhook
 
 0. **If the testing-phase secret `PAYMENT_ALLOW_TEST_CHECKOUT` is set (§60),
-   delete it first.**
+   delete it first, and delete `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` with it**
+   (the second secret was added by the 2026-11-22 code; `RELEASE_CHECKLIST.md`
+   §0 names both). *Corrected 2026-11-26: this step named only the first.*
 1. In the Moyasar card, switch the mode to **live**. The console asks for
    confirmation.
 2. Save the live secret key, the live publishable key and a live webhook token.
@@ -4870,14 +4936,16 @@ Once applied, `begin_payment_attempt` refuses a cancelled order, so
 `place_customer_order` creates no new online order. It needs no deploy.
 Applying it (§54) before step 1 closes this warning. The other choices above
 still stand; which one to take, and when, is yours. Until something is done,
-the TEST-mode refusal is what keeps the three orders unpayable.
+the TEST-mode refusal is what keeps the three orders unpayable (*while the §60
+secret is unset; superseded by the applied guard above*).
 
 ### 47.14 Make sure the payment row is enabled
 
 It is enabled, in TEST mode, since 2026-11-13 18:17:02 UTC, for the sandbox
 (47.9); before that it had been disabled since 2026-11-11 10:55:54 UTC. Keep it
 enabled: this step is a check that it still is. The console's Online Payment switch opens
-only when the row is enabled, names Moyasar and is in live mode. It does not
+only when the row is enabled, names Moyasar and is in live or test mode
+(*corrected 2026-11-26; "live mode" was the 2026-11-13 position*). It does not
 check that the live keys are saved; 47.13's Test connection is that check.
 
 ### 47.15 Update the customer documents, before customers can pay by card
@@ -5063,9 +5131,15 @@ Pick a quiet hour.
    order is confirmed, so it creates no order and needs no second refund.
 3. Make one small live payment for a real order, and check that the branch's
    POS ticket shows it as paid (gap PG-07).
-4. **One automatic refund, seen end to end.** **Read 47.20 first: cancelling
-   the order does not refund it.** The automatic refund runs only for a paid
-   order that never reached the POS after the customer's resends. Produce one
+4. **One automatic refund, seen end to end.** **Corrected 2026-11-26: this
+   step said "cancelling the order does not refund it", which was true until
+   `20261018120000` was applied (§61, live `20261119051739`, found applied by a
+   live read 2026-11-22). Now cancelling a paid card order DOES enrol one
+   automatic refund in full, and staff must NOT also refund it by hand: the
+   second attempt raises a critical R14 `REFUND_FAILED` incident for a refund
+   that was made (47.20, §61).** There are two routes to an automatic refund: a
+   cancelled paid order (above) and a paid order that never reached the POS
+   after the customer's resends. Produce one
    in a way agreed with you beforehand (`PAYMENTS.md` §9 B), and watch it reach
    refunded, both on the order (its refund status) and in Moyasar. If none can
    be produced, or it does not complete, switch Online Payment off and publish
@@ -5138,15 +5212,17 @@ Added 2026-11-13, from the proxy comparison and the card-payment gaps:
   paid or captured payment and for at most its amount, so the automatic attempt
   after a hand refund is expected to be refused, not paid twice, but it then
   raises a critical R14 `REFUND_FAILED` incident for a refund that was made.
-  Until the apply, the paragraph below still applies. The owner's answer on
+  *Corrected 2026-11-26: the paragraph that follows is the PRE-apply
+  position, kept as the record. The apply is done, so it no longer applies:
+  do not refund a cancelled paid order by hand.* The owner's answer on
   2026-11-11 was "automatic via Moyasar". The code enrols an automatic refund in
   one case only: a paid order that never reached the POS after the customer's
   resends (`order_refund_due`, reason `pos_delivery_failed_after_customer_retries`).
   An admin cancelling a paid online order reverses loyalty points and refunds no
   money. Until that changes, refund a cancelled paid order by hand in the Moyasar
   dashboard. Making cancellation refund automatically is a code and migration
-  change. Once `20261012120000` is applied (§54), the POS-failure rule also skips
-  a cancelled order, so the hand refund cannot be followed by an automatic one
+  change. Since `20261012120000` was applied (§54, 2026-11-14, ledger row 117),
+  the POS-failure rule also skips a cancelled order, so the hand refund cannot be followed by an automatic one
   after failed resends (gap PG-03). A refund enrolled before the cancellation
   still runs: check the order's refund status before refunding by hand.
 - **A duplicate payment is recorded, not refunded.** If a customer pays twice for
@@ -5418,8 +5494,8 @@ refuse **every** push from this project, order updates included.
 5. **Only then enable Enhanced Security** in the Expo dashboard, and confirm a
    second order push still arrives.
 
-**Follow-up, now in progress (§53):** admins at AAL2 can still read raw token
-values through `push_devices_admin_select`, while the console only ever needs
+**Follow-up, now DONE (§53, all five steps, 2026-11-13; this said "now in progress" until 2026-11-26, F-DOW-01-008):** admins at AAL2 could read raw token
+values through `push_devices_admin_select` (until §53 dropped that policy), while the console only ever needs
 counts. `20261010120000` adds an `is_admin()`-gated count RPC; the console
 switch and the policy drop follow it, in that order.
 
@@ -5839,7 +5915,7 @@ console (PG-10), and turning the refund job on (§47.16).
 
 ## 59. Advisor fixes: one RLS policy and 21 covering indexes — one apply — DONE (found applied by a live read 2026-11-22)
 
-**DONE.** `20261017120000_advisor_fixes` is applied (live version `20261118120101`); `MIGRATIONS.md` §69 is marked APPLIED and ledger row 122 is filled in. The apply was not recorded when it happened, so who applied it and how is not recorded; the steps below are kept as the record of the plan, not as open work.
+**DONE.** `20261017120000_advisor_fixes` is applied (live version `20261118120101`); `MIGRATIONS.md` §69 is marked APPLIED and ledger row 122 is filled in. The apply was not recorded when it happened, so who applied it and how is not recorded; the steps below are kept as the record of the plan, not as open work. **Added 2026-11-26 (document audit F-DOW-01-005):** no owner approval for this apply is recorded in this repository either, and CLAUDE.md §5 makes applying a migration an owner-approval action. Whether it was approved is for the owner to say; this note neither assumes nor invents one. `MIGRATIONS.md` ledger row 122 agrees that it is applied.
 
 **Opened 2026-11-18.** You asked for Supabase's advisors to be run and anything
 new fixed. Two findings are fixed in `20261017120000_advisor_fixes`:
@@ -5894,6 +5970,21 @@ anything else, nothing changes. What it does and does not do:
 [`PAYMENTS.md`](PAYMENTS.md) §3, "The testing-phase switch".
 
 **It is for the testing phase only. Unset it before card payments go live.**
+
+**Omission corrected 2026-11-26 (document audit F-DOW-01-003): as written
+above, the switch has no notion of who is paying.** In the build of 2026-11-18
+the secret alone admitted EVERY signed-in customer of the public app, so while
+it was set and Online Payment was on, anyone holding Moyasar's published test
+cards could pay a real order for nothing, and that order reached a branch POS as
+a real kitchen ticket. Turning Online Payment on is also one global setting: it
+offers card payment to every customer, not only to your test account (47.18).
+The amendment further down narrows the switch to listed customers, and it says
+that code is NOT deployed as written. **Whether the narrowed code is deployed,
+whether `PAYMENT_ALLOW_TEST_CHECKOUT` or `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` is
+set in Production, and what the payment row's mode is, are not known from the
+repository (online payment itself was read as on, 2026-11-24). The owner should
+confirm that `PAYMENT_ALLOW_TEST_CHECKOUT` is unset** (Supabase → Edge Functions
+→ Secrets, names only) unless a deliberate test is running.
 
 **Which deployed bundles change.** Computed from each function's import closure
 (`deno info`): the change is in `payment-initiate/index.ts`,
@@ -5981,7 +6072,7 @@ reason:'test_mode'}` with nothing opened.
 
 ## 61. A cancelled paid card order is refunded automatically — one apply — DONE (found applied by a live read 2026-11-22)
 
-**DONE.** `20261018120000_refund_cancelled_paid_orders` is applied (live version `20261119051739`); `MIGRATIONS.md` §70 is marked APPLIED, ledger row 123 is filled in, and §47.20's first bullet is struck through and marked decided. The refund job is active (read live 2026-11-24), so **step 3 is in force: staff do not also refund a cancelled order by hand.** The apply was not recorded when it happened. The steps below are the record of the plan.
+**DONE.** `20261018120000_refund_cancelled_paid_orders` is applied (live version `20261119051739`); `MIGRATIONS.md` §70 is marked APPLIED, ledger row 123 is filled in, and §47.20's first bullet is struck through and marked decided. The refund job is active (read live 2026-11-24), so **step 3 is in force: staff do not also refund a cancelled order by hand.** The apply was not recorded when it happened. **Added 2026-11-26 (document audit F-DOW-01-005):** no owner approval for it is recorded in this repository either, and this one is refund behaviour, which CLAUDE.md §5 and §6 reserve for explicit owner approval one action at a time. Whether it was approved is for the owner to say; this note neither assumes nor invents one. `MIGRATIONS.md` ledger row 123 agrees that it is applied. The steps below are the record of the plan.
 
 **Opened 2026-11-19.** Your decision, 2026-11-19: "do the auto refund". A paid
 card order that is cancelled is refunded automatically, in full, by the refund
@@ -6227,6 +6318,50 @@ fewer targeted device than the opt-in count.
 What is known: a submitted listing or label that still says cash only, while card orders are being paid, is the mismatch these conditions existed to prevent. What is **not** known from the repository: whether any of these answers has been entered in Play Console or App Store Connect, which build customers are running, whether the live `privacy_policy`, `payment_policy`, `cancellation_refund_policy` and `terms_conditions` have been edited to name Moyasar (§47.15; `RECORD_OF_PROCESSING.md` item 6 still records that the policy did not), and whether the 19 paid orders include test-card payments under the `PAYMENT_ALLOW_TEST_CHECKOUT` exception (CLAUDE.md §6).
 
 **To close:** decide the answers, enter them, and record the date and the console they were entered in here. Entering them is an owner step; engineering writes nothing live.
+
+## 66. Owner decisions found by the document audit, 2026-11-26
+
+**Opened 2026-11-26.** The Phase 3 document pass of the full audit corrected the wording of
+`OWNER_ACTIONS.md`, `GO_LIVE_READINESS.md`, `RELEASE_CHECKLIST.md` and
+`RECORD_OF_PROCESSING.md`. It found the items below that no document edit can settle.
+**This section lists them and decides none of them.** Each one line, with its
+finding id; the live facts quoted are the repository's own newest read (2026-11-24) and
+nothing was read live by this pass.
+
+- **Published texts against current state (no single finding id; see §65 and the
+  cross-cutting payment findings).** Read live 2026-11-24, card payment is on and 19
+  online orders are paid; since 2026-11-19 the POS ticket for a card order carries the
+  card scheme, the masked last four digits and the Moyasar approval reference
+  (`RECORD_OF_PROCESSING.md` activities 3 and 15), and since 2026-11-22 the payment
+  record is kept with its order through account deletion. Whether the live privacy
+  policy, payment policy, cancellation and refund policy, terms and the store forms
+  say so is not known from the repository (F-DOC-06-001, F-DOW-01-003).
+- **`PAYMENT_ALLOW_TEST_CHECKOUT` state.** Whether the secret (and
+  `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`) is set in Production, and whether the 2026-11-22
+  narrowed code is deployed, is not known from the repository; the owner should confirm
+  the first is unset (F-DOW-01-002, F-DOW-01-003, F-EFP-05-001).
+- **Google API key restriction.** `apps/mobile/google-services.json` carries a Google API
+  key. Whether it is restricted to the app's package and the Firebase APIs in Google
+  Cloud is not established by anything in the repository; checking it is an owner step
+  (F-DOW-01-029).
+- **Points-rounding checkout defect.** A total that is not a multiple of 0.10 SAR can
+  leave 0.01 to 0.09 SAR after points, and the card path refuses that remainder; the
+  card-payment gaps register says such orders settle at once. Reproduced locally, read
+  from source, not run live (F-DRF-03-001).
+- **A repeated modifier beyond `max_select` on online orders.** The database enforces the
+  modifier contract for cash orders only; the online snapshot does not reject a repeated
+  id or a selection above the maximum (F-DRF-01-001).
+- **Verified-phone rule and order limits do not cover the card path.** Both apply to the
+  cash wrapper and not to `begin_checkout_session`, and no go-live gate makes closing
+  that a condition of online payment (F-DMG-01-001).
+- **`admin_order_stats` migration need.** The console's per-branch sales and
+  average-ticket figures count cancelled orders; correcting them needs a migration, an
+  owner-approved apply (F-DBM-11-004).
+- **Approvals for two applied migrations are not recorded.** `20261017120000` (§59) and
+  `20261018120000` (§61) are live, and no owner approval for either is recorded in this
+  repository; whether it was given is the owner's to say (F-DOW-01-005).
+
+**To close:** decide each, or record that it is accepted, and write the date here.
 
 ## Owner-action closeout rule
 
