@@ -46,7 +46,7 @@ Safe approach:
 2. Prepare the intended function source on a fresh branch/PR or, during an explicitly approved emergency, identify the exact prior source to redeploy.
 3. Verify `supabase/config.toml` invocation/auth settings for that function.
 4. Obtain the required explicit owner approval.
-5. Use the controlled deployment workflow with the exact function name(s).
+5. Deploy with the exact function name(s) by the path `DEPLOY.md` §12 describes. The deploy workflow needs the repository secret `SUPABASE_ACCESS_TOKEN`, which as far as the record shows has never existed (`DEPLOY.md` §12, `OWNER_ACTIONS.md` §15), so a deploy is by hand (Supabase dashboard or CLI) and must use the same `verify_jwt` values as step 3.
 6. Verify behavior and logs/health after deployment.
 7. Record the deployed source commit/version as incident evidence.
 
@@ -142,8 +142,8 @@ measured on a disposable copy of the full chain on 2026-11-11:
   `function public.order_note_normalized(text) does not exist`. Following that
   footer stops every order.
 - **`20260807150000_order_flow_health_card`** (`MIGRATIONS.md` §25). Its footer
-  re-applies a July body of `operations_health_snapshot_internal`, which three later
-  migrations have redefined. The snapshot lost the branch-availability card along
+  re-applies a July body of `operations_health_snapshot_internal`, which six later
+  migrations have redefined (counted 2026-11-26 from the files). The snapshot lost the branch-availability card along
   with the order-flow card, and raised no error. The footer's second step, dropping
   the five-argument `operations_health_overall_state`, makes the current snapshot
   raise on every call.
@@ -171,7 +171,7 @@ Do not use a direct SQL mutation as a generic “fast rollback” when a support
 *Changed 2026-11-12: this list applied "while payment work is frozen". It still applies; only the reason changed.*
 
 - do not use a payment/refund transaction as a rollback smoke test;
-- keep `payment-refund-worker` in its expected state: off until the owner re-enables it (`OWNER_ACTIONS.md` §47.16);
+- keep `payment-refund-worker` in its expected state: **active**. It was switched on 2026-11-19 at 04:47 UTC (`OWNER_ACTIONS.md` §47.16, DONE) and read active on 2026-11-24, and cancelled paid card orders depend on it (`PAYMENTS.md` §6). Do not switch it off as a rollback step; stopping or starting it is a payment action and an owner approval (this line used to say "off until the owner re-enables it");
 - after any environment restore/rebuild, re-verify its cron state before traffic;
 - financial/provider correction is an explicit owner action.
 

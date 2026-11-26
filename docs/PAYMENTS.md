@@ -81,8 +81,11 @@ Read-only reads of Production on 2026-11-11, also recorded in
 | `payment-refund-worker` cron job | disabled since 2026-07-29 (`PAYMENT_POSTPONEMENT.md` §3) **as of this read; switched on 2026-11-19 04:47 UTC (§6) and read active 2026-11-24** |
 | `refund_trigger_secret` | **not in Vault** (no Vault secret named like it). A names-only read on 2026-11-11 listed the key on the payment row (`BACKUP_RECOVERY.md` §4.3); its value was not read, so whether it is non-blank is unknown. Check it by length (`OWNER_ACTIONS.md` §47.16). No console field sets it. |
 
-Because the functions are July bundles and the migration is missing, online
-payment cannot work in Production today, whatever the settings say.
+Because the functions were July bundles and the migration was missing, online
+payment could not work in Production on 2026-11-11, whatever the settings said.
+**That is history** (the migrations are applied and the functions deployed, see
+the 2026-11-13 note above); online payment's state is the 2026-11-24 read at
+the top of this section: `online_payment_enabled` `true`, 19 paid online orders.
 
 ---
 
@@ -519,8 +522,9 @@ the testing-phase switch below lifts.
 
 **The web build (`/app`) never offers online payment.** The app hides the online
 option on `web`, because the hosted page needs the in-app WebView. This takes
-effect when the branch is merged, because the web build deploys with every
-merge ([CLAUDE.md §13](../CLAUDE.md)).
+effect on every merge, because the web build deploys with every merge
+([CLAUDE.md §13](../CLAUDE.md)). It is merged: `onlineSupportedOn` in
+`apps/mobile/src/lib/payment.ts` returns `platform !== 'web'`.
 
 ### The testing-phase switch: `PAYMENT_ALLOW_TEST_CHECKOUT`
 
@@ -732,8 +736,8 @@ order, or pay in cash." Older builds show "Online payment is unavailable right
 now."; the server retires the session, so `payment-verify` then answers it
 terminal. Until 2026-11-14 the new build's message said "Use fewer points",
 which the app cannot do: points are all or nothing, because the switch sends
-the whole balance (gap PG-05). The change is on branch
-`fix/checkout-points-preview-20261114` and reaches customers with the
+the whole balance (gap PG-05). The change is merged (branch
+`fix/checkout-points-preview-20261114`) and reaches app customers with the
 `OWNER_ACTIONS.md` §47.17 build. Points that cover the whole order are fine:
 it is settled at once, with nothing to charge. Points are the usual cause of a
 total under 1.00 SAR, but not the only possible one: a fixed-amount coupon, or
@@ -751,9 +755,9 @@ switch now also says "Points can be used when the total before points is
 10.00 SAR or more." when that is why no points are used, and a screen reader
 reads it as part of the switch. `previewParity.test.ts` checks the summary
 against the real `compute_order_snapshot` for 23 carts; detail in
-[`LOYALTY.md`](LOYALTY.md) §1. Same branch. App customers get it with the same
-build; the web checkout at `/app` gets it as soon as the branch is merged,
-because a merge deploys the web build (CLAUDE.md §13).
+[`LOYALTY.md`](LOYALTY.md) §1. Same branch, merged. App customers get it with
+the same build; the web checkout at `/app` has it already, because a merge
+deploys the web build (CLAUDE.md §13).
 
 **It uses fresh settings, and stops rather than charge what it did not show.**
 Until 2026-11-17 the summary matched the server's rule only for the settings
@@ -775,8 +779,9 @@ Detail in [`LOYALTY.md`](LOYALTY.md) §1.
 **What is still not fresh:** the balance is not re-read at submission, only when
 checkout opens and when the switch is turned on. Points spent on another device
 in that window would make the server use fewer points than the summary shows.
-On branch `fix/checkout-loyalty-settings-reread-20261117`: the web checkout at `/app` gets it when the branch is merged
-(CLAUDE.md §13), app customers with the `OWNER_ACTIONS.md` §47.17 EAS build.
+Branch `fix/checkout-loyalty-settings-reread-20261117` is merged: the web checkout
+at `/app` has it already (CLAUDE.md §13), app customers get it with the
+`OWNER_ACTIONS.md` §47.17 EAS build.
 
 **Place order waits for a payment run.** In the new build, Place order does
 nothing while an online payment run (for example "Try again" from the status
@@ -961,14 +966,23 @@ next run, within about five minutes.
 refund (the trigger had skipped cancelled orders since `20261012120000`, gap
 PG-03) and was refunded by hand in Moyasar's dashboard. **That file is applied
 (live `20261119051739`) and the refund job is active (read live 2026-11-24), so
-staff must not also refund a cancelled order by hand.** It would not pay
-the customer twice: Moyasar's documentation says a refund is made only from a
-`paid` or `captured` payment and for at most its amount (Moyasar API reference
-§3.2, read from Moyasar's public documentation, not tested), so the worker's
-attempt after a full hand refund is expected to be refused with a 4xx. The
-worker writes that refund `failed`, and R14 `REFUND_FAILED` raises a critical
-incident for a refund that was in fact made, which then stays open until
-dashboard refunds are recorded (gap PG-14). A refund enrolled *before* the
+staff must not also refund a cancelled order by hand. The rule is one: look at
+the order's refund status in the console first, and leave the refund to the
+worker.** Whether a hand refund would pay the customer twice is **unproven**,
+and the worker's code gives two outcomes, not one. Moyasar's documentation says
+a refund is made only from a `paid` or `captured` payment and for at most its
+amount (Moyasar API reference §3.2, read from Moyasar's public documentation,
+not tested). On that reading, the worker's **first** attempt after a full hand
+refund is refused with a 4xx, which `payment-refund` classifies as definitive:
+the refund is written `failed` and R14 `REFUND_FAILED` raises a critical
+incident for a refund that was in fact made (`moyasarRefund.ts`,
+`classifyMoyasarRefundResponse`). From the **second** attempt the worker reads
+the payment first (`mustReconcileBeforePost`), and if Moyasar reports it fully
+refunded it records the refund `succeeded` without posting and raises no R14.
+Either way the order does not learn of the hand refund, and an R14 incident
+stays open until dashboard refunds are recorded (gap PG-14). A sandbox
+over-refund test would settle the Moyasar half; it is a provider action and
+needs the owner's approval. A refund enrolled *before* the
 order was cancelled (the POS-failure path) keeps running, and cancelling it
 adds no second refund.
 
@@ -1166,7 +1180,11 @@ bad key) is a definitive failure.
 
 Each numbered step is a **separate owner approval**, named when it is due.
 Approval for one is not approval for the next. Steps 1 to 6 are done
-(2026-11-13, `OWNER_ACTIONS.md` §47.2-47.9); steps 7 to 16 are not.
+(2026-11-13, `OWNER_ACTIONS.md` §47.2-47.9). Of steps 7 to 16, the repository
+records only two as having happened: the refund job in step 12 and step 14,
+online payment on (read live 2026-11-22 and 2026-11-24, see the annotations
+below). For the rest it records no completion, so whether each was done is not
+known from the repository.
 
 1. **Apply `20260824100000_moyasar_payment_provider`**, named by version. Done
    2026-11-13 (live `20261113171942`).
@@ -1199,6 +1217,11 @@ Approval for one is not approval for the next. Steps 1 to 6 are done
 8. **List the proxy's IPs in Moyasar's LIVE Allowed IPs** (§8.1, step 5), only
    after Moyasar's written answers to questions 1 and 3 of that email. The live
    list can never be set back to any address.
+   **Before step 9: unset `PAYMENT_ALLOW_TEST_CHECKOUT`** in the Edge Function
+   secrets, and delete `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS` with it (§3, §9
+   part B, `OWNER_ACTIONS.md` §47.13 step 0). It is a Supabase secrets write and
+   an owner action. Whether the secret is set today is not known from the
+   repository, and the testing phase's switch is not recorded as turned off.
 9. **Switch the payment row to live, then enter the live keys and the live
    webhook token** in the console, register the live webhook, enter its
    verification code (§8.2), and run Test connection in LIVE mode. The card asks
@@ -1508,8 +1531,9 @@ search for.
   redelivery and no resumable checkout on the device. The R17 incident still
   opens on the row, and ends when the retry confirms the payment.
 
-**Finding them.** Until the apply, the console has no list of them. The order
-receipt shows only the **newest** payment row for an order, so it may show the
+**Finding them.** Since 2026-11-17 the Live Orders card lists them (above).
+Before that, and for a search outside the console, use the read-only query
+below. The order receipt shows only the **newest** payment row for an order, so it may show the
 duplicate or hide it, and a duplicate with no order id appears on no receipt.
 Use a read-only query:
 
@@ -1567,8 +1591,8 @@ For Supabase: which edge-runtime version hosted functions run, and whether
 
 For the owner:
 
-- automatic refund of a cancelled paid order the branch accepted (§6).
-  (Decided 2026-11-17: a duplicate payment is refunded by hand, D2, §10;
+- ~~automatic refund of a cancelled paid order the branch accepted (§6)~~ —
+  decided 2026-11-19, "do the auto refund", and applied (§6). (Decided 2026-11-17: a duplicate payment is refunded by hand, D2, §10;
   how many times a refund is tried, the wait and the stuck age, PG-01, §6;
   a hand refund is to be recorded automatically from Moyasar's `refunded`
   notification, PG-14, not yet built);
@@ -1645,9 +1669,11 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 - **The console's "configured" badge on Moyasar secret fields is row-level.**
   Tap's July keys still in `secret_config` make every secret field read
   configured even when it is empty. Read the Moyasar panel's rows instead.
-- **Payment errors can reach the customer in English.** `payment-initiate`'s
-  error text is shown as it is, and it is written in English only
-  (`docs/OWNER_ACTIONS.md`).
+- ~~**Payment errors can reach the customer in English.**~~ **Closed
+  2026-11-19.** `payment-initiate`'s error text is written in English only, but
+  the checkout screen no longer shows it: `failureMessage` returns a localized
+  key and the detail goes to Sentry (§4;
+  `apps/mobile/src/features/checkout/CheckoutScreen.tsx`).
 - **Only five older invoices are asked** per verify. A session rarely holds
   more than two.
 - **If Moyasar serves the hosted page from another domain**, online payment
@@ -1656,15 +1682,20 @@ Recorded by the changes on `feat/moyasar-only-20261111` and their review.
 Added 2026-11-14 with `20261012120000_cancelled_orders_guard` (gap PG-03;
 applied 2026-11-14):
 
-- **A refund enrolled before an order is cancelled still runs.** Refunding that
-  order by hand as well would refund it twice. Check the order's refund status
-  first (§6).
+- **A refund enrolled before an order is cancelled still runs.** Do not refund
+  that order by hand as well: the worker's refund is already in progress and
+  nothing records a dashboard refund against it (gap PG-14). Check the order's
+  refund status first (§6). Whether a hand refund beside the worker's would pay
+  twice is unproven: see the rule in §6 "What is automatic, and what is not".
 - **A payment that is captured for a cancelled order is still recorded.** Money
   taken is never refused (`confirm_order_payment`), the order is not sent to the
-  kitchen, and nothing refunds it automatically, so it is a hand refund. After
-  the apply no attempt can be opened for a cancelled order, and on 2026-11-14
-  there were 0 Moyasar attempts live, so this needs an attempt opened before
-  the apply.
+  kitchen. When this file was written nothing refunded it automatically, so it
+  was a hand refund. **Updated 2026-11-26:** since `20261018120000` is applied
+  (§6) confirming a captured payment onto an already cancelled online order is
+  itself a write that makes it cancelled and paid, which enrols the full
+  refund. After the apply no attempt can be opened for a cancelled order, and on
+  2026-11-14 there were 0 Moyasar attempts live, so this needs an attempt
+  opened before the apply.
 - **Builds already installed still show Resend on a cancelled order.** After the
   apply the server refuses it and nothing happens. The new state ships in the
   next EAS build (`OWNER_ACTIONS.md` §47.17).
