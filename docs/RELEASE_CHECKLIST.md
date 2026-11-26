@@ -1,6 +1,6 @@
 # Spicy Meal Release Checklist
 
-> **Updated 2026-08-12.** Keep this checklist aligned with the actual workflow files. A stale checklist is a release risk, not documentation trivia.
+> **First written 2026-08-12; amended in place since, each amendment carrying its own date (latest 2026-11-22); corrected 2026-11-26 by the document audit.** The banner used to say only "Updated 2026-08-12", which hid the later amendments. Keep this checklist aligned with the actual workflow files. A stale checklist is a release risk, not documentation trivia.
 
 The web/admin release path and the native mobile release path are related but not identical. A green web build does **not** prove the native app is safe to ship.
 
@@ -33,6 +33,8 @@ npm --prefix apps/mobile run typecheck
 npm run design-system:check
 npm run build
 ```
+
+CI also runs three gates that the list above does not cover, and a release prepared from this list alone can still fail them (added 2026-11-26): the browser end-to-end guest journey (`npm run test:e2e`), the Edge Function handler tests (`deno test --no-lock --node-modules-dir=none --allow-env supabase/functions/*/*_test.ts`, as in `.github/workflows/production-gates.yml`), and the documentation gate (`npm run docs:check`, which is not a required merge context, see section 2).
 
 After mobile/native dependency or Expo config changes, also run from `apps/mobile/`:
 
@@ -95,7 +97,7 @@ Never run `supabase db push` or `supabase migration repair` against production.
 - [ ] Authentication model (`verify_jwt`, signature/service secret, role check) still matches the caller.
 - [ ] No provider/service-role secret can reach a client/log.
 - [ ] Deployment is separately approved by the owner.
-- [ ] The controlled deployment workflow is used; do not copy old direct deploy commands from historical docs.
+- [ ] Deploy only by the path the owner approves for that function. The `deploy-functions` workflow needs the repository secret `SUPABASE_ACCESS_TOKEN`, which `OWNER_ACTIONS.md` §15 records as never created, so as far as the record shows it has never deployed anything (`DEPLOY.md` §12); a deploy by hand (Supabase dashboard or CLI) must use the `verify_jwt` values in `DEPLOY.md` §12. Do not copy old direct deploy commands from historical docs. *Corrected 2026-11-26: this line used to say "the controlled deployment workflow is used".*
 
 The seven payment functions deploy only together, and only after `20260824100000` and then `20261003120000` are applied (`DEPLOY.md` §12, `OWNER_ACTIONS.md` §47.4). The workflow takes each function's `verify_jwt` from `supabase/config.toml`; a deploy by hand must match it. *Changed 2026-11-11: this used to say the payment functions were frozen.*
 
@@ -353,7 +355,7 @@ Re-check these live immediately before submission; do not copy old audit status 
 - [ ] Terms/refund/delete-account/support pages reflect shipped product behavior.
 - [ ] In-app account deletion and public policy are consistent.
 - [ ] Reviewer login/test instructions work and do not expose production secrets.
-- [ ] **Create the App Review test-phone entry.** First verify the number is UNUSED — `select count(*) from auth.users where phone = '+9665XXXXXXXX';` must return **0**. A number already enrolled signs the reviewer into that person's existing account (orders, saved addresses), because the profile trigger only fires for new users. Then map the fixed code and confirm it signs in. It is a permanent reusable login until removed, so §11 removes it — do not skip that. Detail: `OWNER_ACTIONS.md` §27.
+- [ ] **Create the App Review test-phone entry.** First verify the number is UNUSED — `select count(*) from auth.users where regexp_replace(coalesce(phone, ''), '\D', '', 'g') = '9665XXXXXXXX';` (digits only, no plus; GoTrue stores the number without one, so the old plus-prefixed form could not match an enrolled number) must return **0**; any non-zero result means the number is already a customer's, so pick another. Run it once for a number you know is enrolled and confirm it returns 1. Whether hosted Auth stores the number without a plus was not run live; confirm with a read-only query on the owner's approval. A number already enrolled signs the reviewer into that person's existing account (orders, saved addresses), because the profile trigger only fires for new users. Then map the fixed code and confirm it signs in. It is a permanent reusable login until removed, so §11 removes it — do not skip that. Detail: `OWNER_ACTIONS.md` §27.
 - [ ] Store metadata, screenshots, support contact and category information are current.
 - [ ] iOS bundle identifier / Android package match production config.
 - [ ] Version/build numbers and signing credentials are correct.
