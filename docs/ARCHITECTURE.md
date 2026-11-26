@@ -1,6 +1,6 @@
 # Spicy Meal — Current Production Architecture
 
-> **Updated 2026-08-12.** This document describes the current repository architecture. Historical prototype/emulator descriptions are obsolete.
+> **Updated 2026-08-12; sections 9 and 10 carry later dates, and sections 4, 9 and 13 were corrected 2026-11-26.** This document describes the current repository architecture. Historical prototype/emulator descriptions are obsolete.
 
 ## 1. System topology
 
@@ -337,9 +337,12 @@ two things to the `20260710120100` body:
    of up to a minute later when the sweeper next runs. Lazy expiry at read,
    sweeper for the durable write.
 
-`begin_checkout_session` and `compute_order_snapshot` are **not** touched — they
-are payment-adjacent, and because `is_available` stays authoritative they never
-needed to be.
+`begin_checkout_session` and `compute_order_snapshot` were **not** touched by the
+product and option availability work — they are payment-adjacent, and because
+`is_available` stays authoritative they never needed to be. *(Corrected
+2026-11-26: the later per-size model is different. `20260924120000` redefined
+`place_order` and `compute_order_snapshot` so that each refuses a line naming a
+closed size, by reading `branch_variant_availability`.)*
 
 On the clients, the required-group rule is a **computation, not a second
 server check**. A product is orderable when its own row says so *and* every
@@ -471,7 +474,7 @@ The shape, as the code on the default branch has it:
 - the app opens Moyasar's hosted page **only inside its own payment screen** (a WebView). Card details and Apple Pay are entered there, never in our code;
 - Moyasar sends the customer to our return address (`payment-return`). The payment screen recognises it and closes, and the app asks `payment-verify`;
 - `payment-webhook` receives Moyasar's events and **re-fetches the payment from Moyasar** before confirming anything;
-- a payment confirms an order only if its invoice, amount, currency and **live** mode match the attempt. Customer checkout is refused in TEST mode; the sandbox is the console's admin test (`payment-test-config`);
+- a payment confirms an order only if its invoice, amount, currency and **live** mode match the attempt. Customer checkout is refused in TEST mode; the sandbox is the console's admin test (`payment-test-config`). **One exception exists: the testing-phase switch.** When the Edge Function secret `PAYMENT_ALLOW_TEST_CHECKOUT` is exactly `true`, a TEST-mode payment can pay a real order, since 2026-11-22 only for the customers listed in the second secret `PAYMENT_TEST_CHECKOUT_CUSTOMER_IDS`. The secret must be unset before card payments go live, and whether it is set now is not known from the repository ([`PAYMENTS.md`](PAYMENTS.md) §3 and §9 part B);
 - refunds go through `payment-refund`, driven by the `payment-refund-worker` cron job, which was switched on 2026-11-19 04:47 UTC and read active on 2026-11-24.
 
 The web build (`/app`) never offers online payment.
@@ -542,7 +545,7 @@ performs the admin Vite build and the Expo customer web export, placing the cust
 
 Production database state is not reconstructed by blindly comparing migration filename timestamps.
 
-[`MIGRATIONS.md`](MIGRATIONS.md) remains the migration workflow/history ledger, but its last full live-count reconciliation was 2026-08-07. Aug 10 added further migration files, so use [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §12 before treating the Aug 7 counts as current.
+[`MIGRATIONS.md`](MIGRATIONS.md) remains the migration workflow/history ledger, but its large classification table is the 2026-08-07 snapshot. The ledger reconciliation was resolved on 2026-08-12 ([`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §12); the current position and the applied-by-name record are in `MIGRATIONS.md` (its ledger rows) and CLAUDE.md §8.
 
 Rules:
 

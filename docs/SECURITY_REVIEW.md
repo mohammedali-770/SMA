@@ -8,6 +8,64 @@ permission behavior was changed except to fix a confirmed security bug.
 
 ---
 
+> **WARNING (2026-11-26) — do not run the commands in this file.** Sections 3 to 11
+> and the 2026-07-09 "Deploy delta" are a **2026-07 snapshot**, kept as history.
+> Their deploy commands are retired. **`supabase db push` is PERMANENTLY FORBIDDEN
+> against Production** (CLAUDE.md §8; it would also apply every unapplied file in
+> version order, not the one a sentence names), and a function deploy or a migration apply is an owner-approved action naming
+> its target. The current procedures are [`MIGRATIONS.md`](MIGRATIONS.md) and
+> [`DEPLOY.md`](DEPLOY.md). Where a checkbox below is unchecked, that records
+> what was open on 2026-07-09, not what is open now. The history is kept; nothing
+> was deleted.
+
+> **CORRECTION (2026-11-26) — what the document says that the repository no longer
+> does.** Each item is a true statement of its date that reads as current.
+>
+> - **Payment webhooks and "HMAC" (§1, §5, L-1, R-2).** Those passages described
+>   the Geidea and Tap webhooks. The only payment webhook now is Moyasar's
+>   (`payment-webhook`), and it does **not** verify an HMAC: its own header
+>   comment says "there is no HMAC and no signature header". What the code does
+>   is compare a `secret_token` carried in the JSON body with the configured one
+>   (`verifyWebhookSecretToken`, a timing-safe equality) and answer 401 on a
+>   mismatch. The code's comment states that this proves the sender knows a
+>   secret and does not bind it to the payload, so the webhook is treated as a
+>   nudge: it decides whether the function looks, and the payment is then
+>   re-fetched from Moyasar server-to-server with the function's own key and
+>   confirmed only on `paid` with every bound field matching. The sentence "a
+>   forged callback cannot mark paid" is therefore a statement about that
+>   re-fetch, not about a signature. Detail: [`PAYMENTS.md`](PAYMENTS.md) §2
+>   ("What the webhook answers").
+> - **`payment/return.tsx` deep link.** The finding is not described anywhere in
+>   this repository, and the passage that calls it "frozen under CLAUDE.md §6"
+>   is superseded: that freeze ended on 2026-11-11. The file has since changed:
+>   a link may no longer replace a different pending checkout session (audit
+>   finding F-TA5-001, a comment in the code). Whether that is the finding
+>   recorded here is not known from the repository.
+> - **No CSP or security headers (§8, §9, re-review).** `vercel.json` now sets a
+>   `Content-Security-Policy` and `X-Content-Type-Options`, `X-Frame-Options`,
+>   `Referrer-Policy`, `Strict-Transport-Security` and `Permissions-Policy`
+>   headers for every path. The sample policy in §9 is not the deployed one (the
+>   deployed policy also admits Google Maps, Mapbox and the Sentry ingest origin),
+>   so do not paste it over `vercel.json`. How the deployed headers behave live
+>   was not checked here.
+> - **`send-otp`** no longer exists as a function: customer sign-in is
+>   `whatsapp-send-otp`, `whatsapp-verify-otp` and `auth-send-sms-whatsapp`, with
+>   a fail-closed OTP rate limiter (see the table in the closing section, and
+>   `WHATSAPP_LOGIN.md`). "Still open" in the 2026-08-23 banner and the `send-otp`
+>   passages are the 2026-07/08 position.
+> - **Table counts.** "20 public tables" was the 2026-07-08 count. CLAUDE.md
+>   records 59 application tables in `public` read on 2026-09-13; today's count
+>   is not known from the repository.
+> - **The branch credential store (§4)** is no longer "not yet applied":
+>   `20260917120000` was applied on 2026-09-14.
+> - **The Tap and Geidea code** was removed when the Moyasar-only branch merged
+>   (#446), not "on the branch". The `payment-initiate` rate-limit note the
+>   2026-11-12 banner places "in §11" is under "Re-confirmed & documented"
+>   (after the R-3 entry), not in §11, which is the Go / No-Go.
+> - **"AsyncStorage session store"** (§5) was superseded by S-1 (below): native
+>   sessions are held in the keystore.
+> - **A root `app.json`** (L-3, §7) does not exist; only `apps/mobile/app.json` does.
+
 > **CORRECTION (2026-11-12) — the payment provider.** This audit describes "the
 > prepared Geidea payment flow". On 2026-11-11 the owner chose **Moyasar**
 > (CLAUDE.md §6), and the branch `feat/moyasar-only-20261111` removes the Tap and
@@ -51,7 +109,9 @@ recomputed server-side (`place_order` is the single source of truth), secrets ar
 held only in `integration_settings.secret_config` (table fully revoked from the
 API; only `has_secret` is ever returned), every SECURITY DEFINER function pins
 `search_path`, all 20 public tables have RLS, webhooks verify HMAC signatures
-(timing-safe) before mutating anything, and the mobile client is correctly
+(timing-safe) before mutating anything *(2026-07-08 wording; the Moyasar
+webhook authenticates by a body `secret_token`, not an HMAC: see the 2026-11-26
+correction above)*, and the mobile client is correctly
 configured (AsyncStorage, `detectSessionInUrl:false`, anon-only).
 
 The audit (11-dimension multi-agent fan-out + adversarial verification, plus a
@@ -140,6 +200,8 @@ lives only in `integration_settings`; the admin UI reads the non-secret projecti
 
 - **Loyalty/coupon require deploy to take effect.** M-1's fix ships as a migration;
   it only protects production once `supabase db push` applies it (see §9).
+  *(Retired command: `db push` is forbidden against Production; see the warning
+  at the top.)*
 - **`send-otp` / `push-dispatch`** are `501` placeholders with `verify_jwt=false`
   and no rate-limit/auth. Before either is implemented, add per-phone + per-IP rate
   limiting (OTP) and a caller auth gate (push). Already noted with `TODO`s in code.
@@ -187,6 +249,8 @@ lives only in `integration_settings`; the admin UI reads the non-secret projecti
 - **Payments:** `confirm_order_payment` is service-role-only, `search_path`-pinned,
   amount-must-equal-order-total, idempotent, row-locked; both webhooks verify HMAC
   (timing-safe) **before** any mutation; a forged callback cannot mark paid.
+  *(2026-07-08 wording about the Geidea and Tap webhooks; for Moyasar see the
+  2026-11-26 correction at the top.)*
 - **RLS/authorization:** RLS on all 20 tables; customers see only their own
   orders/addresses/profile/loyalty; staff read-only where intended; **column-level
   grants** stop customers from editing their own `role`/`loyalty_points`; coupons
@@ -538,6 +602,8 @@ own limits. Adding it there is a separate decision.
 - **`apps/mobile/src/app/payment/return.tsx`.** A deep-link finding was confirmed
   there. It is payment return behaviour, frozen under `CLAUDE.md` §6, and fixing
   it needs a specific owner exception rather than a self-declared one.
+  *(2026-11-26: the freeze ended on 2026-11-11 and the finding is still not
+  described in this repository; see the correction at the top.)*
 - **A config-level TLS requirement for SMTP.** denomailer already refuses to send
   `AUTH` over a connection it could not secure; adding a flag would have wrongly
   rejected STARTTLS relays. Recorded with the quoted source in

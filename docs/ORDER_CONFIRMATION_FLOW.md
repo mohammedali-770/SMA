@@ -102,6 +102,9 @@ session total differs from the screen (`checkoutTotalChanged`). Detail:
 | `final_failure_refund_failed` | Refund could not complete; manual review | no | no | no |
 | `unpaid_final_failure` | CASH, budget spent; no refund language | no | no | no |
 | `order_cancelled` | The order was cancelled (app only, from `orders.status`; see below) | no | **no** | no |
+| `cancelled_refund_pending` | Cancelled, and a refund is pending or processing (app only; since 2026-11-19) | no | **no** | no |
+| `cancelled_refunded` | Cancelled, and the refund is provider-CONFIRMED (app only) | no | **no** | no |
+| `cancelled_refund_failed` | Cancelled, and the refund could not complete (app only) | no | **no** | no |
 
 `confirmed_by_branch` requires `lazywait_sync_state = 'synced'` **and**
 `lazywait_pos_ref_is_usable(lazywait_ref)`. A `'synced'` row without a usable
@@ -234,8 +237,17 @@ are the live "cancelled" push's own (`push-dispatch` `STATUS_COPY`), and
 
 **One exception: a refund that already exists stays the story.** If the order
 has a refund (`refund_state` pending, processing, refunded or failed), the
-refund state is shown, because it says what is happening to the money. The
-server's resend refusal reports the same.
+refund is shown, because it says what is happening to the money.
+**Corrected 2026-11-26:** since 2026-11-19 (commit 9784043) the app does not show
+the `final_failure_refund_*` states for a cancelled order. It derives three
+app-only states, `cancelled_refund_pending`, `cancelled_refunded` and
+`cancelled_refund_failed`, with cancelled-order copy (for example *Your order was
+cancelled. Your payment is being refunded to your card automatically.*), because
+the POS story no longer matters once an order is cancelled
+(`orderConfirmationState` in `orderConfirmation.ts`; strings
+`oc_cancelled_refund_*`). The server's resend refusal still answers from
+`customer_order_state`, which takes no status and so still returns the
+`final_failure_refund_*` value; the app ignores that state.
 
 **Where it is decided.** In `orderConfirmationState`, the function the receipt
 and the order card call with the whole order. `deriveCustomerOrderState` is
@@ -266,8 +278,11 @@ cannot resurface it:
    operational columns — notably `pos_create_attempt_token`, the Create-Order
    fencing token, which the wildcard select had been sending to every device.
 2. **Not representable.** `DbCustomerOrder` and the `Order` model no longer
-   declare `order_number` (or the customer-identity copies, coupon, notes,
-   address snapshot), so reading one fails to compile.
+   declare `order_number` (or the customer-identity copies, coupon, address
+   snapshot), so reading one fails to compile. `notes` is the deliberate
+   exception: it was moved back out of the internal set, because it is the
+   customer's own kitchen note on their own RLS-scoped order, and both types
+   declare it (`orderSelect.ts`, pinned by `orderSelect.test.ts`).
 3. **Not returned by any customer endpoint.** `payment-verify`, `payment-initiate`
    and `order-intake` return `orderId` and a customer-safe projection only.
 
@@ -354,9 +369,13 @@ Four changes, and the reasoning matters more than the numbers:
   the kick builds its URL from `SUPABASE_URL`). Deleting the redundant driver
   would let one missing secret stop all reaping, and a **cash** order stranded in
   `syncing` with no ref is invisible to the watchdog too, since R1 and R7 both
-  require `payment_status = 'paid'`.
-- **The CRM lookup is capped at 1.5 s on the kick path** and keeps its 8 s on the
-  cron path. It returned nothing on both measured orders, and it cannot do
+  require `payment_status = 'paid'`. *(Written 2026-08-27. Superseded: rules R12
+  and R13, added by `20260831120000_watchdog_cash_order_coverage` and applied
+  2026-09-01, cover an unpaid order stranded in `syncing`, `blocked` or
+  `dead_letter`.)*
+- **The CRM lookup is capped at 1.5 s on the kick path** *(superseded: on the
+  targeted path `lazywait-sync` no longer awaits it inline: it is queued in
+  `crmBackfills` and run in the deferred drain after the push; see below)* and keeps its 8 s on the cron path. It returned nothing on both measured orders, and it cannot do
   otherwise yet: `profiles.lazywait_customer_id` has never been populated for
   anybody. It also sits *before* `begin_lazywait_create_attempt`, so every
   millisecond it burns is deadline budget spent before that gate re-checks
@@ -462,8 +481,10 @@ repository file (`marker_evaluated_first = true`).
 because the reason is not the one that first suggests itself. Three barriers
 stand, not one: the customer read contract grants raw columns and never a state
 string; `ConfirmationHero` and `OrderCard` both derive locally from those
-columns; and `ReceiptScreen.tsx:180` **discards the RPC's response entirely** —
-*"the RPC's own outcome is advisory, the row is the truth"*.
+columns; and `ReceiptScreen.tsx` **ignores the RPC's returned state** — *"the RPC's own
+outcome is advisory, the row is the truth"* (corrected 2026-11-26: it did
+discard the response entirely when this was written; since gap PG-03 it reads
+`reason` to show the cancelled-order message and nothing else).
 
 Producing the wrong value at all takes a race: `request_customer_pos_resend` has
 to be called while the row is `syncing` with the marker set, which in the normal
@@ -997,12 +1018,16 @@ rule, error mapping, retry — rather than source shape, which is what every oth
 guard around this function is limited to. `restNoSupabaseJs.test.ts` walks the
 import graph from `order-intake/index.ts` and fails if any file in it references
 the package in code, type-only imports included; that graph is also the deploy
-bundle, and the test pins it at **four** files (`order-intake/index.ts`,
-`_shared/cors.ts`, `_shared/rest.ts`, `_shared/apiKeys.ts`). It was three from
-2026-08-30 to 2026-11-09; `_shared/apiKeys.ts` joined for the Supabase API-key
+bundle, and the test pins it at **five** files (`order-intake/index.ts`,
+`_shared/cors.ts`, `_shared/rest.ts`, `_shared/apiKeys.ts`,
+`_shared/functionRegion.ts`). It was three from 2026-08-30 to 2026-11-09, four
+until 2026-11-18. `_shared/apiKeys.ts` joined for the Supabase API-key
 migration (`docs/SUPABASE_API_KEYS.md`) and is Web-standard-only, so the graph is
-still dependency-free. **A hand deploy of `order-intake` must send all four** —
-a missing file is a function that fails at boot.
+still dependency-free; `_shared/functionRegion.ts` joined on 2026-11-18 for the
+region-pinned POS kick and imports nothing. **A hand deploy of `order-intake`
+must send all five** — a missing file is a function that fails at boot. The
+list in `restNoSupabaseJs.test.ts` ("is exactly the five files the deploy must
+send") is the source of truth, not this paragraph.
 
 **Step 9 cleanup (2026-11-18, merged only after step 8 held).** `serviceTarget()`
 and `callerTarget()` read only `SUPABASE_SECRET_KEYS` / `SUPABASE_PUBLISHABLE_KEYS`
@@ -1012,7 +1037,8 @@ service target sends `apikey` alone. The checkout path is unchanged in effect:
 key skips the config read and the instant POS kick, and never fails the order.
 The kick's `apikey` is the publishable key only; without one the kick is skipped
 and the once-a-minute cron picks the order up. Three of the four bundle files
-change (`index.ts`, `rest.ts`, `apiKeys.ts`), so the deploy is again all four.
+change (`index.ts`, `rest.ts`, `apiKeys.ts`), so the deploy was again all four
+(it is five since `functionRegion.ts` joined the same day).
 
 **A version caveat worth stating.** `npm:@supabase/supabase-js@2` is a *floating*
 specifier resolved at build time, so which 2.x the deployed function bundled is
@@ -1270,6 +1296,10 @@ above.
 
 ### The push must follow the send, not precede it
 
+> **Superseded 2026-08-27, kept as history.** `order-intake` no longer sends
+> any push, so there is no ordering to pin; see the next section.
+> `orderIntakeSyncWiring.test.ts` now asserts that it "sends NO push of its own".
+
 The "order received" push fires **after** the sync block, and that ordering is
 load-bearing rather than incidental. For pickup it therefore followed a real
 attempt. For delivery the block was skipped entirely, so the customer was told
@@ -1407,6 +1437,7 @@ success the worker never acts on — the exact false-success bug that
 Enrollment is automatic, path-independent and decided in Postgres by
 `order_refund_due()`, which requires **all** of:
 
+- `refund_state = 'none'`: the order is not already refunding
 - `payment_status = 'paid'` and `total > 0`
 - the order participates in the POS confirmation gate
 - `lazywait_ref IS NULL` — no stored reference of any kind
@@ -1486,13 +1517,21 @@ screen calls that function. Since `20261013120000` was applied (2026-11-17), a f
 also raises the critical watchdog rule R14 and is listed on the admin-only Live
 Orders card "Refunds and payments needing attention" ([`PAYMENTS.md`](PAYMENTS.md) §6).
 
-**What this does not cover (measured 2026-11-12, on a local chain, during review).**
-A paid online order that the branch **accepted** and staff then cancelled is
-not enrolled: `refund_state` stays `none` and no `order_refunds` row is opened.
-That predates the Moyasar change. Refunding it today is a manual refund in
-Moyasar's dashboard, an owner-approved live action. A **duplicate** payment
-(§6a) is not refunded automatically either. Both are recorded in
-[`PAYMENTS.md`](PAYMENTS.md) §6 and §10.
+**What this does not cover.** A **duplicate** payment (§6a) is not refunded
+automatically: the owner decided on 2026-11-17 that duplicates are refunded by
+hand. It is recorded in [`PAYMENTS.md`](PAYMENTS.md) §6 and §10. So is an order
+cancelled **before** `20261018120000` was applied, which was never enrolled
+(there is no backfill).
+
+> **Superseded 2026-11-26.** This paragraph was written on 2026-11-12 and said
+> that a paid online order the branch accepted and staff then cancelled was not
+> enrolled, and that refunding it was a manual refund in Moyasar's dashboard.
+> That ended with the AMENDED paragraph above: `20261018120000` is applied (live
+> `20261119051739`) and the refund job was read active on 2026-11-24 (§8), so a
+> cancelled paid card order is refunded automatically and **staff do not refund
+> it by hand as well**. Whether a hand refund beside the worker's would pay the
+> customer twice is unproven, and the worker's outcome depends on the attempt:
+> the rule and the two outcomes are in [`PAYMENTS.md`](PAYMENTS.md) §6.
 
 ## 6a. The online-payment path (Moyasar, 2026-11-11)
 
@@ -1566,15 +1605,15 @@ On the order-first path this is decided under the order's row lock
 it. The new build says "Online payment needs a total of at least 1.00 SAR. Turn
 off points for this order, or pay in cash." Until 2026-11-14 that code said
 "Use fewer points", which the app cannot do: points are all or nothing (gap
-PG-05). The fix is on branch `fix/checkout-points-preview-20261114` and ships
-with the `OWNER_ACTIONS.md` §47.17 build. Older builds show "Online payment is
+PG-05). The fix is merged (branch `fix/checkout-points-preview-20261114`) and
+ships to app customers with the `OWNER_ACTIONS.md` §47.17 build. Older builds show "Online payment is
 unavailable right now." (`PAYMENTS.md` §4).
 
 **The web build never offers online payment.** `/app` hides the online option
 (`apps/mobile/src/lib/payment.ts`, platform `web`). If online were the only
 method switched on, `/app` checkout would show that no payment method is
-available. This takes effect when the branch is merged, because the web build
-deploys with every merge (CLAUDE.md §13).
+available. This is merged (`onlineSupportedOn` returns `platform !== 'web'`), and
+the web build deploys with every merge (CLAUDE.md §13).
 
 **TEST mode.** Customer checkout is refused while Moyasar is in TEST mode
 (`{status:'disabled', reason:'test_mode'}`), shown as "Online payment is
@@ -1643,13 +1682,16 @@ separate owner-approved step, deliberately left out so that merging this work
 cannot start moving money on its own.
 
 > **Updated 2026-11-11.** The `payment-refund-worker` cron job was later created
-> (`20260729090000`) and has been **disabled since 2026-07-29**. Its driver,
+> (`20260729090000`) and had been **disabled since 2026-07-29**. **Updated
+> 2026-11-26: it was switched on 2026-11-19 at 04:47 UTC and read active on
+> 2026-11-24 (`OWNER_ACTIONS.md` §47.16; `PAYMENTS.md` §6).** Its driver,
 > `invoke_payment_refund_processor()`, reads the same `refund_trigger_secret`
 > from the payment row and, once `20261003120000` is applied, runs only for
 > provider `moyasar`. It is not in Vault. A names-only read on 2026-11-11
 > listed the key on the payment row (`BACKUP_RECOVERY.md` §4.3); its value was
-> not read, so whether it is non-blank is unknown. Check it by length
-> (`OWNER_ACTIONS.md` §47.16). See [`PAYMENTS.md`](PAYMENTS.md) §6.
+> not read, so whether it is non-blank was then unknown. It was settled on
+> 2026-11-13: present on the payment row, length 64 (`PAYMENTS.md` §6). See
+> [`PAYMENTS.md`](PAYMENTS.md) §6.
 
 ## 9. Testing
 
@@ -1697,7 +1739,13 @@ pricing functions:
   *redacts* the identifier from any other free text, preserving the rest of an
   operator's note.
 - A BEFORE INSERT OR UPDATE trigger applies it, so the fix is writer-independent.
-- A `NOT VALID` CHECK constraint is the backstop for future writes.
+- A `NOT VALID` CHECK constraint was added as the backstop for future writes.
+  **Superseded 2026-11-26: `20260724190000_loyalty_reason_history_safe`
+  (applied 2026-07-29, live `20260729073815`) dropped that constraint**
+  (`loyalty_transactions_reason_no_order_number`), because a `NOT VALID` check
+  is re-evaluated whenever a row is updated and would have made historical rows
+  un-updatable. It also made the trigger return early on an UPDATE that does not
+  change `reason`. **The trigger is the only control now.**
 
 **Why not redefine `place_order`:** it is a ~200-line pricing authority that owns
 subtotal, modifiers, delivery fee, coupon, VAT, loyalty, award timing and
@@ -1713,7 +1761,8 @@ No grant or RLS policy was revoked.
 ### Historical rows — NOT rewritten
 
 This migration deliberately does **not** touch existing rows, and the constraint
-is `NOT VALID` so history is neither validated nor rejected. Rewriting them is a
+is `NOT VALID` so history is neither validated nor rejected (the constraint was
+dropped later, see above). Rewriting them is a
 Production **data** change requiring separate, explicit owner approval. The
 proposed statement, to be run only under that approval:
 
@@ -1727,9 +1776,11 @@ update public.loyalty_transactions
    set reason = public.loyalty_safe_reason(type::text, order_id, reason)
  where public.text_has_internal_order_number(reason);
 
--- Verify, then optionally promote the guarantee to cover all rows:
-alter table public.loyalty_transactions
-  validate constraint loyalty_transactions_reason_no_order_number;
+-- Verify. (The original block ended with `validate constraint
+-- loyalty_transactions_reason_no_order_number`; that constraint no longer
+-- exists, so the step was removed 2026-11-26. Do not add it back.)
+select count(*) from public.loyalty_transactions
+ where public.text_has_internal_order_number(reason);
 ```
 
 ## 10a-bis. Loyalty is pickup only — the checkout must say so
@@ -1814,10 +1865,10 @@ on 23 carts at `52a3976`: the summary was wrong on 11.
 steps in whole halalas, and `previewParity.test.ts` holds it to the real
 `compute_order_snapshot`. The rule and its tests are in
 [`LOYALTY.md`](LOYALTY.md) §1. The receipt was never affected: it shows the
-order's own figures. This change is on branch
-`fix/checkout-points-preview-20261114`. App customers get it with the
-`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` gets it when the
-branch is merged, because a merge deploys the web build (CLAUDE.md §13).
+order's own figures. This change is merged (branch
+`fix/checkout-points-preview-20261114`). App customers get it with the
+`OWNER_ACTIONS.md` §47.17 EAS build; the web checkout at `/app` has it already,
+because a merge deploys the web build (CLAUDE.md §13).
 
 **Fresh settings, 2026-11-17.** The rule was right but its inputs could be old:
 the minimum and the point value came from the settings row read once at launch.
@@ -1827,7 +1878,7 @@ pickup-only checks, and stops with the refreshed summary on screen if the points
 figures would change. A failed read blocks nothing, the same rule as the
 availability and comp re-checks above. The same read runs when checkout opens
 and when the points switch is turned on. Detail in [`LOYALTY.md`](LOYALTY.md)
-§1; on branch `fix/checkout-loyalty-settings-reread-20261117`.
+§1; merged (branch `fix/checkout-loyalty-settings-reread-20261117`).
 
 ## 10b. Tap `description` (closed)
 
@@ -2101,8 +2152,10 @@ when sizes are closed, and fixing it properly means a per-read non-blocking
 error notice.
 
 Details of the availability model itself — the keystone that keeps
-`is_available` authoritative, and why `begin_checkout_session` and
-`compute_order_snapshot` were never touched — are in `docs/ARCHITECTURE.md` §4.
+`is_available` authoritative, and why product and option availability never
+touched `begin_checkout_session` or `compute_order_snapshot` (the per-size tier
+check of `20260924120000` did redefine `compute_order_snapshot` and
+`place_order`, see above) — are in `docs/ARCHITECTURE.md` §4.
 
 ## 10d. The confirmation screen — what the cashier is shown
 
@@ -2386,6 +2439,16 @@ screen".
 
 ### Provider error text — classified on the order path, still raw on the payment path
 
+> **Corrected 2026-11-26.** The two payment catches described below as "still
+> raw" no longer show `e.message`: `runOnlinePayment` and `verifyPaymentSession`
+> in `CheckoutScreen.tsx` render `failureMessage(e, t, ...)` (fallback keys
+> `payFailed` and `payUnknown`), which returns a translated key and never the
+> exception text (`apps/mobile/src/lib/errors/reportFailure.ts`).
+> `payment-initiate` still writes its text in English only, but the client does
+> not display it. The payment freeze this section cites was lifted on
+> 2026-11-11. The text below is kept as the record of what was true when it was
+> written.
+
 Coupon-validation and order-placement failures are classified through
 `failureMessage(...)` rather than surfaced raw. A provider's message is written
 for developers, may name internal systems, and is not translated. The customer
@@ -2408,8 +2471,11 @@ failure can still be shown raw provider text. Converting these two sites is a
 worthwhile change; it needs explicit owner approval under §5 first, and should
 be its own change rather than a passenger in an unrelated commit.
 
-**One caveat this does not fix:** on the **cash** path a server-raised error is
-not readable at all. Cash orders go through
+**One caveat this did not fix (closed since: `placeAndSync` now does
+`throw new Error(await functionErrorText(error))`, which reads the server's
+sentence from the error body, and `orderRefusalWiring.test.ts` pins it;
+corrected 2026-11-26):** on the **cash** path a server-raised error was not
+readable at all. Cash orders go through
 `supabase.functions.invoke('order-intake')`, which returns HTTP 400 with the
 message in the body — but a non-2xx `invoke` yields `FunctionsHttpError`, whose
 `.message` is the generic *"Edge Function returned a non-2xx status code"*.
@@ -2541,7 +2607,8 @@ Consequences worth holding in mind:
   refund language for money nobody paid, and `order_refund_due` (which requires
   `total > 0`) will never enrol it. The defect pre-dates comps; comped orders
   make it reachable. Not fixed here — refund language is payment-adjacent and
-  CLAUDE.md §6 is active. Listed again under Known gaps.
+  CLAUDE.md §6 was in force when this was written (the freeze ended 2026-11-11;
+  the gap is still open and unscheduled). Listed again under Known gaps.
 
 Full behaviour, administration and deploy order: `docs/DISCOUNTS_CAMPAIGNS.md`.
 
@@ -2601,7 +2668,11 @@ nothing is auto-selected. Full reasoning: `docs/PAYMENT_POSTPONEMENT.md` §11.
 
 What this changes on the checkout screen:
 
-- **The picker starts empty.** No radio is filled on arrival. Paying in cash is
+- **The picker starts empty** *(for a first-time customer; corrected
+  2026-11-26: a returning customer's own last choice is preselected when it was
+  ONLINE and online is offered, `rememberedPreselection` in
+  `apps/mobile/src/lib/payment.ts`; cash is never preselected, see
+  `PAYMENTS.md` §4, "A returning customer's last method")*. No radio is filled on arrival. Paying in cash is
   an errand — having the money at the door, or at the counter — and a
   preselected option makes that commitment for the customer, who then meets it
   at the door.
@@ -2640,8 +2711,17 @@ will not submit until a method is chosen.
 
 ## 11. Known gaps
 
-- **The raw `public.orders` table surface still carries `order_number` (and
-  `pos_create_attempt_token`) to the owning customer.** One root cause —
+- **CLOSED 2026-07-29 (written here as a closed gap on 2026-11-26): the raw
+  `public.orders` table surface used to carry `order_number` (and
+  `pos_create_attempt_token`) to the owning customer.** The entry below is the
+  record of what was open when this PR was written. `20260724200000_order_read_contracts`
+  (applied 2026-07-29, live `20260729074932`, `MIGRATIONS.md` ledger row 52)
+  revoked the table-wide `select` and granted a column list that has neither
+  column, revoked `place_order` from `authenticated` (the app uses
+  `place_customer_order` and `order-intake`), dropped `orders` from the
+  `supabase_realtime` publication in favour of `order_change_events`, and moved
+  staff reads behind admin RPCs. Which grants hold live today is not known from
+  the repository. One root cause —
   `grant select on public.orders to authenticated` is TABLE-WIDE (`20260707120500`
   :107) and RLS filters ROWS, not columns — with three reachable expressions:
 
@@ -2669,7 +2749,8 @@ will not submit until a method is chosen.
   be promised a refund of nothing while `order_refund_due` (requiring
   `total > 0`) never enrols it. Reachable only when a comped order's POS sync
   fails outright. Fixing it means changing refund-facing language, which is
-  payment-adjacent under CLAUDE.md §6, so it is recorded rather than patched.
+  payment-adjacent under CLAUDE.md §6 as it stood then, so it was recorded rather
+  than patched (the freeze ended 2026-11-11; the gap is still open).
   See §10f.
 - **No Lazywait reconciliation API.** Issue #94 asks that a timeout/unknown
   response be reconciled with Lazywait before another create request. Lazywait
@@ -2677,7 +2758,10 @@ will not submit until a method is chosen.
   means a human working the `confirmation_required` feed. When such an endpoint
   is published, an automated reconciler could convert some ambiguous orders into
   proven-not-sent ones and widen resend eligibility.
-- **A server-raised order error is not readable on the cash path.** Cash orders
+- ~~**A server-raised order error is not readable on the cash path.**~~
+  **Closed (corrected 2026-11-26): `placeAndSync` reads the body through
+  `functionErrorText`, pinned by `orderRefusalWiring.test.ts`.** The entry below
+  is the record of the gap. Cash orders
   go through `supabase.functions.invoke('order-intake')`, which returns HTTP 400
   with the Postgres message in the body — but a non-2xx `invoke` yields
   `FunctionsHttpError`, whose `.message` is the generic *"Edge Function returned
@@ -2730,7 +2814,9 @@ will not submit until a method is chosen.
   the order as `blocked` / `order_cancelled`, queuing no message;
   `lazywait-sync` is unchanged and sends nothing on that answer. An existing
   build shows such an order from its status, which is `cancelled`.
-- **Refund worker scheduling is manual.** See §8.
+- ~~**Refund worker scheduling is manual.** See §8.~~ **Closed 2026-11-19:** the
+  `payment-refund-worker` cron job was switched on and read active on
+  2026-11-24 (`PAYMENTS.md` §6).
 - **`payment-refund` has no integration test against a Moyasar sandbox** (until
   2026-11-11 this said Tap). The pure
   classifier is unit-tested; the transport path is not exercised.
